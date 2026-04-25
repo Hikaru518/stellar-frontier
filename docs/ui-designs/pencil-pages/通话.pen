@@ -1,0 +1,925 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "frame",
+      "id": "Qrwgl",
+      "x": 0,
+      "y": 0,
+      "name": "通话页面 / Garry 普通状态",
+      "width": 1180,
+      "height": 720,
+      "fill": "#E9E9E6",
+      "stroke": {
+        "thickness": 2,
+        "fill": "#6F7478"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "oywpm",
+          "x": 28,
+          "y": 22,
+          "name": "garryTitle",
+          "fill": "#171A1C",
+          "textGrowth": "fixed-width-height",
+          "width": 500,
+          "height": 36,
+          "content": "通话页面：Garry 普通状态",
+          "fontFamily": "Inter",
+          "fontSize": 30,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "6wJ0s",
+          "x": 28,
+          "y": 62,
+          "name": "garrySub",
+          "fill": "#46505A",
+          "textGrowth": "fixed-width-height",
+          "width": 760,
+          "height": 24,
+          "content": "当前只与 Garry 通话。地图和通讯录是辅助浮层，不会切换通话对象。",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "E7vA6",
+          "x": 32,
+          "y": 112,
+          "name": "现场图片",
+          "width": 650,
+          "height": 430,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "MX6xn",
+              "name": "garryImageText",
+              "fill": "#171A1C",
+              "content": "通话中的图片\n矿床 / 灰尘 / 正常采矿",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 26,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Im0xw",
+          "x": 712,
+          "y": 112,
+          "name": "角色与对话",
+          "width": 430,
+          "height": 430,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#7D8388"
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "UigrV",
+              "x": 22,
+              "y": 22,
+              "name": "garryAvatar",
+              "width": 76,
+              "height": 76,
+              "fill": "#E7E7E4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "McIAx",
+                  "name": "garryAvatarText",
+                  "fill": "#171A1C",
+                  "content": "头像",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "5Qyy7",
+              "x": 116,
+              "y": 30,
+              "name": "garryName",
+              "fill": "#5D6368",
+              "textGrowth": "fixed-width-height",
+              "width": 280,
+              "height": 34,
+              "content": "Garry，退休老大爷",
+              "fontFamily": "Inter",
+              "fontSize": 26,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "iIiRf",
+              "x": 118,
+              "y": 68,
+              "name": "garryState",
+              "fill": "#46505A",
+              "textGrowth": "fixed-width-height",
+              "width": 260,
+              "height": 24,
+              "content": "地点：矿床 / 状态：采矿中",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "xL6OU",
+              "x": 22,
+              "y": 120,
+              "name": "garryBubble",
+              "width": 370,
+              "height": 78,
+              "fill": "#F7F7F4",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": 14,
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n3AZd",
+                  "name": "garryBubbleText",
+                  "fill": "#171A1C",
+                  "textGrowth": "fixed-width-height",
+                  "width": 330,
+                  "height": 44,
+                  "content": "头儿，我正在矿床采矿，有什么事吗？",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "6q0GC",
+              "x": 242,
+              "y": 220,
+              "name": "garryMap",
+              "width": 150,
+              "height": 86,
+              "fill": "#ECECEA",
+              "cornerRadius": 14,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xdCOD",
+                  "name": "garryMapText",
+                  "fill": "#171A1C",
+                  "content": "地图\n二级菜单",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "SzU8l",
+                  "name": "garryMapHint",
+                  "fill": "#46505A",
+                  "content": "只读查看",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "g00k1",
+              "x": 22,
+              "y": 220,
+              "name": "garryBtn1",
+              "width": 196,
+              "height": 34,
+              "fill": "#F7F7F4",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "G7cwj",
+                  "name": "garryBtn1Text",
+                  "fill": "#171A1C",
+                  "content": "请求前往",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "uo7aC",
+              "x": 22,
+              "y": 264,
+              "name": "garryBtn2",
+              "width": 196,
+              "height": 34,
+              "fill": "#F7F7F4",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "KGYAS",
+                  "name": "garryBtn2Text",
+                  "fill": "#171A1C",
+                  "content": "安装 / 建设",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "3FgO1",
+              "x": 22,
+              "y": 308,
+              "name": "garryBtn3",
+              "width": 370,
+              "height": 34,
+              "fill": "#F7F7F4",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n3Y8X",
+                  "name": "garryBtn3Text",
+                  "fill": "#171A1C",
+                  "content": "停止工作原地待命",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "vIivz",
+              "x": 22,
+              "y": 352,
+              "name": "garryBtn4",
+              "width": 370,
+              "height": 34,
+              "fill": "#F7F7F4",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "eoyJy",
+                  "name": "garryBtn4Text",
+                  "fill": "#171A1C",
+                  "content": "开展调查",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "UXSgj",
+          "x": 32,
+          "y": 572,
+          "name": "辅助入口",
+          "width": 650,
+          "height": 86,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#A0A6AA"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "I246v",
+              "name": "garryOverlayTitle",
+              "fill": "#171A1C",
+              "content": "辅助浮层入口",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "sMHHp",
+              "name": "garryOverlayText",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 600,
+              "height": 38,
+              "content": "打开通讯录只能查看 Mike / Amy 状态，不会在当前页面发起第二个通话。打开地图只用于选择目标坐标信息。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "KcdTM",
+          "x": 712,
+          "y": 572,
+          "name": "通话日志",
+          "width": 430,
+          "height": 86,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#A0A6AA"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "fujVd",
+              "name": "garryLogTitle",
+              "fill": "#171A1C",
+              "content": "本页反馈",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "WEQ7j",
+              "name": "garryLogText",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 390,
+              "height": 34,
+              "content": "选择行动后：Garry 状态、地图地块和通讯台卡片同步变化。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "j3AOL",
+      "x": 1240,
+      "y": 0,
+      "name": "通话页面 / Amy 紧急事件",
+      "width": 1180,
+      "height": 720,
+      "fill": "#E9E9E6",
+      "stroke": {
+        "thickness": 2,
+        "fill": "#C46A10"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "DnGAp",
+          "x": 28,
+          "y": 22,
+          "name": "amyTitle",
+          "fill": "#171A1C",
+          "textGrowth": "fixed-width-height",
+          "width": 520,
+          "height": 36,
+          "content": "通话页面：Amy 紧急事件",
+          "fontFamily": "Inter",
+          "fontSize": 30,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "qLsoJ",
+          "x": 28,
+          "y": 62,
+          "name": "amySub",
+          "fill": "#46505A",
+          "textGrowth": "fixed-width-height",
+          "width": 760,
+          "height": 24,
+          "content": "当前只与 Amy 通话。紧急选择会结算风险，并同步森林地块与队员状态。",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "hrFBW",
+          "x": 32,
+          "y": 112,
+          "name": "现场图片",
+          "width": 650,
+          "height": 430,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "9gbAG",
+              "name": "amyImageText",
+              "fill": "#171A1C",
+              "content": "通话中的图片\n森林 / 噪声 / 有东西在靠近",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 26,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "gwybm",
+          "x": 712,
+          "y": 112,
+          "name": "角色与对话",
+          "width": 430,
+          "height": 430,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#C46A10"
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "NZg7m",
+              "x": 22,
+              "y": 22,
+              "name": "amyAvatar",
+              "width": 76,
+              "height": 76,
+              "fill": "#E7E7E4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "XWroo",
+                  "name": "amyAvatarText",
+                  "fill": "#171A1C",
+                  "content": "头像",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "85I9o",
+              "x": 116,
+              "y": 30,
+              "name": "amyName",
+              "fill": "#5D6368",
+              "textGrowth": "fixed-width-height",
+              "width": 280,
+              "height": 34,
+              "content": "Amy，千金大小姐",
+              "fontFamily": "Inter",
+              "fontSize": 26,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "wgrEr",
+              "x": 300,
+              "y": 68,
+              "name": "amyBadge",
+              "width": 88,
+              "height": 28,
+              "fill": "#FFF2E0",
+              "cornerRadius": 6,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#C46A10"
+              },
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "41Dyv",
+                  "name": "amyBadgeText",
+                  "fill": "#B45B13",
+                  "content": "紧急来电",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "ENF54",
+              "x": 118,
+              "y": 70,
+              "name": "amyState",
+              "fill": "#B45B13",
+              "textGrowth": "fixed-width-height",
+              "width": 170,
+              "height": 24,
+              "content": "地点：森林 / 危险",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "UTJLL",
+              "x": 22,
+              "y": 120,
+              "name": "amyBubble",
+              "width": 370,
+              "height": 78,
+              "fill": "#F7F7F4",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": 14,
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "67fK9",
+                  "name": "amyBubbleText",
+                  "fill": "#171A1C",
+                  "textGrowth": "fixed-width-height",
+                  "width": 330,
+                  "height": 44,
+                  "content": "头儿，我遇到熊了我草。",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "3FkaH",
+              "x": 242,
+              "y": 220,
+              "name": "amyMap",
+              "width": 150,
+              "height": 86,
+              "fill": "#ECECEA",
+              "cornerRadius": 14,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "gap": 5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "VTfUg",
+                  "name": "amyMapText",
+                  "fill": "#171A1C",
+                  "content": "地图\n查看坐标",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "ObiSQ",
+                  "name": "amyMapHint",
+                  "fill": "#46505A",
+                  "content": "不下指令",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gqZ6w",
+              "x": 22,
+              "y": 220,
+              "name": "amyBtn1",
+              "width": 196,
+              "height": 34,
+              "fill": "#FFF7ED",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#C46A10"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "UVhib",
+                  "name": "amyBtn1Text",
+                  "fill": "#171A1C",
+                  "content": "快跑（资源中断）",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JlBIi",
+              "x": 22,
+              "y": 264,
+              "name": "amyBtn2",
+              "width": 370,
+              "height": 34,
+              "fill": "#FFF7ED",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#C46A10"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Gve7H",
+                  "name": "amyBtn2Text",
+                  "fill": "#171A1C",
+                  "content": "跟他爆了（可能会死）",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dvdMZ",
+              "x": 22,
+              "y": 308,
+              "name": "amyBtn3",
+              "width": 370,
+              "height": 34,
+              "fill": "#F7F7F4",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#7D8388"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "WVPjE",
+                  "name": "amyBtn3Text",
+                  "fill": "#171A1C",
+                  "content": "先稳住！我考虑一下",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "xE8ac",
+              "x": 22,
+              "y": 352,
+              "name": "amyTimer",
+              "width": 370,
+              "height": 34,
+              "fill": "#FFF2E0",
+              "cornerRadius": 7,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#C46A10"
+              },
+              "layout": "vertical",
+              "padding": [
+                0,
+                12
+              ],
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "oI29c",
+                  "name": "amyTimerText",
+                  "fill": "#B45B13",
+                  "content": "风险：等待会推进倒计时",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "PIlVQ",
+          "x": 32,
+          "y": 572,
+          "name": "辅助入口",
+          "width": 650,
+          "height": 86,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#A0A6AA"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "H98Fx",
+              "name": "amyOverlayTitle",
+              "fill": "#171A1C",
+              "content": "辅助浮层入口",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "49cnZ",
+              "name": "amyOverlayText",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 600,
+              "height": 38,
+              "content": "可以打开地图查看森林坐标，或打开通讯录查看其他队员，但本页仍只处理 Amy 的当前事件。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "tgmBV",
+          "x": 712,
+          "y": 572,
+          "name": "通话日志",
+          "width": 430,
+          "height": 86,
+          "fill": "#FFF7ED",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#C46A10"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "V2l4i",
+              "name": "amyLogTitle",
+              "fill": "#171A1C",
+              "content": "本页反馈",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Kl7Lk",
+              "name": "amyLogText",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 390,
+              "height": 34,
+              "content": "选择后：按钮禁用，Amy 状态、森林危险和通讯台来电状态同步更新。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

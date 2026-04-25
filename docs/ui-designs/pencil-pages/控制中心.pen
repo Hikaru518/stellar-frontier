@@ -1,0 +1,576 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "frame",
+      "id": "MQsl0",
+      "x": 0,
+      "y": 0,
+      "name": "控制中心 / Base Command",
+      "width": 1180,
+      "height": 760,
+      "fill": "#E9E9E6",
+      "stroke": {
+        "thickness": 2,
+        "fill": "#6F7478"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "DRKmZ",
+          "x": 24,
+          "y": 18,
+          "name": "页面标题",
+          "fill": "#171A1C",
+          "textGrowth": "fixed-width-height",
+          "width": 360,
+          "height": 34,
+          "content": "前沿基地控制中心",
+          "fontFamily": "Inter",
+          "fontSize": 28,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "TH4Nu",
+          "x": 24,
+          "y": 56,
+          "name": "当前状态",
+          "fill": "#46505A",
+          "textGrowth": "fixed-width-height",
+          "width": 560,
+          "height": 24,
+          "content": "SOL 037 / 本地供电 62% / 通讯窗口：不稳定",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "2dHya",
+          "x": 760,
+          "y": 18,
+          "name": "资源摘要面板",
+          "width": 390,
+          "height": 86,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "HMUBW",
+              "name": "ccResourceTitle",
+              "fill": "#171A1C",
+              "content": "中控台摘要",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "RdLrQ",
+              "name": "ccResourceLine1",
+              "fill": "#252A2E",
+              "content": "能源 620 / 铁矿 1240",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "neI4g",
+              "name": "ccResourceLine2",
+              "fill": "#B45B13",
+              "content": "基地完整度 71%  ·  未读通讯 1",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VV3q7",
+          "x": 384,
+          "y": 118,
+          "name": "窗户",
+          "width": 410,
+          "height": 76,
+          "fill": "#F0F0ED",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "kwzMz",
+              "name": "ccWindowText",
+              "fill": "#171A1C",
+              "content": "窗户\n外部能见度：低",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 22,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "MTqDS",
+          "x": 110,
+          "y": 210,
+          "name": "通讯台入口",
+          "width": 190,
+          "height": 126,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "RZnc4",
+              "name": "ccCommText",
+              "fill": "#171A1C",
+              "content": "通讯台",
+              "fontFamily": "Inter",
+              "fontSize": 25,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "BPZA1",
+              "name": "ccCommState",
+              "fill": "#C46A10",
+              "content": "1 条来电 · Amy",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bWMem",
+          "x": 455,
+          "y": 210,
+          "name": "卫星雷达入口",
+          "width": 215,
+          "height": 126,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "kMx35",
+              "name": "ccRadarText",
+              "fill": "#171A1C",
+              "content": "卫星雷达",
+              "fontFamily": "Inter",
+              "fontSize": 25,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "YkFW2",
+              "name": "ccRadarState",
+              "fill": "#46505A",
+              "content": "地图信号：16 格 / 2 异常",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VTqGl",
+          "x": 780,
+          "y": 210,
+          "name": "中控台入口",
+          "width": 216,
+          "height": 126,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "nl39D",
+              "name": "ccConsoleText",
+              "fill": "#171A1C",
+              "content": "中控台",
+              "fontFamily": "Inter",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "DOvZc",
+              "name": "ccConsoleSub",
+              "fill": "#252A2E",
+              "content": "资源 / 状态 / 统计",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "f8jU6",
+          "x": 26,
+          "y": 405,
+          "name": "研究台",
+          "width": 210,
+          "height": 116,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "YyBqq",
+              "name": "ccResearchText",
+              "fill": "#252A2E",
+              "content": "研究台\n科技树",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "jFjuA",
+              "name": "ccResearchState",
+              "fill": "#7B8085",
+              "content": "未供电",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "S4apb",
+          "x": 26,
+          "y": 560,
+          "name": "星际贸易",
+          "width": 210,
+          "height": 116,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "VBb5w",
+              "name": "ccTradeText",
+              "fill": "#252A2E",
+              "content": "星际贸易\n资源交换",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Tb1Nb",
+          "x": 1030,
+          "y": 184,
+          "name": "咖啡机",
+          "width": 126,
+          "height": 132,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "2TRUq",
+              "name": "ccCoffeeText",
+              "fill": "#171A1C",
+              "content": "咖啡机",
+              "fontFamily": "Inter",
+              "fontSize": 22,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "tWpOx",
+              "name": "ccCoffeeSub",
+              "fill": "#46505A",
+              "content": "自检完成",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "zDAm5",
+          "x": 1047,
+          "y": 345,
+          "name": "唱片机",
+          "width": 109,
+          "height": 126,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "QukWJ",
+              "name": "ccRecordText",
+              "fill": "#171A1C",
+              "content": "唱片机",
+              "fontFamily": "Inter",
+              "fontSize": 22,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "blR8S",
+              "name": "ccRecordSub",
+              "fill": "#46505A",
+              "content": "低噪播放",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "YNcYN",
+          "x": 1047,
+          "y": 500,
+          "name": "冰箱",
+          "width": 109,
+          "height": 140,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "MXiL2",
+              "name": "ccFridgeText",
+              "fill": "#171A1C",
+              "content": "冰箱",
+              "fontFamily": "Inter",
+              "fontSize": 22,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "3omdH",
+          "x": 720,
+          "y": 600,
+          "name": "星际之门",
+          "width": 238,
+          "height": 116,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#72787E"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "FmAb0",
+              "name": "ccGateText",
+              "fill": "#171A1C",
+              "content": "星际之门",
+              "fontFamily": "Inter",
+              "fontSize": 23,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "ER3kx",
+              "name": "ccGateSub",
+              "fill": "#252A2E",
+              "content": "请求总部空投",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "iKrMx",
+          "x": 270,
+          "y": 536,
+          "name": "系统日志",
+          "width": 390,
+          "height": 180,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "T7G4d",
+              "name": "ccLogTitle",
+              "fill": "#171A1C",
+              "content": "系统日志",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "7CfT4",
+              "name": "ccLog1",
+              "fill": "#252A2E",
+              "content": "[19:42] 卫星雷达返回 3 个低置信度信号。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "qbz0z",
+              "name": "ccLog2",
+              "fill": "#B45B13",
+              "content": "[19:45] Amy 正在森林中请求接入。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "hPsaa",
+              "name": "ccLog3",
+              "fill": "#46505A",
+              "content": "[19:47] 咖啡机拒绝说明上次维护日期。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "8XLKx",
+          "x": 270,
+          "y": 405,
+          "name": "操作提示",
+          "width": 390,
+          "height": 92,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#A0A6AA"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "eprLw",
+              "name": "ccHintTitle",
+              "fill": "#171A1C",
+              "content": "当前建议",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "eIviP",
+              "name": "ccHintText",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 354,
+              "height": 44,
+              "content": "先处理通讯台来电。中控台认为你继续忽视它也不会让问题变少。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

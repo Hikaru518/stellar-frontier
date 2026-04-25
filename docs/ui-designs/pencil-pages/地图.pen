@@ -1,0 +1,784 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "frame",
+      "id": "d9CSE",
+      "x": 0,
+      "y": 0,
+      "name": "地图 / Satellite Map",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": {
+        "thickness": 2,
+        "fill": "#6F7478"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "LAHG6",
+          "x": 28,
+          "y": 20,
+          "name": "mapTitle",
+          "fill": "#171A1C",
+          "textGrowth": "fixed-width-height",
+          "width": 320,
+          "height": 36,
+          "content": "卫星雷达地图",
+          "fontFamily": "Inter",
+          "fontSize": 30,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "boUTU",
+          "x": 28,
+          "y": 62,
+          "name": "mapSub",
+          "fill": "#46505A",
+          "textGrowth": "fixed-width-height",
+          "width": 780,
+          "height": 24,
+          "content": "4x4 地块网格 / 地图只读 / 指令需返回通话或通讯台发起",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "kM1oq",
+          "x": 28,
+          "y": 108,
+          "name": "4x4 地图网格",
+          "width": 840,
+          "height": 640,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#7D8388"
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "7DGaW",
+              "x": 0,
+              "y": 0,
+              "name": "(1,1) 平原",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "yoEZz",
+                  "name": "cell11t",
+                  "fill": "#171A1C",
+                  "content": "(1,1)\n平原",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "uigf5",
+              "x": 210,
+              "y": 0,
+              "name": "(1,2) 平原",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "FsUGO",
+                  "name": "cell12t",
+                  "fill": "#171A1C",
+                  "content": "(1,2)\n平原",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "aqDEh",
+              "x": 420,
+              "y": 0,
+              "name": "(1,3) 平原",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "hXVMQ",
+                  "name": "cell13t",
+                  "fill": "#171A1C",
+                  "content": "(1,3)\n平原",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "mCdhF",
+              "x": 630,
+              "y": 0,
+              "name": "(1,4) 平原",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "L6ivM",
+                  "name": "cell14t",
+                  "fill": "#171A1C",
+                  "content": "(1,4)\n平原",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ZKib8",
+              "x": 0,
+              "y": 160,
+              "name": "(2,1) 水",
+              "width": 210,
+              "height": 160,
+              "fill": "#EDF3F8",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "PMvz0",
+                  "name": "cell21t",
+                  "fill": "#171A1C",
+                  "content": "(2,1)\n水",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "WFs5n",
+              "x": 210,
+              "y": 160,
+              "name": "(2,2) 水",
+              "width": 210,
+              "height": 160,
+              "fill": "#EDF3F8",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "O9jyc",
+                  "name": "cell22t",
+                  "fill": "#171A1C",
+                  "content": "(2,2)\n水",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "x848t",
+              "x": 420,
+              "y": 160,
+              "name": "(2,3) 森林山",
+              "width": 210,
+              "height": 160,
+              "fill": "#EFF4EC",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "t2toq",
+                  "name": "cell23t",
+                  "fill": "#B45B13",
+                  "content": "(2,3)\n森林\n山\nAmy：危险",
+                  "fontFamily": "Inter",
+                  "fontSize": 21,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FmVls",
+              "x": 630,
+              "y": 160,
+              "name": "(2,4) 森林山",
+              "width": 210,
+              "height": 160,
+              "fill": "#EFF4EC",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Ns9vU",
+                  "name": "cell24t",
+                  "fill": "#171A1C",
+                  "content": "(2,4)\n森林\n山",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "besi8",
+              "x": 0,
+              "y": 320,
+              "name": "(3,1) 平原",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "eI55R",
+                  "name": "cell31t",
+                  "fill": "#171A1C",
+                  "content": "(3,1)\n平原",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "9EJj0",
+              "x": 210,
+              "y": 320,
+              "name": "(3,2) 平原",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "7Zla4",
+                  "name": "cell32t",
+                  "fill": "#171A1C",
+                  "content": "(3,2)\n平原",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "pqUiq",
+              "x": 420,
+              "y": 320,
+              "name": "(3,3) 选中铁矿床",
+              "width": 210,
+              "height": 160,
+              "fill": "#FFF8E8",
+              "stroke": {
+                "thickness": 3,
+                "fill": "#C46A10"
+              },
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xANLC",
+                  "name": "cell33t",
+                  "fill": "#171A1C",
+                  "textGrowth": "fixed-width-height",
+                  "width": 174,
+                  "height": 126,
+                  "content": "(3,3)\n丘陵 / 铁矿床\n采矿厂：铁 #2\n仪器：水银温度计\nGarry：采矿中",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Jei8I",
+              "x": 630,
+              "y": 320,
+              "name": "(3,4) 铁矿床",
+              "width": 210,
+              "height": 160,
+              "fill": "#F7F7F4",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "84OSa",
+                  "name": "cell34t",
+                  "fill": "#171A1C",
+                  "content": "(3,4)\n丘陵\n铁矿床",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "LUH6f",
+              "x": 0,
+              "y": 480,
+              "name": "(4,1) 未调查",
+              "width": 210,
+              "height": 160,
+              "fill": "#ECECEA",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "EtCFA",
+                  "name": "cell41t",
+                  "fill": "#7B8085",
+                  "content": "(4,1)\n空地\n未知详情",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "CHy6A",
+              "x": 210,
+              "y": 480,
+              "name": "(4,2) 未调查",
+              "width": 210,
+              "height": 160,
+              "fill": "#ECECEA",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "wHBZh",
+                  "name": "cell42t",
+                  "fill": "#7B8085",
+                  "content": "(4,2)\n空地\n未知详情",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "u5b1N",
+              "x": 420,
+              "y": 480,
+              "name": "(4,3) 沙漠",
+              "width": 210,
+              "height": 160,
+              "fill": "#F6F0E3",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "CHo7R",
+                  "name": "cell43t",
+                  "fill": "#171A1C",
+                  "content": "(4,3)\n沙漠",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "x4JzH",
+              "x": 630,
+              "y": 480,
+              "name": "(4,4) 沙漠",
+              "width": 210,
+              "height": 160,
+              "fill": "#F6F0E3",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#B0B5B8"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "VMgu5",
+                  "name": "cell44t",
+                  "fill": "#171A1C",
+                  "content": "(4,4)\n沙漠",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "gKVep",
+          "x": 28,
+          "y": 762,
+          "name": "图例",
+          "width": 840,
+          "height": 36,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#A0A6AA"
+          },
+          "layout": "vertical",
+          "padding": [
+            0,
+            14
+          ],
+          "justifyContent": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "ZzZYl",
+              "name": "mapLegendText",
+              "fill": "#252A2E",
+              "content": "选中：橙色描边  ·  危险：橙色文字  ·  未调查：灰色低对比  ·  地图页面不提供联系/移动/建设按钮",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Q30ul",
+          "x": 900,
+          "y": 108,
+          "name": "坐标详情面板",
+          "width": 340,
+          "height": 360,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 2,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 10,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "gbVU7",
+              "name": "detailTitle",
+              "fill": "#171A1C",
+              "content": "坐标详情： (3,3)",
+              "fontFamily": "Inter",
+              "fontSize": 22,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "q87GD",
+              "name": "detailLine1",
+              "fill": "#252A2E",
+              "content": "地形：丘陵",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "pt6yz",
+              "name": "detailLine2",
+              "fill": "#252A2E",
+              "content": "自然资源：铁矿床",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "x7W4k",
+              "name": "detailLine3",
+              "fill": "#252A2E",
+              "content": "玩家建筑：采矿厂：铁 #2",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "ka5Kh",
+              "name": "detailLine4",
+              "fill": "#252A2E",
+              "content": "仪器：水银温度计",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "gADry",
+              "name": "detailLine5",
+              "fill": "#252A2E",
+              "content": "手下状态：Garry 采矿中",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "EMRkz",
+              "name": "detailLine6",
+              "fill": "#46505A",
+              "content": "危险：未发现即时危险",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "j3FfF",
+              "name": "detailWarn",
+              "width": 304,
+              "height": 70,
+              "fill": "#ECECEA",
+              "stroke": {
+                "thickness": 1,
+                "fill": "#A0A6AA"
+              },
+              "layout": "vertical",
+              "padding": 10,
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "VhiEY",
+                  "name": "detailWarnText",
+                  "fill": "#252A2E",
+                  "textGrowth": "fixed-width-height",
+                  "width": 278,
+                  "height": 48,
+                  "content": "地图只展示信息。若要移动 Garry 或建设设施，请返回通话页面确认指令。",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "JK3iQ",
+          "x": 900,
+          "y": 496,
+          "name": "手下状态汇总",
+          "width": 340,
+          "height": 150,
+          "fill": "#F4F4F1",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#7D8388"
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "LT4To",
+              "name": "crewTitle",
+              "fill": "#171A1C",
+              "content": "手下状态",
+              "fontFamily": "Inter",
+              "fontSize": 19,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "2IVxt",
+              "name": "crewGarry",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 300,
+              "height": 32,
+              "content": "Garry： (3,3) 丘陵铁矿床，采矿中。",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "6RGRd",
+              "name": "crewAmy",
+              "fill": "#B45B13",
+              "textGrowth": "fixed-width-height",
+              "width": 300,
+              "height": 36,
+              "content": "Amy： (2,3) 森林，正在和熊搏斗。需返回通话处理。",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VwIE3",
+          "x": 900,
+          "y": 674,
+          "name": "返回规则",
+          "width": 340,
+          "height": 74,
+          "fill": "#ECECEA",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#A0A6AA"
+          },
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "USAev",
+              "name": "returnTitle",
+              "fill": "#171A1C",
+              "content": "返回目标",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Xwv4C",
+              "name": "returnText",
+              "fill": "#252A2E",
+              "textGrowth": "fixed-width-height",
+              "width": 300,
+              "height": 32,
+              "content": "卫星雷达进入：返回控制中心。通话进入：返回当前通话。",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
