@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember } from "../data/gameData";
+import { getInventoryView, type InventoryItemView } from "../inventorySystem";
 import { CrewDetail } from "./CrewDetail";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
@@ -16,8 +17,10 @@ interface CommunicationStationProps {
 export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, onBack, onStartCall }: CommunicationStationProps) {
   const [contactsOpen, setContactsOpen] = useState(true);
   const [detailCrewId, setDetailCrewId] = useState<CrewId | null>(null);
+  const [inventoryCrewId, setInventoryCrewId] = useState<CrewId | null>(null);
   const incomingCount = crew.filter((member) => member.hasIncoming).length;
   const detailCrew = crew.find((member) => member.id === detailCrewId);
+  const inventoryCrew = crew.find((member) => member.id === inventoryCrewId);
 
   return (
     <ConsoleShell
@@ -54,6 +57,7 @@ export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, 
                   member={member}
                   elapsedGameSeconds={elapsedGameSeconds}
                   onOpenDetail={() => setDetailCrewId(member.id)}
+                  onOpenInventory={() => setInventoryCrewId(member.id)}
                   onStartCall={() => onStartCall(member.id)}
                 />
               ))}
@@ -83,6 +87,12 @@ export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, 
           <CrewDetail member={detailCrew} />
         </Modal>
       ) : null}
+
+      {inventoryCrew ? (
+        <Modal title={`${inventoryCrew.name} / 背包`} onClose={() => setInventoryCrewId(null)}>
+          <CrewInventoryList member={inventoryCrew} />
+        </Modal>
+      ) : null}
     </ConsoleShell>
   );
 }
@@ -91,11 +101,13 @@ function CrewCard({
   member,
   elapsedGameSeconds,
   onOpenDetail,
+  onOpenInventory,
   onStartCall,
 }: {
   member: CrewMember;
   elapsedGameSeconds: number;
   onOpenDetail: () => void;
+  onOpenInventory: () => void;
   onStartCall: () => void;
 }) {
   return (
@@ -114,13 +126,21 @@ function CrewCard({
       </div>
       <div className="crew-actions">
         {member.hasIncoming ? (
-          <button type="button" className="primary-button" disabled={member.unavailable} onClick={onStartCall}>
-            {member.unavailable ? "信号中断" : "接通"}
-          </button>
+          <>
+            <button type="button" className="primary-button" disabled={member.unavailable} onClick={onStartCall}>
+              {member.unavailable ? "信号中断" : "接通"}
+            </button>
+            <button type="button" className="secondary-button" onClick={onOpenInventory}>
+              查看背包
+            </button>
+          </>
         ) : (
           <>
             <button type="button" className="secondary-button" onClick={onOpenDetail}>
               查看档案
+            </button>
+            <button type="button" className="secondary-button" onClick={onOpenInventory}>
+              查看背包
             </button>
             <button type="button" className="secondary-button" disabled={member.unavailable} onClick={onStartCall}>
               通话
@@ -130,6 +150,45 @@ function CrewCard({
       </div>
     </article>
   );
+}
+
+function CrewInventoryList({ member }: { member: CrewMember }) {
+  const inventoryView = getInventoryView(member.inventory);
+
+  if (!inventoryView.length) {
+    return <p>未记录携带物。</p>;
+  }
+
+  return (
+    <div className="expertise-list">
+      {inventoryView.map((item) => (
+        <article key={item.itemId} className="expertise-item">
+          <div className="expertise-heading">
+            <strong>{item.name}</strong>
+            <StatusTag tone={item.missingDefinition ? "danger" : "neutral"}>{item.categoryLabel}</StatusTag>
+          </div>
+          <FieldList
+            rows={[
+              ["数量", `x${item.quantity}`],
+              ["分类", item.categoryLabel],
+              ["中文标签", formatItemTags(item)],
+              ["描述", item.description],
+              ["可用于响应", formatBoolean(item.usableInResponse)],
+              ["使用后消耗", formatBoolean(item.consumedOnUse)],
+            ]}
+          />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function formatItemTags(item: InventoryItemView) {
+  return item.tagLabels.length ? item.tagLabels.join(" / ") : "无标签";
+}
+
+function formatBoolean(value: boolean) {
+  return value ? "是" : "否";
 }
 
 function getCrewTiming(member: CrewMember, elapsedGameSeconds: number) {

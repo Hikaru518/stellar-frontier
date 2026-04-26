@@ -171,7 +171,65 @@ describe("App", () => {
     expect(screen.getByText("5 维轻量属性")).toBeInTheDocument();
     expect(screen.getByText("嘴硬心软")).toBeInTheDocument();
     expect(screen.getByText("拾荒者")).toBeInTheDocument();
+    expect(screen.getByText(/信号弹 x2/)).toBeInTheDocument();
     expect(screen.getByText(/湖的位置不对/)).toBeInTheDocument();
+  });
+
+  it("opens a read-only crew inventory modal with item details", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const mikeCard = screen.getByText("Mike，特战干员").closest("article");
+    expect(mikeCard).not.toBeNull();
+    fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
+
+    expect(screen.getByRole("heading", { name: "Mike / 背包" })).toBeInTheDocument();
+    expect(screen.getByText("信号弹")).toBeInTheDocument();
+    expect(screen.getByText("x2")).toBeInTheDocument();
+    expect(screen.getAllByText("消耗品").length).toBeGreaterThan(0);
+    expect(screen.getByText("信号 / 应急")).toBeInTheDocument();
+    expect(screen.getByText("可在失联或救援相关事件中提供定位帮助。")).toBeInTheDocument();
+    expect(screen.getAllByText("可用于响应").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("使用后消耗").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "使用" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "转移" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "丢弃" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "拆分" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "交易" })).not.toBeInTheDocument();
+  });
+
+  it("keeps incoming call connect as the primary action while inventory remains available", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+
+    expect(within(amyCard as HTMLElement).getByRole("button", { name: "接通" })).toHaveClass("primary-button");
+    expect(within(amyCard as HTMLElement).getByRole("button", { name: "查看背包" })).toBeInTheDocument();
+  });
+
+  it("shows an empty inventory message in the crew inventory modal", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 0,
+        crew: [{ id: "mike", inventory: [] }],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const mikeCard = screen.getByText("Mike，特战干员").closest("article");
+    expect(mikeCard).not.toBeNull();
+    fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
+
+    expect(screen.getByRole("heading", { name: "Mike / 背包" })).toBeInTheDocument();
+    expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
   });
 
   it("normalizes legacy saves to base inventory and structured crew inventory", () => {
