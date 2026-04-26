@@ -1,25 +1,20 @@
 # TODO（设计 / 文档体系级）
 
-本文件记录与 stellar-frontier 项目设计 / 文档体系相关的、目前**有意搁置**但未来值得做的事项。代码实现层面的 TODO 不在这里登记。
+本文件记录与 stellar-frontier 项目设计 / 文档体系相关的、目前**有意搁置**但未来值得做的事项。代码实现层面的 TODO 不在这里登记；`audit-wiki` skill 在每轮审计中产生的"待代码处理" TODO 留在对应 `docs/plans/audits/<YYYY-MM-DD-HH-MM>/audit-report.md` 中。
 
-## Wiki 索引页 / 子系统总览
+## Wiki 索引页 / 子系统总览（已收口于 audit-wiki skill）
 
-**背景**：当前 `organize-wiki` skill 把每个子系统输出成独立 wiki 文件（`docs/gameplay/<system>/<system>.md`），但**没有**一个总览索引文件（类似 `docs/gameplay/README.md` 或 `docs/wiki-index.md`）来列出所有子系统、它们的简介和入口链接。
+**当前状态**：已由 `audit-wiki` skill 处理。
 
-**当前缺口**：
+- 索引页路径：`docs/index.md`
+- 维护方：`audit-wiki` skill 的 Step 5.1 自动重生成
+- 模板：`.opencode/skills/audit-wiki/references/index-template.md`
+- 索引页包含：每个子系统的标题、scope、`last_updated`、一句话概述、与其他系统的耦合关系图（mermaid，自动从各 wiki 章节 6「系统交互」抽取）
 
-- 子系统数量增长后，外来读者难以快速浏览全貌
-- 系统间的耦合关系只能通过逐个翻 wiki 章节 6「系统交互」拼出，缺少全景视图
-- `docs/core-ideas.md` 是 whole-game 的概念描述，并不承担"目录"角色
+**仍未处理的子项**：
 
-**可能的实现方向**：
+- 子系统数量增长 3+ 后再首次跑 audit-wiki 会更有意义；目前 `docs/gameplay/crew/`、`event-system/`、`time-system/` 仍是空目录
+- 索引页的「状态」列（已实现 / 部分实现 / 仅设计 / 已废弃）判定细则需要在第一次实跑后根据真实情况微调
+- 是否引入 `whole-game-index` 这一 scope 暂不需要（`docs/index.md` 直接由 audit-wiki 生成、`organize-wiki` 不动它，二者职责清晰）
 
-- 引入新的 scope，例如 `whole-game-index`，专门指向一个目录文件
-- 或者增加一个独立的 skill（暂名 `update-wiki-index`），消费所有现有 wiki 的 frontmatter，自动生成 / 维护索引页
-- 索引页可包含：每个子系统的标题、scope、`last_updated`、一句话概述、与其他系统的耦合关系图（可由 mermaid 自动生成）
-
-**为什么本轮不做**：
-
-- 子系统目前还没有 wiki 内容（`docs/gameplay/crew/`、`event-system/`、`time-system/` 都是空目录）
-- 索引在只有 1-2 份 wiki 时几乎没价值；等积累 3+ 份再做更合算
-- 索引文件的维护策略（手工 / 自动 / 半自动）需要先看实际使用习惯再定
+如果未来有更复杂的索引需求（例如按 scope / 按耦合度 / 按更新时间多视图），再考虑独立 skill 或扩展 `audit-wiki/references/index-template.md`。
