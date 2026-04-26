@@ -1,0 +1,165 @@
+{
+  "$schema": "../schemas/items.schema.json",
+  "version": 1,
+  "items": [
+    {
+      "itemId": "folding_rifle",
+      "name": "折叠步枪",
+      "category": "weapon",
+      "stackable": false,
+      "description": "便携式武器，可在危险事件中提高对抗成功率。",
+      "tags": ["weapon", "combat"],
+      "effects": [
+        { "type": "combatBonus", "target": "danger_event", "value": 0.15 }
+      ]
+    },
+    {
+      "itemId": "signal_flare",
+      "name": "信号弹",
+      "category": "consumable",
+      "stackable": true,
+      "maxStack": 5,
+      "description": "可在失联或救援相关事件中提供定位帮助。",
+      "tags": ["signal", "emergency"],
+      "effects": [
+        { "type": "communicationBonus", "target": "lost_recovery", "value": 0.2 }
+      ]
+    },
+    {
+      "itemId": "old_compass",
+      "name": "旧式指南针",
+      "category": "tool",
+      "stackable": false,
+      "description": "不依赖电子信号的方向工具。",
+      "tags": ["navigation", "survey"],
+      "effects": [
+        { "type": "chanceModifier", "target": "desert_lost", "value": -0.1 }
+      ]
+    },
+    {
+      "itemId": "ration",
+      "name": "压缩饼干",
+      "category": "consumable",
+      "stackable": true,
+      "maxStack": 10,
+      "description": "基础口粮，可缓解饥饿或疲劳事件。",
+      "tags": ["food"],
+      "effects": [
+        { "type": "restoreCondition", "condition": "fatigued", "value": 1 }
+      ]
+    },
+    {
+      "itemId": "perfume",
+      "name": "香水",
+      "category": "misc",
+      "stackable": false,
+      "description": "在荒野中用途可疑，气味可能吸引或驱赶生物。",
+      "tags": ["social", "scent"],
+      "effects": []
+    },
+    {
+      "itemId": "medical_injector",
+      "name": "急救针",
+      "category": "consumable",
+      "stackable": true,
+      "maxStack": 3,
+      "description": "一次性急救用品，可处理轻伤。",
+      "tags": ["medical"],
+      "effects": [
+        { "type": "restoreCondition", "condition": "light_wound", "value": 1 }
+      ]
+    },
+    {
+      "itemId": "chocolate",
+      "name": "半块巧克力",
+      "category": "consumable",
+      "stackable": true,
+      "maxStack": 5,
+      "description": "少量补给，更多是心理安慰。",
+      "tags": ["food", "morale"],
+      "effects": []
+    },
+    {
+      "itemId": "hq_credit",
+      "name": "总部信用凭证",
+      "category": "quest",
+      "stackable": false,
+      "description": "总部发行的信用凭证，可能用于后续贸易或剧情。",
+      "tags": ["quest", "trade"],
+      "effects": []
+    },
+    {
+      "itemId": "mining_pick",
+      "name": "矿镐",
+      "category": "tool",
+      "stackable": false,
+      "description": "基础采矿工具。",
+      "tags": ["tool", "mining"],
+      "effects": [
+        { "type": "yieldModifier", "target": "iron_ore", "value": 0.25 }
+      ]
+    },
+    {
+      "itemId": "mercury_thermometer",
+      "name": "水银温度计",
+      "category": "tool",
+      "stackable": false,
+      "description": "旧式测温工具，可用于环境异常判断。",
+      "tags": ["tool", "survey"],
+      "effects": [
+        { "type": "chanceModifier", "target": "thermal_anomaly", "value": 0.1 }
+      ]
+    },
+    {
+      "itemId": "old_pipe",
+      "name": "旧烟斗",
+      "category": "misc",
+      "stackable": false,
+      "description": "Garry 的旧物，目前没有明确玩法效果。",
+      "tags": ["personal"],
+      "effects": []
+    },
+    {
+      "itemId": "iron_ore",
+      "name": "铁矿石",
+      "category": "resource",
+      "stackable": true,
+      "maxStack": 999,
+      "description": "基础建设资源。",
+      "tags": ["resource", "mining"],
+      "effects": []
+    },
+    {
+      "itemId": "wood",
+      "name": "木材",
+      "category": "resource",
+      "stackable": true,
+      "maxStack": 999,
+      "description": "基础建设资源，可通过森林调查或采集获得。",
+      "tags": ["resource", "building"],
+      "effects": []
+    },
+    {
+      "itemId": "basic_tool",
+      "name": "基础工具",
+      "category": "tool",
+      "stackable": false,
+      "description": "通用工具包，可提高部分调查和建设事件的成功率。",
+      "tags": ["tool", "survey", "build"],
+      "effects": [
+        { "type": "chanceModifier", "target": "survey_minor_resource", "value": 0.05 }
+      ]
+    },
+    {
+      "itemId": "scanner",
+      "name": "扫描器",
+      "category": "tool",
+      "stackable": false,
+      "description": "用于发现隐藏资源和异常信号的工具。",
+      "tags": ["tool", "survey", "signal"],
+      "effects": [
+        { "type": "chanceModifier", "target": "hidden_discovery", "value": 0.2 }
+      ]
+    }
+  ]
+}

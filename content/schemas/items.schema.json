@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/items.schema.json",
+  "title": "Stellar Frontier Items",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "items"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "localizedText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "itemEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["chanceModifier", "yieldModifier", "unlockChoice", "restoreCondition", "combatBonus", "communicationBonus"]
+        },
+        "target": {
+          "$ref": "#/$defs/id"
+        },
+        "value": {
+          "type": "number"
+        },
+        "condition": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemId", "name", "category", "stackable", "description", "tags", "effects"],
+      "properties": {
+        "itemId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["tool", "weapon", "consumable", "resource", "quest", "misc"]
+        },
+        "stackable": {
+          "type": "boolean"
+        },
+        "maxStack": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "description": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/itemEffect"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "stackable": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["maxStack"]
+          }
+        }
+      ]
+    }
+  }
+}

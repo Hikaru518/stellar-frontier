@@ -1,0 +1,102 @@
+{
+  "$schema": "../schemas/crew.schema.json",
+  "version": 1,
+  "crew": [
+    {
+      "crewId": "mike",
+      "name": "Mike",
+      "role": "特战干员",
+      "currentTile": "1-1",
+      "status": "moving",
+      "statusTone": "muted",
+      "summary": "上次回报：水面比地图记录近了 19 米。",
+      "attributes": {
+        "perception": 4,
+        "survival": 5,
+        "mining": 1,
+        "engineering": 2,
+        "combat": 5,
+        "communication": 3
+      },
+      "skills": ["combat", "survival"],
+      "inventory": [
+        { "itemId": "folding_rifle", "quantity": 1 },
+        { "itemId": "signal_flare", "quantity": 2 },
+        { "itemId": "old_compass", "quantity": 1 },
+        { "itemId": "ration", "quantity": 1 }
+      ],
+      "canCommunicate": true,
+      "lastContactTime": 0,
+      "activeAction": {
+        "actionType": "move",
+        "status": "inProgress",
+        "targetTile": "2-1",
+        "durationSeconds": 60
+      }
+    },
+    {
+      "crewId": "amy",
+      "name": "Amy",
+      "role": "千金大小姐",
+      "currentTile": "2-3",
+      "status": "inEvent",
+      "statusTone": "danger",
+      "summary": "最近一次通讯：非常不礼貌的求救。",
+      "attributes": {
+        "perception": 3,
+        "survival": 1,
+        "mining": 0,
+        "engineering": 1,
+        "combat": 1,
+        "communication": 4
+      },
+      "skills": ["negotiation"],
+      "inventory": [
+        { "itemId": "perfume", "quantity": 1 },
+        { "itemId": "medical_injector", "quantity": 1 },
+        { "itemId": "chocolate", "quantity": 1 },
+        { "itemId": "hq_credit", "quantity": 1 }
+      ],
+      "canCommunicate": true,
+      "lastContactTime": 0,
+      "emergencyEvent": {
+        "eventId": "emergency_forest_beast",
+        "dangerStage": 0,
+        "deadlineSeconds": 120
+      }
+    },
+    {
+      "crewId": "garry",
+      "name": "Garry",
+      "role": "退休老大爷",
+      "currentTile": "3-3",
+      "status": "working",
+      "statusTone": "muted",
+      "summary": "上次回报：铁矿产出稳定，抱怨也稳定。",
+      "attributes": {
+        "perception": 3,
+        "survival": 3,
+        "mining": 5,
+        "engineering": 4,
+        "combat": 2,
+        "communication": 2
+      },
+      "skills": ["mining", "repair"],
+      "inventory": [
+        { "itemId": "mining_pick", "quantity": 1 },
+        { "itemId": "mercury_thermometer", "quantity": 1 },
+        { "itemId": "old_pipe", "quantity": 1 },
+        { "itemId": "iron_ore", "quantity": 4 }
+      ],
+      "canCommunicate": true,
+      "lastContactTime": 0,
+      "activeAction": {
+        "actionType": "gather",
+        "status": "inProgress",
+        "targetTile": "3-3",
+        "durationSeconds": 300,
+        "resourceId": "iron_ore"
+      }
+    }
+  ]
+}

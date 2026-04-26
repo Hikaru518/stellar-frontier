@@ -1,3 +1,5 @@
+import { crewDefinitions, eventDefinitionById, formatInventory, type CrewDefinition } from "../content/contentData";
+
 export type PageId = "control" | "station" | "call" | "map";
 
 export type CrewId = "mike" | "amy" | "garry";
@@ -8,9 +10,9 @@ export type CallType = "normal" | "emergency";
 
 export type MapReturnTarget = "control" | "call";
 
-export type ActionType = "move" | "gather" | "build" | "survey" | "standby";
+export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
 
-export type ActionStatus = "inProgress" | "completed" | "interrupted" | "failed";
+export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
 
 export interface ActiveAction {
   id: string;
@@ -26,12 +28,14 @@ export interface ActiveAction {
   stepStartedAt?: number;
   stepFinishTime?: number;
   totalDurationSeconds?: number;
-  resource?: "iron" | "wood" | "food" | "water";
+  resource?: string;
   perRoundYield?: number;
 }
 
 export interface EmergencyEvent {
-  eventStartTime: number;
+  instanceId: string;
+  eventId: string;
+  createdAt: number;
   callReceivedTime: number;
   dangerStage: number;
   nextEscalationTime: number;
@@ -49,6 +53,10 @@ export interface CrewMember {
   status: string;
   statusTone: Tone;
   summary: string;
+  attributes: CrewDefinition["attributes"];
+  skills: string[];
+  inventory: Array<{ itemId: string; quantity: number }>;
+  conditions: string[];
   bag: string[];
   hasIncoming: boolean;
   canCommunicate: boolean;
@@ -61,6 +69,9 @@ export interface CrewMember {
 export interface ResourceSummary {
   energy: number;
   iron: number;
+  wood: number;
+  food: number;
+  water: number;
   baseIntegrity: number;
   sol: number;
   power: number;
@@ -115,94 +126,14 @@ export interface Facility {
 export const resources: ResourceSummary = {
   energy: 620,
   iron: 1240,
+  wood: 0,
+  food: 0,
+  water: 0,
   baseIntegrity: 71,
   sol: 37,
   power: 62,
   commWindow: "不稳定",
 };
-
-export const initialCrew: CrewMember[] = [
-  {
-    id: "mike",
-    name: "Mike",
-    role: "特战干员",
-    currentTile: "1-1",
-    location: "平原前哨",
-    coord: "(1,1)",
-    status: "正在前往湖泊，行进中。",
-    statusTone: "muted",
-    summary: "上次回报：水面比地图记录近了 19 米。",
-    bag: ["折叠步枪", "信号弹 x2", "旧式指南针", "压缩饼干"],
-    hasIncoming: false,
-    canCommunicate: true,
-    lastContactTime: 0,
-    activeAction: {
-      id: "mike-move-lake",
-      actionType: "move",
-      status: "inProgress",
-      startTime: 0,
-      durationSeconds: 60,
-      finishTime: 60,
-      fromTile: "1-1",
-      targetTile: "2-1",
-      route: ["2-1"],
-      routeStepIndex: 0,
-      stepStartedAt: 0,
-      stepFinishTime: 60,
-      totalDurationSeconds: 60,
-    },
-  },
-  {
-    id: "amy",
-    name: "Amy",
-    role: "千金大小姐",
-    currentTile: "2-3",
-    location: "森林",
-    coord: "(2,3)",
-    status: "森林，正在和熊搏斗。",
-    statusTone: "danger",
-    summary: "最近一次通讯：非常不礼貌的求救。",
-    bag: ["香水", "急救针", "半块巧克力", "总部信用凭证"],
-    hasIncoming: true,
-    canCommunicate: true,
-    lastContactTime: 0,
-    emergencyEvent: {
-      eventStartTime: 0,
-      callReceivedTime: 0,
-      dangerStage: 0,
-      nextEscalationTime: 30,
-      deadlineTime: 120,
-      settled: false,
-    },
-  },
-  {
-    id: "garry",
-    name: "Garry",
-    role: "退休老大爷",
-    currentTile: "3-3",
-    location: "矿床",
-    coord: "(3,3)",
-    status: "在矿床，采矿中。",
-    statusTone: "muted",
-    summary: "上次回报：铁矿产出稳定，抱怨也稳定。",
-    bag: ["矿镐", "水银温度计", "旧烟斗", "铁矿样本 x4"],
-    hasIncoming: false,
-    canCommunicate: true,
-    lastContactTime: 0,
-    activeAction: {
-      id: "garry-mine-iron",
-      actionType: "gather",
-      status: "inProgress",
-      startTime: 0,
-      durationSeconds: 300,
-      finishTime: 300,
-      fromTile: "3-3",
-      targetTile: "3-3",
-      resource: "iron",
-      perRoundYield: 5,
-    },
-  },
-];
 
 export const initialTiles: MapTile[] = [
   tile("1-1", "(1,1)", 1, 1, "平原"),
@@ -222,6 +153,8 @@ export const initialTiles: MapTile[] = [
   tile("4-3", "(4,3)", 4, 3, "沙漠"),
   tile("4-4", "(4,4)", 4, 4, "沙漠"),
 ];
+
+export const initialCrew: CrewMember[] = crewDefinitions.map((member) => createInitialCrewMember(member));
 
 export const initialLogs: SystemLog[] = [
   { id: 1, time: "19:42", text: "卫星雷达返回 3 个低置信度信号。", tone: "neutral" },
@@ -247,12 +180,6 @@ export const garryActions: ActionOption[] = [
   { id: "build", label: "安装 / 建设", hint: "消耗本地材料，增加设施维护压力。" },
   { id: "standby", label: "停止工作原地待命", hint: "矿物产出会暂停。" },
   { id: "survey", label: "开展调查", hint: "可能发现异常，也可能发现更多问题。" },
-];
-
-export const amyActions: ActionOption[] = [
-  { id: "run", label: "快跑（资源中断）", tone: "accent" },
-  { id: "fight", label: "跟他爆了（可能会死）", tone: "danger" },
-  { id: "wait", label: "先稳住！我考虑一下", hint: "风险：等待会推进倒计时。", tone: "danger" },
 ];
 
 function tile(
@@ -283,4 +210,88 @@ function tile(
     status,
     investigated,
   };
+}
+
+function createInitialCrewMember(member: CrewDefinition): CrewMember {
+  const tile = initialTiles.find((item) => item.id === member.currentTile);
+  const emergencyDefinition = member.emergencyEvent ? eventDefinitionById.get(member.emergencyEvent.eventId) : undefined;
+  const emergency = member.emergencyEvent && emergencyDefinition?.emergency;
+  const activeAction = member.activeAction ? createInitialAction(member, member.activeAction) : undefined;
+
+  return {
+    id: member.crewId as CrewId,
+    name: member.name,
+    role: member.role,
+    currentTile: member.currentTile,
+    location: tile ? getTileLocation(tile) : member.currentTile,
+    coord: tile?.coord ?? member.currentTile,
+    status: getInitialStatus(member),
+    statusTone: member.statusTone,
+    summary: member.summary,
+    attributes: member.attributes,
+    skills: member.skills,
+    inventory: member.inventory,
+    conditions: [],
+    bag: formatInventory(member.inventory),
+    hasIncoming: Boolean(member.emergencyEvent),
+    canCommunicate: member.canCommunicate,
+    lastContactTime: member.lastContactTime,
+    activeAction,
+    emergencyEvent:
+      member.emergencyEvent && emergency
+        ? {
+            instanceId: `${member.crewId}-${member.emergencyEvent.eventId}-0`,
+            eventId: member.emergencyEvent.eventId,
+            createdAt: 0,
+            callReceivedTime: 0,
+            dangerStage: member.emergencyEvent.dangerStage,
+            nextEscalationTime: emergency.firstWaitSeconds,
+            deadlineTime: member.emergencyEvent.deadlineSeconds,
+            settled: false,
+          }
+        : undefined,
+    unavailable: member.unavailable,
+  };
+}
+
+function createInitialAction(member: CrewDefinition, action: NonNullable<CrewDefinition["activeAction"]>): ActiveAction {
+  return {
+    id: `${member.crewId}-${action.actionType}-${action.targetTile}`,
+    actionType: action.actionType,
+    status: action.status,
+    startTime: 0,
+    durationSeconds: action.durationSeconds,
+    finishTime: action.durationSeconds,
+    fromTile: member.currentTile,
+    targetTile: action.targetTile,
+    route: action.actionType === "move" ? [action.targetTile] : undefined,
+    routeStepIndex: action.actionType === "move" ? 0 : undefined,
+    stepStartedAt: action.actionType === "move" ? 0 : undefined,
+    stepFinishTime: action.actionType === "move" ? action.durationSeconds : undefined,
+    totalDurationSeconds: action.actionType === "move" ? action.durationSeconds : undefined,
+    resource: action.resourceId,
+    perRoundYield: action.resourceId === "iron_ore" ? 5 : undefined,
+  };
+}
+
+function getInitialStatus(member: CrewDefinition) {
+  switch (member.status) {
+    case "moving":
+      return "正在前往目标地点，行进中。";
+    case "working":
+      return member.activeAction?.actionType === "gather" ? "在矿床，采矿中。" : "工作中。";
+    case "inEvent":
+      return "遭遇紧急事件，等待指令。";
+    case "lost":
+      return "失联。";
+    case "dead":
+      return "不可用。";
+    case "idle":
+    default:
+      return "待命中。";
+  }
+}
+
+function getTileLocation(tile: MapTile) {
+  return tile.resources[0] ?? tile.terrain;
 }

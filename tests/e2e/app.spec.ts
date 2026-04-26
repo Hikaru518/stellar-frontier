@@ -15,7 +15,7 @@ test("loads the app and completes the Amy emergency flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
   await page.getByRole("button", { name: "返回当前通话" }).click();
 
-  await page.getByRole("button", { name: "快跑（资源中断）" }).click();
-  await expect(page.getByText("Amy 切断了采集路线并开始撤离。熊没有签署停火协议。")).toBeVisible();
+  await page.getByRole("button", { name: "立刻撤离" }).click();
+  await expect(page.getByText("队员成功撤离。")).toBeVisible();
   await expect(page.getByRole("button", { name: "结束通话" }).last()).toBeVisible();
 });

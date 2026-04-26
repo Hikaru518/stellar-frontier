@@ -141,10 +141,11 @@ flowchart TD
 | --- | --- | --- |
 | `actionId` | 字符串 | 行动唯一 ID。 |
 | `crewId` | 字符串 | 执行动作的队员。 |
-| `actionType` | 枚举 | 行动类型，例如 `move`、`idle`、`survey`、`gather`、`build`。 |
+| `actionType` | 枚举 | 行动类型，例如 `move`、`standby`、`survey`、`gather`、`build`、`event`。 |
 | `status` | 枚举 | `pending`、`inProgress`、`completed`、`interrupted`、`failed`。 |
 | `startTime` | 游戏秒 | 行动开始时间。 |
-| `finishTime` | 游戏秒 | 行动预计完成时间。 |
+| `durationSeconds` | 整数或空 | 行动总耗时。持续待命等无固定结束时间的行动可为空。 |
+| `finishTime` | 游戏秒或空 | 行动预计完成时间。持续待命等无固定结束时间的行动可为空。 |
 | `fromTile` | 坐标 | 行动起点。 |
 | `targetTile` | 坐标 | 行动目标地块。 |
 | `resultPayload` | 对象 | 行动完成后的结果。 |
@@ -157,7 +158,7 @@ flowchart TD
 | `routeStepIndex` | 整数 | 当前正在前往的路线节点索引。 |
 | `stepStartedAt` | 游戏秒 | 当前格移动开始时间。 |
 | `stepFinishTime` | 游戏秒 | 当前格移动完成时间。 |
-| `totalDurationSeconds` | 整数 | 整条路线总耗时。 |
+| `totalDurationSeconds` | 整数 | 整条路线总耗时，应与移动行动的 `durationSeconds` 一致。 |
 | `remainingSeconds` | 整数 | 当前时刻距离抵达目标的剩余时间。 |
 
 ## 子模块：移动

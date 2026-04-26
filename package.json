@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "validate:content": "node scripts/validate-content.mjs",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "ajv": "^8.20.0",
     "jsdom": "^29.0.2",
     "typescript": "^6.0.3",
     "vite": "^8.0.10",

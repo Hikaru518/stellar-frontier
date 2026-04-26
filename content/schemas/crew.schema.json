@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/crew.schema.json",
+  "title": "Stellar Frontier Crew",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "crew"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "crew": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/crewMember"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "localizedText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attributeMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["perception", "survival", "mining", "engineering", "combat", "communication"],
+      "properties": {
+        "perception": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "survival": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "mining": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "engineering": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "combat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "communication": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        }
+      }
+    },
+    "inventoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemId", "quantity"],
+      "properties": {
+        "itemId": {
+          "$ref": "#/$defs/id"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "activeAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actionType", "status", "targetTile", "durationSeconds"],
+      "properties": {
+        "actionType": {
+          "type": "string",
+          "enum": ["move", "gather", "build", "survey", "standby", "event"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "inProgress", "completed", "interrupted", "failed"]
+        },
+        "targetTile": {
+          "type": "string",
+          "pattern": "^[0-9]+-[0-9]+$"
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resourceId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "emergencyEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventId", "dangerStage", "deadlineSeconds"],
+      "properties": {
+        "eventId": {
+          "$ref": "#/$defs/id"
+        },
+        "dangerStage": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deadlineSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "crewMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["crewId", "name", "role", "currentTile", "status", "statusTone", "summary", "attributes", "skills", "inventory", "canCommunicate", "lastContactTime"],
+      "properties": {
+        "crewId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "role": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "currentTile": {
+          "type": "string",
+          "pattern": "^[0-9]+-[0-9]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "moving", "working", "inEvent", "lost", "dead"]
+        },
+        "statusTone": {
+          "type": "string",
+          "enum": ["neutral", "muted", "accent", "danger", "success"]
+        },
+        "summary": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "attributes": {
+          "$ref": "#/$defs/attributeMap"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "inventory": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/inventoryEntry"
+          }
+        },
+        "canCommunicate": {
+          "type": "boolean"
+        },
+        "lastContactTime": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "activeAction": {
+          "$ref": "#/$defs/activeAction"
+        },
+        "emergencyEvent": {
+          "$ref": "#/$defs/emergencyEvent"
+        },
+        "unavailable": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
