@@ -1,19 +1,24 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { amyActions, garryActions, type ActionOption, type CallContext, type CrewMember } from "../data/gameData";
+import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
+  elapsedGameSeconds: number;
+  gameTimeLabel: string;
   onDecision: (actionId: string) => void;
   onOpenMap: () => void;
   onEndCall: () => void;
   onOpenStation: () => void;
 }
 
-export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenStation }: CallPageProps) {
+export function CallPage({ call, crew, elapsedGameSeconds, gameTimeLabel, onDecision, onOpenMap, onEndCall, onOpenStation }: CallPageProps) {
   const [contactsOpen, setContactsOpen] = useState(false);
   const member = crew.find((item) => item.id === call?.crewId);
+  const emergencyEvent = member?.emergencyEvent;
+  const callClosed = Boolean(call?.settled || (call?.type === "emergency" && emergencyEvent?.settled));
 
   const callView = useMemo(() => {
     if (!call || !member) {
@@ -60,7 +65,7 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
 
   if (!call || !member || !callView) {
     return (
-      <ConsoleShell title="通话页面" subtitle="没有活动通话。">
+      <ConsoleShell title="通话页面" subtitle="没有活动通话。" gameTimeLabel={gameTimeLabel}>
         <Panel>
           <p>当前没有通话事件。通讯台记录显示这可能只是短暂的安静。</p>
           <button type="button" className="primary-button" onClick={onOpenStation}>
@@ -75,13 +80,14 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
     <ConsoleShell
       title={callView.title}
       subtitle={callView.subtitle}
+      gameTimeLabel={gameTimeLabel}
       actions={
         <>
           <button type="button" className="secondary-button" onClick={() => setContactsOpen((value) => !value)}>
             {contactsOpen ? "关闭通讯录" : "打开通讯录"}
           </button>
           <button type="button" className="secondary-button" onClick={onEndCall}>
-            {call.settled ? "结束通话" : "返回通讯台"}
+            {callClosed ? "结束通话" : "返回通讯台"}
           </button>
         </>
       }
@@ -101,7 +107,9 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
             <StatusTag tone={call.type === "emergency" ? "danger" : "muted"}>{callView.badge}</StatusTag>
           </div>
 
-          <blockquote>{call.result ?? callView.line}</blockquote>
+          <blockquote>{call.result ?? (emergencyEvent?.settled ? member.summary : callView.line)}</blockquote>
+
+          <p className="muted-text">{getCallTiming(member, elapsedGameSeconds)}</p>
 
           <button type="button" className="map-chip" onClick={onOpenMap}>
             <strong>地图二级菜单</strong>
@@ -115,7 +123,7 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
                 key={action.id}
                 className={`choice-button choice-${action.tone ?? "neutral"}`}
                 onClick={() => onDecision(action.id)}
-                disabled={call.settled}
+                disabled={callClosed}
               >
                 <span>{action.label}</span>
                 {action.hint ? <small>{action.hint}</small> : null}
@@ -123,7 +131,7 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
             ))}
           </div>
 
-          {call.settled ? (
+          {callClosed ? (
             <button type="button" className="primary-button full-width" onClick={onEndCall}>
               结束通话
             </button>
@@ -137,7 +145,7 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
         </Panel>
 
         <Panel title="本页反馈" className="call-feedback">
-          <p>{call.settled ? "本轮选择已结算。按钮已禁用，通讯台与地图状态已同步。" : "选择行动后会写入日志，并更新队员、地块或通讯状态。"}</p>
+          <p>{callClosed ? "本轮选择已结算。按钮已禁用，通讯台与地图状态已同步。" : "选择行动后会写入日志，并更新队员、地块或通讯状态。"}</p>
         </Panel>
 
         {contactsOpen ? (
@@ -155,4 +163,23 @@ export function CallPage({ call, crew, onDecision, onOpenMap, onEndCall, onOpenS
       </div>
     </ConsoleShell>
   );
+}
+
+function getCallTiming(member: CrewMember, elapsedGameSeconds: number) {
+  if (member.emergencyEvent && !member.emergencyEvent.settled) {
+    const remaining = getRemainingSeconds(member.emergencyEvent.deadlineTime, elapsedGameSeconds);
+    const nextStage = getRemainingSeconds(member.emergencyEvent.nextEscalationTime, elapsedGameSeconds);
+    return `紧急倒计时：剩余 ${formatDuration(remaining)} / 下一次升级 ${formatDuration(nextStage)} / 危险阶段 ${member.emergencyEvent.dangerStage}`;
+  }
+
+  if (member.emergencyEvent?.settled) {
+    return "紧急事件已结算。";
+  }
+
+  if (member.activeAction?.status === "inProgress") {
+    const remaining = getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds);
+    return `当前行动剩余 ${formatDuration(remaining)}`;
+  }
+
+  return "当前通话没有强制倒计时。";
 }

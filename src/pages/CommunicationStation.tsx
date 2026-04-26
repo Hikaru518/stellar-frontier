@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import type { CrewId, CrewMember } from "../data/gameData";
+import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface CommunicationStationProps {
   crew: CrewMember[];
+  elapsedGameSeconds: number;
+  gameTimeLabel: string;
   onBack: () => void;
   onStartCall: (crewId: CrewId) => void;
 }
 
-export function CommunicationStation({ crew, onBack, onStartCall }: CommunicationStationProps) {
+export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, onBack, onStartCall }: CommunicationStationProps) {
   const [contactsOpen, setContactsOpen] = useState(true);
   const [bagCrewId, setBagCrewId] = useState<CrewId | null>(null);
   const incomingCount = crew.filter((member) => member.hasIncoming).length;
@@ -18,6 +21,7 @@ export function CommunicationStation({ crew, onBack, onStartCall }: Communicatio
     <ConsoleShell
       title="通讯台"
       subtitle="频道 A-17 / 信号噪声 38% / 当前仅允许一条通话事件"
+      gameTimeLabel={gameTimeLabel}
       actions={
         <>
           <button type="button" className="secondary-button" onClick={onBack}>
@@ -46,6 +50,7 @@ export function CommunicationStation({ crew, onBack, onStartCall }: Communicatio
                 <CrewCard
                   key={member.id}
                   member={member}
+                  elapsedGameSeconds={elapsedGameSeconds}
                   onOpenBag={() => setBagCrewId(member.id)}
                   onStartCall={() => onStartCall(member.id)}
                 />
@@ -70,6 +75,7 @@ export function CommunicationStation({ crew, onBack, onStartCall }: Communicatio
               ["身份", bagCrew.role],
               ["位置", `${bagCrew.location} ${bagCrew.coord}`],
               ["当前状态", bagCrew.status],
+              ["时间状态", getCrewTiming(bagCrew, elapsedGameSeconds)],
               ["携带物", bagCrew.bag.join(" / ")],
             ]}
           />
@@ -82,10 +88,12 @@ export function CommunicationStation({ crew, onBack, onStartCall }: Communicatio
 
 function CrewCard({
   member,
+  elapsedGameSeconds,
   onOpenBag,
   onStartCall,
 }: {
   member: CrewMember;
+  elapsedGameSeconds: number;
   onOpenBag: () => void;
   onStartCall: () => void;
 }) {
@@ -100,6 +108,7 @@ function CrewCard({
           {member.hasIncoming ? <StatusTag tone="danger">来电</StatusTag> : <StatusTag tone={member.statusTone}>在线</StatusTag>}
         </div>
         <p className={`crew-status status-${member.statusTone}`}>{member.status}</p>
+        <p className="muted-text">{getCrewTiming(member, elapsedGameSeconds)}</p>
         <p className="muted-text">{member.summary}</p>
       </div>
       <div className="crew-actions">
@@ -120,4 +129,19 @@ function CrewCard({
       </div>
     </article>
   );
+}
+
+function getCrewTiming(member: CrewMember, elapsedGameSeconds: number) {
+  if (member.emergencyEvent && !member.emergencyEvent.settled) {
+    const waited = elapsedGameSeconds - member.emergencyEvent.callReceivedTime;
+    const remaining = getRemainingSeconds(member.emergencyEvent.deadlineTime, elapsedGameSeconds);
+    return `紧急事件：已等待 ${formatDuration(waited)} / 危险阶段 ${member.emergencyEvent.dangerStage} / 剩余 ${formatDuration(remaining)}`;
+  }
+
+  if (member.activeAction?.status === "inProgress") {
+    const remaining = getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds);
+    return `行动剩余 ${formatDuration(remaining)}`;
+  }
+
+  return "无进行中的计时行动";
 }

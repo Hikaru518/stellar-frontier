@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
 import type { CrewMember, MapReturnTarget, MapTile } from "../data/gameData";
+import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface MapPageProps {
   tiles: MapTile[];
   crew: CrewMember[];
+  elapsedGameSeconds: number;
+  gameTimeLabel: string;
   returnTarget: MapReturnTarget;
   onReturn: () => void;
 }
 
-export function MapPage({ tiles, crew, returnTarget, onReturn }: MapPageProps) {
+export function MapPage({ tiles, crew, elapsedGameSeconds, gameTimeLabel, returnTarget, onReturn }: MapPageProps) {
   const [selectedId, setSelectedId] = useState("3-3");
   const selectedTile = tiles.find((tile) => tile.id === selectedId) ?? tiles[0];
 
@@ -22,6 +25,7 @@ export function MapPage({ tiles, crew, returnTarget, onReturn }: MapPageProps) {
     <ConsoleShell
       title="卫星雷达地图"
       subtitle="4x4 地块网格 / 地图只读 / 指令需返回通话或通讯台发起"
+      gameTimeLabel={gameTimeLabel}
       actions={
         <button type="button" className="primary-button" onClick={onReturn}>
           {returnTarget === "call" ? "返回当前通话" : "返回控制中心"}
@@ -74,6 +78,7 @@ export function MapPage({ tiles, crew, returnTarget, onReturn }: MapPageProps) {
               ["玩家建筑", selectedTile.buildings.length ? selectedTile.buildings.join(" / ") : "无"],
               ["仪器", selectedTile.instruments.length ? selectedTile.instruments.join(" / ") : "无"],
               ["手下状态", crewStatus(selectedTile, crewById)],
+              ["计时状态", crewTiming(selectedTile, crewById, elapsedGameSeconds)],
               ["危险", selectedTile.danger],
               ["状态", selectedTile.status],
             ]}
@@ -85,6 +90,8 @@ export function MapPage({ tiles, crew, returnTarget, onReturn }: MapPageProps) {
           {crew.map((member) => (
             <p key={member.id}>
               <StatusTag tone={member.statusTone}>{member.name}</StatusTag> {member.coord} {member.location}，{member.status}
+              <br />
+              <span className="muted-text">{memberTiming(member, elapsedGameSeconds)}</span>
             </p>
           ))}
         </Panel>
@@ -108,6 +115,31 @@ function crewStatus(tile: MapTile, crewById: Map<string, CrewMember>) {
       return member ? `${member.name}：${member.status}` : crewId;
     })
     .join(" / ");
+}
+
+function crewTiming(tile: MapTile, crewById: Map<string, CrewMember>, elapsedGameSeconds: number) {
+  if (tile.crew.length === 0) {
+    return "无手下计时状态";
+  }
+
+  return tile.crew
+    .map((crewId) => {
+      const member = crewById.get(crewId);
+      return member ? `${member.name}：${memberTiming(member, elapsedGameSeconds)}` : crewId;
+    })
+    .join(" / ");
+}
+
+function memberTiming(member: CrewMember, elapsedGameSeconds: number) {
+  if (member.emergencyEvent && !member.emergencyEvent.settled) {
+    return `紧急剩余 ${formatDuration(getRemainingSeconds(member.emergencyEvent.deadlineTime, elapsedGameSeconds))}`;
+  }
+
+  if (member.activeAction?.status === "inProgress") {
+    return `行动剩余 ${formatDuration(getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds))}`;
+  }
+
+  return "无进行中的计时行动";
 }
 
 function shortStatus(status: string) {

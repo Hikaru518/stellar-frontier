@@ -5,6 +5,7 @@ interface ConsoleShellProps {
   title: string;
   subtitle: string;
   children: ReactNode;
+  gameTimeLabel?: string;
   actions?: ReactNode;
 }
 
@@ -21,11 +22,12 @@ interface ModalProps {
   onClose: () => void;
 }
 
-export function ConsoleShell({ title, subtitle, children, actions }: ConsoleShellProps) {
+export function ConsoleShell({ title, subtitle, children, gameTimeLabel, actions }: ConsoleShellProps) {
   return (
     <main className="console-shell">
       <header className="page-header">
         <div>
+          {gameTimeLabel ? <p className="global-time">{gameTimeLabel}</p> : null}
           <h1>{title}</h1>
           <p>{subtitle}</p>
         </div>
