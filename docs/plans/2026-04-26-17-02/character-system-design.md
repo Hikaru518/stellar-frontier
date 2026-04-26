@@ -1,13 +1,15 @@
 ---
 topic: character-system
 date: 2026-04-26
-status: approved
+status: merged
 scope: system
 source:
   initial: docs/plans/2026-04-26-17-02/initial.md
   research: docs/plans/2026-04-26-17-02/research.md
   interview: docs/plans/2026-04-26-17-02/character-system-interview.md
 target_wiki: docs/gameplay/crew/crew.md
+merged_into: docs/gameplay/crew/crew.md
+merged_at: 2026-04-26T21:38:51+08:00
 ---
 
 # 人物系统设计
