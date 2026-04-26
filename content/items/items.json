@@ -7,6 +7,8 @@
       "name": "折叠步枪",
       "category": "weapon",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "便携式武器，可在危险事件中提高对抗成功率。",
       "tags": ["weapon", "combat"],
       "effects": [
@@ -19,6 +21,8 @@
       "category": "consumable",
       "stackable": true,
       "maxStack": 5,
+      "usableInResponse": true,
+      "consumedOnUse": true,
       "description": "可在失联或救援相关事件中提供定位帮助。",
       "tags": ["signal", "emergency"],
       "effects": [
@@ -30,6 +34,8 @@
       "name": "旧式指南针",
       "category": "tool",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "不依赖电子信号的方向工具。",
       "tags": ["navigation", "survey"],
       "effects": [
@@ -42,6 +48,8 @@
       "category": "consumable",
       "stackable": true,
       "maxStack": 10,
+      "usableInResponse": true,
+      "consumedOnUse": true,
       "description": "基础口粮，可缓解饥饿或疲劳事件。",
       "tags": ["food"],
       "effects": [
@@ -53,6 +61,8 @@
       "name": "香水",
       "category": "misc",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "在荒野中用途可疑，气味可能吸引或驱赶生物。",
       "tags": ["social", "scent"],
       "effects": []
@@ -63,6 +73,8 @@
       "category": "consumable",
       "stackable": true,
       "maxStack": 3,
+      "usableInResponse": true,
+      "consumedOnUse": true,
       "description": "一次性急救用品，可处理轻伤。",
       "tags": ["medical"],
       "effects": [
@@ -75,6 +87,8 @@
       "category": "consumable",
       "stackable": true,
       "maxStack": 5,
+      "usableInResponse": true,
+      "consumedOnUse": true,
       "description": "少量补给，更多是心理安慰。",
       "tags": ["food", "morale"],
       "effects": []
@@ -84,6 +98,8 @@
       "name": "总部信用凭证",
       "category": "quest",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "总部发行的信用凭证，可能用于后续贸易或剧情。",
       "tags": ["quest", "trade"],
       "effects": []
@@ -93,6 +109,8 @@
       "name": "矿镐",
       "category": "tool",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "基础采矿工具。",
       "tags": ["tool", "mining"],
       "effects": [
@@ -104,6 +122,8 @@
       "name": "水银温度计",
       "category": "tool",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "旧式测温工具，可用于环境异常判断。",
       "tags": ["tool", "survey"],
       "effects": [
@@ -115,6 +135,8 @@
       "name": "旧烟斗",
       "category": "misc",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "Garry 的旧物，目前没有明确玩法效果。",
       "tags": ["personal"],
       "effects": []
@@ -125,6 +147,8 @@
       "category": "resource",
       "stackable": true,
       "maxStack": 999,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "基础建设资源。",
       "tags": ["resource", "mining"],
       "effects": []
@@ -135,6 +159,8 @@
       "category": "resource",
       "stackable": true,
       "maxStack": 999,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "基础建设资源，可通过森林调查或采集获得。",
       "tags": ["resource", "building"],
       "effects": []
@@ -144,6 +170,8 @@
       "name": "基础工具",
       "category": "tool",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "通用工具包，可提高部分调查和建设事件的成功率。",
       "tags": ["tool", "survey", "build"],
       "effects": [
@@ -155,6 +183,8 @@
       "name": "扫描器",
       "category": "tool",
       "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
       "description": "用于发现隐藏资源和异常信号的工具。",
       "tags": ["tool", "survey", "signal"],
       "effects": [

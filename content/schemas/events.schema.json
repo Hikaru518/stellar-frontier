@@ -34,6 +34,10 @@
       "type": "string",
       "minLength": 1
     },
+    "itemTag": {
+      "type": "string",
+      "enum": ["food", "light", "medical", "signal", "clue"]
+    },
     "modifier": {
       "type": "object",
       "additionalProperties": false,
@@ -91,7 +95,17 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["addResource", "removeResource", "discoverResource", "updateTile", "updateCrewStatus", "addCrewCondition", "startEmergency", "addLog"]
+          "enum": ["addResource", "removeResource", "discoverResource", "updateTile", "updateCrewStatus", "addCrewCondition", "startEmergency", "addLog", "addItem", "useItemByTag"]
+        },
+        "itemId": {
+          "$ref": "#/$defs/id"
+        },
+        "itemTag": {
+          "$ref": "#/$defs/itemTag"
+        },
+        "target": {
+          "type": "string",
+          "enum": ["crewInventory", "baseInventory"]
         },
         "resource": {
           "$ref": "#/$defs/id"
@@ -136,6 +150,12 @@
         },
         "hint": {
           "$ref": "#/$defs/localizedText"
+        },
+        "unavailableHint": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "usesItemTag": {
+          "$ref": "#/$defs/itemTag"
         },
         "tone": {
           "type": "string",

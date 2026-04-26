@@ -13,6 +13,8 @@ const pairs = [
 
 const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
 const loaded = Object.fromEntries(pairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
+const validItemTags = new Set(["food", "light", "medical", "signal", "clue"]);
+const validAddItemTargets = new Set(["crewInventory", "baseInventory"]);
 
 let failed = false;
 
@@ -85,14 +87,28 @@ function validateReferences(data) {
     }
 
     for (const choice of event.choices) {
+      const owner = `${event.eventId}.${choice.choiceId}`;
+      if (choice.usesItemTag && !validItemTags.has(choice.usesItemTag)) {
+        hasError = report(`Invalid usesItemTag in ${owner}: ${choice.usesItemTag}`) || hasError;
+      }
+
+      const choiceEffects = [
+        ...(choice.effects ?? []),
+        ...(choice.successEffects ?? []),
+        ...(choice.failureEffects ?? []),
+      ];
+      if (choice.usesItemTag && !choiceEffects.some((effect) => effect.type === "useItemByTag" && effect.itemTag === choice.usesItemTag)) {
+        hasError = report(`Choice ${owner} usesItemTag '${choice.usesItemTag}' but has no matching useItemByTag effect`) || hasError;
+      }
+
       for (const effect of choice.effects ?? []) {
-        hasError = validateEffectReference(`${event.eventId}.${choice.choiceId}`, effect, itemIds) || hasError;
+        hasError = validateEffectReference(owner, effect, itemIds) || hasError;
       }
       for (const effect of choice.successEffects ?? []) {
-        hasError = validateEffectReference(`${event.eventId}.${choice.choiceId}.success`, effect, itemIds) || hasError;
+        hasError = validateEffectReference(`${owner}.success`, effect, itemIds) || hasError;
       }
       for (const effect of choice.failureEffects ?? []) {
-        hasError = validateEffectReference(`${event.eventId}.${choice.choiceId}.failure`, effect, itemIds) || hasError;
+        hasError = validateEffectReference(`${owner}.failure`, effect, itemIds) || hasError;
       }
     }
   }
@@ -109,6 +125,21 @@ function validateReferences(data) {
 function validateEffectReference(owner, effect, itemIds) {
   if ((effect.type === "addResource" || effect.type === "removeResource" || effect.type === "discoverResource") && !itemIds.has(effect.resource)) {
     return report(`Unknown resource item in ${owner}: ${effect.resource}`);
+  }
+
+  if (effect.type === "addItem") {
+    let hasError = false;
+    if (!itemIds.has(effect.itemId)) {
+      hasError = report(`Unknown addItem.itemId in ${owner}: ${effect.itemId}`) || hasError;
+    }
+    if (!validAddItemTargets.has(effect.target)) {
+      hasError = report(`Invalid addItem.target in ${owner}: ${effect.target}`) || hasError;
+    }
+    return hasError;
+  }
+
+  if (effect.type === "useItemByTag" && !validItemTags.has(effect.itemTag)) {
+    return report(`Invalid useItemByTag.itemTag in ${owner}: ${effect.itemTag}`);
   }
 
   return false;

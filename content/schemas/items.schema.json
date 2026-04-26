@@ -53,7 +53,7 @@
     "item": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["itemId", "name", "category", "stackable", "description", "tags", "effects"],
+      "required": ["itemId", "name", "category", "stackable", "usableInResponse", "consumedOnUse", "description", "tags", "effects"],
       "properties": {
         "itemId": {
           "$ref": "#/$defs/id"
@@ -66,6 +66,12 @@
           "enum": ["tool", "weapon", "consumable", "resource", "quest", "misc"]
         },
         "stackable": {
+          "type": "boolean"
+        },
+        "usableInResponse": {
+          "type": "boolean"
+        },
+        "consumedOnUse": {
           "type": "boolean"
         },
         "maxStack": {
