@@ -3,7 +3,13 @@ import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { createMovePreview, formatMoveRoute } from "../crewSystem";
 import { getEmergencyChoices, getEmergencyEventDefinition } from "../eventSystem";
 import { garryActions, type ActionOption, type CallContext, type CrewMember, type MapTile } from "../data/gameData";
+import { findUsableInventoryItemByTag, getItemTagLabel } from "../inventorySystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
+
+type CallActionOption = ActionOption & {
+  usesItemTag?: string;
+  unavailableHint?: string;
+};
 
 interface CallPageProps {
   call: CallContext | null;
@@ -52,7 +58,14 @@ export function CallPage({
         scene: "通话中的图片 / 森林 / 噪声 / 有东西在靠近",
         line: emergencyDefinition.resultText.start ?? emergencyDefinition.title,
         meta: `地点：${member.location} / 危险阶段 ${member.emergencyEvent?.dangerStage ?? 0}`,
-        actions: getEmergencyChoices(member).map((choice) => ({ id: choice.choiceId, label: choice.text, hint: choice.hint, tone: choice.tone })) satisfies ActionOption[],
+        actions: getEmergencyChoices(member).map((choice) => ({
+          id: choice.choiceId,
+          label: choice.text,
+          hint: choice.hint,
+          tone: choice.tone,
+          usesItemTag: choice.usesItemTag,
+          unavailableHint: choice.unavailableHint,
+        })) satisfies CallActionOption[],
         badge: "紧急来电",
       };
     }
@@ -64,7 +77,7 @@ export function CallPage({
         scene: "通话中的图片 / 矿床 / 灰尘 / 正常采矿",
         line: "头儿，我正在矿床采矿，有什么事吗？",
         meta: "地点：矿床 / 状态：采矿中",
-        actions: garryActions,
+        actions: garryActions satisfies CallActionOption[],
         badge: "普通通话",
       };
     }
@@ -78,7 +91,7 @@ export function CallPage({
       actions: [
         { id: "mike-status", label: "要求继续前进", hint: "维持行进状态。" },
         { id: "mike-hold", label: "原地等待", hint: "暂停探索，避免进入未知水域。" },
-      ] satisfies ActionOption[],
+      ] satisfies CallActionOption[],
       badge: "普通通话",
     };
   }, [call, member]);
@@ -149,18 +162,22 @@ export function CallPage({
           ) : null}
 
           <div className="action-stack">
-            {callView.actions.map((action) => (
-              <button
-                type="button"
-                key={action.id}
-                className={`choice-button choice-${action.tone ?? "neutral"}`}
-                onClick={() => onDecision(action.id)}
-                disabled={callClosed}
-              >
-                <span>{action.label}</span>
-                {action.hint ? <small>{action.hint}</small> : null}
-              </button>
-            ))}
+            {callView.actions.map((action) => {
+              const itemAvailability = getChoiceItemAvailability(action, member);
+              return (
+                <button
+                  type="button"
+                  key={action.id}
+                  className={`choice-button choice-${action.tone ?? "neutral"}`}
+                  onClick={() => onDecision(action.id)}
+                  disabled={callClosed || itemAvailability.disabled}
+                >
+                  <span>{action.label}</span>
+                  {action.hint ? <small>{action.hint}</small> : null}
+                  {itemAvailability.description ? <small>{itemAvailability.description}</small> : null}
+                </button>
+              );
+            })}
           </div>
 
           {callClosed ? (
@@ -263,6 +280,26 @@ function MoveConfirmPanel({
       </div>
     </div>
   );
+}
+
+function getChoiceItemAvailability(action: CallActionOption, member: CrewMember) {
+  if (!action.usesItemTag) {
+    return { disabled: false, description: null };
+  }
+
+  const tagLabel = getItemTagLabel(action.usesItemTag);
+  const candidate = findUsableInventoryItemByTag(member.inventory, action.usesItemTag);
+  if (!candidate) {
+    return {
+      disabled: true,
+      description: action.unavailableHint ?? `需要可用的${tagLabel}道具。`,
+    };
+  }
+
+  return {
+    disabled: false,
+    description: `${tagLabel}道具：将使用${candidate.item.name}，${candidate.item.consumedOnUse ? "使用后消耗" : "不会消耗"}。`,
+  };
 }
 
 function getCallTiming(member: CrewMember, elapsedGameSeconds: number) {

@@ -105,6 +105,120 @@ describe("App", () => {
     expect(signalChoice?.effects?.some((effect) => effect.type === "addLog" && /通讯|定位|额外信息/.test(effect.text ?? ""))).toBe(true);
   });
 
+  it("enables a light response choice when the caller has a usable light item", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "lin_xia",
+            status: "洞穴低光区域，等待指令。",
+            statusTone: "danger",
+            hasIncoming: true,
+            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /通讯台/ }));
+    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
+    expect(linCard).not.toBeNull();
+    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "接通" }));
+
+    const lightButton = screen.getByRole("button", { name: /使用照明道具继续确认洞内路径/ });
+    expect(lightButton).toBeEnabled();
+    expect(screen.getByText("照明道具：将使用手持照明灯，不会消耗。")).toBeInTheDocument();
+
+    await user.click(lightButton);
+    expect(screen.getByText("照明稳定后，队员确认了洞内可通行路径和湿滑边界。")).toBeInTheDocument();
+  });
+
+  it("disables a light response choice when the caller has no usable light item", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "lin_xia",
+            status: "洞穴低光区域，等待指令。",
+            statusTone: "danger",
+            hasIncoming: true,
+            inventory: [],
+            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /通讯台/ }));
+    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
+    expect(linCard).not.toBeNull();
+    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByRole("button", { name: /使用照明道具继续确认洞内路径/ })).toBeDisabled();
+    expect(screen.getByText("需要可用的照明道具才能安全进入低光区域。")).toBeInTheDocument();
+  });
+
+  it("uses a signal response item and records the consumed item in the result logs", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "kael",
+            currentTile: "3-2",
+            status: "通讯定位偏移，等待指令。",
+            statusTone: "danger",
+            hasIncoming: true,
+            emergencyEvent: createSavedEmergencyEvent("kael", "emergency_signal_assist_comms"),
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /通讯台/ }));
+    const kaelCard = screen.getByText("Kael，轨道城邦祭司学徒").closest("article");
+    expect(kaelCard).not.toBeNull();
+    await user.click(within(kaelCard as HTMLElement).getByRole("button", { name: "接通" }));
+
+    const signalButton = screen.getByRole("button", { name: /使用信号道具辅助定位/ });
+    expect(signalButton).toBeEnabled();
+    expect(screen.getByText("信号道具：将使用信号弹，使用后消耗。")).toBeInTheDocument();
+
+    await user.click(signalButton);
+
+    expect(screen.getByText("信号辅助后通讯噪声下降，定位坐标被重新校准，并回传了一段额外环境信息。")).toBeInTheDocument();
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: "Kael 使用了信号弹，道具已消耗。" }),
+        expect.objectContaining({ text: "信号辅助后通讯噪声下降，定位坐标被重新校准，并回传了一段额外环境信息。" }),
+      ]),
+    );
+  });
+
   it("handles an incoming Amy call and settles a decision", async () => {
     const user = userEvent.setup();
 
@@ -293,3 +407,16 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
   });
 });
+
+function createSavedEmergencyEvent(crewId: string, eventId: string) {
+  return {
+    instanceId: `${crewId}-${eventId}-test`,
+    eventId,
+    createdAt: 0,
+    callReceivedTime: 0,
+    dangerStage: 0,
+    nextEscalationTime: 30,
+    deadlineTime: 120,
+    settled: false,
+  };
+}
