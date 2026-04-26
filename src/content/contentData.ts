@@ -51,8 +51,21 @@ export interface DiaryEntryDefinition {
 }
 
 export interface EventEffectDefinition {
-  type: "addResource" | "removeResource" | "discoverResource" | "updateTile" | "updateCrewStatus" | "addCrewCondition" | "startEmergency" | "addLog";
+  type:
+    | "addResource"
+    | "removeResource"
+    | "discoverResource"
+    | "updateTile"
+    | "updateCrewStatus"
+    | "addCrewCondition"
+    | "startEmergency"
+    | "addLog"
+    | "addItem"
+    | "useItemByTag";
   resource?: string;
+  itemId?: string;
+  itemTag?: string;
+  target?: "crewInventory" | "baseInventory";
   amount?: number;
   quality?: string;
   field?: string;
@@ -71,6 +84,8 @@ export interface EventChoiceDefinition {
   baseSuccessChance?: number;
   dangerStageModifier?: number;
   durationSeconds?: number;
+  usesItemTag?: string;
+  unavailableHint?: string;
   successEffects?: EventEffectDefinition[];
   failureEffects?: EventEffectDefinition[];
   effects?: EventEffectDefinition[];
@@ -147,6 +162,8 @@ export interface ItemDefinition {
   category: "tool" | "weapon" | "consumable" | "resource" | "quest" | "misc";
   stackable: boolean;
   maxStack?: number;
+  usableInResponse: boolean;
+  consumedOnUse: boolean;
   description: string;
   tags: string[];
   effects: Array<{ type: string; target?: string; value?: number; condition?: string }>;
