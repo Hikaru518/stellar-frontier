@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
+import { GAME_SAVE_KEY } from "./timeSystem";
 
 describe("App", () => {
   beforeEach(() => {
@@ -110,6 +112,36 @@ describe("App", () => {
     expect(screen.getByText("嘴硬心软")).toBeInTheDocument();
     expect(screen.getByText("拾荒者")).toBeInTheDocument();
     expect(screen.getByText(/湖的位置不对/)).toBeInTheDocument();
+  });
+
+  it("normalizes legacy saves to base inventory and structured crew inventory", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 12,
+        crew: [{ id: "mike", bag: ["legacy item"] }],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: { ...initialResources, iron: 7, wood: 3, food: 2, water: 4 },
+      }),
+    );
+
+    render(<App />);
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.baseInventory).toEqual([
+      { itemId: "iron_ore", quantity: 7 },
+      { itemId: "wood", quantity: 3 },
+    ]);
+    expect(saved.resources.food).toBe(2);
+    expect(saved.resources.water).toBe(4);
+    expect(saved.crew.find((member: { id: string }) => member.id === "mike").inventory).toEqual([
+      { itemId: "folding_rifle", quantity: 1 },
+      { itemId: "signal_flare", quantity: 2 },
+      { itemId: "old_compass", quantity: 1 },
+      { itemId: "ration", quantity: 1 },
+    ]);
+    expect(JSON.stringify(saved)).not.toContain("bag");
   });
 
   it("uses the debug toolbox to accelerate game time", () => {

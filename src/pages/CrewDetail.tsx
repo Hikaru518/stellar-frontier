@@ -1,6 +1,7 @@
 import { FieldList, Panel, StatusTag } from "../components/Layout";
 import { getDiaryAvailabilityLabel, getVisibleDiaryEntries } from "../diarySystem";
 import type { CrewMember, Tone } from "../data/gameData";
+import { getInventoryView } from "../inventorySystem";
 import { formatGameTime } from "../timeSystem";
 
 const attributeLabels: Array<[keyof CrewMember["attributes"], string]> = [
@@ -13,6 +14,7 @@ const attributeLabels: Array<[keyof CrewMember["attributes"], string]> = [
 
 export function CrewDetail({ member }: { member: CrewMember }) {
   const diaryEntries = getVisibleDiaryEntries(member).sort((a, b) => a.gameSecond - b.gameSecond);
+  const inventorySummary = formatInventorySummary(member.inventory);
 
   return (
     <div className="crew-detail">
@@ -88,11 +90,21 @@ export function CrewDetail({ member }: { member: CrewMember }) {
       </Panel>
 
       <Panel title="携带物">
-        <p>{member.bag.length ? member.bag.join(" / ") : "未记录携带物。"}</p>
+        <p>{inventorySummary}</p>
         <p className="muted-text">背包容量与负重规则不属于本轮人物系统。</p>
       </Panel>
     </div>
   );
+}
+
+function formatInventorySummary(inventory: CrewMember["inventory"]) {
+  const inventoryView = getInventoryView(inventory);
+
+  if (!inventoryView.length) {
+    return "未记录携带物。";
+  }
+
+  return inventoryView.map((item) => `${item.name} x${item.quantity}`).join(" / ");
 }
 
 function formatRuleEffect(effect: NonNullable<CrewMember["expertise"][number]["ruleEffect"]>) {
