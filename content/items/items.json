@@ -82,6 +82,19 @@
       ]
     },
     {
+      "itemId": "hand_lamp",
+      "name": "手持照明灯",
+      "category": "tool",
+      "stackable": false,
+      "usableInResponse": true,
+      "consumedOnUse": false,
+      "description": "低功率照明工具，可在洞穴、废墟等低能见度事件中提供稳定光源。",
+      "tags": ["light", "survey"],
+      "effects": [
+        { "type": "chanceModifier", "target": "dark_area", "value": 0.2 }
+      ]
+    },
+    {
       "itemId": "chocolate",
       "name": "半块巧克力",
       "category": "consumable",
@@ -91,6 +104,18 @@
       "consumedOnUse": true,
       "description": "少量补给，更多是心理安慰。",
       "tags": ["food", "morale"],
+      "effects": []
+    },
+    {
+      "itemId": "sealed_map_fragment",
+      "name": "封存地图残片",
+      "category": "quest",
+      "stackable": true,
+      "maxStack": 20,
+      "usableInResponse": false,
+      "consumedOnUse": false,
+      "description": "带有旧殖民测绘标记的残片，作为线索词表样例保留。",
+      "tags": ["clue"],
       "effects": []
     },
     {

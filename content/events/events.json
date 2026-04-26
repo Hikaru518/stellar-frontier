@@ -24,7 +24,7 @@
       ],
       "durationSeconds": 0,
       "effects": [
-        { "type": "addResource", "resource": "wood", "amount": 2 },
+        { "type": "addItem", "itemId": "wood", "target": "crewInventory", "amount": 2 },
         { "type": "addLog", "text": "队员从倒伏树枝中挑出了可用木材。", "tone": "success" }
       ],
       "choices": [],
@@ -55,7 +55,7 @@
       ],
       "durationSeconds": 0,
       "effects": [
-        { "type": "addResource", "resource": "iron_ore", "amount": 1 },
+        { "type": "addItem", "itemId": "iron_ore", "target": "crewInventory", "amount": 1 },
         { "type": "addLog", "text": "岩缝中有几块可以直接收集的矿石。", "tone": "success" }
       ],
       "choices": [],
@@ -162,6 +162,122 @@
         "timeout": "队员没有等到指示，只能自行撤离。"
       },
       "tags": ["forest", "danger", "emergency"]
+    },
+    {
+      "eventId": "emergency_mountain_cave_darkness",
+      "title": "洞穴低光区域",
+      "type": "emergency",
+      "priority": 55,
+      "scope": "crew",
+      "repeatable": true,
+      "cooldownSeconds": 1800,
+      "trigger": {
+        "source": "surveyComplete",
+        "tileTypes": ["hill", "mountain"],
+        "surveyLevel": "standard"
+      },
+      "conditions": ["crew.status != lost", "crew.status != dead"],
+      "baseChance": 0.08,
+      "modifiers": [
+        { "condition": "crew.attributes.perception >= 4", "chance": 0.05 }
+      ],
+      "durationSeconds": 0,
+      "effects": [
+        { "type": "startEmergency" },
+        { "type": "updateCrewStatus", "status": "inEvent" }
+      ],
+      "choices": [
+        {
+          "choiceId": "hold_position",
+          "text": "原地标记入口，等待光线恢复",
+          "tone": "muted",
+          "effects": [
+            { "type": "updateCrewStatus", "status": "idle" },
+            { "type": "addLog", "text": "队员退回洞口并标记了低光区域，未继续深入。", "tone": "muted" }
+          ]
+        },
+        {
+          "choiceId": "use_light",
+          "text": "使用照明道具继续确认洞内路径",
+          "usesItemTag": "light",
+          "unavailableHint": "需要可用的照明道具才能安全进入低光区域。",
+          "tone": "accent",
+          "effects": [
+            { "type": "useItemByTag", "itemTag": "light" },
+            { "type": "updateCrewStatus", "status": "idle" },
+            { "type": "addLog", "text": "照明稳定后，队员确认了洞内可通行路径和湿滑边界。", "tone": "success" }
+          ]
+        }
+      ],
+      "emergency": {
+        "firstWaitSeconds": 30,
+        "escalationIntervalSeconds": 30,
+        "deadlineSeconds": 120,
+        "autoResolveResult": "hold_position"
+      },
+      "resultText": {
+        "start": "队员报告前方洞穴光线迅速下降，肉眼无法确认地面。",
+        "escalate": "通讯里只剩脚下碎石声，队员要求立刻决定是否使用照明。",
+        "timeout": "队员放弃深入，沿原路退回洞口。"
+      },
+      "tags": ["cave", "light", "emergency"]
+    },
+    {
+      "eventId": "emergency_signal_assist_comms",
+      "title": "通讯定位偏移",
+      "type": "emergency",
+      "priority": 50,
+      "scope": "crew",
+      "repeatable": true,
+      "cooldownSeconds": 1800,
+      "trigger": {
+        "source": "idleTime",
+        "tileTypes": ["plain"],
+        "minIdleSeconds": 120
+      },
+      "conditions": ["crew.status != lost", "crew.status != dead"],
+      "baseChance": 0.05,
+      "modifiers": [],
+      "durationSeconds": 0,
+      "effects": [
+        { "type": "startEmergency" },
+        { "type": "updateCrewStatus", "status": "inEvent" }
+      ],
+      "choices": [
+        {
+          "choiceId": "wait_for_lock",
+          "text": "维持静默，等待通讯台重新锁定",
+          "tone": "muted",
+          "effects": [
+            { "type": "updateCrewStatus", "status": "idle" },
+            { "type": "addLog", "text": "队员保持静默，通讯台稍后恢复了基础联络。", "tone": "muted" }
+          ]
+        },
+        {
+          "choiceId": "boost_with_signal",
+          "text": "使用信号道具辅助定位",
+          "usesItemTag": "signal",
+          "unavailableHint": "需要可用的信号道具才能辅助通讯定位。",
+          "tone": "accent",
+          "effects": [
+            { "type": "useItemByTag", "itemTag": "signal" },
+            { "type": "updateCrewStatus", "status": "idle" },
+            { "type": "addLog", "text": "信号辅助后通讯噪声下降，定位坐标被重新校准，并回传了一段额外环境信息。", "tone": "success" }
+          ]
+        }
+      ],
+      "emergency": {
+        "firstWaitSeconds": 30,
+        "escalationIntervalSeconds": 30,
+        "deadlineSeconds": 120,
+        "autoResolveResult": "wait_for_lock"
+      },
+      "resultText": {
+        "start": "通讯台提示队员定位发生偏移，语音包开始错位。",
+        "escalate": "定位误差继续扩大，需要额外信号辅助或等待重新锁定。",
+        "timeout": "通讯台自行降级到基础联络，额外信息丢失。"
+      },
+      "tags": ["signal", "communication", "emergency"]
     }
   ]
 }

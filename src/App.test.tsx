@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { crewDefinitions, eventDefinitionById, itemDefinitions } from "./content/contentData";
 import { initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
 import { GAME_SAVE_KEY } from "./timeSystem";
 
@@ -76,6 +77,32 @@ describe("App", () => {
         expect.objectContaining({ text: "Garry 敲了三下岩壁，找出一条地图没有标注的铁矿细脉。" }),
       ]),
     );
+  });
+
+  it("keeps the MVP item and event content slice wired through content data", () => {
+    const lightItem = itemDefinitions.find((item) => item.tags.includes("light") && item.usableInResponse);
+    expect(lightItem).toBeDefined();
+    expect(
+      crewDefinitions.some((member) => member.inventory.some((entry) => entry.itemId === lightItem?.itemId && entry.quantity > 0)),
+    ).toBe(true);
+
+    expect(itemDefinitions.some((item) => item.tags.includes("clue"))).toBe(true);
+
+    expect(eventDefinitionById.get("survey_forest_scattered_wood")?.effects).toEqual(
+      expect.arrayContaining([{ type: "addItem", itemId: "wood", target: "crewInventory", amount: 2 }]),
+    );
+    expect(eventDefinitionById.get("survey_hill_loose_ore")?.effects).toEqual(
+      expect.arrayContaining([{ type: "addItem", itemId: "iron_ore", target: "crewInventory", amount: 1 }]),
+    );
+
+    const lightChoice = eventDefinitionById.get("emergency_mountain_cave_darkness")?.choices.find((choice) => choice.choiceId === "use_light");
+    expect(lightChoice?.usesItemTag).toBe("light");
+    expect(lightChoice?.effects).toEqual(expect.arrayContaining([{ type: "useItemByTag", itemTag: "light" }]));
+
+    const signalChoice = eventDefinitionById.get("emergency_signal_assist_comms")?.choices.find((choice) => choice.choiceId === "boost_with_signal");
+    expect(signalChoice?.usesItemTag).toBe("signal");
+    expect(signalChoice?.effects).toEqual(expect.arrayContaining([{ type: "useItemByTag", itemTag: "signal" }]));
+    expect(signalChoice?.effects?.some((effect) => effect.type === "addLog" && /通讯|定位|额外信息/.test(effect.text ?? ""))).toBe(true);
   });
 
   it("handles an incoming Amy call and settles a decision", async () => {
