@@ -38,10 +38,18 @@ export function loadGameSave<T>() {
 
 export function saveGameState<T>(state: T) {
   try {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(state, omitDeprecatedSaveFields));
   } catch {
     // Losing a browser save should not stop the running prototype.
   }
+}
+
+function omitDeprecatedSaveFields(key: string, value: unknown) {
+  if (key === "bag") {
+    return undefined;
+  }
+
+  return value;
 }
 
 function pad2(value: number) {

@@ -7,8 +7,9 @@ import { MapPage } from "./pages/MapPage";
 import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents, type EventHistory } from "./eventSystem";
-import { formatInventory } from "./content/contentData";
+import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
 import {
+  createBaseInventoryFromResources,
   initialCrew,
   initialLogs,
   initialTiles,
@@ -30,11 +31,18 @@ import { formatDuration, formatGameTime, GAME_SAVE_KEY, loadGameSave, saveGameSt
 interface GameState {
   elapsedGameSeconds: number;
   crew: CrewMember[];
+  baseInventory: InventoryEntry[];
   tiles: MapTile[];
   logs: SystemLog[];
   resources: ResourceSummary;
   eventHistory: EventHistory;
 }
+
+type SavedCrewMember = Partial<CrewMember> & { id: CrewId; bag?: unknown };
+
+type SavedGameState = Partial<Omit<GameState, "crew">> & {
+  crew?: SavedCrewMember[];
+};
 
 interface DecisionResult {
   status: string;
@@ -375,31 +383,41 @@ function App() {
 export default App;
 
 function createInitialGameState(): GameState {
-  const saved = loadGameSave<GameState>();
+  const saved = loadGameSave<SavedGameState>();
 
   if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.tiles && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
-      return normalizeCrewMember(member, initialMember);
+      const { bag: _deprecatedBag, ...memberWithoutBag } = member;
+      const normalizedMember = normalizeCrewMember(memberWithoutBag as CrewMember, initialMember as CrewMember);
+
+      return {
+        ...normalizedMember,
+        inventory: Array.isArray(member.inventory) ? member.inventory : (initialMember as CrewMember).inventory,
+      };
     });
     const savedCrewIds = new Set(normalizedCrew.map((member) => member.id));
     const crewWithNewDefaults = [...normalizedCrew, ...initialCrew.filter((member) => !savedCrewIds.has(member.id))];
     return {
       ...saved,
       crew: crewWithNewDefaults,
+      baseInventory: Array.isArray(saved.baseInventory)
+        ? saved.baseInventory
+        : createBaseInventoryFromResources(saved.resources),
       tiles: syncTileCrew(saved.tiles, crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
-    };
+    } as GameState;
   }
 
   const state = {
     elapsedGameSeconds: 0,
     crew: initialCrew,
+    baseInventory: createBaseInventoryFromResources(initialResources),
     tiles: initialTiles,
     logs: initialLogs,
-      resources: initialResources,
-      eventHistory: {},
-    };
+    resources: initialResources,
+    eventHistory: {},
+  };
 
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
 }
@@ -790,7 +808,7 @@ function applySurveyExpertiseBonus(member: CrewMember, resources: ResourceSummar
       }
 
       const inventory = addInventoryItem(state.member.inventory, effect.resourceId, effect.amount);
-      const nextMember = { ...state.member, inventory, bag: formatInventory(inventory) };
+      const nextMember = { ...state.member, inventory };
       return {
         member: nextMember,
         resources: state.resources,
@@ -799,15 +817,6 @@ function applySurveyExpertiseBonus(member: CrewMember, resources: ResourceSummar
     },
     { member, resources, logs },
   );
-}
-
-function addInventoryItem(inventory: CrewMember["inventory"], itemId: string, amount: number) {
-  const existing = inventory.find((entry) => entry.itemId === itemId);
-  if (existing) {
-    return inventory.map((entry) => (entry.itemId === itemId ? { ...entry, quantity: entry.quantity + amount } : entry));
-  }
-
-  return [...inventory, { itemId, quantity: amount }];
 }
 
 function getDeterministicRoll(seed: string) {

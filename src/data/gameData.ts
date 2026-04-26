@@ -1,12 +1,12 @@
 import {
   crewDefinitions,
   eventDefinitionById,
-  formatInventory,
   type CrewDefinition,
   type CrewProfile,
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
 } from "../content/contentData";
+import type { InventoryEntry } from "../inventorySystem";
 
 export type PageId = "control" | "station" | "call" | "map";
 
@@ -63,14 +63,13 @@ export interface CrewMember {
   summary: string;
   attributes: CrewDefinition["attributes"];
   skills: string[];
-  inventory: Array<{ itemId: string; quantity: number }>;
+  inventory: InventoryEntry[];
   profile: CrewProfile;
   voiceTone: string;
   personalityTags: string[];
   expertise: ExpertiseDefinition[];
   diaryEntries: DiaryEntryDefinition[];
   conditions: string[];
-  bag: string[];
   hasIncoming: boolean;
   canCommunicate: boolean;
   lastContactTime: number;
@@ -147,6 +146,20 @@ export const resources: ResourceSummary = {
   power: 62,
   commWindow: "不稳定",
 };
+
+export function createBaseInventoryFromResources(resourceSummary: Pick<ResourceSummary, "iron" | "wood">): InventoryEntry[] {
+  const inventory: InventoryEntry[] = [];
+
+  if (resourceSummary.iron > 0) {
+    inventory.push({ itemId: "iron_ore", quantity: resourceSummary.iron });
+  }
+
+  if (resourceSummary.wood > 0) {
+    inventory.push({ itemId: "wood", quantity: resourceSummary.wood });
+  }
+
+  return inventory;
+}
 
 export const initialTiles: MapTile[] = [
   tile("1-1", "(1,1)", 1, 1, "平原"),
@@ -250,7 +263,6 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     expertise: member.expertise,
     diaryEntries: member.diaryEntries,
     conditions: [],
-    bag: formatInventory(member.inventory),
     hasIncoming: Boolean(member.emergencyEvent),
     canCommunicate: member.canCommunicate,
     lastContactTime: member.lastContactTime,
