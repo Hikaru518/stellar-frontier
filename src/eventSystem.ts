@@ -1,5 +1,6 @@
 import { eventDefinitionById, eventDefinitions, itemDefinitionById, type EventChoiceDefinition, type EventDefinition, type EventEffectDefinition, type TriggerSource } from "./content/contentData";
 import type { ActiveAction, CrewMember, MapTile, ResourceSummary, SystemLog, Tone } from "./data/gameData";
+import { addInventoryItem, useInventoryItemByTag, type InventoryEntry } from "./inventorySystem";
 import { formatGameTime } from "./timeSystem";
 
 export type EventHistory = Record<string, number>;
@@ -23,6 +24,10 @@ export interface EventDecisionResult {
     id: string;
     patch: Partial<MapTile>;
   };
+  inventory?: InventoryEntry[];
+  baseInventory?: InventoryEntry[];
+  resources?: ResourceSummary;
+  logs?: SystemLog[];
 }
 
 interface TriggerEventOptions {
@@ -33,6 +38,15 @@ interface TriggerEventOptions {
   resources: ResourceSummary;
   logs: SystemLog[];
   eventHistory: EventHistory;
+  baseInventory: InventoryEntry[];
+}
+
+interface EffectExecutionResult {
+  member: CrewMember;
+  tiles: MapTile[];
+  resources: ResourceSummary;
+  logs: SystemLog[];
+  baseInventory: InventoryEntry[];
 }
 
 export function getEmergencyEventDefinition(member: CrewMember) {
@@ -62,7 +76,7 @@ export function triggerEvents(options: TriggerEventOptions) {
     return { ...options, member: options.member, changed: false };
   }
 
-  const applied = applyEventEffects({
+  const applied = executeEventEffects({
     event: selected,
     effects: selected.effects,
     member: options.member,
@@ -70,6 +84,7 @@ export function triggerEvents(options: TriggerEventOptions) {
     tiles: options.tiles,
     resources: options.resources,
     logs: options.logs,
+    baseInventory: options.baseInventory,
     elapsedGameSeconds: options.elapsedGameSeconds,
   });
 
@@ -84,7 +99,15 @@ export function triggerEvents(options: TriggerEventOptions) {
   };
 }
 
-export function resolveEmergencyChoice(member: CrewMember, choiceId: string, elapsedGameSeconds: number): EventDecisionResult | null {
+export function resolveEmergencyChoice(
+  member: CrewMember,
+  choiceId: string,
+  elapsedGameSeconds: number,
+  resources: ResourceSummary,
+  baseInventory: InventoryEntry[],
+  logs: SystemLog[],
+  tiles: MapTile[],
+): EventDecisionResult | null {
   const event = getEmergencyEventDefinition(member);
   const choice = event?.choices.find((item) => item.choiceId === choiceId);
   if (!event || !choice || !member.emergencyEvent) {
@@ -93,11 +116,29 @@ export function resolveEmergencyChoice(member: CrewMember, choiceId: string, ela
 
   const succeeded = isChoiceSuccess(event, choice, member.emergencyEvent.dangerStage, elapsedGameSeconds);
   const effects = choice.effects ?? (succeeded ? choice.successEffects ?? [] : choice.failureEffects ?? []);
+  const tile = tiles.find((item) => item.id === member.currentTile);
+  if (!tile) {
+    return null;
+  }
+
+  const applied = executeEventEffects({
+    event,
+    effects,
+    member,
+    tile,
+    tiles,
+    resources,
+    logs,
+    baseInventory,
+    elapsedGameSeconds,
+    appendDefaultLog: false,
+  });
   const summary = getChoiceSummary(choice, effects, succeeded);
   const logEffect = effects.find((effect) => effect.type === "addLog" && effect.text);
   const crewStatusEffect = effects.find((effect) => effect.type === "updateCrewStatus");
   const conditionEffect = effects.find((effect) => effect.type === "addCrewCondition" && effect.condition);
   const tileEffect = effects.find((effect) => effect.type === "updateTile" && effect.field);
+  const nextMember = applied.member;
   const nextStatus = getDisplayStatus(crewStatusEffect?.status, conditionEffect?.condition, succeeded);
   const tone = getChoiceTone(choice, crewStatusEffect?.status, conditionEffect?.condition, succeeded);
 
@@ -109,9 +150,13 @@ export function resolveEmergencyChoice(member: CrewMember, choiceId: string, ela
     tone,
     emergencySettled: choice.durationSeconds ? false : true,
     advanceSeconds: choice.durationSeconds,
-    unavailable: crewStatusEffect?.status === "lost" || crewStatusEffect?.status === "dead" ? true : undefined,
-    canCommunicate: crewStatusEffect?.status === "lost" || crewStatusEffect?.status === "dead" ? false : undefined,
-    conditions: conditionEffect?.condition ? addUnique(member.conditions, conditionEffect.condition) : member.conditions,
+    unavailable: nextMember.unavailable,
+    canCommunicate: nextMember.canCommunicate,
+    conditions: nextMember.conditions,
+    inventory: nextMember.inventory,
+    baseInventory: applied.baseInventory,
+    resources: applied.resources,
+    logs: applied.logs === logs ? undefined : applied.logs,
     clearAction: true,
     tileUpdate: tileEffect
       ? {
@@ -122,13 +167,20 @@ export function resolveEmergencyChoice(member: CrewMember, choiceId: string, ela
   };
 }
 
-export function createAutoEmergencyDecision(member: CrewMember, elapsedGameSeconds: number): EventDecisionResult | null {
+export function createAutoEmergencyDecision(
+  member: CrewMember,
+  elapsedGameSeconds: number,
+  resources: ResourceSummary,
+  baseInventory: InventoryEntry[],
+  logs: SystemLog[],
+  tiles: MapTile[],
+): EventDecisionResult | null {
   const event = getEmergencyEventDefinition(member);
   const autoChoice = event?.emergency?.autoResolveResult;
-  return autoChoice ? resolveEmergencyChoice(member, autoChoice, elapsedGameSeconds) : null;
+  return autoChoice ? resolveEmergencyChoice(member, autoChoice, elapsedGameSeconds, resources, baseInventory, logs, tiles) : null;
 }
 
-function applyEventEffects({
+export function executeEventEffects({
   event,
   effects,
   member,
@@ -136,7 +188,9 @@ function applyEventEffects({
   tiles,
   resources,
   logs,
+  baseInventory,
   elapsedGameSeconds,
+  appendDefaultLog = true,
 }: {
   event: EventDefinition;
   effects: EventEffectDefinition[];
@@ -145,12 +199,15 @@ function applyEventEffects({
   tiles: MapTile[];
   resources: ResourceSummary;
   logs: SystemLog[];
+  baseInventory: InventoryEntry[];
   elapsedGameSeconds: number;
-}) {
+  appendDefaultLog?: boolean;
+}): EffectExecutionResult {
   let nextMember = member;
   let nextTiles = tiles;
   let nextResources = resources;
   let nextLogs = logs;
+  let nextBaseInventory = baseInventory;
 
   for (const effect of effects) {
     if (effect.type === "addResource" && effect.resource && effect.amount) {
@@ -159,6 +216,32 @@ function applyEventEffects({
 
     if (effect.type === "removeResource" && effect.resource && effect.amount) {
       nextResources = addResource(nextResources, effect.resource, -effect.amount);
+    }
+
+    if (effect.type === "addItem" && effect.itemId) {
+      const amount = effect.amount ?? 1;
+      if (effect.target === "baseInventory") {
+        const next = addBaseInventoryItem(nextBaseInventory, nextResources, effect.itemId, amount);
+        nextBaseInventory = next.baseInventory;
+        nextResources = next.resources;
+      } else {
+        nextMember = { ...nextMember, inventory: addInventoryItem(nextMember.inventory, effect.itemId, amount) };
+      }
+    }
+
+    if (effect.type === "useItemByTag" && effect.itemTag) {
+      const result = useInventoryItemByTag(nextMember.inventory, effect.itemTag);
+      if (result.available) {
+        nextMember = { ...nextMember, inventory: result.inventory };
+        nextLogs = appendLogEntry(
+          nextLogs,
+          `${nextMember.name} 使用了${result.item?.name ?? result.entry?.itemId ?? effect.itemTag}${result.consumed ? "，道具已消耗。" : "，道具未消耗。"}`,
+          "accent",
+          elapsedGameSeconds,
+        );
+      } else {
+        nextLogs = appendLogEntry(nextLogs, `${nextMember.name} 无法使用${effect.itemTag}道具：${result.reason ?? "没有可用道具。"}`, "muted", elapsedGameSeconds);
+      }
     }
 
     if (effect.type === "discoverResource" && effect.resource) {
@@ -207,11 +290,21 @@ function applyEventEffects({
     }
   }
 
-  if (!effects.some((effect) => effect.type === "addLog")) {
+  if (appendDefaultLog && !effects.some((effect) => effect.type === "addLog")) {
     nextLogs = appendLogEntry(nextLogs, `${nextMember.name} 触发事件：${event.title}。`, event.type === "emergency" ? "danger" : "neutral", elapsedGameSeconds);
   }
 
-  return { member: nextMember, tiles: nextTiles, resources: nextResources, logs: nextLogs };
+  return { member: nextMember, tiles: nextTiles, resources: nextResources, logs: nextLogs, baseInventory: nextBaseInventory };
+}
+
+function addBaseInventoryItem(baseInventory: InventoryEntry[], resources: ResourceSummary, itemId: string, amount: number) {
+  const nextBaseInventory = addInventoryItem(baseInventory, itemId, amount);
+  const resourceKey = getResourceKey(itemId);
+
+  return {
+    baseInventory: nextBaseInventory,
+    resources: resourceKey === "iron" || resourceKey === "wood" ? addResource(resources, itemId, amount) : resources,
+  };
 }
 
 function matchesTile(event: EventDefinition, tile: MapTile) {

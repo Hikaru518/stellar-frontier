@@ -63,6 +63,10 @@ interface DecisionResult {
   unavailable?: boolean;
   canCommunicate?: boolean;
   conditions?: string[];
+  inventory?: InventoryEntry[];
+  baseInventory?: InventoryEntry[];
+  resources?: ResourceSummary;
+  logs?: SystemLog[];
 }
 
 function App() {
@@ -177,7 +181,7 @@ function App() {
 
     const decision =
       currentCall.type === "emergency" && callMember?.emergencyEvent && !callMember.emergencyEvent.settled
-        ? resolveEmergencyChoice(callMember, actionId, elapsedGameSeconds)
+        ? resolveEmergencyChoice(callMember, actionId, elapsedGameSeconds, resources, gameState.baseInventory, logs, tiles)
         : resolveDecision(currentCall.crewId, actionId, elapsedGameSeconds);
     if (!decision) {
       return;
@@ -201,6 +205,7 @@ function App() {
           unavailable: decision.unavailable ?? member.unavailable,
           canCommunicate: decision.canCommunicate ?? member.canCommunicate,
           conditions: decision.conditions ?? member.conditions,
+          inventory: decision.inventory ?? member.inventory,
           emergencyEvent: decision.emergencySettled && member.emergencyEvent ? { ...member.emergencyEvent, settled: true } : member.emergencyEvent,
         };
 
@@ -218,7 +223,9 @@ function App() {
         elapsedGameSeconds: state.elapsedGameSeconds + (decision.advanceSeconds ?? 0),
         crew: updatedCrew,
         tiles: updatedTiles,
-        logs: appendLogEntry(state.logs, decision.log, decision.tone, state.elapsedGameSeconds),
+        baseInventory: decision.baseInventory ?? state.baseInventory,
+        resources: decision.resources ?? state.resources,
+        logs: decision.logs ?? appendLogEntry(state.logs, decision.log, decision.tone, state.elapsedGameSeconds),
       };
 
       return settleGameTime(advancedState);
@@ -428,6 +435,7 @@ function settleGameTime(state: GameState): GameState {
   let tiles = state.tiles;
   let logs = state.logs;
   let eventHistory = state.eventHistory ?? {};
+  let baseInventory = state.baseInventory;
 
   const crew = state.crew.map((member) => {
     let nextMember = member;
@@ -448,11 +456,13 @@ function settleGameTime(state: GameState): GameState {
           resources,
           logs,
           eventHistory,
+          baseInventory,
         });
         nextMember = eventResult.member;
         tiles = eventResult.tiles;
         resources = eventResult.resources;
         logs = eventResult.logs;
+        baseInventory = eventResult.baseInventory;
         eventHistory = eventResult.eventHistory;
         changed = changed || eventResult.changed;
       }
@@ -475,28 +485,32 @@ function settleGameTime(state: GameState): GameState {
           resources,
           logs,
           eventHistory,
+          baseInventory,
         });
         nextMember = eventResult.member;
         tiles = eventResult.tiles;
         resources = eventResult.resources;
         logs = eventResult.logs;
+        baseInventory = eventResult.baseInventory;
         eventHistory = eventResult.eventHistory;
         changed = changed || eventResult.changed;
       }
     }
 
     if (nextMember.emergencyEvent && !nextMember.emergencyEvent.settled) {
-      const settled = settleEmergencyEvent(nextMember, state.elapsedGameSeconds, tiles, logs);
+      const settled = settleEmergencyEvent(nextMember, state.elapsedGameSeconds, tiles, logs, resources, baseInventory);
       nextMember = settled.member;
       tiles = settled.tiles;
       logs = settled.logs;
+      resources = settled.resources;
+      baseInventory = settled.baseInventory;
       changed = changed || settled.changed;
     }
 
     return nextMember;
   });
 
-  return changed ? { ...state, crew, resources, tiles: syncTileCrew(tiles, crew), logs, eventHistory } : state;
+  return changed ? { ...state, crew, resources, baseInventory, tiles: syncTileCrew(tiles, crew), logs, eventHistory } : state;
 }
 
 function settleCrewAction(
@@ -643,14 +657,21 @@ function settleCrewAction(
   };
 }
 
-function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, tiles: MapTile[], logs: SystemLog[]) {
+function settleEmergencyEvent(
+  member: CrewMember,
+  elapsedGameSeconds: number,
+  tiles: MapTile[],
+  logs: SystemLog[],
+  resources: ResourceSummary,
+  baseInventory: InventoryEntry[],
+) {
   const event = member.emergencyEvent;
   if (!event) {
-    return { member, tiles, logs, changed: false };
+    return { member, tiles, logs, resources, baseInventory, changed: false };
   }
 
   if (elapsedGameSeconds >= event.deadlineTime) {
-    const decision = createAutoEmergencyDecision(member, elapsedGameSeconds);
+    const decision = createAutoEmergencyDecision(member, elapsedGameSeconds, resources, baseInventory, logs, tiles);
     if (decision) {
       const nextMember = appendEmergencyDiary(
         {
@@ -662,6 +683,7 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
           unavailable: decision.unavailable ?? member.unavailable,
           canCommunicate: decision.canCommunicate ?? member.canCommunicate,
           conditions: decision.conditions ?? member.conditions,
+          inventory: decision.inventory ?? member.inventory,
           emergencyEvent: { ...event, dangerStage: 4, settled: true },
         },
         "auto",
@@ -671,7 +693,9 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
       return {
         member: nextMember,
         tiles: decision.tileUpdate ? patchTile(tiles, decision.tileUpdate.id, decision.tileUpdate.patch) : tiles,
-        logs: appendLogEntry(logs, decision.log, decision.tone, elapsedGameSeconds),
+        logs: decision.logs ?? appendLogEntry(logs, decision.log, decision.tone, elapsedGameSeconds),
+        resources: decision.resources ?? resources,
+        baseInventory: decision.baseInventory ?? baseInventory,
         changed: true,
       };
     }
@@ -697,6 +721,8 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
       ),
       tiles: patchTile(tiles, "2-3", { danger: "紧急事件自动结算：Amy 失联", status: "失联" }),
       logs: appendLogEntry(logs, "Amy 的紧急事件超过最终期限，系统按坏结果自动结算。", "danger", elapsedGameSeconds),
+      resources,
+      baseInventory,
       changed: true,
     };
   }
@@ -709,7 +735,7 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
   }
 
   if (nextStage === event.dangerStage) {
-    return { member, tiles, logs, changed: false };
+    return { member, tiles, logs, resources, baseInventory, changed: false };
   }
 
   return {
@@ -722,6 +748,8 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
     },
     tiles: patchTile(tiles, "2-3", { danger: `大型野兽接近，危险阶段 ${nextStage}`, status: "危险升级" }),
     logs: appendLogEntry(logs, `Amy 的情况正在恶化，危险等级提升到 ${nextStage}。`, "danger", elapsedGameSeconds),
+    resources,
+    baseInventory,
     changed: true,
   };
 }
