@@ -173,14 +173,20 @@ wiki 现状：
 
 #### 5.2 审计 docs/core-ideas.md
 
+`docs/core-ideas.md` 是全局核心想法与设计原则的简短指导页：它说明这个游戏最稳定的高层方向，例如通讯调度、只读地图、时间代价、队员人格化、事件反馈、内容与文档分离等原则。它不是完整玩法总览，也不替代各子系统 wiki。
+
+**特殊规则**：`core-ideas.md` 不使用 `organize-wiki/references/wiki-template.md` 的 10 章骨架。审计时不要把它改写成普通子系统 wiki，也不要要求它补齐「核心循环 / 机制规则 / 系统交互 / 关键场景」等标准章节。
+
 1. 读取 core-ideas.md 当前内容。
 2. 用 `@general` subagent 检查：
    - core-ideas.md 中提到的核心理念是否被所有子系统 wiki 体现
    - core-ideas.md 是否引用了已不存在 / 名称已变更的子系统
    - core-ideas.md 是否存在与子系统 wiki 矛盾的高层描述（这通常是类别 A 矛盾，应已在 Step 3-4 处理）
-3. 仅当用户在 Step 4 已确认要修订 core-ideas.md 时，才在本步动手；**不主动**为 core-ideas.md 引入未确认的内容。如发现新的、未在 Step 3 报告里出现的不一致，记录到 `audit-report.md`「Step 5 新发现」段，**不**自动改写。
+   - core-ideas.md 是否仍保持“简短指导页”定位，未变成重复子系统 wiki 的长篇规则汇总
+   - core-ideas.md 是否误用了普通子系统 wiki 的 10 章结构；如果误用，应在用户确认后收缩为短小原则页
+3. **任何对 core-ideas.md 的更新都必须先获得人类确认**。仅当用户在 Step 4 已明确确认要修订 core-ideas.md 时，才在本步动手；**不主动**为 core-ideas.md 引入未确认的内容。如发现新的、未在 Step 3 报告里出现的不一致，记录到 `audit-report.md`「Step 5 新发现」段，**不**自动改写。
 
-如果 core-ideas.md 当前为空（未由 organize-wiki 写入过），保持空文件，仅在 `audit-report.md` 中记录一句「core-ideas.md 仍为空，待 brainstorm + organize-wiki 写入」。
+如果 core-ideas.md 当前为空或缺少上述指导性定位，不要自行补写；在 `audit-report.md` 中记录「core-ideas.md 需要人类确认后由 organize-wiki 写入 / 修订」。
 
 ### Step 6: 同步 AGENTS.md 与 README.md
 
