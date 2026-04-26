@@ -78,6 +78,18 @@ p {
   line-height: 1.1;
 }
 
+.global-time {
+  display: inline-flex;
+  margin-bottom: 10px;
+  border: 1px solid #24384f;
+  background: #dbe3e9;
+  padding: 5px 9px;
+  color: #24384f;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .page-header p,
 .muted-text,
 .facility-sub {

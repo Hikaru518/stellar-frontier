@@ -6,6 +6,7 @@ interface ControlCenterProps {
   crew: CrewMember[];
   logs: SystemLog[];
   resources: ResourceSummary;
+  gameTimeLabel: string;
   onOpenStation: () => void;
   onOpenMap: () => void;
   onAppendLog: (text: string, tone?: "neutral" | "muted" | "accent" | "danger" | "success") => void;
@@ -15,6 +16,7 @@ export function ControlCenter({
   crew,
   logs,
   resources,
+  gameTimeLabel,
   onOpenStation,
   onOpenMap,
   onAppendLog,
@@ -45,6 +47,7 @@ export function ControlCenter({
     <ConsoleShell
       title="前沿基地控制中心"
       subtitle={`SOL ${String(resources.sol).padStart(3, "0")} / 本地供电 ${resources.power}% / 通讯窗口：${resources.commWindow}`}
+      gameTimeLabel={gameTimeLabel}
       actions={<StatusTag tone={incomingCount > 0 ? "danger" : "muted"}>未读通讯 {incomingCount}</StatusTag>}
     >
       <div className="control-layout">

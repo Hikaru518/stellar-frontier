@@ -8,6 +8,31 @@ export type CallType = "normal" | "emergency";
 
 export type MapReturnTarget = "control" | "call";
 
+export type ActionType = "move" | "gather" | "build" | "survey" | "standby";
+
+export type ActionStatus = "inProgress" | "completed" | "interrupted" | "failed";
+
+export interface ActiveAction {
+  id: string;
+  actionType: ActionType;
+  status: ActionStatus;
+  startTime: number;
+  durationSeconds: number;
+  finishTime: number;
+  targetTile?: string;
+  resource?: "iron" | "wood" | "food" | "water";
+  perRoundYield?: number;
+}
+
+export interface EmergencyEvent {
+  eventStartTime: number;
+  callReceivedTime: number;
+  dangerStage: number;
+  nextEscalationTime: number;
+  deadlineTime: number;
+  settled: boolean;
+}
+
 export interface CrewMember {
   id: CrewId;
   name: string;
@@ -19,6 +44,8 @@ export interface CrewMember {
   summary: string;
   bag: string[];
   hasIncoming: boolean;
+  activeAction?: ActiveAction;
+  emergencyEvent?: EmergencyEvent;
   unavailable?: boolean;
 }
 
@@ -95,6 +122,15 @@ export const initialCrew: CrewMember[] = [
     summary: "上次回报：水面比地图记录近了 19 米。",
     bag: ["折叠步枪", "信号弹 x2", "旧式指南针", "压缩饼干"],
     hasIncoming: false,
+    activeAction: {
+      id: "mike-move-lake",
+      actionType: "move",
+      status: "inProgress",
+      startTime: 0,
+      durationSeconds: 60,
+      finishTime: 60,
+      targetTile: "2-1",
+    },
   },
   {
     id: "amy",
@@ -107,6 +143,14 @@ export const initialCrew: CrewMember[] = [
     summary: "最近一次通讯：非常不礼貌的求救。",
     bag: ["香水", "急救针", "半块巧克力", "总部信用凭证"],
     hasIncoming: true,
+    emergencyEvent: {
+      eventStartTime: 0,
+      callReceivedTime: 0,
+      dangerStage: 0,
+      nextEscalationTime: 30,
+      deadlineTime: 120,
+      settled: false,
+    },
   },
   {
     id: "garry",
@@ -119,6 +163,17 @@ export const initialCrew: CrewMember[] = [
     summary: "上次回报：铁矿产出稳定，抱怨也稳定。",
     bag: ["矿镐", "水银温度计", "旧烟斗", "铁矿样本 x4"],
     hasIncoming: false,
+    activeAction: {
+      id: "garry-mine-iron",
+      actionType: "gather",
+      status: "inProgress",
+      startTime: 0,
+      durationSeconds: 300,
+      finishTime: 300,
+      targetTile: "3-3",
+      resource: "iron",
+      perRoundYield: 5,
+    },
   },
 ];
 
