@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember } from "../data/gameData";
+import { CrewDetail } from "./CrewDetail";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface CommunicationStationProps {
@@ -14,9 +15,9 @@ interface CommunicationStationProps {
 
 export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, onBack, onStartCall }: CommunicationStationProps) {
   const [contactsOpen, setContactsOpen] = useState(true);
-  const [bagCrewId, setBagCrewId] = useState<CrewId | null>(null);
+  const [detailCrewId, setDetailCrewId] = useState<CrewId | null>(null);
   const incomingCount = crew.filter((member) => member.hasIncoming).length;
-  const bagCrew = crew.find((member) => member.id === bagCrewId);
+  const detailCrew = crew.find((member) => member.id === detailCrewId);
 
   return (
     <ConsoleShell
@@ -52,7 +53,7 @@ export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, 
                   key={member.id}
                   member={member}
                   elapsedGameSeconds={elapsedGameSeconds}
-                  onOpenBag={() => setBagCrewId(member.id)}
+                  onOpenDetail={() => setDetailCrewId(member.id)}
                   onStartCall={() => onStartCall(member.id)}
                 />
               ))}
@@ -69,18 +70,17 @@ export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, 
         </Panel>
       </div>
 
-      {bagCrew ? (
-        <Modal title={`${bagCrew.name} / 背包`} onClose={() => setBagCrewId(null)}>
+      {detailCrew ? (
+        <Modal title={`${detailCrew.name} / 队员档案`} onClose={() => setDetailCrewId(null)}>
           <FieldList
             rows={[
-              ["身份", bagCrew.role],
-              ["位置", `${bagCrew.location} ${bagCrew.coord}`],
-              ["当前状态", bagCrew.status],
-              ["时间状态", getCrewTiming(bagCrew, elapsedGameSeconds)],
-              ["携带物", bagCrew.bag.join(" / ")],
+              ["身份", detailCrew.role],
+              ["位置", `${detailCrew.location} ${detailCrew.coord}`],
+              ["当前状态", detailCrew.status],
+              ["时间状态", getCrewTiming(detailCrew, elapsedGameSeconds)],
             ]}
           />
-          <p className="muted-text">背包只展示携带物。紧急事件仍需要接通通讯处理。</p>
+          <CrewDetail member={detailCrew} />
         </Modal>
       ) : null}
     </ConsoleShell>
@@ -90,12 +90,12 @@ export function CommunicationStation({ crew, elapsedGameSeconds, gameTimeLabel, 
 function CrewCard({
   member,
   elapsedGameSeconds,
-  onOpenBag,
+  onOpenDetail,
   onStartCall,
 }: {
   member: CrewMember;
   elapsedGameSeconds: number;
-  onOpenBag: () => void;
+  onOpenDetail: () => void;
   onStartCall: () => void;
 }) {
   return (
@@ -119,8 +119,8 @@ function CrewCard({
           </button>
         ) : (
           <>
-            <button type="button" className="secondary-button" onClick={onOpenBag}>
-              查看背包
+            <button type="button" className="secondary-button" onClick={onOpenDetail}>
+              查看档案
             </button>
             <button type="button" className="secondary-button" disabled={member.unavailable} onClick={onStartCall}>
               通话

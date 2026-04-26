@@ -33,37 +33,124 @@
     "attributeMap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["perception", "survival", "mining", "engineering", "combat", "communication"],
+      "required": ["physical", "agility", "intellect", "perception", "luck"],
       "properties": {
+        "physical": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "agility": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "intellect": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
         "perception": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 10
+          "minimum": 1,
+          "maximum": 6
         },
-        "survival": {
+        "luck": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 10
+          "minimum": 1,
+          "maximum": 6
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["originWorld", "originProfession", "experience", "selfIntro"],
+      "properties": {
+        "originWorld": {
+          "$ref": "#/$defs/localizedText"
         },
-        "mining": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10
+        "originProfession": {
+          "$ref": "#/$defs/localizedText"
         },
-        "engineering": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10
+        "experience": {
+          "$ref": "#/$defs/localizedText"
         },
-        "combat": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10
+        "selfIntro": {
+          "$ref": "#/$defs/localizedText"
+        }
+      }
+    },
+    "expertiseRuleEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "resourceId", "amount", "chance", "customLogText"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["surveyBonus"]
         },
-        "communication": {
+        "resourceId": {
+          "$ref": "#/$defs/id"
+        },
+        "amount": {
           "type": "integer",
+          "minimum": 1
+        },
+        "chance": {
+          "type": "number",
           "minimum": 0,
-          "maximum": 10
+          "maximum": 1
+        },
+        "customLogText": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "tileId": {
+          "type": "string",
+          "pattern": "^[0-9]+-[0-9]+$"
+        }
+      }
+    },
+    "expertiseEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expertiseId", "name", "description"],
+      "properties": {
+        "expertiseId": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "ruleEffect": {
+          "$ref": "#/$defs/expertiseRuleEffect"
+        }
+      }
+    },
+    "diaryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entryId", "triggerNode", "gameSecond", "text", "availability"],
+      "properties": {
+        "entryId": {
+          "$ref": "#/$defs/id"
+        },
+        "triggerNode": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "gameSecond": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "availability": {
+          "type": "string",
+          "enum": ["delivered", "pending", "lostBlocked", "recovered"]
         }
       }
     },
@@ -128,7 +215,24 @@
     "crewMember": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["crewId", "name", "role", "currentTile", "status", "statusTone", "summary", "attributes", "skills", "inventory", "canCommunicate", "lastContactTime"],
+      "required": [
+        "crewId",
+        "name",
+        "role",
+        "currentTile",
+        "status",
+        "statusTone",
+        "summary",
+        "attributes",
+        "inventory",
+        "canCommunicate",
+        "lastContactTime",
+        "profile",
+        "voiceTone",
+        "personalityTags",
+        "expertise",
+        "diaryEntries"
+      ],
       "properties": {
         "crewId": {
           "$ref": "#/$defs/id"
@@ -167,6 +271,32 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/inventoryEntry"
+          }
+        },
+        "profile": {
+          "$ref": "#/$defs/profile"
+        },
+        "voiceTone": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "personalityTags": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/localizedText"
+          }
+        },
+        "expertise": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/expertiseEntry"
+          }
+        },
+        "diaryEntries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diaryEntry"
           }
         },
         "canCommunicate": {

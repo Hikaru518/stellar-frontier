@@ -1,8 +1,16 @@
-import { crewDefinitions, eventDefinitionById, formatInventory, type CrewDefinition } from "../content/contentData";
+import {
+  crewDefinitions,
+  eventDefinitionById,
+  formatInventory,
+  type CrewDefinition,
+  type CrewProfile,
+  type DiaryEntryDefinition,
+  type ExpertiseDefinition,
+} from "../content/contentData";
 
 export type PageId = "control" | "station" | "call" | "map";
 
-export type CrewId = "mike" | "amy" | "garry";
+export type CrewId = "mike" | "amy" | "garry" | "lin_xia" | "kael";
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
 
@@ -56,6 +64,11 @@ export interface CrewMember {
   attributes: CrewDefinition["attributes"];
   skills: string[];
   inventory: Array<{ itemId: string; quantity: number }>;
+  profile: CrewProfile;
+  voiceTone: string;
+  personalityTags: string[];
+  expertise: ExpertiseDefinition[];
+  diaryEntries: DiaryEntryDefinition[];
   conditions: string[];
   bag: string[];
   hasIncoming: boolean;
@@ -148,8 +161,8 @@ export const initialTiles: MapTile[] = [
   tile("3-2", "(3,2)", 3, 2, "平原"),
   tile("3-3", "(3,3)", 3, 3, "丘陵", ["铁矿床"], ["采矿厂：铁 #2"], ["水银温度计"], ["garry"], "未发现即时危险", "工作中"),
   tile("3-4", "(3,4)", 3, 4, "丘陵", ["铁矿床"]),
-  tile("4-1", "(4,1)", 4, 1, "空地", [], [], [], [], "未知详情", "未调查", false),
-  tile("4-2", "(4,2)", 4, 2, "空地", [], [], [], [], "未知详情", "未调查", false),
+  tile("4-1", "(4,1)", 4, 1, "旧医疗前哨", ["废弃医疗舱"], [], ["扫描器残留信号"], ["lin_xia"], "未发现即时危险", "待命"),
+  tile("4-2", "(4,2)", 4, 2, "坠落广播塔", ["断续信号"], [], ["损坏中继器"], ["kael"], "未知回声", "待命"),
   tile("4-3", "(4,3)", 4, 3, "沙漠"),
   tile("4-4", "(4,4)", 4, 4, "沙漠"),
 ];
@@ -231,6 +244,11 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     attributes: member.attributes,
     skills: member.skills,
     inventory: member.inventory,
+    profile: member.profile,
+    voiceTone: member.voiceTone,
+    personalityTags: member.personalityTags,
+    expertise: member.expertise,
+    diaryEntries: member.diaryEntries,
     conditions: [],
     bag: formatInventory(member.inventory),
     hasIncoming: Boolean(member.emergencyEvent),

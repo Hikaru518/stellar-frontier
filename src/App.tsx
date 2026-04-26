@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
+import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { MapPage } from "./pages/MapPage";
 import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
+import { appendDiaryEntry } from "./diarySystem";
 import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents, type EventHistory } from "./eventSystem";
+import { formatInventory } from "./content/contentData";
 import {
   initialCrew,
   initialLogs,
@@ -22,7 +25,7 @@ import {
   type SystemLog,
   type Tone,
 } from "./data/gameData";
-import { formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
+import { formatDuration, formatGameTime, GAME_SAVE_KEY, loadGameSave, saveGameState } from "./timeSystem";
 
 interface GameState {
   elapsedGameSeconds: number;
@@ -60,17 +63,19 @@ function App() {
   const [page, setPage] = useState<PageId>("control");
   const [currentCall, setCurrentCall] = useState<CallContext | null>(null);
   const [mapReturnTarget, setMapReturnTarget] = useState<MapReturnTarget>("control");
+  const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
+  const [debugOpen, setDebugOpen] = useState(false);
 
   const { elapsedGameSeconds, crew, tiles, logs, resources } = gameState;
   const gameTimeLabel = formatGameTime(elapsedGameSeconds);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setGameState((state) => settleGameTime({ ...state, elapsedGameSeconds: state.elapsedGameSeconds + 1 }));
+      setGameState((state) => settleGameTime({ ...state, elapsedGameSeconds: state.elapsedGameSeconds + timeMultiplier }));
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [timeMultiplier]);
 
   useEffect(() => {
     saveGameState(gameState);
@@ -94,6 +99,16 @@ function App() {
 
   function returnFromMap() {
     setPage(mapReturnTarget === "call" && currentCall ? "call" : "control");
+  }
+
+  function resetGame() {
+    window.localStorage.removeItem(GAME_SAVE_KEY);
+    const freshState = createInitialGameState();
+    setGameState(freshState);
+    setCurrentCall(null);
+    setMapReturnTarget("control");
+    setPage("control");
+    setDebugOpen(false);
   }
 
   function startCall(crewId: CrewId) {
@@ -161,25 +176,30 @@ function App() {
     }
 
     setGameState((state) => {
-      const updatedCrew = state.crew.map((member) =>
-        member.id === currentCall.crewId
-          ? {
-              ...member,
-              status: decision.status,
-              statusTone: decision.tone,
-              hasIncoming: false,
-              location: decision.location ?? member.location,
-              coord: decision.coord ?? member.coord,
-              summary: decision.summary,
-              activeAction: decision.clearAction ? undefined : decision.activeAction ?? member.activeAction,
-              unavailable: decision.unavailable ?? member.unavailable,
-              canCommunicate: decision.canCommunicate ?? member.canCommunicate,
-              conditions: decision.conditions ?? member.conditions,
-              emergencyEvent:
-                decision.emergencySettled && member.emergencyEvent ? { ...member.emergencyEvent, settled: true } : member.emergencyEvent,
-            }
-          : member,
-      );
+      const updatedCrew = state.crew.map((member) => {
+        if (member.id !== currentCall.crewId) {
+          return member;
+        }
+
+        const nextMember = {
+          ...member,
+          status: decision.status,
+          statusTone: decision.tone,
+          hasIncoming: false,
+          location: decision.location ?? member.location,
+          coord: decision.coord ?? member.coord,
+          summary: decision.summary,
+          activeAction: decision.clearAction ? undefined : decision.activeAction ?? member.activeAction,
+          unavailable: decision.unavailable ?? member.unavailable,
+          canCommunicate: decision.canCommunicate ?? member.canCommunicate,
+          conditions: decision.conditions ?? member.conditions,
+          emergencyEvent: decision.emergencySettled && member.emergencyEvent ? { ...member.emergencyEvent, settled: true } : member.emergencyEvent,
+        };
+
+        return currentCall.type === "emergency" && decision.emergencySettled
+          ? appendEmergencyDiary(nextMember, actionId, state.elapsedGameSeconds)
+          : nextMember;
+      });
 
       const updatedTiles = decision.tileUpdate
         ? patchTile(state.tiles, decision.tileUpdate.id, decision.tileUpdate.patch)
@@ -329,15 +349,26 @@ function App() {
   }
 
   return (
-    <ControlCenter
-      crew={crew}
-      logs={logs}
-      resources={resources}
-      gameTimeLabel={gameTimeLabel}
-      onOpenStation={openStation}
-      onOpenMap={() => openMap("control")}
-      onAppendLog={appendLog}
-    />
+    <>
+      <ControlCenter
+        crew={crew}
+        logs={logs}
+        resources={resources}
+        gameTimeLabel={gameTimeLabel}
+        onOpenStation={openStation}
+        onOpenMap={() => openMap("control")}
+        onOpenDebug={() => setDebugOpen(true)}
+        onAppendLog={appendLog}
+      />
+      {debugOpen ? (
+        <DebugToolbox
+          timeMultiplier={timeMultiplier}
+          onSetTimeMultiplier={setTimeMultiplier}
+          onResetGame={resetGame}
+          onClose={() => setDebugOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -351,10 +382,12 @@ function createInitialGameState(): GameState {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       return normalizeCrewMember(member, initialMember);
     });
+    const savedCrewIds = new Set(normalizedCrew.map((member) => member.id));
+    const crewWithNewDefaults = [...normalizedCrew, ...initialCrew.filter((member) => !savedCrewIds.has(member.id))];
     return {
       ...saved,
-      crew: normalizedCrew,
-      tiles: syncTileCrew(saved.tiles, normalizedCrew),
+      crew: crewWithNewDefaults,
+      tiles: syncTileCrew(saved.tiles, crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
     };
   }
@@ -388,6 +421,7 @@ function settleGameTime(state: GameState): GameState {
       changed = changed || settled.changed;
 
       if (settled.changed && member.activeAction && !nextMember.activeAction) {
+        nextMember = appendArrivalDiary(nextMember, state.elapsedGameSeconds);
         const eventResult = triggerEvents({
           member: nextMember,
           source: "arrival",
@@ -470,8 +504,8 @@ function settleCrewAction(
     }
 
     const ironYield = (action.perRoundYield ?? 5) * completedRounds;
-    return {
-      member: {
+    const nextMember = appendDiaryEntry(
+      {
         ...member,
         status: "在矿床，采矿中。",
         statusTone: "muted" as Tone,
@@ -482,6 +516,16 @@ function settleCrewAction(
           finishTime: nextFinishTime,
         },
       },
+      {
+        entryId: "garry_mining_round_1",
+        triggerNode: "采矿结算",
+        gameSecond: elapsedGameSeconds,
+        text: "矿脉的声音比昨天低一点。年轻人会说这是数据波动，我会说这是它在提醒你别贪。",
+      },
+    );
+
+    return {
+      member: nextMember,
       resources: { ...resources, iron: resources.iron + ironYield },
       tiles,
       logs: appendLogEntry(logs, `Garry 完成了 ${completedRounds} 轮铁矿采集，获得 ${ironYield} 铁矿石。`, "success", elapsedGameSeconds),
@@ -490,13 +534,16 @@ function settleCrewAction(
 
   if (member.id === "mike" && action.actionType === "move") {
     return {
-      member: {
-        ...member,
-        status: "已抵达湖泊边缘，正在观察。",
-        statusTone: "neutral" as Tone,
-        summary: "Mike 抵达湖泊边缘。湖水仍然拒绝待在地图标注的位置。",
-        activeAction: undefined,
-      },
+      member: appendArrivalDiary(
+        {
+          ...member,
+          status: "已抵达湖泊边缘，正在观察。",
+          statusTone: "neutral" as Tone,
+          summary: "Mike 抵达湖泊边缘。湖水仍然拒绝待在地图标注的位置。",
+          activeAction: undefined,
+        },
+        elapsedGameSeconds,
+      ),
       resources,
       tiles: patchTile(tiles, "2-1", { status: "观察中" }),
       logs: appendLogEntry(logs, "Mike 抵达湖泊边缘，开始观察异常水位。", "neutral", elapsedGameSeconds),
@@ -519,17 +566,54 @@ function settleCrewAction(
   }
 
   if (member.id === "garry" && action.actionType === "survey") {
-    return {
-      member: {
+    const surveyedMember = appendDiaryEntry(
+      {
         ...member,
         status: "调查完成，待命中。",
         statusTone: "neutral" as Tone,
         summary: "Garry 完成了一轮调查，正在回报发现。",
         activeAction: undefined,
       },
-      resources,
+      {
+        entryId: `garry_survey_${member.currentTile.replace("-", "_")}_${elapsedGameSeconds}`,
+        triggerNode: "矿床调查",
+        gameSecond: elapsedGameSeconds,
+        text: "温度计这次没骗人。岩壁里面有一段空声，像有人把矿脉掏走又后悔了。",
+      },
+    );
+    const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
+
+    return {
+      member: withExpertise.member,
+      resources: withExpertise.resources,
       tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
+      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
+    };
+  }
+
+  if (member.id === "mike" && action.actionType === "survey") {
+    const surveyedMember = appendDiaryEntry(
+      {
+        ...member,
+        status: "调查完成，待命中。",
+        statusTone: "neutral" as Tone,
+        summary: "Mike 完成调查。他的报告比地图更像地图。",
+        activeAction: undefined,
+      },
+      {
+        entryId: `mike_survey_${member.currentTile.replace("-", "_")}_${elapsedGameSeconds}`,
+        triggerNode: "野外调查",
+        gameSecond: elapsedGameSeconds,
+        text: "废弃营地里没有人，但有太多被匆忙丢下的东西。人离开时通常比地图诚实。",
+      },
+    );
+    const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
+
+    return {
+      member: withExpertise.member,
+      resources: withExpertise.resources,
+      tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
+      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
     };
   }
 
@@ -550,8 +634,8 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
   if (elapsedGameSeconds >= event.deadlineTime) {
     const decision = createAutoEmergencyDecision(member, elapsedGameSeconds);
     if (decision) {
-      return {
-        member: {
+      const nextMember = appendEmergencyDiary(
+        {
           ...member,
           status: decision.status,
           statusTone: decision.tone,
@@ -562,6 +646,12 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
           conditions: decision.conditions ?? member.conditions,
           emergencyEvent: { ...event, dangerStage: 4, settled: true },
         },
+        "auto",
+        elapsedGameSeconds,
+      );
+
+      return {
+        member: nextMember,
         tiles: decision.tileUpdate ? patchTile(tiles, decision.tileUpdate.id, decision.tileUpdate.patch) : tiles,
         logs: appendLogEntry(logs, decision.log, decision.tone, elapsedGameSeconds),
         changed: true,
@@ -569,15 +659,24 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
     }
 
     return {
-      member: {
-        ...member,
-        status: "受重伤并失联。",
-        statusTone: "danger" as Tone,
-        summary: "Amy 错过处理窗口，通讯只剩断续噪声。",
-        hasIncoming: false,
-        unavailable: true,
-        emergencyEvent: { ...event, dangerStage: 4, settled: true },
-      },
+      member: appendDiaryEntry(
+        {
+          ...member,
+          status: "受重伤并失联。",
+          statusTone: "danger" as Tone,
+          summary: "Amy 错过处理窗口，通讯只剩断续噪声。",
+          hasIncoming: false,
+          unavailable: true,
+          canCommunicate: false,
+          emergencyEvent: { ...event, dangerStage: 4, settled: true },
+        },
+        {
+          entryId: `amy_lost_timeout_${elapsedGameSeconds}`,
+          triggerNode: "紧急事件超时",
+          gameSecond: elapsedGameSeconds,
+          text: "我等了够久。下次如果还有下次，请让中控台学会在野兽靠近时闭嘴。",
+        },
+      ),
       tiles: patchTile(tiles, "2-3", { danger: "紧急事件自动结算：Amy 失联", status: "失联" }),
       logs: appendLogEntry(logs, "Amy 的紧急事件超过最终期限，系统按坏结果自动结算。", "danger", elapsedGameSeconds),
       changed: true,
@@ -629,6 +728,95 @@ function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGame
 
 function patchTile(tiles: MapTile[], id: string, patch: Partial<MapTile>) {
   return tiles.map((tile) => (tile.id === id ? { ...tile, ...patch } : tile));
+}
+
+function appendArrivalDiary(member: CrewMember, elapsedGameSeconds: number) {
+  if (member.id !== "mike") {
+    return member;
+  }
+
+  return appendDiaryEntry(member, {
+    entryId: "mike_arrival_lake",
+    triggerNode: "抵达湖泊边缘",
+    gameSecond: elapsedGameSeconds,
+    text: "湖没有声音，但通讯里有回声。它离地图更近，也离我更近。先不要让 Amy 知道我这么写。",
+  });
+}
+
+function appendEmergencyDiary(member: CrewMember, actionId: string, elapsedGameSeconds: number) {
+  if (member.id !== "amy") {
+    return member;
+  }
+
+  const isLost = member.unavailable || !member.canCommunicate || member.status.includes("失联");
+  const entryId = `amy_emergency_${actionId}_${elapsedGameSeconds}`;
+  const text = isLost
+    ? "如果这条记录能传回去，说明我至少赢了其中一半。另一半正在树后面呼吸。"
+    : actionId === "fight"
+      ? "我没有计划和野兽进行任何社交活动。结果很难看，但它先退了。"
+      : "撤离不是逃跑。撤离是把尖叫留给更需要戏剧性的人。";
+
+  return appendDiaryEntry(member, {
+    entryId,
+    triggerNode: "森林紧急事件",
+    gameSecond: elapsedGameSeconds,
+    text,
+  });
+}
+
+function applySurveyExpertiseBonus(member: CrewMember, resources: ResourceSummary, logs: SystemLog[], elapsedGameSeconds: number) {
+  return member.expertise.reduce(
+    (state, expertise) => {
+      const effect = expertise.ruleEffect;
+      if (!effect || effect.type !== "surveyBonus") {
+        return state;
+      }
+
+      if (effect.tileId && effect.tileId !== member.currentTile) {
+        return state;
+      }
+
+      const roll = getDeterministicRoll(`${member.id}:${expertise.expertiseId}:${member.currentTile}:${elapsedGameSeconds}`);
+      if (roll >= effect.chance) {
+        return state;
+      }
+
+      if (effect.resourceId === "iron_ore") {
+        return {
+          member: state.member,
+          resources: { ...state.resources, iron: state.resources.iron + effect.amount },
+          logs: appendLogEntry(state.logs, effect.customLogText, "success", elapsedGameSeconds),
+        };
+      }
+
+      const inventory = addInventoryItem(state.member.inventory, effect.resourceId, effect.amount);
+      const nextMember = { ...state.member, inventory, bag: formatInventory(inventory) };
+      return {
+        member: nextMember,
+        resources: state.resources,
+        logs: appendLogEntry(state.logs, effect.customLogText, "success", elapsedGameSeconds),
+      };
+    },
+    { member, resources, logs },
+  );
+}
+
+function addInventoryItem(inventory: CrewMember["inventory"], itemId: string, amount: number) {
+  const existing = inventory.find((entry) => entry.itemId === itemId);
+  if (existing) {
+    return inventory.map((entry) => (entry.itemId === itemId ? { ...entry, quantity: entry.quantity + amount } : entry));
+  }
+
+  return [...inventory, { itemId, quantity: amount }];
+}
+
+function getDeterministicRoll(seed: string) {
+  let value = 0;
+  for (const char of seed) {
+    value = (value * 31 + char.charCodeAt(0)) % 233280;
+  }
+
+  return ((value * 9301 + 49297) % 233280) / 233280;
 }
 
 function resolveDecision(crewId: CrewId, actionId: string, elapsedGameSeconds: number): DecisionResult | null {

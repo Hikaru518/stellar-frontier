@@ -11,19 +11,61 @@
       "statusTone": "muted",
       "summary": "上次回报：水面比地图记录近了 19 米。",
       "attributes": {
+        "physical": 5,
+        "agility": 5,
+        "intellect": 3,
         "perception": 4,
-        "survival": 5,
-        "mining": 1,
-        "engineering": 2,
-        "combat": 5,
-        "communication": 3
+        "luck": 3
       },
-      "skills": ["combat", "survival"],
+      "skills": ["scavenger", "field_operator"],
       "inventory": [
         { "itemId": "folding_rifle", "quantity": 1 },
         { "itemId": "signal_flare", "quantity": 2 },
         { "itemId": "old_compass", "quantity": 1 },
         { "itemId": "ration", "quantity": 1 }
+      ],
+      "profile": {
+        "originWorld": "旧矿业边境 / 第七码头带",
+        "originProfession": "安全承包队特战干员",
+        "experience": "在几个名字被总部涂黑的矿区待过太久，习惯先检查出口，再相信任何地图。",
+        "selfIntro": "我不是来当英雄的。英雄通常死得太吵。"
+      },
+      "voiceTone": "短句、低声、带一点不耐烦；危险越近越少解释，但会把关键坐标说两遍。",
+      "personalityTags": ["嘴硬心软", "不信任总部", "旧矿区幸存者", "会偷偷给队友留补给"],
+      "expertise": [
+        {
+          "expertiseId": "scavenger",
+          "name": "拾荒者",
+          "description": "调查废弃地点时更容易发现能用的边角物资。",
+          "ruleEffect": {
+            "type": "surveyBonus",
+            "resourceId": "basic_tool",
+            "amount": 1,
+            "chance": 0.3,
+            "customLogText": "Mike 从一堆被烧焦的设备里拆出还能用的基础工具。"
+          }
+        },
+        {
+          "expertiseId": "field_operator",
+          "name": "野外行动",
+          "description": "行动报告更关注路线、掩体和撤离窗口。"
+        }
+      ],
+      "diaryEntries": [
+        {
+          "entryId": "mike_init_lake",
+          "triggerNode": "初始行进",
+          "gameSecond": 0,
+          "text": "湖的位置不对。不是地图错，是湖在移动。把这句话写下来听起来很蠢，但它确实离我更近了。",
+          "availability": "delivered"
+        },
+        {
+          "entryId": "mike_init_compass",
+          "triggerNode": "装备检查",
+          "gameSecond": 0,
+          "text": "指南针正常，步枪正常，通讯台的建议不正常。至少前三样里有两样能用。",
+          "availability": "delivered"
+        }
       ],
       "canCommunicate": true,
       "lastContactTime": 0,
@@ -43,19 +85,47 @@
       "statusTone": "danger",
       "summary": "最近一次通讯：非常不礼貌的求救。",
       "attributes": {
-        "perception": 3,
-        "survival": 1,
-        "mining": 0,
-        "engineering": 1,
-        "combat": 1,
-        "communication": 4
+        "physical": 2,
+        "agility": 3,
+        "intellect": 4,
+        "perception": 4,
+        "luck": 5
       },
-      "skills": ["negotiation"],
+      "skills": ["negotiator"],
       "inventory": [
         { "itemId": "perfume", "quantity": 1 },
         { "itemId": "medical_injector", "quantity": 1 },
         { "itemId": "chocolate", "quantity": 1 },
         { "itemId": "hq_credit", "quantity": 1 }
+      ],
+      "profile": {
+        "originWorld": "内环商业城 / 白塔区",
+        "originProfession": "财团继承人助理，实际负责危机公关",
+        "experience": "她不承认自己被流放，只说这是一次糟糕到无法写进履历的外勤。",
+        "selfIntro": "如果你想听我尖叫，请先给我一个像样的理由。"
+      },
+      "voiceTone": "礼貌、刻薄、速度很快；恐惧时会更精确地挑剔别人的用词。",
+      "personalityTags": ["骄傲但不迟钝", "害怕欠人情", "会用礼貌包装威胁", "讨厌脏水"],
+      "expertise": [
+        {
+          "expertiseId": "negotiator",
+          "name": "谈判本能",
+          "description": "在压力下仍能抓住对方语气里的退路，适合处理需要说服的事件。"
+        },
+        {
+          "expertiseId": "expensive_luck",
+          "name": "昂贵的运气",
+          "description": "她随身物品里总有一件东西在荒野里不合时宜地派上用场。"
+        }
+      ],
+      "diaryEntries": [
+        {
+          "entryId": "amy_init_forest",
+          "triggerNode": "森林求救前",
+          "gameSecond": 0,
+          "text": "森林里没有路，只有一堆互相假装不是树枝的障碍物。我开始理解为什么地图没有写“令人讨厌”。",
+          "availability": "delivered"
+        }
       ],
       "canCommunicate": true,
       "lastContactTime": 0,
@@ -74,19 +144,55 @@
       "statusTone": "muted",
       "summary": "上次回报：铁矿产出稳定，抱怨也稳定。",
       "attributes": {
-        "perception": 3,
-        "survival": 3,
-        "mining": 5,
-        "engineering": 4,
-        "combat": 2,
-        "communication": 2
+        "physical": 3,
+        "agility": 2,
+        "intellect": 4,
+        "perception": 4,
+        "luck": 3
       },
-      "skills": ["mining", "repair"],
+      "skills": ["veteran_miner", "repair_habit"],
       "inventory": [
         { "itemId": "mining_pick", "quantity": 1 },
         { "itemId": "mercury_thermometer", "quantity": 1 },
         { "itemId": "old_pipe", "quantity": 1 },
         { "itemId": "iron_ore", "quantity": 4 }
+      ],
+      "profile": {
+        "originWorld": "重力井采矿带 / 退役矿站 12",
+        "originProfession": "矿工、维修工、所有年轻人的反面教材",
+        "experience": "他声称自己退休过三次，每次都被更糟糕的设备重新雇用。",
+        "selfIntro": "机器会坏，人也会。区别是机器坏了还知道闭嘴。"
+      },
+      "voiceTone": "慢、干、带抱怨；经常先说坏消息，再补一句更坏的。",
+      "personalityTags": ["坏消息先说", "对机器比对人耐心", "爱讲冷笑话", "相信老工具"],
+      "expertise": [
+        {
+          "expertiseId": "veteran_miner",
+          "name": "老矿工",
+          "description": "调查矿床时能凭声音和温度判断矿脉走向。",
+          "ruleEffect": {
+            "type": "surveyBonus",
+            "resourceId": "iron_ore",
+            "amount": 1,
+            "chance": 0.5,
+            "tileId": "3-3",
+            "customLogText": "Garry 敲了三下岩壁，找出一条地图没有标注的铁矿细脉。"
+          }
+        },
+        {
+          "expertiseId": "repair_habit",
+          "name": "维修习惯",
+          "description": "看到松动螺栓会自动伸手，哪怕没人感谢。"
+        }
+      ],
+      "diaryEntries": [
+        {
+          "entryId": "garry_init_mine",
+          "triggerNode": "初始采矿",
+          "gameSecond": 0,
+          "text": "矿床还算诚实，至少它不会说自己“正在优化工作流”。温度计有点不对劲，先记着。",
+          "availability": "delivered"
+        }
       ],
       "canCommunicate": true,
       "lastContactTime": 0,
@@ -97,6 +203,112 @@
         "durationSeconds": 300,
         "resourceId": "iron_ore"
       }
+    },
+    {
+      "crewId": "lin_xia",
+      "name": "林夏",
+      "role": "前轨道麻醉医师",
+      "currentTile": "4-1",
+      "status": "idle",
+      "statusTone": "neutral",
+      "summary": "最近一次回报：她把沙尘噪声标成了“低级疼痛”。",
+      "attributes": {
+        "physical": 2,
+        "agility": 3,
+        "intellect": 5,
+        "perception": 5,
+        "luck": 2
+      },
+      "skills": ["clinical_eye", "triage_memory"],
+      "inventory": [
+        { "itemId": "medical_injector", "quantity": 1 },
+        { "itemId": "scanner", "quantity": 1 },
+        { "itemId": "ration", "quantity": 1 }
+      ],
+      "profile": {
+        "originWorld": "联邦旧殖民地 / 阿瑞斯轨道医院",
+        "originProfession": "麻醉医师，事故后转入灾害分诊",
+        "experience": "她习惯用剂量、脉搏和沉默来判断局势，讨厌没有记录的疼痛。",
+        "selfIntro": "如果有人要崩溃，请按顺序来。记录表只有一张。"
+      },
+      "voiceTone": "克制、精确、轻微疲惫；常把恐惧描述成症状，把坏消息描述成流程。",
+      "personalityTags": ["把痛苦换算成数值", "温柔但不安慰", "记录强迫", "讨厌英雄主义"],
+      "expertise": [
+        {
+          "expertiseId": "clinical_eye",
+          "name": "冷静评估",
+          "description": "面对伤病或惊慌时，能快速拆成可处理步骤。"
+        },
+        {
+          "expertiseId": "triage_memory",
+          "name": "分诊记忆",
+          "description": "她记得每一次被迫排优先级的选择。"
+        }
+      ],
+      "diaryEntries": [
+        {
+          "entryId": "lin_xia_init_dust",
+          "triggerNode": "初始待命",
+          "gameSecond": 0,
+          "text": "这里的风噪像一台没有校准的呼吸机。中控台没有问我感受，这一点值得表扬。",
+          "availability": "delivered"
+        }
+      ],
+      "canCommunicate": true,
+      "lastContactTime": 0
+    },
+    {
+      "crewId": "kael",
+      "name": "Kael",
+      "role": "轨道城邦祭司学徒",
+      "currentTile": "4-2",
+      "status": "idle",
+      "statusTone": "muted",
+      "summary": "最近一次回报：静电里有重复的七拍节奏，他说这不是巧合。",
+      "attributes": {
+        "physical": 3,
+        "agility": 3,
+        "intellect": 3,
+        "perception": 5,
+        "luck": 6
+      },
+      "skills": ["pattern_seer", "bad_omen"],
+      "inventory": [
+        { "itemId": "old_compass", "quantity": 1 },
+        { "itemId": "signal_flare", "quantity": 1 },
+        { "itemId": "chocolate", "quantity": 1 }
+      ],
+      "profile": {
+        "originWorld": "轨道城邦 / 灯环七号",
+        "originProfession": "祭司学徒，后来负责维护坠落前的广播礼仪",
+        "experience": "他的家园毁于一次官方称为“轨道调整”的事故。从那以后，他开始把噪声当作幸存者名单。",
+        "selfIntro": "仪器说没有信号。仪器当然会这么说。"
+      },
+      "voiceTone": "低声、断续、像在听别人听不见的东西；会把技术名词和兆头混在一起。",
+      "personalityTags": ["迷信但敏锐", "害怕安静", "把噪声当征兆", "对数字七过度认真"],
+      "expertise": [
+        {
+          "expertiseId": "pattern_seer",
+          "name": "直觉解读",
+          "description": "能从重复噪声、断续信号和坏掉的仪表里看出异常模式。"
+        },
+        {
+          "expertiseId": "bad_omen",
+          "name": "坏兆头",
+          "description": "他总能提前说出一句让所有人不舒服但后来很难反驳的话。"
+        }
+      ],
+      "diaryEntries": [
+        {
+          "entryId": "kael_init_signal",
+          "triggerNode": "初始待命",
+          "gameSecond": 0,
+          "text": "通讯台的噪声重复了七次。不是求救，也不是风。风不会数数。",
+          "availability": "delivered"
+        }
+      ],
+      "canCommunicate": true,
+      "lastContactTime": 0
     }
   ]
 }

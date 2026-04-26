@@ -9,6 +9,46 @@ export type EventScope = "crew" | "tile" | "global";
 export type TriggerSource = "arrival" | "surveyComplete" | "gatherComplete" | "buildComplete" | "idleTime" | "callChoice";
 export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
 export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
+export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recovered";
+
+export interface CrewAttributeMap {
+  physical: number;
+  agility: number;
+  intellect: number;
+  perception: number;
+  luck: number;
+}
+
+export interface CrewProfile {
+  originWorld: string;
+  originProfession: string;
+  experience: string;
+  selfIntro: string;
+}
+
+export interface ExpertiseRuleEffect {
+  type: "surveyBonus";
+  resourceId: string;
+  amount: number;
+  chance: number;
+  customLogText: string;
+  tileId?: string;
+}
+
+export interface ExpertiseDefinition {
+  expertiseId: string;
+  name: string;
+  description: string;
+  ruleEffect?: ExpertiseRuleEffect;
+}
+
+export interface DiaryEntryDefinition {
+  entryId: string;
+  triggerNode: string;
+  gameSecond: number;
+  text: string;
+  availability: DiaryAvailability;
+}
 
 export interface EventEffectDefinition {
   type: "addResource" | "removeResource" | "discoverResource" | "updateTile" | "updateCrewStatus" | "addCrewCondition" | "startEmergency" | "addLog";
@@ -76,9 +116,14 @@ export interface CrewDefinition {
   status: CrewStatus;
   statusTone: Tone;
   summary: string;
-  attributes: Record<"perception" | "survival" | "mining" | "engineering" | "combat" | "communication", number>;
+  attributes: CrewAttributeMap;
   skills: string[];
   inventory: Array<{ itemId: string; quantity: number }>;
+  profile: CrewProfile;
+  voiceTone: string;
+  personalityTags: string[];
+  expertise: ExpertiseDefinition[];
+  diaryEntries: DiaryEntryDefinition[];
   canCommunicate: boolean;
   lastContactTime: number;
   activeAction?: {

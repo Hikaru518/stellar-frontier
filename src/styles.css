@@ -296,7 +296,10 @@ p {
 }
 
 .modal-window {
-  width: min(560px, 100%);
+  display: flex;
+  max-height: calc(100vh - 48px);
+  width: min(760px, 100%);
+  flex-direction: column;
   border: 2px solid #171a1c;
   background: #f1eee6;
   box-shadow: 8px 8px 0 rgba(23, 26, 28, 0.22);
@@ -304,6 +307,7 @@ p {
 
 .modal-titlebar {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -317,6 +321,9 @@ p {
 }
 
 .modal-content {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
   padding: 16px;
 }
 
@@ -654,6 +661,124 @@ blockquote {
   margin-top: 14px;
   border-top: 1px dashed #c6c0b4;
   padding-top: 12px;
+}
+
+.crew-detail,
+.debug-toolbox {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.attribute-grid,
+.expertise-list,
+.diary-list {
+  display: grid;
+  gap: 10px;
+}
+
+.attribute-row {
+  display: grid;
+  grid-template-columns: 72px 32px 1fr;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px dashed #c6c0b4;
+  padding-bottom: 7px;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.attribute-row strong {
+  color: #24384f;
+}
+
+.attribute-bar {
+  letter-spacing: 0.08em;
+  color: #b45b13;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.text-chip {
+  border: 1px solid #77736b;
+  background: #eeece5;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.expertise-item {
+  border: 1px dashed #a9a49a;
+  background: #f7f4ec;
+  padding: 10px;
+}
+
+.expertise-item p {
+  margin-bottom: 6px;
+}
+
+.expertise-heading,
+.diary-meta,
+.debug-confirm-row,
+.debug-multiplier-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.expertise-heading {
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.diary-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diary-list li {
+  border-left: 3px solid #24384f;
+  background: #f7f4ec;
+  padding: 10px 12px;
+}
+
+.diary-list p {
+  margin-bottom: 0;
+}
+
+.diary-meta {
+  margin-bottom: 6px;
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.diary-locked {
+  border-left-color: #9d3d1f !important;
+  color: #5d6368;
+}
+
+.debug-button {
+  min-height: 30px;
+  border-style: dashed;
+  background: #e1ded5;
+  color: #5d6368;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.debug-multiplier-row {
+  margin-bottom: 12px;
+}
+
+.debug-confirm-row {
+  border: 1px dashed #9d3d1f;
+  background: #f4eadf;
+  padding: 10px;
 }
 
 @media (max-width: 980px) {
