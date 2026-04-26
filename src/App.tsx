@@ -539,6 +539,7 @@ function settleCrewAction(
     const nextMember = appendDiaryEntry(
       {
         ...member,
+        inventory: addInventoryItem(member.inventory, "iron_ore", ironYield),
         status: "在矿床，采矿中。",
         statusTone: "muted" as Tone,
         summary: `已完成 ${completedRounds} 轮采矿，本轮剩余 ${formatDuration(nextFinishTime - elapsedGameSeconds)}。`,
@@ -558,7 +559,7 @@ function settleCrewAction(
 
     return {
       member: nextMember,
-      resources: { ...resources, iron: resources.iron + ironYield },
+      resources,
       tiles,
       logs: appendLogEntry(logs, `Garry 完成了 ${completedRounds} 轮铁矿采集，获得 ${ironYield} 铁矿石。`, "success", elapsedGameSeconds),
     };
@@ -825,14 +826,6 @@ function applySurveyExpertiseBonus(member: CrewMember, resources: ResourceSummar
       const roll = getDeterministicRoll(`${member.id}:${expertise.expertiseId}:${member.currentTile}:${elapsedGameSeconds}`);
       if (roll >= effect.chance) {
         return state;
-      }
-
-      if (effect.resourceId === "iron_ore") {
-        return {
-          member: state.member,
-          resources: { ...state.resources, iron: state.resources.iron + effect.amount },
-          logs: appendLogEntry(state.logs, effect.customLogText, "success", elapsedGameSeconds),
-        };
       }
 
       const inventory = addInventoryItem(state.member.inventory, effect.resourceId, effect.amount);

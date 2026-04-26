@@ -32,7 +32,7 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
   });
 
-  it("settles Garry mining from the time system", () => {
+  it("settles Garry mining into Garry's inventory from the time system", () => {
     vi.useFakeTimers();
 
     render(<App />);
@@ -41,8 +41,41 @@ describe("App", () => {
       vi.advanceTimersByTime(300_000);
     });
 
-    expect(screen.getByText("1245")).toBeInTheDocument();
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const garry = saved.crew.find((member: { id: string }) => member.id === "garry");
+    expect(garry.inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
+    expect(saved.resources.iron).toBe(1240);
     expect(screen.getByText(/Garry 完成了 1 轮铁矿采集/)).toBeInTheDocument();
+  });
+
+  it("settles Garry survey expertise rewards into Garry's inventory", () => {
+    vi.useFakeTimers();
+
+    render(<App />);
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const garry = saved.crew.find((member: { id: string }) => member.id === "garry");
+    expect(garry.inventory).toContainEqual({ itemId: "iron_ore", quantity: 5 });
+    expect(saved.resources.iron).toBe(1240);
+    expect(saved.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: "Garry 敲了三下岩壁，找出一条地图没有标注的铁矿细脉。" }),
+      ]),
+    );
   });
 
   it("handles an incoming Amy call and settles a decision", async () => {
