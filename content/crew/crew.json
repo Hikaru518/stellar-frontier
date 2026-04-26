@@ -222,6 +222,7 @@
       "skills": ["clinical_eye", "triage_memory"],
       "inventory": [
         { "itemId": "medical_injector", "quantity": 1 },
+        { "itemId": "hand_lamp", "quantity": 1 },
         { "itemId": "scanner", "quantity": 1 },
         { "itemId": "ration", "quantity": 1 }
       ],
