@@ -4,6 +4,7 @@ import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { MapPage } from "./pages/MapPage";
 import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
+import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents, type EventHistory } from "./eventSystem";
 import {
   initialCrew,
   initialLogs,
@@ -29,6 +30,7 @@ interface GameState {
   tiles: MapTile[];
   logs: SystemLog[];
   resources: ResourceSummary;
+  eventHistory: EventHistory;
 }
 
 interface DecisionResult {
@@ -47,6 +49,9 @@ interface DecisionResult {
   clearAction?: boolean;
   emergencySettled?: boolean;
   advanceSeconds?: number;
+  unavailable?: boolean;
+  canCommunicate?: boolean;
+  conditions?: string[];
 }
 
 function App() {
@@ -147,7 +152,10 @@ function App() {
       return;
     }
 
-    const decision = resolveDecision(currentCall.crewId, actionId, elapsedGameSeconds);
+    const decision =
+      currentCall.type === "emergency" && callMember?.emergencyEvent && !callMember.emergencyEvent.settled
+        ? resolveEmergencyChoice(callMember, actionId, elapsedGameSeconds)
+        : resolveDecision(currentCall.crewId, actionId, elapsedGameSeconds);
     if (!decision) {
       return;
     }
@@ -164,6 +172,9 @@ function App() {
               coord: decision.coord ?? member.coord,
               summary: decision.summary,
               activeAction: decision.clearAction ? undefined : decision.activeAction ?? member.activeAction,
+              unavailable: decision.unavailable ?? member.unavailable,
+              canCommunicate: decision.canCommunicate ?? member.canCommunicate,
+              conditions: decision.conditions ?? member.conditions,
               emergencyEvent:
                 decision.emergencySettled && member.emergencyEvent ? { ...member.emergencyEvent, settled: true } : member.emergencyEvent,
             }
@@ -344,6 +355,7 @@ function createInitialGameState(): GameState {
       ...saved,
       crew: normalizedCrew,
       tiles: syncTileCrew(saved.tiles, normalizedCrew),
+      eventHistory: saved.eventHistory ?? {},
     };
   }
 
@@ -352,8 +364,9 @@ function createInitialGameState(): GameState {
     crew: initialCrew,
     tiles: initialTiles,
     logs: initialLogs,
-    resources: initialResources,
-  };
+      resources: initialResources,
+      eventHistory: {},
+    };
 
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
 }
@@ -363,6 +376,7 @@ function settleGameTime(state: GameState): GameState {
   let resources = state.resources;
   let tiles = state.tiles;
   let logs = state.logs;
+  let eventHistory = state.eventHistory ?? {};
 
   const crew = state.crew.map((member) => {
     let nextMember = member;
@@ -372,13 +386,51 @@ function settleGameTime(state: GameState): GameState {
       nextMember = settled.member;
       logs = settled.logs;
       changed = changed || settled.changed;
+
+      if (settled.changed && member.activeAction && !nextMember.activeAction) {
+        const eventResult = triggerEvents({
+          member: nextMember,
+          source: "arrival",
+          elapsedGameSeconds: state.elapsedGameSeconds,
+          tiles,
+          resources,
+          logs,
+          eventHistory,
+        });
+        nextMember = eventResult.member;
+        tiles = eventResult.tiles;
+        resources = eventResult.resources;
+        logs = eventResult.logs;
+        eventHistory = eventResult.eventHistory;
+        changed = changed || eventResult.changed;
+      }
     } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
+      const completedActionType = member.activeAction.actionType;
       const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs);
       nextMember = settled.member;
       resources = settled.resources;
       tiles = settled.tiles;
       logs = settled.logs;
       changed = true;
+
+      const source = getEventTriggerSource(completedActionType);
+      if (source) {
+        const eventResult = triggerEvents({
+          member: nextMember,
+          source,
+          elapsedGameSeconds: state.elapsedGameSeconds,
+          tiles,
+          resources,
+          logs,
+          eventHistory,
+        });
+        nextMember = eventResult.member;
+        tiles = eventResult.tiles;
+        resources = eventResult.resources;
+        logs = eventResult.logs;
+        eventHistory = eventResult.eventHistory;
+        changed = changed || eventResult.changed;
+      }
     }
 
     if (nextMember.emergencyEvent && !nextMember.emergencyEvent.settled) {
@@ -392,7 +444,7 @@ function settleGameTime(state: GameState): GameState {
     return nextMember;
   });
 
-  return changed ? { ...state, crew, resources, tiles: syncTileCrew(tiles, crew), logs } : state;
+  return changed ? { ...state, crew, resources, tiles: syncTileCrew(tiles, crew), logs, eventHistory } : state;
 }
 
 function settleCrewAction(
@@ -407,7 +459,7 @@ function settleCrewAction(
     return { member, resources, tiles, logs };
   }
 
-  if (member.id === "garry" && action.actionType === "gather" && action.resource === "iron") {
+  if (member.id === "garry" && action.actionType === "gather" && (action.resource === "iron" || action.resource === "iron_ore")) {
     const duration = Math.max(1, action.durationSeconds);
     let nextFinishTime = action.finishTime;
     let completedRounds = 0;
@@ -470,14 +522,14 @@ function settleCrewAction(
     return {
       member: {
         ...member,
-        status: "矿床异常调查完成。",
-        statusTone: "accent" as Tone,
-        summary: "Garry 记录了低频震动。矿脉没有解释为什么会哼歌。",
+        status: "调查完成，待命中。",
+        statusTone: "neutral" as Tone,
+        summary: "Garry 完成了一轮调查，正在回报发现。",
         activeAction: undefined,
       },
       resources,
-      tiles: patchTile(tiles, "3-3", { danger: "低频震动已记录", status: "异常已记录" }),
-      logs: appendLogEntry(logs, "Garry 完成矿床异常调查，记录低频震动。", "accent", elapsedGameSeconds),
+      tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
+      logs: appendLogEntry(logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
     };
   }
 
@@ -496,6 +548,26 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
   }
 
   if (elapsedGameSeconds >= event.deadlineTime) {
+    const decision = createAutoEmergencyDecision(member, elapsedGameSeconds);
+    if (decision) {
+      return {
+        member: {
+          ...member,
+          status: decision.status,
+          statusTone: decision.tone,
+          summary: decision.summary,
+          hasIncoming: false,
+          unavailable: decision.unavailable ?? member.unavailable,
+          canCommunicate: decision.canCommunicate ?? member.canCommunicate,
+          conditions: decision.conditions ?? member.conditions,
+          emergencyEvent: { ...event, dangerStage: 4, settled: true },
+        },
+        tiles: decision.tileUpdate ? patchTile(tiles, decision.tileUpdate.id, decision.tileUpdate.patch) : tiles,
+        logs: appendLogEntry(logs, decision.log, decision.tone, elapsedGameSeconds),
+        changed: true,
+      };
+    }
+
     return {
       member: {
         ...member,
@@ -535,6 +607,19 @@ function settleEmergencyEvent(member: CrewMember, elapsedGameSeconds: number, ti
     logs: appendLogEntry(logs, `Amy 的情况正在恶化，危险等级提升到 ${nextStage}。`, "danger", elapsedGameSeconds),
     changed: true,
   };
+}
+
+function getEventTriggerSource(actionType: ActiveAction["actionType"]) {
+  if (actionType === "survey") {
+    return "surveyComplete" as const;
+  }
+  if (actionType === "gather") {
+    return "gatherComplete" as const;
+  }
+  if (actionType === "build") {
+    return "buildComplete" as const;
+  }
+  return null;
 }
 
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number) {

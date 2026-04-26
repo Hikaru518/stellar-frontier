@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { createMovePreview, formatMoveRoute } from "../crewSystem";
-import { amyActions, garryActions, type ActionOption, type CallContext, type CrewMember, type MapTile } from "../data/gameData";
+import { getEmergencyChoices, getEmergencyEventDefinition } from "../eventSystem";
+import { garryActions, type ActionOption, type CallContext, type CrewMember, type MapTile } from "../data/gameData";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface CallPageProps {
@@ -43,14 +44,15 @@ export function CallPage({
       return null;
     }
 
-    if (member.id === "amy") {
+    const emergencyDefinition = getEmergencyEventDefinition(member);
+    if (emergencyDefinition) {
       return {
-        title: "通话页面：Amy 紧急事件",
-        subtitle: "当前只与 Amy 通话。紧急选择会结算风险，并同步森林地块与队员状态。",
+        title: `通话页面：${member.name} 紧急事件`,
+        subtitle: `当前只与 ${member.name} 通话。紧急选择会按事件配置结算风险。`,
         scene: "通话中的图片 / 森林 / 噪声 / 有东西在靠近",
-        line: "头儿，我遇到熊了我草。",
-        meta: "地点：森林 / 危险",
-        actions: amyActions,
+        line: emergencyDefinition.resultText.start ?? emergencyDefinition.title,
+        meta: `地点：${member.location} / 危险阶段 ${member.emergencyEvent?.dangerStage ?? 0}`,
+        actions: getEmergencyChoices(member).map((choice) => ({ id: choice.choiceId, label: choice.text, hint: choice.hint, tone: choice.tone })) satisfies ActionOption[],
         badge: "紧急来电",
       };
     }
