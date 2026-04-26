@@ -184,9 +184,22 @@ export function syncTileCrew(tiles: MapTile[], crew: CrewMember[]) {
 }
 
 export function normalizeCrewMember(member: CrewMember, initialMember: CrewMember): CrewMember {
+  const hasCurrentAttributes =
+    typeof member.attributes?.physical === "number" &&
+    typeof member.attributes?.agility === "number" &&
+    typeof member.attributes?.intellect === "number" &&
+    typeof member.attributes?.perception === "number" &&
+    typeof member.attributes?.luck === "number";
+
   return {
     ...initialMember,
     ...member,
+    attributes: hasCurrentAttributes ? member.attributes : initialMember.attributes,
+    profile: member.profile ?? initialMember.profile,
+    voiceTone: member.voiceTone ?? initialMember.voiceTone,
+    personalityTags: member.personalityTags ?? initialMember.personalityTags,
+    expertise: member.expertise ?? initialMember.expertise,
+    diaryEntries: member.diaryEntries ?? initialMember.diaryEntries,
     currentTile: member.currentTile ?? initialMember.currentTile,
     canCommunicate: member.canCommunicate ?? !member.unavailable,
     lastContactTime: member.lastContactTime ?? 0,

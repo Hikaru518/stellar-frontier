@@ -33,3 +33,6 @@ Thumbs.db
 # Local files
 docs/ui-designs/assets/
 design_raw.md
+
+# Agent / session scratch
+tmp/
