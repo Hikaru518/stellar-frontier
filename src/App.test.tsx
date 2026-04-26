@@ -47,6 +47,15 @@ describe("App", () => {
     expect(garry.inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
     expect(saved.resources.iron).toBe(1240);
     expect(screen.getByText(/Garry 完成了 1 轮铁矿采集/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "查看背包" }));
+
+    expect(screen.getByRole("heading", { name: "Garry / 背包" })).toBeInTheDocument();
+    expect(screen.getByText("铁矿石")).toBeInTheDocument();
+    expect(screen.getByText("x9")).toBeInTheDocument();
   });
 
   it("settles Garry survey expertise rewards into Garry's inventory", () => {
