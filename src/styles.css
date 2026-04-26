@@ -465,6 +465,51 @@ blockquote {
   font-size: 12px;
 }
 
+.map-chip-active {
+  border-color: #b45b13;
+  background: #f4eadf;
+}
+
+.move-confirm-box {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  border: 1px dashed #77736b;
+  background: #f7f4ec;
+  padding: 12px;
+}
+
+.move-confirm-blocked {
+  border-color: #9d3d1f;
+}
+
+.compact-fields {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.compact-fields div {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+}
+
+.compact-fields dt {
+  color: #46505a;
+}
+
+.compact-fields dd {
+  margin: 0;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.move-confirm-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .action-stack {
   display: grid;
   gap: 10px;
@@ -569,6 +614,24 @@ blockquote {
   color: #9d3d1f;
 }
 
+.map-cell-route {
+  box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.35);
+}
+
+.map-cell-target {
+  background: #f4eadf;
+}
+
+.map-cell-crew-current {
+  border-left: 4px solid #24384f;
+}
+
+.route-text {
+  color: #24384f !important;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-weight: 700;
+}
+
 .map-legend {
   grid-area: legend;
 }
@@ -583,6 +646,14 @@ blockquote {
 
 .return-panel {
   grid-area: return;
+}
+
+.map-select-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border-top: 1px dashed #c6c0b4;
+  padding-top: 12px;
 }
 
 @media (max-width: 980px) {

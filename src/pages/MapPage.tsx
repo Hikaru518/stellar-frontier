@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
-import type { CrewMember, MapReturnTarget, MapTile } from "../data/gameData";
+import { createMovePreview, formatMoveRoute, getCrewActionTiming } from "../crewSystem";
+import type { CrewId, CrewMember, MapReturnTarget, MapTile } from "../data/gameData";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface MapPageProps {
@@ -9,12 +10,27 @@ interface MapPageProps {
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   returnTarget: MapReturnTarget;
+  moveSelectionCrewId?: CrewId | null;
+  selectedMoveTargetId?: string;
+  onSelectMoveTarget?: (tileId: string) => void;
   onReturn: () => void;
 }
 
-export function MapPage({ tiles, crew, elapsedGameSeconds, gameTimeLabel, returnTarget, onReturn }: MapPageProps) {
+export function MapPage({
+  tiles,
+  crew,
+  elapsedGameSeconds,
+  gameTimeLabel,
+  returnTarget,
+  moveSelectionCrewId,
+  selectedMoveTargetId,
+  onSelectMoveTarget,
+  onReturn,
+}: MapPageProps) {
   const [selectedId, setSelectedId] = useState("3-3");
   const selectedTile = tiles.find((tile) => tile.id === selectedId) ?? tiles[0];
+  const moveSelectionMember = crew.find((member) => member.id === moveSelectionCrewId);
+  const movePreview = moveSelectionMember && selectedTile ? createMovePreview(moveSelectionMember, selectedTile.id, tiles) : null;
 
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),
@@ -24,7 +40,11 @@ export function MapPage({ tiles, crew, elapsedGameSeconds, gameTimeLabel, return
   return (
     <ConsoleShell
       title="卫星雷达地图"
-      subtitle="4x4 地块网格 / 地图只读 / 指令需返回通话或通讯台发起"
+      subtitle={
+        moveSelectionMember
+          ? `4x4 地块网格 / 正在为 ${moveSelectionMember.name} 标记候选目的地 / 指令仍需返回通话确认`
+          : "4x4 地块网格 / 地图只读 / 指令需返回通话或通讯台发起"
+      }
       gameTimeLabel={gameTimeLabel}
       actions={
         <button type="button" className="primary-button" onClick={onReturn}>
@@ -36,13 +56,18 @@ export function MapPage({ tiles, crew, elapsedGameSeconds, gameTimeLabel, return
         <section className="map-grid" aria-label="4x4 星球地块">
           {tiles.map((tile) => {
             const hasDanger = tile.danger !== "未发现即时危险" && tile.danger !== "未知详情";
+            const isRouteTile = movePreview?.route.includes(tile.id) ?? false;
+            const isMoveTarget = selectedMoveTargetId === tile.id;
+            const hasCurrentCrew = crew.some((member) => member.currentTile === tile.id);
             return (
               <button
                 type="button"
                 key={tile.id}
                 className={`map-cell ${selectedTile.id === tile.id ? "map-cell-selected" : ""} ${
                   tile.investigated ? "" : "map-cell-unknown"
-                } ${hasDanger ? "map-cell-danger" : ""}`}
+                } ${hasDanger ? "map-cell-danger" : ""} ${isRouteTile ? "map-cell-route" : ""} ${isMoveTarget ? "map-cell-target" : ""} ${
+                  hasCurrentCrew ? "map-cell-crew-current" : ""
+                }`}
                 onClick={() => setSelectedId(tile.id)}
               >
                 <strong>{tile.coord}</strong>
@@ -61,13 +86,17 @@ export function MapPage({ tiles, crew, elapsedGameSeconds, gameTimeLabel, return
                     </small>
                   ) : null;
                 })}
+                {isRouteTile ? <small className="route-text">候选路线</small> : null}
+                {isMoveTarget ? <small className="route-text">已标记目标</small> : null}
               </button>
             );
           })}
         </section>
 
         <Panel className="map-legend">
-          <p>选中：橙色描边 · 危险：橙色文字 · 未调查：灰色低对比 · 地图页面不提供联系/移动/建设按钮</p>
+          <p>
+            选中：橙色描边 · 危险：橙色文字 · 未调查：灰色低对比 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
+          </p>
         </Panel>
 
         <Panel title={`坐标详情：${selectedTile.coord}`} className="map-detail">
@@ -81,9 +110,28 @@ export function MapPage({ tiles, crew, elapsedGameSeconds, gameTimeLabel, return
               ["计时状态", crewTiming(selectedTile, crewById, elapsedGameSeconds)],
               ["危险", selectedTile.danger],
               ["状态", selectedTile.status],
+              ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
             ]}
           />
-          <p className="muted-text">地图只展示信息。若要移动、建设或调查，请返回通话页面确认指令。</p>
+          {moveSelectionMember ? (
+            <div className="map-select-box">
+              <p className={movePreview?.canMove ? "muted-text" : "danger-text"}>
+                {movePreview?.canMove
+                  ? `将 ${selectedTile.coord} 标记为候选目的地，返回通话后确认。预计 ${formatDuration(movePreview.totalDurationSeconds)}。`
+                  : movePreview?.reason ?? "当前目标不可达。"}
+              </p>
+              <button
+                type="button"
+                className="primary-button full-width"
+                disabled={!movePreview?.canMove}
+                onClick={() => onSelectMoveTarget?.(selectedTile.id)}
+              >
+                标记为目的地，返回通话确认
+              </button>
+            </div>
+          ) : (
+            <p className="muted-text">地图只展示信息。若要移动、建设或调查，请返回通话页面确认指令。</p>
+          )}
         </Panel>
 
         <Panel title="手下状态" className="crew-map-panel">
@@ -136,10 +184,22 @@ function memberTiming(member: CrewMember, elapsedGameSeconds: number) {
   }
 
   if (member.activeAction?.status === "inProgress") {
-    return `行动剩余 ${formatDuration(getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds))}`;
+    return getCrewActionTiming(member, elapsedGameSeconds);
   }
 
   return "无进行中的计时行动";
+}
+
+function moveSelectionText(preview: ReturnType<typeof createMovePreview> | null) {
+  if (!preview) {
+    return "未选择地块";
+  }
+
+  if (!preview.canMove) {
+    return preview.reason ?? "不可达";
+  }
+
+  return `${formatMoveRoute(preview)} / 预计 ${formatDuration(preview.totalDurationSeconds)}`;
 }
 
 function shortStatus(status: string) {

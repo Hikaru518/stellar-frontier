@@ -3,6 +3,7 @@ import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { MapPage } from "./pages/MapPage";
+import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import {
   initialCrew,
   initialLogs,
@@ -125,6 +126,21 @@ function App() {
       return;
     }
 
+    if (actionId === "move") {
+      setCurrentCall((call) =>
+        call
+          ? {
+              ...call,
+              selectingMoveTarget: true,
+              selectedTargetTileId: undefined,
+              result: "请在地图中标记候选目的地。移动指令仍需回到通话中确认。",
+            }
+          : call,
+      );
+      appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
+      return;
+    }
+
     const callMember = crew.find((member) => member.id === currentCall.crewId);
     const emergencySettled = callMember?.emergencyEvent?.settled ?? false;
     if (currentCall.settled || emergencySettled) {
@@ -180,6 +196,81 @@ function App() {
     );
   }
 
+  function selectMoveTarget(tileId: string) {
+    setCurrentCall((call) =>
+      call?.selectingMoveTarget
+        ? {
+            ...call,
+            selectedTargetTileId: tileId,
+            result: `已标记候选目的地 ${tileId}。返回通话后确认是否下达移动指令。`,
+          }
+        : call,
+    );
+    setPage("call");
+  }
+
+  function clearMoveTarget() {
+    setCurrentCall((call) =>
+      call
+        ? {
+            ...call,
+            selectedTargetTileId: undefined,
+            result: "候选目的地已清除。地图仍然愿意假装自己是可靠的。",
+          }
+        : call,
+    );
+  }
+
+  function confirmMove() {
+    if (!currentCall?.selectedTargetTileId) {
+      appendLog("移动确认失败：没有候选目的地。", "muted");
+      return;
+    }
+
+    setGameState((state) => {
+      const member = state.crew.find((item) => item.id === currentCall.crewId);
+      if (!member) {
+        return state;
+      }
+
+      const preview = createMovePreview(member, currentCall.selectedTargetTileId!, state.tiles);
+      if (!preview.canMove) {
+        return {
+          ...state,
+          logs: appendLogEntry(state.logs, `移动确认失败：${preview.reason ?? "目标不可达。"}`, "danger", state.elapsedGameSeconds),
+        };
+      }
+
+      const targetTile = state.tiles.find((tile) => tile.id === preview.targetTileId);
+      const updatedCrew = state.crew.map((item) =>
+        item.id === currentCall.crewId ? startCrewMove(item, preview, state.tiles, state.elapsedGameSeconds) : item,
+      );
+
+      return {
+        ...state,
+        crew: updatedCrew,
+        tiles: syncTileCrew(state.tiles, updatedCrew),
+        logs: appendLogEntry(
+          state.logs,
+          `${member.name} 开始前往 ${targetTile?.coord ?? preview.targetTileId}，预计 ${formatDuration(preview.totalDurationSeconds)}。`,
+          "accent",
+          state.elapsedGameSeconds,
+        ),
+      };
+    });
+
+    setCurrentCall((call) =>
+      call
+        ? {
+            ...call,
+            settled: true,
+            selectingMoveTarget: false,
+            result: "移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。",
+          }
+        : call,
+    );
+  }
+
   if (page === "station") {
     return (
       <CommunicationStation
@@ -194,29 +285,35 @@ function App() {
 
   if (page === "call") {
     return (
-      <CallPage
-        call={currentCall}
-        crew={crew}
-        elapsedGameSeconds={elapsedGameSeconds}
-        gameTimeLabel={gameTimeLabel}
-        onDecision={handleDecision}
-        onOpenMap={() => openMap("call")}
-        onEndCall={endCall}
-        onOpenStation={() => setPage("station")}
+        <CallPage
+          call={currentCall}
+          crew={crew}
+          tiles={tiles}
+          elapsedGameSeconds={elapsedGameSeconds}
+          gameTimeLabel={gameTimeLabel}
+          onDecision={handleDecision}
+          onConfirmMove={confirmMove}
+          onClearMoveTarget={clearMoveTarget}
+          onOpenMap={() => openMap("call")}
+          onEndCall={endCall}
+          onOpenStation={() => setPage("station")}
       />
     );
   }
 
   if (page === "map") {
     return (
-      <MapPage
-        tiles={tiles}
-        crew={crew}
-        elapsedGameSeconds={elapsedGameSeconds}
-        gameTimeLabel={gameTimeLabel}
-        returnTarget={mapReturnTarget}
-        onReturn={returnFromMap}
-      />
+        <MapPage
+          tiles={tiles}
+          crew={crew}
+          elapsedGameSeconds={elapsedGameSeconds}
+          gameTimeLabel={gameTimeLabel}
+          returnTarget={mapReturnTarget}
+          moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
+          selectedMoveTargetId={currentCall?.selectedTargetTileId}
+          onSelectMoveTarget={selectMoveTarget}
+          onReturn={returnFromMap}
+        />
     );
   }
 
@@ -239,16 +336,26 @@ function createInitialGameState(): GameState {
   const saved = loadGameSave<GameState>();
 
   if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.tiles && saved.logs && saved.resources) {
-    return saved;
+    const normalizedCrew = saved.crew.map((member) => {
+      const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
+      return normalizeCrewMember(member, initialMember);
+    });
+    return {
+      ...saved,
+      crew: normalizedCrew,
+      tiles: syncTileCrew(saved.tiles, normalizedCrew),
+    };
   }
 
-  return {
+  const state = {
     elapsedGameSeconds: 0,
     crew: initialCrew,
     tiles: initialTiles,
     logs: initialLogs,
     resources: initialResources,
   };
+
+  return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
 }
 
 function settleGameTime(state: GameState): GameState {
@@ -260,7 +367,12 @@ function settleGameTime(state: GameState): GameState {
   const crew = state.crew.map((member) => {
     let nextMember = member;
 
-    if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
+    if (member.activeAction?.actionType === "move" && member.activeAction.route) {
+      const settled = advanceCrewMovement(member, tiles, logs, state.elapsedGameSeconds);
+      nextMember = settled.member;
+      logs = settled.logs;
+      changed = changed || settled.changed;
+    } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
       const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs);
       nextMember = settled.member;
       resources = settled.resources;
@@ -280,7 +392,7 @@ function settleGameTime(state: GameState): GameState {
     return nextMember;
   });
 
-  return changed ? { ...state, crew, resources, tiles, logs } : state;
+  return changed ? { ...state, crew, resources, tiles: syncTileCrew(tiles, crew), logs } : state;
 }
 
 function settleCrewAction(

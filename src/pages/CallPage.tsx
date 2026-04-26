@@ -1,24 +1,42 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
-import { amyActions, garryActions, type ActionOption, type CallContext, type CrewMember } from "../data/gameData";
+import { createMovePreview, formatMoveRoute } from "../crewSystem";
+import { amyActions, garryActions, type ActionOption, type CallContext, type CrewMember, type MapTile } from "../data/gameData";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
+  tiles: MapTile[];
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   onDecision: (actionId: string) => void;
+  onConfirmMove: () => void;
+  onClearMoveTarget: () => void;
   onOpenMap: () => void;
   onEndCall: () => void;
   onOpenStation: () => void;
 }
 
-export function CallPage({ call, crew, elapsedGameSeconds, gameTimeLabel, onDecision, onOpenMap, onEndCall, onOpenStation }: CallPageProps) {
+export function CallPage({
+  call,
+  crew,
+  tiles,
+  elapsedGameSeconds,
+  gameTimeLabel,
+  onDecision,
+  onConfirmMove,
+  onClearMoveTarget,
+  onOpenMap,
+  onEndCall,
+  onOpenStation,
+}: CallPageProps) {
   const [contactsOpen, setContactsOpen] = useState(false);
   const member = crew.find((item) => item.id === call?.crewId);
   const emergencyEvent = member?.emergencyEvent;
   const callClosed = Boolean(call?.settled || (call?.type === "emergency" && emergencyEvent?.settled));
+  const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
+  const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
 
   const callView = useMemo(() => {
     if (!call || !member) {
@@ -111,10 +129,22 @@ export function CallPage({ call, crew, elapsedGameSeconds, gameTimeLabel, onDeci
 
           <p className="muted-text">{getCallTiming(member, elapsedGameSeconds)}</p>
 
-          <button type="button" className="map-chip" onClick={onOpenMap}>
+          <button type="button" className={`map-chip ${call.selectingMoveTarget ? "map-chip-active" : ""}`} onClick={onOpenMap}>
             <strong>地图二级菜单</strong>
-            <span>只读查看坐标，不下指令</span>
+            <span>{call.selectingMoveTarget ? "标记候选目的地" : "只读查看坐标，不下指令"}</span>
           </button>
+
+          {call.selectingMoveTarget ? (
+            <MoveConfirmPanel
+              member={member}
+              targetTile={selectedMoveTarget}
+              preview={movePreview}
+              callClosed={callClosed}
+              onOpenMap={onOpenMap}
+              onConfirmMove={onConfirmMove}
+              onClearMoveTarget={onClearMoveTarget}
+            />
+          ) : null}
 
           <div className="action-stack">
             {callView.actions.map((action) => (
@@ -162,6 +192,74 @@ export function CallPage({ call, crew, elapsedGameSeconds, gameTimeLabel, onDeci
         ) : null}
       </div>
     </ConsoleShell>
+  );
+}
+
+function MoveConfirmPanel({
+  member,
+  targetTile,
+  preview,
+  callClosed,
+  onOpenMap,
+  onConfirmMove,
+  onClearMoveTarget,
+}: {
+  member: CrewMember;
+  targetTile: MapTile | undefined;
+  preview: ReturnType<typeof createMovePreview> | null;
+  callClosed: boolean;
+  onOpenMap: () => void;
+  onConfirmMove: () => void;
+  onClearMoveTarget: () => void;
+}) {
+  if (!targetTile || !preview) {
+    return (
+      <div className="move-confirm-box">
+        <strong>目的地未标记</strong>
+        <p>打开地图，选择一个地块并标记为候选目的地。地图不会直接下达移动指令。</p>
+        <button type="button" className="secondary-button full-width" onClick={onOpenMap} disabled={callClosed}>
+          打开地图标记目的地
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`move-confirm-box ${preview.canMove ? "" : "move-confirm-blocked"}`}>
+      <strong>移动确认</strong>
+      <dl className="compact-fields">
+        <div>
+          <dt>起点</dt>
+          <dd>
+            {member.coord} {member.location}
+          </dd>
+        </div>
+        <div>
+          <dt>目标</dt>
+          <dd>
+            {targetTile.coord} {targetTile.terrain}
+          </dd>
+        </div>
+        <div>
+          <dt>路线</dt>
+          <dd>{preview.canMove ? formatMoveRoute(preview) : preview.reason}</dd>
+        </div>
+        <div>
+          <dt>预计耗时</dt>
+          <dd>{preview.canMove ? formatDuration(preview.totalDurationSeconds) : "不可达"}</dd>
+        </div>
+      </dl>
+      {preview.interruptionWarning ? <p className="danger-text">{preview.interruptionWarning}</p> : null}
+      <p className="muted-text">确认后才会下达移动指令。抵达目标地块后，{member.name} 将原地待命。</p>
+      <div className="move-confirm-actions">
+        <button type="button" className="primary-button" onClick={onConfirmMove} disabled={!preview.canMove || callClosed}>
+          确认请求 {member.name} 前往 {targetTile.coord}
+        </button>
+        <button type="button" className="secondary-button" onClick={onClearMoveTarget} disabled={callClosed}>
+          清除候选
+        </button>
+      </div>
+    </div>
   );
 }
 

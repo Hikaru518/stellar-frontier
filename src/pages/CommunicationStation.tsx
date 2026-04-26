@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
+import { getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember } from "../data/gameData";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
@@ -139,8 +140,7 @@ function getCrewTiming(member: CrewMember, elapsedGameSeconds: number) {
   }
 
   if (member.activeAction?.status === "inProgress") {
-    const remaining = getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds);
-    return `行动剩余 ${formatDuration(remaining)}`;
+    return getCrewActionTiming(member, elapsedGameSeconds);
   }
 
   return "无进行中的计时行动";

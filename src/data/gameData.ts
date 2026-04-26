@@ -19,7 +19,13 @@ export interface ActiveAction {
   startTime: number;
   durationSeconds: number;
   finishTime: number;
+  fromTile?: string;
   targetTile?: string;
+  route?: string[];
+  routeStepIndex?: number;
+  stepStartedAt?: number;
+  stepFinishTime?: number;
+  totalDurationSeconds?: number;
   resource?: "iron" | "wood" | "food" | "water";
   perRoundYield?: number;
 }
@@ -37,6 +43,7 @@ export interface CrewMember {
   id: CrewId;
   name: string;
   role: string;
+  currentTile: string;
   location: string;
   coord: string;
   status: string;
@@ -44,6 +51,8 @@ export interface CrewMember {
   summary: string;
   bag: string[];
   hasIncoming: boolean;
+  canCommunicate: boolean;
+  lastContactTime: number;
   activeAction?: ActiveAction;
   emergencyEvent?: EmergencyEvent;
   unavailable?: boolean;
@@ -85,6 +94,8 @@ export interface CallContext {
   type: CallType;
   settled: boolean;
   result?: string;
+  selectingMoveTarget?: boolean;
+  selectedTargetTileId?: string;
 }
 
 export interface ActionOption {
@@ -115,13 +126,16 @@ export const initialCrew: CrewMember[] = [
     id: "mike",
     name: "Mike",
     role: "特战干员",
-    location: "湖泊",
-    coord: "(2,1)",
+    currentTile: "1-1",
+    location: "平原前哨",
+    coord: "(1,1)",
     status: "正在前往湖泊，行进中。",
     statusTone: "muted",
     summary: "上次回报：水面比地图记录近了 19 米。",
     bag: ["折叠步枪", "信号弹 x2", "旧式指南针", "压缩饼干"],
     hasIncoming: false,
+    canCommunicate: true,
+    lastContactTime: 0,
     activeAction: {
       id: "mike-move-lake",
       actionType: "move",
@@ -129,13 +143,20 @@ export const initialCrew: CrewMember[] = [
       startTime: 0,
       durationSeconds: 60,
       finishTime: 60,
+      fromTile: "1-1",
       targetTile: "2-1",
+      route: ["2-1"],
+      routeStepIndex: 0,
+      stepStartedAt: 0,
+      stepFinishTime: 60,
+      totalDurationSeconds: 60,
     },
   },
   {
     id: "amy",
     name: "Amy",
     role: "千金大小姐",
+    currentTile: "2-3",
     location: "森林",
     coord: "(2,3)",
     status: "森林，正在和熊搏斗。",
@@ -143,6 +164,8 @@ export const initialCrew: CrewMember[] = [
     summary: "最近一次通讯：非常不礼貌的求救。",
     bag: ["香水", "急救针", "半块巧克力", "总部信用凭证"],
     hasIncoming: true,
+    canCommunicate: true,
+    lastContactTime: 0,
     emergencyEvent: {
       eventStartTime: 0,
       callReceivedTime: 0,
@@ -156,6 +179,7 @@ export const initialCrew: CrewMember[] = [
     id: "garry",
     name: "Garry",
     role: "退休老大爷",
+    currentTile: "3-3",
     location: "矿床",
     coord: "(3,3)",
     status: "在矿床，采矿中。",
@@ -163,6 +187,8 @@ export const initialCrew: CrewMember[] = [
     summary: "上次回报：铁矿产出稳定，抱怨也稳定。",
     bag: ["矿镐", "水银温度计", "旧烟斗", "铁矿样本 x4"],
     hasIncoming: false,
+    canCommunicate: true,
+    lastContactTime: 0,
     activeAction: {
       id: "garry-mine-iron",
       actionType: "gather",
@@ -170,6 +196,7 @@ export const initialCrew: CrewMember[] = [
       startTime: 0,
       durationSeconds: 300,
       finishTime: 300,
+      fromTile: "3-3",
       targetTile: "3-3",
       resource: "iron",
       perRoundYield: 5,
