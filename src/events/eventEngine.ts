@@ -174,8 +174,8 @@ export function processEventWakeups(input: ProcessEventWakeupsInput): EventEngin
   const graphResults: GraphRunnerResult[] = [];
 
   const dueEvents = Object.values(state.active_events)
-    .filter((event) => event.status === "waiting_time" && typeof event.next_wakeup_at === "number" && event.next_wakeup_at <= input.elapsed_game_seconds)
-    .sort((left, right) => (left.next_wakeup_at ?? 0) - (right.next_wakeup_at ?? 0) || left.id.localeCompare(right.id));
+    .filter((event) => isDueTimedEvent(event, input.elapsed_game_seconds))
+    .sort((left, right) => eventDueAt(left) - eventDueAt(right) || left.id.localeCompare(right.id));
 
   for (const dueEvent of dueEvents) {
     const result = processTrigger({
@@ -203,6 +203,26 @@ export function processEventWakeups(input: ProcessEventWakeupsInput): EventEngin
   }
 
   return { state, events, event: events[events.length - 1], errors, graph_results: graphResults };
+}
+
+function isDueTimedEvent(event: RuntimeEvent, elapsedGameSeconds: GameSeconds): boolean {
+  if (event.status === "waiting_time") {
+    return typeof event.next_wakeup_at === "number" && event.next_wakeup_at <= elapsedGameSeconds;
+  }
+
+  if (event.status === "waiting_call") {
+    return typeof event.deadline_at === "number" && event.deadline_at <= elapsedGameSeconds;
+  }
+
+  return false;
+}
+
+function eventDueAt(event: RuntimeEvent): GameSeconds {
+  if (event.status === "waiting_time") {
+    return event.next_wakeup_at ?? Number.POSITIVE_INFINITY;
+  }
+
+  return event.deadline_at ?? Number.POSITIVE_INFINITY;
 }
 
 export function assignObjective(input: AssignObjectiveInput): EventEngineResult {

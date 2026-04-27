@@ -186,6 +186,7 @@ function buildRenderContextSnapshot(input: RenderRuntimeCallInput, crewId: Id): 
     expertise_tags: readPath(crew, "expertise_tags") ?? [],
     crew_conditions: readPath(crew, "condition_tags") ?? [],
     event_pressure: input.node.urgency,
+    severity: severityFromUrgency(input.node.urgency),
     previous_choices: input.event.selected_options,
     event_id: input.event.id,
     event_definition_id: input.event.event_definition_id,
@@ -218,6 +219,16 @@ function resolveSpeakerCrewId(input: RenderRuntimeCallInput): Id {
     return input.event.related_crew_ids[0];
   }
   return input.event.primary_crew_id ?? input.trigger_context.crew_id ?? "unknown_crew";
+}
+
+function severityFromUrgency(urgency: RenderRuntimeCallInput["node"]["urgency"]) {
+  if (urgency === "emergency") {
+    return "high";
+  }
+  if (urgency === "urgent") {
+    return "medium";
+  }
+  return "normal";
 }
 
 function readCrew(state: CallRendererGameState, crewId: Id): unknown {

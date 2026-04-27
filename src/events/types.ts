@@ -120,6 +120,7 @@ export type EffectType =
   | "cancel_crew_action"
   | "update_crew_action"
   | "update_tile_field"
+  | "update_tile_state"
   | "add_tile_tag"
   | "add_danger_tag"
   | "set_discovery_state"

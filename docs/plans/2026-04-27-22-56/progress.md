@@ -22,9 +22,9 @@ source:
 | 6 | TASK-006 | 重构 App.tsx 删除硬编码分支并接入 callActionSettlement | completed | 1 |
 | 7 | TASK-007 | 重构 CallPage 用 buildCallView 渲染按钮 | completed | 1 |
 | 8 | TASK-008 | 通讯台统一所有事件来电为接通按钮 | completed | 1 |
-| 9 | TASK-009 | 实现 Mike crash_site_wreckage_recon 事件内容与集成 | pending | 0 |
-| 10 | TASK-010 | 实现 Amy forest_beast_emergency 紧急事件 | pending | 0 |
-| 11 | TASK-011 | 实现 Garry mine_anomaly_report 事件 | pending | 0 |
+| 9 | TASK-009 | 实现 Mike crash_site_wreckage_recon 事件内容与集成 | completed | 2 |
+| 10 | TASK-010 | 实现 Amy forest_beast_emergency 紧急事件 | completed | 1 |
+| 11 | TASK-011 | 实现 Garry mine_anomaly_report 事件 | completed | 1 |
 | 12 | TASK-012 | 新增 e2e 三事件验收用例 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -96,3 +96,30 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。通讯台事件来电统一显示“接通”；非紧急事件显示 neutral 普通标签且无倒计时，high/critical 显示 danger 紧急标签与 `formatDuration` 倒计时；玩家主动入口保持“通话”并避免重复入口。
 - 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 130 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-009: 实现 Mike crash_site_wreckage_recon 事件内容与集成
+- 状态: completed
+- 开始时间: 2026-04-28 00:59
+- 完成时间: 2026-04-28 01:10
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: 单独派发时被用户调整为 Wave 5 并行执行，中断后重派。
+  - 尝试 2: 与 TASK-010 / TASK-011 并行派发。
+- Monkey summary: 完成 Mike 残骸事件内容、call template、runtime tile-state reveal 支持、content 导出与 App 集成测试。
+- 质量检查: Wave 5 合并后 `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 139 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-010: 实现 Amy forest_beast_emergency 紧急事件
+- 状态: completed
+- 开始时间: 2026-04-28 01:00
+- 完成时间: 2026-04-28 01:10
+- 尝试次数: 1
+- Monkey summary: 成功。实现 Amy `forest_beast_emergency` 紧急事件，基于 `idle_time` + `danger_tags: beast_tracks` 触发，支持阻塞、三个处理选项和超时失败路径。
+- 质量检查: Wave 5 合并后 `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 139 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-011: 实现 Garry mine_anomaly_report 事件
+- 状态: completed
+- 开始时间: 2026-04-28 01:00
+- 完成时间: 2026-04-28 01:10
+- 尝试次数: 1
+- Monkey summary: 成功。新增 Garry 矿床异常事件与模板，接入 runtime content library，并覆盖 mineral_deposit 正向触发与非 mineral_deposit 反向路径。
+- 质量检查: Wave 5 合并后 `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 139 tests）；`npm run build` 通过；ReadLints 无新增错误。

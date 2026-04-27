@@ -1,0 +1,218 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mine_anomaly_report",
+      "version": 1,
+      "domain": "mine",
+      "title": "矿床异常空声",
+      "summary": "队员采集矿床后报告矿脉深处传来异常空声。",
+      "tags": ["mine", "normal_report"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          {
+            "type": "handler_condition",
+            "handler_type": "trigger_context_value_equals",
+            "params": {
+              "field": "payload.action_type",
+              "value": "gather"
+            }
+          },
+          {
+            "type": "any_of",
+            "conditions": [
+              {
+                "type": "handler_condition",
+                "handler_type": "trigger_context_value_equals",
+                "params": {
+                  "field": "payload.tags.0",
+                  "value": "mineral_deposit"
+                }
+              },
+              {
+                "type": "handler_condition",
+                "handler_type": "trigger_context_value_equals",
+                "params": {
+                  "field": "payload.tags.1",
+                  "value": "mineral_deposit"
+                }
+              },
+              {
+                "type": "handler_condition",
+                "handler_type": "trigger_context_value_equals",
+                "params": {
+                  "field": "payload.tags.2",
+                  "value": "mineral_deposit"
+                }
+              },
+              {
+                "type": "handler_condition",
+                "handler_type": "trigger_context_value_equals",
+                "params": {
+                  "field": "payload.tags.3",
+                  "value": "mineral_deposit"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 40,
+        "weight": 1,
+        "mutex_group": null,
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": false
+      },
+      "repeat_policy": {
+        "scope": "crew_tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 0,
+        "history_key_template": "event:{event_definition_id}:{crew_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          {
+            "id": "report",
+            "type": "call",
+            "title": "报告矿脉空声",
+            "call_template_id": "mine_anomaly_report.call.report",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              {
+                "id": "log_anomaly",
+                "effect_refs": ["mine_log_anomaly"],
+                "is_default": true
+              }
+            ],
+            "option_node_mapping": {
+              "log_anomaly": "ok"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 180
+          },
+          {
+            "id": "ok",
+            "type": "end",
+            "title": "矿脉异常已记录",
+            "resolution": "resolved",
+            "result_key": "mine_anomaly_noted",
+            "event_log_template_id": "mine_anomaly_log",
+            "history_writes": [
+              {
+                "key_template": "mine_anomaly_report:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "mine_anomaly_noted"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["ok"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "mine_log_anomaly",
+          "effects": [
+            {
+              "id": "mine_add_condition",
+              "type": "add_crew_condition",
+              "target": {
+                "type": "primary_crew"
+              },
+              "params": {
+                "condition": "noted_mine_anomaly"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "mine_add_event_log",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "Garry 记录了铁脊矿带矿脉中的异常空声。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "mine_anomaly_noted"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "mine_anomaly_log",
+          "summary": "矿脉异常空声已记录",
+          "importance": "normal",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["mine_anomaly_report.call.report"],
+        "crew_ids": ["garry"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "action_complete",
+          "occurred_at": 300,
+          "source": "crew_action",
+          "crew_id": "garry",
+          "tile_id": "3-3",
+          "action_id": "gather:iron-ridge-deposit:3-3:120",
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "action_type": "gather",
+            "object_id": "iron-ridge-deposit",
+            "tags": ["mineral_deposit"]
+          }
+        }
+      ]
+    }
+  ]
+}

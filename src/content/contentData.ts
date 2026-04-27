@@ -1,11 +1,15 @@
 import eventsContent from "../../content/events/events.json";
+import crashSiteCallTemplatesContent from "../../content/events/call_templates/crash_site.json";
 import crewKaelCallTemplatesContent from "../../content/events/call_templates/crew_kael.json";
 import desertCallTemplatesContent from "../../content/events/call_templates/desert.json";
 import forestCallTemplatesContent from "../../content/events/call_templates/forest.json";
+import mineCallTemplatesContent from "../../content/events/call_templates/mine.json";
 import mountainCallTemplatesContent from "../../content/events/call_templates/mountain.json";
+import crashSiteEventDefinitionsContent from "../../content/events/definitions/crash_site.json";
 import crewKaelEventDefinitionsContent from "../../content/events/definitions/crew_kael.json";
 import desertEventDefinitionsContent from "../../content/events/definitions/desert.json";
 import forestEventDefinitionsContent from "../../content/events/definitions/forest.json";
+import mineEventDefinitionsContent from "../../content/events/definitions/mine.json";
 import mountainEventDefinitionsContent from "../../content/events/definitions/mountain.json";
 import handlerRegistryContent from "../../content/events/handler_registry.json";
 import forestPresetsContent from "../../content/events/presets/forest.json";
@@ -270,13 +274,17 @@ export interface CallActionDef {
 }
 
 export const eventProgramDefinitions = [
+  ...crashSiteEventDefinitionsContent.event_definitions,
   ...forestEventDefinitionsContent.event_definitions,
+  ...mineEventDefinitionsContent.event_definitions,
   ...mountainEventDefinitionsContent.event_definitions,
   ...desertEventDefinitionsContent.event_definitions,
   ...crewKaelEventDefinitionsContent.event_definitions,
 ] as unknown as ProgramEventDefinition[];
 export const callTemplates = [
+  ...crashSiteCallTemplatesContent.call_templates,
   ...forestCallTemplatesContent.call_templates,
+  ...mineCallTemplatesContent.call_templates,
   ...mountainCallTemplatesContent.call_templates,
   ...desertCallTemplatesContent.call_templates,
   ...crewKaelCallTemplatesContent.call_templates,

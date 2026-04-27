@@ -114,12 +114,12 @@ function App() {
 
   function startCall(crewId: CrewId) {
     const member = crew.find((item) => item.id === crewId);
-    if (!member || member.unavailable) {
+    const runtimeCall = findRuntimeCallForCrew(gameState, crewId);
+    if (!member || (member.unavailable && !runtimeCall)) {
       appendLog("通讯台尝试接入失败。信号像一条拒绝工作的蛇。", "muted");
       return;
     }
 
-    const runtimeCall = findRuntimeCallForCrew(gameState, crewId);
     const type = "normal";
     setCurrentCall({ crewId, type, settled: false, runtimeCallId: runtimeCall?.id });
     setGameState((state) => ({
@@ -692,10 +692,12 @@ function toEventEngineState(state: GameState): GraphRunnerGameState {
 function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
   const views = syncEventRuntimeToViews(state, eventState);
   const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventState);
+  const eventMap = (eventState as GraphRunnerGameState & { map?: GameMapState }).map;
 
   return {
     ...state,
     crew: bridged.crew,
+    map: eventMap ?? state.map,
     tiles: views.tiles,
     logs: bridged.logs,
     active_events: eventState.active_events,
@@ -717,6 +719,16 @@ function bridgeCrewActions(state: GameState, eventState: GraphRunnerGameState): 
   const crew = state.crew.map((member) => {
     const eventAction = actionByCrew.get(member.id);
     if (!eventAction) {
+      if (member.activeAction?.actionType === "event" || (member.unavailable && member.canCommunicate && member.status === "遭遇事件，等待通讯接通。")) {
+        return {
+          ...member,
+          status: "待命中。",
+          statusTone: "muted" as Tone,
+          activeAction: undefined,
+          unavailable: false,
+          canCommunicate: true,
+        };
+      }
       return member;
     }
 
@@ -925,7 +937,10 @@ function crewInventoryId(crewId: CrewId) {
 
 function inferTileTags(tile: MapTile) {
   const text = [tile.terrain, tile.status, tile.danger, ...tile.resources, ...tile.buildings, ...tile.instruments].join(" ");
-  const tags = new Set<string>();
+  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const explicitTags = "tags" in tile && Array.isArray(tile.tags) ? tile.tags.filter((tag): tag is string => typeof tag === "string") : [];
+  const contentTags = configTile?.objects.flatMap((object) => object.tags?.filter((tag) => tag === "crash_site") ?? []) ?? [];
+  const tags = new Set<string>([...explicitTags, ...contentTags]);
 
   if (/森林|木材|野生动物/.test(text)) {
     tags.add("forest");
