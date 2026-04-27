@@ -4,9 +4,10 @@ import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { MapPage } from "./pages/MapPage";
+import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
 import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary } from "./content/contentData";
+import { eventContentLibrary, type MapCandidateAction, type MapObjectDefinition } from "./content/contentData";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -21,7 +22,6 @@ import {
   type TileState,
   type TriggerContext,
 } from "./events/types";
-import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
 import { defaultMapConfig } from "./content/contentData";
 import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
 import {
@@ -31,13 +31,11 @@ import {
   initialLogs,
   resources as initialResources,
   type ActiveAction,
-  type ActionStatus,
   type CallContext,
   type CrewId,
   type GameState,
   type CrewMember,
   type GameMapState,
-  type InvestigationReport,
   type MapReturnTarget,
   type MapTile,
   type PageId,
@@ -59,31 +57,6 @@ type SavedCrewMember = Partial<CrewMember> & { id: CrewId; bag?: unknown };
 type SavedGameState = Partial<Omit<GameState, "crew">> & {
   crew?: SavedCrewMember[];
 };
-
-interface DecisionResult {
-  status: string;
-  summary: string;
-  result: string;
-  log: string;
-  tone: Tone;
-  location?: string;
-  coord?: string;
-  tileUpdate?: {
-    id: string;
-    patch: Partial<MapTile>;
-  };
-  activeAction?: ActiveAction;
-  clearAction?: boolean;
-  emergencySettled?: boolean;
-  advanceSeconds?: number;
-  unavailable?: boolean;
-  canCommunicate?: boolean;
-  conditions?: string[];
-  inventory?: InventoryEntry[];
-  baseInventory?: InventoryEntry[];
-  resources?: ResourceSummary;
-  logs?: SystemLog[];
-}
 
 function App() {
   const initialState = useMemo(createInitialGameState, []);
@@ -211,69 +184,25 @@ function App() {
       return;
     }
 
-    const decision = resolveDecision(currentCall.crewId, actionId, elapsedGameSeconds);
-    if (!decision) {
-      return;
-    }
-
     setGameState((state) => {
-      const updatedCrew = state.crew.map((member) => {
-        if (member.id !== currentCall.crewId) {
-          return member;
-        }
-
-        const nextMember = {
-          ...member,
-          status: decision.status,
-          statusTone: decision.tone,
-          hasIncoming: false,
-          location: decision.location ?? member.location,
-          coord: decision.coord ?? member.coord,
-          summary: decision.summary,
-          activeAction: decision.clearAction ? undefined : decision.activeAction ?? member.activeAction,
-          unavailable: decision.unavailable ?? member.unavailable,
-          canCommunicate: decision.canCommunicate ?? member.canCommunicate,
-          conditions: decision.conditions ?? member.conditions,
-          inventory: decision.inventory ?? member.inventory,
-        };
-
-        return nextMember;
+      const actionViewId = resolveActionViewIdForCurrentTile(state, currentCall.crewId, actionId);
+      const applied = applyImmediateOrCreateAction({
+        state,
+        crewId: currentCall.crewId,
+        actionViewId,
+        occurredAt: state.elapsedGameSeconds,
       });
+      const settledState = settleGameTime(applied.state);
 
-      const updatedMap = decision.tileUpdate ? patchMapFromLegacyTile(state.map, decision.tileUpdate.id, decision.tileUpdate.patch) : state.map;
-      const updatedTiles = decision.tileUpdate ? patchTile(deriveLegacyTiles(defaultMapConfig, updatedMap), decision.tileUpdate.id, decision.tileUpdate.patch) : state.tiles;
-
-      const advancedState = {
-        ...state,
-        elapsedGameSeconds: state.elapsedGameSeconds + (decision.advanceSeconds ?? 0),
-        crew: updatedCrew,
-        map: syncMapCrew(updatedMap, updatedCrew),
-        tiles: updatedTiles,
-        baseInventory: decision.baseInventory ?? state.baseInventory,
-        resources: decision.resources ?? state.resources,
-        logs: decision.logs ?? appendLogEntry(state.logs, decision.log, decision.tone, state.elapsedGameSeconds),
-      };
-
-      const settledState = settleGameTime(advancedState);
-      return actionId === "standby"
-        ? processAppEventTrigger(settledState, {
-            trigger_type: "idle_time",
-            occurred_at: settledState.elapsedGameSeconds,
-            source: "crew_action",
-            crew_id: currentCall.crewId,
-            tile_id: updatedCrew.find((member) => member.id === currentCall.crewId)?.currentTile ?? null,
-            action_id: null,
-            payload: { action_type: "standby" },
-          })
-        : settledState;
+      return applied.patch.triggerContexts.reduce(processAppEventTrigger, settledState);
     });
 
     setCurrentCall((call) =>
       call
         ? {
             ...call,
-            settled: actionId === "wait" ? false : true,
-            result: decision.result,
+            settled: true,
+            result: "行动指令已提交。",
           }
         : call,
     );
@@ -557,27 +486,15 @@ function settleGameTime(state: GameState): GameState {
         });
       }
     } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
-      const completedActionType = member.activeAction.actionType;
-      const completedActionId = member.activeAction.id;
-      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs, map);
+      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
       nextMember = settled.member;
       resources = settled.resources;
       tiles = settled.tiles;
       logs = settled.logs;
       map = settled.map;
+      baseInventory = settled.baseInventory ?? baseInventory;
+      triggerContexts.push(...settled.triggerContexts);
       changed = true;
-
-      if (shouldTriggerActionComplete(completedActionType)) {
-        triggerContexts.push({
-          trigger_type: "action_complete",
-          occurred_at: state.elapsedGameSeconds,
-          source: "crew_action",
-          crew_id: nextMember.id,
-          tile_id: nextMember.currentTile,
-          action_id: completedActionId,
-          payload: { action_type: completedActionType },
-        });
-      }
     }
 
     return nextMember;
@@ -598,158 +515,107 @@ function settleCrewAction(
   member: CrewMember,
   elapsedGameSeconds: number,
   resources: ResourceSummary,
+  baseInventory: GameState["baseInventory"],
   tiles: MapTile[],
   logs: SystemLog[],
   map: GameMapState,
-) {
+): ActionSettlementPatch {
   const action = member.activeAction;
   if (!action) {
-    return { member, resources, tiles, logs, map };
+    return { member, resources, baseInventory, tiles, logs, map, triggerContexts: [] };
   }
 
-  if (member.id === "garry" && action.actionType === "gather" && (action.resource === "iron" || action.resource === "iron_ore")) {
-    const duration = Math.max(1, action.durationSeconds);
-    let nextFinishTime = action.finishTime;
-    let completedRounds = 0;
+  return settleAction({
+    member,
+    action: enrichActionForSettlement(member, action),
+    occurredAt: elapsedGameSeconds,
+    resources,
+    baseInventory,
+    tiles,
+    map,
+    logs,
+  });
+}
 
-    while (elapsedGameSeconds >= nextFinishTime) {
-      completedRounds += 1;
-      nextFinishTime += duration;
-    }
+function resolveActionViewIdForCurrentTile(state: GameState, crewId: CrewId, actionId: string) {
+  if (actionId.includes(":") || actionId === "survey" || actionId === "standby" || actionId === "stop") {
+    return actionId;
+  }
 
-    const ironYield = (action.perRoundYield ?? 5) * completedRounds;
-    const nextMember = appendDiaryEntry(
-      {
-        ...member,
-        inventory: addInventoryItem(member.inventory, "iron_ore", ironYield),
-        status: "在矿床，采矿中。",
-        statusTone: "muted" as Tone,
-        summary: `已完成 ${completedRounds} 轮采矿，本轮剩余 ${formatDuration(nextFinishTime - elapsedGameSeconds)}。`,
-        activeAction: {
-          ...action,
-          startTime: nextFinishTime - duration,
-          finishTime: nextFinishTime,
-        },
-      },
-      {
-        entryId: "garry_mining_round_1",
-        triggerNode: "采矿结算",
-        gameSecond: elapsedGameSeconds,
-        text: "矿脉的声音比昨天低一点。年轻人会说这是数据波动，我会说这是它在提醒你别贪。",
-      },
-    );
+  const member = state.crew.find((item) => item.id === crewId);
+  const actionObject = member ? findCandidateObject(member.currentTile, actionId, state.map) : undefined;
 
+  return actionObject ? `${actionId}:${actionObject.id}` : actionId;
+}
+
+function enrichActionForSettlement(member: CrewMember, action: ActiveAction): ActiveAction | SettlementActiveAction {
+  if (hasSettlementMetadata(action)) {
+    return action;
+  }
+
+  if (isObjectCandidateAction(action.actionType)) {
+    const object = findCandidateObject(action.targetTile ?? member.currentTile, action.actionType);
     return {
-      member: nextMember,
-      resources,
-      tiles,
-      logs: appendLogEntry(logs, `Garry 完成了 ${completedRounds} 轮铁矿采集，获得 ${ironYield} 铁矿石。`, "success", elapsedGameSeconds),
-      map,
+      ...action,
+      objectId: object?.id,
+      params: {
+        ...createLegacyYieldParams(action, object),
+        ...action.params,
+      },
+      handler: action.actionType,
+      actionDefId: action.actionType,
     };
   }
 
-  if (member.id === "mike" && action.actionType === "move") {
+  if (action.actionType === "survey" || action.actionType === "standby") {
     return {
-      member: appendArrivalDiary(
-        {
-          ...member,
-          status: "已抵达湖泊边缘，正在观察。",
-          statusTone: "neutral" as Tone,
-          summary: "Mike 抵达湖泊边缘。湖水仍然拒绝待在地图标注的位置。",
-          activeAction: undefined,
-        },
-        elapsedGameSeconds,
-      ),
-      resources,
-      tiles: patchTile(tiles, "2-1", { status: "观察中" }),
-      logs: appendLogEntry(logs, "Mike 抵达湖泊边缘，开始观察异常水位。", "neutral", elapsedGameSeconds),
-      map,
+      ...action,
+      params: action.params ?? {},
+      handler: action.actionType,
+      actionDefId: action.actionType,
     };
   }
 
-  if (member.id === "garry" && action.actionType === "build") {
-    return {
-      member: {
-        ...member,
-        status: "临时支架安装完成，恢复采矿待命。",
-        statusTone: "success" as Tone,
-        summary: "Garry 完成临时支架安装，并要求把它叫作工程，不要叫摆架子。",
-        activeAction: undefined,
-      },
-      resources,
-      tiles: patchTile(tiles, "3-3", { buildings: ["采矿厂：铁 #2", "临时支架"], status: "设施已加固" }),
-      logs: appendLogEntry(logs, "丘陵地块的临时支架已安装完成。", "success", elapsedGameSeconds),
-      map,
-    };
+  return action;
+}
+
+function hasSettlementMetadata(action: ActiveAction): action is ActiveAction & SettlementActiveAction {
+  return "handler" in action && typeof action.handler === "string";
+}
+
+function isObjectCandidateAction(actionType: ActiveAction["actionType"]): actionType is Extract<MapCandidateAction, "gather" | "build"> {
+  return actionType === "gather" || actionType === "build";
+}
+
+function findCandidateObject(tileId: string, actionId: string, map?: GameMapState): MapObjectDefinition | undefined {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  return configTile?.objects.find((object) => object.candidateActions?.includes(actionId as MapCandidateAction) && isObjectVisible(tileId, object, map));
+}
+
+function isObjectVisible(tileId: string, object: MapObjectDefinition, map?: GameMapState) {
+  if (!map) {
+    return true;
   }
 
-  if (member.id === "garry" && action.actionType === "survey") {
-    const surveyedMember = appendDiaryEntry(
-      {
-        ...member,
-        status: "调查完成，待命中。",
-        statusTone: "neutral" as Tone,
-        summary: "Garry 完成了一轮调查，正在回报发现。",
-        activeAction: undefined,
-      },
-      {
-        entryId: `garry_survey_${member.currentTile.replace("-", "_")}_${elapsedGameSeconds}`,
-        triggerNode: "矿床调查",
-        gameSecond: elapsedGameSeconds,
-        text: "温度计这次没骗人。岩壁里面有一段空声，像有人把矿脉掏走又后悔了。",
-      },
-    );
-    const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
-    const investigation = completeInvestigation(map, member.currentTile, member.id, elapsedGameSeconds);
+  const runtimeTile = map.tilesById[tileId];
+  return (
+    object.visibility === "onDiscovered" ||
+    runtimeTile?.revealedObjectIds?.includes(object.id) ||
+    (object.visibility === "onInvestigated" && runtimeTile?.investigated)
+  );
+}
 
-    return {
-      member: withExpertise.member,
-      resources: withExpertise.resources,
-      tiles: patchTile(deriveLegacyTiles(defaultMapConfig, investigation.map), member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds, investigation.report.id),
-      map: investigation.map,
-    };
-  }
-
-  if (member.id === "mike" && action.actionType === "survey") {
-    const surveyedMember = appendDiaryEntry(
-      {
-        ...member,
-        status: "调查完成，待命中。",
-        statusTone: "neutral" as Tone,
-        summary: "Mike 完成调查。他的报告比地图更像地图。",
-        activeAction: undefined,
-      },
-      {
-        entryId: `mike_survey_${member.currentTile.replace("-", "_")}_${elapsedGameSeconds}`,
-        triggerNode: "野外调查",
-        gameSecond: elapsedGameSeconds,
-        text: "废弃营地里没有人，但有太多被匆忙丢下的东西。人离开时通常比地图诚实。",
-      },
-    );
-    const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
-    const investigation = completeInvestigation(map, member.currentTile, member.id, elapsedGameSeconds);
-
-    return {
-      member: withExpertise.member,
-      resources: withExpertise.resources,
-      tiles: patchTile(deriveLegacyTiles(defaultMapConfig, investigation.map), member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds, investigation.report.id),
-      map: investigation.map,
-    };
+function createLegacyYieldParams(action: ActiveAction, object: MapObjectDefinition | undefined) {
+  const resourceId = action.resource ?? object?.legacyResource;
+  if (action.actionType !== "gather" || !resourceId) {
+    return {};
   }
 
   return {
-    member: { ...member, activeAction: undefined },
-    resources,
-    tiles,
-    logs: appendLogEntry(logs, `${member.name} 的行动已完成。`, "neutral", elapsedGameSeconds),
-    map,
+    perRoundYieldByResource: {
+      [resourceId]: action.perRoundYield ?? 1,
+    },
   };
-}
-
-function shouldTriggerActionComplete(actionType: ActiveAction["actionType"]) {
-  return actionType === "survey" || actionType === "gather" || actionType === "build";
 }
 
 function processAppEventTrigger(state: GameState, context: TriggerContext): GameState {
@@ -980,7 +846,7 @@ function toTileState(tile: MapTile): TileState {
     },
     terrain_type: tile.terrain,
     tags: inferTileTags(tile),
-    danger_tags: tile.dangerTags ?? (tile.danger === "未发现即时危险" ? [] : [tile.danger]),
+    danger_tags: inferTileDangerTags(tile),
     discovery_state: tile.investigated ? "mapped" : "known",
     survey_state: tile.investigated ? "surveyed" : "unsurveyed",
     visibility: "visible",
@@ -1080,82 +946,27 @@ function inferTileTags(tile: MapTile) {
   return Array.from(tags);
 }
 
+function inferTileDangerTags(tile: MapTile) {
+  if (tile.dangerTags) {
+    return tile.dangerTags;
+  }
+
+  if (tile.danger === "未发现即时危险") {
+    return [];
+  }
+
+  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const configDangerTags =
+    configTile?.specialStates
+      .filter((state) => state.legacyDanger === tile.danger)
+      .flatMap((state) => ("dangerTags" in state && Array.isArray(state.dangerTags) ? state.dangerTags : state.tags ?? [])) ?? [];
+
+  return configDangerTags.length > 0 ? configDangerTags : [tile.danger];
+}
+
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {
   const id = logs.reduce((highest, log) => Math.max(highest, log.id), 0) + 1;
   return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone, ...(reportId ? { reportId } : {}) }];
-}
-
-function completeInvestigation(map: GameMapState, tileId: string, crewId: CrewId, elapsedGameSeconds: number) {
-  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
-  const previous = map.tilesById[tileId] ?? {};
-  const reportId = `investigation-${tileId.replace("-", "_")}-${crewId}-${elapsedGameSeconds}`;
-
-  if (!configTile) {
-    const report: InvestigationReport = {
-      id: reportId,
-      tileId,
-      crewId,
-      createdAtGameSeconds: elapsedGameSeconds,
-      areaName: tileId,
-      playerCoord: tileId,
-      terrain: "未知",
-      weather: "未知",
-      environment: { temperatureCelsius: 0, humidityPercent: 0, magneticFieldMicroTesla: 0, radiationLevel: "unknown" },
-      revealedObjects: [],
-      revealedSpecialStates: [],
-    };
-    return { report, map: { ...map, investigationReportsById: { ...map.investigationReportsById, [reportId]: report } } };
-  }
-
-  const revealedObjectIds = configTile.objects.filter((object) => object.visibility === "onInvestigated").map((object) => object.id);
-  const activeStateIds = previous.activeSpecialStateIds ?? configTile.specialStates.filter((state) => state.startsActive).map((state) => state.id);
-  const revealedSpecialStateIds = configTile.specialStates
-    .filter((state) => state.visibility === "onInvestigated" && activeStateIds.includes(state.id))
-    .map((state) => state.id);
-  const origin = defaultMapConfig.tiles.find((tile) => tile.id === defaultMapConfig.originTileId);
-  const playerCoord = origin ? `(${configTile.col - origin.col},${origin.row - configTile.row})` : `(${configTile.row},${configTile.col})`;
-  const report: InvestigationReport = {
-    id: reportId,
-    tileId,
-    crewId,
-    createdAtGameSeconds: elapsedGameSeconds,
-    areaName: configTile.areaName,
-    playerCoord,
-    terrain: configTile.terrain,
-    weather: configTile.weather,
-    environment: configTile.environment,
-    revealedObjects: configTile.objects
-      .filter((object) => revealedObjectIds.includes(object.id) && !(previous.revealedObjectIds ?? []).includes(object.id))
-      .map((object) => ({ id: object.id, name: object.name, kind: object.kind })),
-    revealedSpecialStates: configTile.specialStates
-      .filter((state) => revealedSpecialStateIds.includes(state.id) && !(previous.revealedSpecialStateIds ?? []).includes(state.id))
-      .map((state) => ({ id: state.id, name: state.name, severity: state.severity })),
-  };
-
-  return {
-    report,
-    map: {
-      ...map,
-      discoveredTileIds: map.discoveredTileIds.includes(tileId) ? map.discoveredTileIds : [...map.discoveredTileIds, tileId],
-      investigationReportsById: { ...map.investigationReportsById, [reportId]: report },
-      tilesById: {
-        ...map.tilesById,
-        [tileId]: {
-          ...previous,
-          discovered: true,
-          investigated: true,
-          status: "已调查",
-          revealedObjectIds: addUnique(previous.revealedObjectIds ?? [], ...revealedObjectIds),
-          revealedSpecialStateIds: addUnique(previous.revealedSpecialStateIds ?? [], ...revealedSpecialStateIds),
-          lastInvestigationReportId: reportId,
-        },
-      },
-    },
-  };
-}
-
-function patchTile(tiles: MapTile[], id: string, patch: Partial<MapTile>) {
-  return tiles.map((tile) => (tile.id === id ? { ...tile, ...patch } : tile));
 }
 
 function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
@@ -1215,22 +1026,6 @@ function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
   };
 }
 
-function patchMapFromLegacyTile(map: GameMapState, tileId: string, patch: Partial<MapTile>): GameMapState {
-  const previous = map.tilesById[tileId] ?? {};
-  return {
-    ...map,
-    tilesById: {
-      ...map.tilesById,
-      [tileId]: {
-        ...previous,
-        status: patch.status ?? previous.status,
-        investigated: patch.investigated ?? previous.investigated,
-        crew: patch.crew ?? previous.crew,
-      },
-    },
-  };
-}
-
 function addUnique<T>(items: T[], ...values: T[]) {
   return [...items, ...values.filter((value) => !items.includes(value))];
 }
@@ -1246,225 +1041,4 @@ function appendArrivalDiary(member: CrewMember, elapsedGameSeconds: number) {
     gameSecond: elapsedGameSeconds,
     text: "湖没有声音，但通讯里有回声。它离地图更近，也离我更近。先不要让 Amy 知道我这么写。",
   });
-}
-
-function appendEmergencyDiary(member: CrewMember, actionId: string, elapsedGameSeconds: number) {
-  if (member.id !== "amy") {
-    return member;
-  }
-
-  const isLost = member.unavailable || !member.canCommunicate || member.status.includes("失联");
-  const entryId = `amy_emergency_${actionId}_${elapsedGameSeconds}`;
-  const text = isLost
-    ? "如果这条记录能传回去，说明我至少赢了其中一半。另一半正在树后面呼吸。"
-    : actionId === "fight"
-      ? "我没有计划和野兽进行任何社交活动。结果很难看，但它先退了。"
-      : "撤离不是逃跑。撤离是把尖叫留给更需要戏剧性的人。";
-
-  return appendDiaryEntry(member, {
-    entryId,
-    triggerNode: "森林紧急事件",
-    gameSecond: elapsedGameSeconds,
-    text,
-  });
-}
-
-function applySurveyExpertiseBonus(member: CrewMember, resources: ResourceSummary, logs: SystemLog[], elapsedGameSeconds: number) {
-  return member.expertise.reduce(
-    (state, expertise) => {
-      const effect = expertise.ruleEffect;
-      if (!effect || effect.type !== "surveyBonus") {
-        return state;
-      }
-
-      if (effect.tileId && effect.tileId !== member.currentTile) {
-        return state;
-      }
-
-      const roll = getDeterministicRoll(`${member.id}:${expertise.expertiseId}:${member.currentTile}:${elapsedGameSeconds}`);
-      if (roll >= effect.chance) {
-        return state;
-      }
-
-      const inventory = addInventoryItem(state.member.inventory, effect.resourceId, effect.amount);
-      const nextMember = { ...state.member, inventory };
-      return {
-        member: nextMember,
-        resources: state.resources,
-        logs: appendLogEntry(state.logs, effect.customLogText, "success", elapsedGameSeconds),
-      };
-    },
-    { member, resources, logs },
-  );
-}
-
-function getDeterministicRoll(seed: string) {
-  let value = 0;
-  for (const char of seed) {
-    value = (value * 31 + char.charCodeAt(0)) % 233280;
-  }
-
-  return ((value * 9301 + 49297) % 233280) / 233280;
-}
-
-function resolveDecision(crewId: CrewId, actionId: string, elapsedGameSeconds: number): DecisionResult | null {
-  if (crewId === "amy") {
-    if (actionId === "run") {
-      return {
-        status: "撤离中，资源采集中断。",
-        summary: "Amy 正在从森林撤离，熊仍然拥有当地解释权。",
-        result: "Amy 切断了采集路线并开始撤离。熊没有签署停火协议。",
-        log: "Amy 执行撤离。森林地块标记为警戒，资源产出中断。",
-        tone: "accent",
-        emergencySettled: true,
-        tileUpdate: {
-          id: "2-3",
-          patch: { danger: "大型野兽仍在附近", status: "警戒", crew: ["amy"] },
-        },
-      };
-    }
-
-    if (actionId === "fight") {
-      return {
-        status: "受伤，击退野兽。",
-        summary: "Amy 活下来了。她要求你不要把这称为成功管理。",
-        result: "Amy 击退了熊，但通讯里全是喘息和不适合记录的词。",
-        log: "Amy 高风险战斗结算：野兽被击退，角色受伤。",
-        tone: "danger",
-        emergencySettled: true,
-        tileUpdate: {
-          id: "2-3",
-          patch: { danger: "野兽被击退，区域仍危险", status: "危险已缓解", crew: ["amy"] },
-        },
-      };
-    }
-
-    if (actionId === "wait") {
-      return {
-        status: "躲避中，等待下一步指令。",
-        summary: "Amy 暂时稳住了。倒计时没有停止，只是变得更安静。",
-        result: "Amy 躲到树后。通讯里传来树枝断裂声，中控台建议你快一点。",
-        log: "Amy 暂缓行动。森林危险倒计时推进 30 秒。",
-        tone: "danger",
-        advanceSeconds: 30,
-        tileUpdate: {
-          id: "2-3",
-          patch: { danger: "大型野兽正在搜索", status: "倒计时推进", crew: ["amy"] },
-        },
-      };
-    }
-  }
-
-  if (crewId === "garry") {
-    if (actionId === "move") {
-      return {
-        status: "等待目标坐标指令。",
-        summary: "Garry 停下矿镐，开始怀疑地图是否真的比他可靠。",
-        result: "Garry 等待目标坐标。请打开地图查看目标，再回到通话确认。",
-        log: "Garry 暂停采矿，等待目标坐标。",
-        tone: "accent",
-        clearAction: true,
-        tileUpdate: {
-          id: "3-3",
-          patch: { status: "等待调度" },
-        },
-      };
-    }
-
-    if (actionId === "build") {
-      return {
-        status: "安装临时支架中。",
-        summary: "Garry 开始安装支架，并要求把维护责任写清楚。",
-        result: "Garry 开始安装临时支架。采矿效率可能提高，维护清单肯定增加。",
-        log: "Garry 在 (3,3) 安装临时支架。新的维护问题已生成。",
-        tone: "success",
-        activeAction: createAction("garry-build-support", "build", elapsedGameSeconds, 120, "3-3"),
-        tileUpdate: {
-          id: "3-3",
-          patch: { buildings: ["采矿厂：铁 #2", "临时支架（安装中）"], status: "建设中" },
-        },
-      };
-    }
-
-    if (actionId === "standby") {
-      return {
-        status: "原地待命，采矿暂停。",
-        summary: "Garry 停止采矿。他看起来像终于赢了一局。",
-        result: "Garry 原地待命。铁矿产出暂停，但至少没有新的噪音。",
-        log: "Garry 停止采矿并原地待命。",
-        tone: "muted",
-        clearAction: true,
-        tileUpdate: {
-          id: "3-3",
-          patch: { status: "待命", buildings: ["采矿厂：铁 #2"] },
-        },
-      };
-    }
-
-    if (actionId === "survey") {
-      return {
-        status: "调查矿床异常中。",
-        summary: "Garry 开始调查低频震动，并坚称矿脉不会自己唱歌。",
-        result: "Garry 开始调查矿床。温度计读数正在用一种不科学的方式上升。",
-        log: "Garry 调查矿床异常。(3,3) 出现低频震动记录。",
-        tone: "accent",
-        activeAction: createAction("garry-survey-mine", "survey", elapsedGameSeconds, 180, "3-3"),
-        tileUpdate: {
-          id: "3-3",
-          patch: { danger: "低频震动", status: "调查中" },
-        },
-      };
-    }
-  }
-
-  if (crewId === "mike") {
-    if (actionId === "mike-hold") {
-      return {
-        status: "湖泊边缘待命。",
-        summary: "Mike 暂停前进。湖水没有，因此更像一个决定。",
-        result: "Mike 停在湖泊边缘。水面继续以不合理的距离靠近。",
-        log: "Mike 原地待命，湖泊坐标保持观察。",
-        tone: "muted",
-        clearAction: true,
-        tileUpdate: {
-          id: "2-1",
-          patch: { status: "观察中" },
-        },
-      };
-    }
-
-    return {
-      status: "继续前往湖泊，行进中。",
-      summary: "Mike 继续前进，并报告湖泊听起来像正在呼吸。",
-      result: "Mike 确认继续前进。通讯延迟增加了 0.4 秒。",
-      log: "Mike 继续前往湖泊，路线保持记录。",
-      tone: "neutral",
-      activeAction: createAction("mike-move-lake", "move", elapsedGameSeconds, 60, "2-1"),
-      tileUpdate: {
-        id: "2-1",
-        patch: { status: "行进路径" },
-      },
-    };
-  }
-
-  return null;
-}
-
-function createAction(
-  id: string,
-  actionType: ActiveAction["actionType"],
-  startTime: number,
-  durationSeconds: number,
-  targetTile?: string,
-  status: ActionStatus = "inProgress",
-): ActiveAction {
-  return {
-    id,
-    actionType,
-    status,
-    startTime,
-    durationSeconds,
-    finishTime: startTime + durationSeconds,
-    targetTile,
-  };
 }
