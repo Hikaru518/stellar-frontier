@@ -1,19 +1,19 @@
 # Audit Protocol（一致性审计协议 / 中文）
 
-本文件由 `audit-wiki` skill 的 Step 2-5 引用，定义如何扫描素材、计算一致性矩阵、产出 `audit-report.md`。
+本文件由 `audit-wiki` skill 的 Step 2-5 引用，定义如何扫描素材、计算一致性矩阵，并在对话中组织 findings / 决议 / 待处理项。
 
 ## 总览
 
 ```mermaid
 flowchart TD
     inputs([wiki + code + 项目根]) --> scan[Step2 并行扫描]
-    scan --> summary[scan-summary.md]
+    scan --> summary[对话内扫描摘要]
     summary --> classify[Step3 分类: A/B/C/D]
-    classify --> report[audit-report.md]
-    report --> hasFinding{有 finding?}
+    classify --> findings[对话内 findings 列表]
+    findings --> hasFinding{有 finding?}
     hasFinding -- "是" --> ask[Step4 逐项 question tool]
     hasFinding -- "否" --> next[直接进 Step5]
-    ask --> apply[Step4.2 备份 + 改写]
+    ask --> apply[Step4.2 读取 + 改写]
     apply --> next
 ```
 
@@ -111,18 +111,13 @@ opencode_json:
   permissions: {...}
 ```
 
-### 1.4 汇总写入
+### 1.4 汇总方式
 
-由本 skill 自身把三个 subagent 的产出原样拼接到 `docs/plans/audits/<YYYY-MM-DD-HH-MM>/scan-summary.md`。**不要**总结 / 重述 / 过滤——后续 Step 3 需要原始事实做对比。
+由本 skill 自身把三个 subagent 的产出保留在当前对话上下文中。**不要**总结 / 重述 / 过滤原始事实——后续 Step 3 需要原始事实做对比。
 
-## 2. scan-summary.md 结构
+## 2. 对话内扫描摘要结构
 
 ```markdown
----
-audit_workspace: docs/plans/audits/<YYYY-MM-DD-HH-MM>
-date: <YYYY-MM-DD HH:MM>
----
-
 # Scan Summary
 
 ## 1. Wikis
@@ -191,18 +186,12 @@ date: <YYYY-MM-DD HH:MM>
 | `P1` | 术语不一致 / 章节自相矛盾 / 缺口 |
 | `P2` | 风格 / 注释 / 可疑（未必矛盾） |
 
-`P0` 必问，`P1` 必问，`P2` 可在 audit-report.md 中提示但不强求修复。
+`P0` 必问，`P1` 必问，`P2` 可在最终回复中提示但不强求修复。
 
-## 4. audit-report.md 结构
+## 4. 对话内 findings 结构
 
 ```markdown
----
-audit_workspace: docs/plans/audits/<YYYY-MM-DD-HH-MM>
-date: <YYYY-MM-DD HH:MM>
-scope: <来自 scope.md：full | partial:<system> | project-only>
----
-
-# Audit Report
+# Findings
 
 ## 0. 总计
 
@@ -282,26 +271,19 @@ scope: <来自 scope.md：full | partial:<system> | project-only>
 ## 8. Step 5 新发现（如有）
 <!-- 在 Step 5 审计 core-ideas.md 时新发现、Step 3 报告未覆盖的不一致 -->
 
----
-
-## 9. 失败记录（如有）
-*（暂无）*
 ```
 
-## 5. 写入与备份
+## 5. 写入与验证
 
-写入 wiki / index.md / AGENTS.md / README.md 之前，**总是**先备份：
+写入 wiki / index.md / AGENTS.md / README.md 之前，**总是**先读取目标文件最新内容，确认当前编辑基于最新版本。
 
-```
-docs/plans/audits/<YYYY-MM-DD-HH-MM>/backups/<原文件相对路径>.bak
-```
+写入后用只读检查验证：
 
-例：
+- 重新读取被改文件，确认关键段落存在。
+- 用搜索确认旧路径、旧术语或旧字段已移除。
+- 用 `git diff` / `git status` 汇总本轮修改范围。
 
-- `docs/gameplay/time-system/time-system.md` → `docs/plans/audits/2026-04-26-22-30/backups/docs/gameplay/time-system/time-system.md.bak`
-- `AGENTS.md` → `docs/plans/audits/2026-04-26-22-30/backups/AGENTS.md.bak`
-
-**不删备份**——长期保留作为审计轨迹。
+本 skill 不为 audit 创建仓库内临时目录、审计报告或备份目录。回溯依赖版本控制 diff 与用户确认。
 
 ## 6. 反模式（不要做的事）
 
@@ -309,7 +291,7 @@ docs/plans/audits/<YYYY-MM-DD-HH-MM>/backups/<原文件相对路径>.bak
 - ❌ 改 src 代码：本 skill 永远不改 `.ts` / `.tsx` / `.css`
 - ❌ 把 audit 当 brainstorm：发现需要新决策时，记 Open Question / 升级到 brainstorm，**不**自己拍板
 - ❌ 把 audit 当 organize-wiki：发现要把策划案合入 wiki 时，提示用户去用 organize-wiki，**不**自己处理
-- ❌ 把 `audit-report.md` 中的 TODO 写进 `docs/todo.md`：`docs/todo.md` 是设计 / 文档体系级 TODO；audit 的 TODO 是临时性的代码对齐项，分开放
+- ❌ 把本轮临时待代码处理项写进 `docs/todo.md`：`docs/todo.md` 是设计 / 文档体系级 TODO；audit 的 TODO 是临时性的代码对齐项，分开放
 - ❌ 一次问多个 finding：每个 finding 单独提问
-- ❌ 跳过备份：失去回滚能力
+- ❌ 为 audit 创建仓库内临时产物：扫描摘要、findings、决议保留在对话和最终回复中
 - ❌ 自动 commit：改完等用户决定何时提交

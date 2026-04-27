@@ -6,7 +6,7 @@
 
 - **完全可重生成**：`docs/index.md` 不应包含手工写入的内容；每次 `audit-wiki` 运行都会全量重写。如果用户想加自定义内容，应该写到 `core-ideas.md` 或对应子系统 wiki 中。
 - **来源是 frontmatter**：所有 wiki 条目的字段都从对应 wiki 文件的 frontmatter 与章节 1「概述」抽取，**不**在 index 中编造内容。
-- **缺字段不补**：wiki frontmatter 缺字段时，对应单元格写 `*（缺字段）*` 并把该 wiki 加进 `audit-report.md` 的「索引页缺口」段。
+- **缺字段不补**：wiki frontmatter 缺字段时，对应单元格写 `*（缺字段）*`，并在 audit-wiki 最终回复的「索引页缺口」段列出。
 - **scope 分组排序**：先 `whole-game` → 再 `system`（按子目录字典序）→ 再 `feature`（按路径字典序）。
 - **耦合关系图可选**：如果所有 wiki 章节 6 都为空，跳过 mermaid 图章节；不要画一个空图。
 
@@ -61,13 +61,12 @@ maintained_by: audit-wiki
 
 ## 4. 计划与策划案
 
-进行中或已完成的策划案见 [`./plans/`](./plans/)，按 `YYYY-MM-DD-HH-MM` 子目录组织。最近的 audit 报告见 [`./plans/audits/`](./plans/audits/)。
+进行中或已完成的策划案见 [`./plans/`](./plans/)，按 `YYYY-MM-DD-HH-MM` 子目录组织。
 
 | 类别 | 路径 | 维护方 |
 | --- | --- | --- |
 | Brainstorm 策划案 | `docs/plans/<YYYY-MM-DD-HH-MM>/<topic>-design.md` | `game-design-brainstorm` |
 | Wiki 合入 diff | `docs/plans/<YYYY-MM-DD-HH-MM>/wiki-merge-diff.md` | `organize-wiki` |
-| 一致性 audit 报告 | `docs/plans/audits/<YYYY-MM-DD-HH-MM>/audit-report.md` | `audit-wiki` |
 
 ## 5. 系统耦合关系
 <!-- 仅在至少一个子系统 wiki 章节 6 非空时才生成；否则整段省略 -->
@@ -84,7 +83,7 @@ flowchart LR
 
 - **brainstorm**（产生策划案）：用 `game-design-brainstorm` skill；产物落 `docs/plans/<YYYY-MM-DD-HH-MM>/`
 - **organize-wiki**（合入全量 wiki）：用 `organize-wiki` skill；目标是 `core-ideas.md` 或 `gameplay/<system>/<system>.md`
-- **audit-wiki**（审计 + 维护索引 + 同步项目根）：用 `audit-wiki` skill；产物落 `docs/plans/audits/<YYYY-MM-DD-HH-MM>/`
+- **audit-wiki**（审计 + 维护索引 + 同步项目根）：用 `audit-wiki` skill；不产生固定仓库产物，按需同步 `docs/index.md`、子系统 wiki 与项目根上下文
 
 详细职责见 [`../AGENTS.md`](../AGENTS.md)。
 ```
