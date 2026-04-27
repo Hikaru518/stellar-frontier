@@ -1,0 +1,67 @@
+{
+  "$schema": "../schemas/call-actions.schema.json",
+  "call_actions": [
+    {
+      "id": "survey",
+      "category": "object_action",
+      "label": "调查 {objectName}",
+      "tone": "neutral",
+      "availableWhenBusy": false,
+      "applicableObjectKinds": ["resourceNode", "structure", "signal", "hazard", "facility", "ruin", "landmark"],
+      "durationSeconds": 120,
+      "handler": "surveyObject",
+      "params": {
+        "surveyLevel": "standard"
+      }
+    },
+    {
+      "id": "gather",
+      "category": "object_action",
+      "label": "采集 {objectName}",
+      "tone": "accent",
+      "availableWhenBusy": false,
+      "applicableObjectKinds": ["resourceNode"],
+      "durationSeconds": 180,
+      "handler": "gather",
+      "params": {
+        "perRoundYieldByResource": {
+          "iron_ore": 5,
+          "wood": 3
+        }
+      }
+    },
+    {
+      "id": "build",
+      "category": "object_action",
+      "label": "建设 {objectName}",
+      "tone": "accent",
+      "availableWhenBusy": false,
+      "applicableObjectKinds": ["structure", "facility"],
+      "durationSeconds": 300,
+      "handler": "build"
+    },
+    {
+      "id": "extract",
+      "category": "object_action",
+      "label": "回收 {objectName}",
+      "tone": "accent",
+      "availableWhenBusy": false,
+      "applicableObjectKinds": ["structure", "signal", "ruin"],
+      "durationSeconds": 180,
+      "handler": "extract"
+    },
+    {
+      "id": "scan",
+      "category": "object_action",
+      "label": "扫描 {objectName}",
+      "tone": "neutral",
+      "availableWhenBusy": false,
+      "applicableObjectKinds": ["structure", "signal", "hazard", "ruin", "landmark"],
+      "durationSeconds": 90,
+      "handler": "scan",
+      "params": {
+        "scanDepth": "standard"
+      }
+    }
+  ]
+}

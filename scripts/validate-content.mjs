@@ -14,6 +14,8 @@ const legacyPairs = [
   ["content/crew/crew.json", "content/schemas/crew.schema.json"],
   ["content/items/items.json", "content/schemas/items.schema.json"],
   ["content/maps/default-map.json", "content/schemas/maps.schema.json"],
+  ["content/call-actions/basic-actions.json", "content/schemas/call-actions.schema.json"],
+  ["content/call-actions/object-actions.json", "content/schemas/call-actions.schema.json"],
 ];
 
 const eventSchemaPaths = [
@@ -205,6 +207,8 @@ function validateReferences(data) {
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
   const defaultMap = data["content/maps/default-map.json"];
+  const basicCallActions = data["content/call-actions/basic-actions.json"].call_actions;
+  const objectCallActions = data["content/call-actions/object-actions.json"].call_actions;
 
   const eventIds = new Set();
   const itemIds = new Set();
@@ -276,8 +280,52 @@ function validateReferences(data) {
   }
 
   hasError = validateMap(defaultMap) || hasError;
+  hasError = validateCallActions(defaultMap, basicCallActions, objectCallActions) || hasError;
 
   return hasError;
+}
+
+function validateCallActions(map, basicCallActions, objectCallActions) {
+  let hasError = false;
+  const mapCandidateActionIds = new Set(getMapCandidateActionIds());
+  const reservedUniversalActionIds = new Set(["stop"]);
+  const objectActionsById = new Map();
+
+  for (const action of objectCallActions) {
+    if (!objectActionsById.has(action.id)) {
+      objectActionsById.set(action.id, []);
+    }
+    objectActionsById.get(action.id).push(action);
+  }
+
+  for (const action of basicCallActions) {
+    if (!mapCandidateActionIds.has(action.id) && !reservedUniversalActionIds.has(action.id)) {
+      hasError =
+        report(`Basic call-action id is not a map candidate action or reserved control action: ${action.id}`) ||
+        hasError;
+    }
+  }
+
+  for (const tile of map.tiles) {
+    for (const object of tile.objects) {
+      for (const candidateAction of object.candidateActions ?? []) {
+        const objectActions = objectActionsById.get(candidateAction) ?? [];
+        if (!objectActions.some((action) => action.category === "object_action")) {
+          hasError =
+            report(
+              `Map object ${object.id} candidateActions references missing object call-action: ${candidateAction}`,
+            ) || hasError;
+        }
+      }
+    }
+  }
+
+  return hasError;
+}
+
+function getMapCandidateActionIds() {
+  const schema = schemasByPath["content/schemas/maps.schema.json"];
+  return schema.$defs.mapObject.properties.candidateActions.items.enum;
 }
 
 function validateMap(map) {
