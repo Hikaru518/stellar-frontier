@@ -566,7 +566,7 @@ blockquote {
 
 .map-layout {
   display: grid;
-  grid-template-columns: minmax(580px, 840px) 340px;
+  grid-template-columns: minmax(0, 840px) minmax(280px, 340px);
   grid-template-areas:
     "grid detail"
     "grid crew"
@@ -577,17 +577,17 @@ blockquote {
 .map-grid {
   grid-area: grid;
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-  grid-template-rows: repeat(4, minmax(118px, 1fr));
   border: 1px solid #171a1c;
   background: #77736b;
   gap: 1px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .map-cell {
   display: flex;
   min-height: 144px;
+  min-width: 0;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
@@ -824,8 +824,9 @@ blockquote {
     grid-column: span 2;
   }
 
-  .map-grid {
-    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  .map-cell {
+    min-height: 118px;
+    padding: 10px;
   }
 
   .contacts-overlay {

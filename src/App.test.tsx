@@ -336,6 +336,57 @@ describe("App", () => {
     expect(screen.getByText("位于 (-1,0)，待命中。")).toBeInTheDocument();
   });
 
+  it("renders the map as a dynamic visible matrix without fixed grid copy", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+    expect(screen.queryByText(/4x4|4 x 4/)).not.toBeInTheDocument();
+
+    const grid = screen.getByLabelText(/雷达可见矩形/);
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
+    expect(screen.getAllByRole("button", { name: /未探索信号/ })).toHaveLength(8);
+    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
+    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("天气：阴天");
+    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("对象：坠毁残骸");
+    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+  });
+
+  it("keeps frontier and unknown-hole map cells redacted", () => {
+    const map = createInitialMapState();
+    map.discoveredTileIds = ["4-4", "4-8"];
+    map.tilesById["4-4"] = { ...map.tilesById["4-4"], discovered: true, investigated: true };
+    map.tilesById["4-8"] = { ...map.tilesById["4-8"], discovered: true, investigated: true };
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
+        crew: [],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+
+    const grid = screen.getByLabelText(/雷达可见矩形/);
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" });
+    expect(screen.queryByText("东侧砾原")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /未探索信号/ }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索信号/ }));
+    const detailPanel = screen.getByRole("heading", { name: "坐标详情：(2,0)" }).closest("section");
+    expect(detailPanel).not.toBeNull();
+    expect(within(detailPanel as HTMLElement).getByText("信号未确认")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("需通过通讯台联系队员前往或调查后确认详情")).toBeInTheDocument();
+    expect(screen.queryByText("强风")).not.toBeInTheDocument();
+  });
+
   it("opens a crew profile with attributes, tags, expertise, and diary entries", () => {
     render(<App />);
 

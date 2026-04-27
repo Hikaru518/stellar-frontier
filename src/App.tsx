@@ -84,7 +84,7 @@ function App() {
   const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
   const [debugOpen, setDebugOpen] = useState(false);
 
-  const { elapsedGameSeconds, crew, tiles, logs, resources } = gameState;
+  const { elapsedGameSeconds, crew, map, tiles, logs, resources } = gameState;
   const gameTimeLabel = formatGameTime(elapsedGameSeconds);
 
   useEffect(() => {
@@ -367,6 +367,7 @@ function App() {
     return (
         <MapPage
           tiles={tiles}
+          map={map}
           crew={crew}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
