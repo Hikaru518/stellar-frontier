@@ -15,7 +15,7 @@ branch: "feature/event-program-model-player-journey"
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 建立事件程序模型 TypeScript 契约 | completed | 2 |
-| 2 | TASK-002 | 搭建全局事件资产库加载与索引 | pending | 0 |
+| 2 | TASK-002 | 搭建全局事件资产库加载与索引 | completed | 1 |
 | 3 | TASK-003 | 新增事件 JSON Schema 与基础内容校验入口 | pending | 0 |
 | 4 | TASK-004 | 实现事件图、引用和模板一致性校验 | pending | 0 |
 | 5 | TASK-005 | 实现结构化 condition evaluator | pending | 0 |
@@ -45,6 +45,18 @@ branch: "feature/event-program-model-player-journey"
   - 尝试 1: Monkey 运行约 5 分钟后被用户中断；仅留下未完成的 `src/events/types.test.ts`，未返回 summary，未完成实现。
   - 尝试 2: 已重新派发 Monkey，要求复用或修正上次残留测试并完成契约、初始状态和 save schema 边界。
 - Monkey summary: 成功。建立 `src/events/types.ts` 事件程序模型契约与初始空运行时状态；扩展 `GameState` 事件 runtime 集合；为 save/load 增加新 schema metadata 与兼容性 gate；更新相关测试 fixture，使旧 legacy save 断言符合 ADR-001 cutover。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+
+### TASK-002: 搭建全局事件资产库加载与索引
+- 状态: completed
+- 开始时间: 2026-04-27 17:06
+- 完成时间: 2026-04-27 17:09
+- 尝试次数: 1
+- Monkey summary: 成功。完成 `content/events` 下 definitions、call_templates、handler_registry、presets 的最小入口；`src/content/contentData.ts` 导出 `eventContentLibrary`；新增 `EventContentIndex`，支持按 definition id、template id、handler type、trigger type、domain、tag、mutex group 建索引；测试覆盖空资产加载、重复 ID 诊断和索引查询。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS
