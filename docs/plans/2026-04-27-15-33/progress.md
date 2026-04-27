@@ -16,7 +16,7 @@ branch: "feature/event-program-model-player-journey"
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 建立事件程序模型 TypeScript 契约 | completed | 2 |
 | 2 | TASK-002 | 搭建全局事件资产库加载与索引 | completed | 1 |
-| 3 | TASK-003 | 新增事件 JSON Schema 与基础内容校验入口 | pending | 0 |
+| 3 | TASK-003 | 新增事件 JSON Schema 与基础内容校验入口 | completed | 1 |
 | 4 | TASK-004 | 实现事件图、引用和模板一致性校验 | pending | 0 |
 | 5 | TASK-005 | 实现结构化 condition evaluator | pending | 0 |
 | 6 | TASK-006 | 实现结构化 effect executor | pending | 0 |
@@ -57,6 +57,18 @@ branch: "feature/event-program-model-player-journey"
 - 完成时间: 2026-04-27 17:09
 - 尝试次数: 1
 - Monkey summary: 成功。完成 `content/events` 下 definitions、call_templates、handler_registry、presets 的最小入口；`src/content/contentData.ts` 导出 `eventContentLibrary`；新增 `EventContentIndex`，支持按 definition id、template id、handler type、trigger type、domain、tag、mutex group 建索引；测试覆盖空资产加载、重复 ID 诊断和索引查询。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+
+### TASK-003: 新增事件 JSON Schema 与基础内容校验入口
+- 状态: completed
+- 开始时间: 2026-04-27 17:10
+- 完成时间: 2026-04-27 17:16
+- 尝试次数: 1
+- Monkey summary: 成功。新增事件资产 JSON Schema；改造 `scripts/validate-content.mjs` 以读取新事件目录并输出字段路径；新增 `scripts/validate-content.test.mjs` 覆盖必填字段、禁止字段和 unsupported type 失败；更新 Vitest 配置纳入脚本测试。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS

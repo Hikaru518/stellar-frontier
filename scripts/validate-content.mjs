@@ -3,33 +3,65 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = process.env.VALIDATE_CONTENT_ROOT
+  ? path.resolve(process.env.VALIDATE_CONTENT_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const pairs = [
+const legacyPairs = [
   ["content/events/events.json", "content/schemas/events.schema.json"],
   ["content/crew/crew.json", "content/schemas/crew.schema.json"],
   ["content/items/items.json", "content/schemas/items.schema.json"],
 ];
 
+const eventSchemaPaths = [
+  "content/schemas/events/condition.schema.json",
+  "content/schemas/events/effect.schema.json",
+  "content/schemas/events/event-graph.schema.json",
+  "content/schemas/events/event-definition.schema.json",
+  "content/schemas/events/call-template.schema.json",
+  "content/schemas/events/handler-registry.schema.json",
+];
+
+const eventAssetGroups = [
+  {
+    directoryPath: "content/events/definitions",
+    schemaPath: "content/schemas/events/event-definition.schema.json",
+  },
+  {
+    directoryPath: "content/events/call_templates",
+    schemaPath: "content/schemas/events/call-template.schema.json",
+  },
+];
+
+const eventAssetFiles = [
+  ["content/events/handler_registry.json", "content/schemas/events/handler-registry.schema.json"],
+];
+
 const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
-const loaded = Object.fromEntries(pairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
+const schemaPaths = new Set([...legacyPairs.map(([, schemaPath]) => schemaPath), ...eventSchemaPaths]);
+const schemasByPath = Object.fromEntries([...schemaPaths].map((schemaPath) => [schemaPath, readJson(schemaPath)]));
+for (const schema of Object.values(schemasByPath)) {
+  ajv.addSchema(schema);
+}
+
+const loaded = Object.fromEntries(legacyPairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
 const validItemTags = new Set(["food", "light", "medical", "signal", "clue"]);
 const validAddItemTargets = new Set(["crewInventory", "baseInventory"]);
 
 let failed = false;
 
-for (const [dataPath, schemaPath] of pairs) {
-  const schema = readJson(schemaPath);
-  const validate = ajv.compile(schema);
-  const valid = validate(loaded[dataPath]);
+for (const [dataPath, schemaPath] of legacyPairs) {
+  failed = validateJsonFile(dataPath, schemaPath, loaded[dataPath]) || failed;
+}
 
-  if (!valid) {
-    failed = true;
-    console.error(`Schema validation failed: ${dataPath}`);
-    for (const error of validate.errors ?? []) {
-      console.error(`  ${error.instancePath || "/"} ${error.message}`);
-    }
+for (const { directoryPath, schemaPath } of eventAssetGroups) {
+  for (const dataPath of listJsonFiles(directoryPath)) {
+    failed = validateJsonFile(dataPath, schemaPath) || failed;
   }
+}
+
+for (const [dataPath, schemaPath] of eventAssetFiles) {
+  failed = validateJsonFile(dataPath, schemaPath) || failed;
 }
 
 failed = validateReferences(loaded) || failed;
@@ -42,6 +74,62 @@ if (failed) {
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
+}
+
+function listJsonFiles(relativeDirectory) {
+  const directory = path.join(root, relativeDirectory);
+  if (!fs.existsSync(directory)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+    .map((entry) => path.posix.join(relativeDirectory, entry.name))
+    .sort();
+}
+
+function validateJsonFile(dataPath, schemaPath, data = readJson(dataPath)) {
+  const schema = schemasByPath[schemaPath];
+  const validate = ajv.getSchema(schema.$id);
+  if (!validate) {
+    throw new Error(`Missing schema: ${schemaPath}`);
+  }
+
+  const valid = validate(data);
+  if (valid) {
+    return false;
+  }
+
+  console.error(`Schema validation failed: ${dataPath}`);
+  for (const error of validate.errors ?? []) {
+    console.error(`  ${formatErrorPath(error)} ${error.message}`);
+  }
+  return true;
+}
+
+function formatErrorPath(error) {
+  if (error.keyword === "required" && error.params.missingProperty) {
+    return joinJsonPointer(error.instancePath, error.params.missingProperty);
+  }
+
+  if (error.keyword === "additionalProperties" && error.params.additionalProperty) {
+    return joinJsonPointer(error.instancePath, error.params.additionalProperty);
+  }
+
+  if (error.keyword === "unevaluatedProperties" && error.params.unevaluatedProperty) {
+    return joinJsonPointer(error.instancePath, error.params.unevaluatedProperty);
+  }
+
+  return error.instancePath || "/";
+}
+
+function joinJsonPointer(instancePath, property) {
+  return `${instancePath || ""}/${escapeJsonPointer(property)}`;
+}
+
+function escapeJsonPointer(value) {
+  return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
 function validateReferences(data) {

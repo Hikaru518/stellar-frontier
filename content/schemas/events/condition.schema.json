@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/condition.schema.json",
+  "title": "Stellar Frontier Event Condition",
+  "$ref": "#/$defs/condition",
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "all_of",
+            "any_of",
+            "not",
+            "compare_field",
+            "has_tag",
+            "lacks_tag",
+            "has_condition",
+            "attribute_check",
+            "inventory_has_item",
+            "resource_amount",
+            "tile_discovery_state",
+            "tile_survey_state",
+            "world_flag_equals",
+            "world_history_exists",
+            "world_history_count",
+            "objective_status",
+            "event_status",
+            "event_current_node",
+            "crew_action_status",
+            "time_compare",
+            "handler_condition"
+          ]
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "field": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "op": {
+          "type": ["string", "null"],
+          "enum": ["equals", "not_equals", "gt", "gte", "lt", "lte", "includes", "not_includes", null]
+        },
+        "value": true,
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "handler_type": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "target_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/target_type"
+        },
+        "id": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "ref": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "primary_crew",
+        "related_crew",
+        "crew_id",
+        "event_tile",
+        "tile_id",
+        "active_event",
+        "parent_event",
+        "child_event",
+        "objective_id",
+        "crew_inventory",
+        "base_inventory",
+        "base_resources",
+        "tile_resources",
+        "world_flags",
+        "world_history",
+        "event_log"
+      ]
+    }
+  }
+}
