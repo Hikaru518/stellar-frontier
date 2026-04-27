@@ -8,6 +8,10 @@ interface DiaryDraft {
   text: string;
 }
 
+export function appendDiaryEntryId(entryIds: string[], entryId: string) {
+  return entryIds.includes(entryId) ? entryIds : [...entryIds, entryId];
+}
+
 export function appendDiaryEntry(member: CrewMember, draft: DiaryDraft): CrewMember {
   if (member.diaryEntries.some((entry) => entry.entryId === draft.entryId)) {
     return member;

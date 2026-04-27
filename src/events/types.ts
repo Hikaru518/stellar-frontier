@@ -146,6 +146,19 @@ export type EffectType =
 
 export type EffectFailurePolicy = "fail_event" | "skip_effect" | "skip_group" | "retry_later";
 
+export type EffectExecutionStatus = "success" | "failed" | "skipped" | "retry_later";
+
+export type EffectExecutionErrorCode =
+  | "invalid_effect"
+  | "missing_target"
+  | "missing_field"
+  | "missing_value"
+  | "invalid_handler_kind"
+  | "invalid_handler_target"
+  | "unknown_handler_type"
+  | "missing_handler_implementation"
+  | "handler_error";
+
 export interface Effect {
   id: Id;
   type: EffectType;
