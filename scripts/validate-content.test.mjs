@@ -90,6 +90,62 @@ describe("validate-content", () => {
     expect(result.output).toContain("unknown_call_template");
     expect(result.output).toContain("event_graph.nodes[0].call_template_id");
   });
+
+  it("rejects map candidate actions missing from object call-actions", () => {
+    const root = createContentRoot();
+    writeJson(root, "content/call-actions/basic-actions.json", {
+      $schema: "../schemas/call-actions.schema.json",
+      call_actions: minimalBasicCallActions(),
+    });
+    writeJson(root, "content/call-actions/object-actions.json", {
+      $schema: "../schemas/call-actions.schema.json",
+      call_actions: minimalObjectCallActions().filter((action) => action.id !== "scan"),
+    });
+    const defaultMap = readJson(root, "content/maps/default-map.json");
+    defaultMap.tiles[0].objects = [
+      {
+        id: "scan-target",
+        kind: "signal",
+        name: "Scan Target",
+        visibility: "onDiscovered",
+        candidateActions: ["scan"],
+      },
+    ];
+    writeJson(root, "content/maps/default-map.json", defaultMap);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("candidateActions references missing object call-action: scan");
+  });
+
+  it("rejects basic call-actions outside the map candidate enum", () => {
+    const root = createContentRoot();
+    writeJson(root, "content/call-actions/basic-actions.json", {
+      $schema: "../schemas/call-actions.schema.json",
+      call_actions: [
+        ...minimalBasicCallActions(),
+        {
+          id: "teleport",
+          category: "universal",
+          label: "Teleport",
+          tone: "accent",
+          availableWhenBusy: false,
+          durationSeconds: 0,
+          handler: "teleport",
+        },
+      ],
+    });
+    writeJson(root, "content/call-actions/object-actions.json", {
+      $schema: "../schemas/call-actions.schema.json",
+      call_actions: minimalObjectCallActions(),
+    });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("teleport");
+  });
 });
 
 function createContentRoot() {
@@ -117,7 +173,12 @@ function runValidator(root) {
 }
 
 function writeJson(root, relativePath, value) {
+  fs.mkdirSync(path.dirname(path.join(root, relativePath)), { recursive: true });
   fs.writeFileSync(path.join(root, relativePath), `${JSON.stringify(value, removeUndefined, 2)}\n`);
+}
+
+function readJson(root, relativePath) {
+  return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
 }
 
 function removeUndefined(_key, value) {
@@ -230,6 +291,53 @@ function minimalCallNode(overrides = {}) {
       blocking_key_template: null,
     },
     expires_in_seconds: 120,
+    ...overrides,
+  };
+}
+
+function minimalBasicCallActions() {
+  return [
+    minimalCallAction({ id: "survey", label: "Survey Area", handler: "survey" }),
+    minimalCallAction({ id: "move", label: "Move", handler: "move" }),
+    minimalCallAction({ id: "standby", label: "Standby", handler: "standby", durationSeconds: 0 }),
+    minimalCallAction({
+      id: "stop",
+      label: "Stop",
+      handler: "stop",
+      tone: "danger",
+      availableWhenBusy: true,
+      durationSeconds: 10,
+    }),
+  ];
+}
+
+function minimalObjectCallActions() {
+  return [
+    minimalObjectCallAction({ id: "survey", label: "Survey {objectName}", handler: "survey_object" }),
+    minimalObjectCallAction({ id: "gather", label: "Gather {objectName}", handler: "gather" }),
+    minimalObjectCallAction({ id: "build", label: "Build {objectName}", handler: "build" }),
+    minimalObjectCallAction({ id: "extract", label: "Extract {objectName}", handler: "extract" }),
+    minimalObjectCallAction({ id: "scan", label: "Scan {objectName}", handler: "scan" }),
+  ];
+}
+
+function minimalObjectCallAction(overrides = {}) {
+  return minimalCallAction({
+    category: "object_action",
+    applicableObjectKinds: ["resourceNode", "structure", "signal"],
+    ...overrides,
+  });
+}
+
+function minimalCallAction(overrides = {}) {
+  return {
+    id: "survey",
+    category: "universal",
+    label: "Survey",
+    tone: "neutral",
+    availableWhenBusy: false,
+    durationSeconds: 60,
+    handler: "survey",
     ...overrides,
   };
 }

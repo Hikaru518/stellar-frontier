@@ -12,6 +12,8 @@ import forestPresetsContent from "../../content/events/presets/forest.json";
 import crewContent from "../../content/crew/crew.json";
 import itemsContent from "../../content/items/items.json";
 import defaultMapJson from "../../content/maps/default-map.json";
+import basicCallActionsContent from "../../content/call-actions/basic-actions.json";
+import objectCallActionsContent from "../../content/call-actions/object-actions.json";
 import type { EventContentLibrary } from "../events/contentIndex";
 import type {
   CallTemplate,
@@ -31,8 +33,10 @@ export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recov
 export type MapVisibility = "onDiscovered" | "onInvestigated" | "hidden";
 export type MapRadiationLevel = "none" | "low" | "medium" | "high" | "critical";
 export type MapObjectKind = "resourceNode" | "structure" | "signal" | "hazard" | "facility" | "ruin" | "landmark";
-export type MapCandidateAction = "move" | "survey" | "gather" | "build" | "standby";
+export type MapCandidateAction = "move" | "survey" | "gather" | "build" | "standby" | "extract" | "scan";
 export type MapSpecialStateSeverity = "low" | "medium" | "high" | "critical";
+export type CallActionCategory = "universal" | "object_action";
+export type CallActionId = MapCandidateAction | "stop";
 
 export interface CrewAttributeMap {
   physical: number;
@@ -253,6 +257,18 @@ export interface MapConfigDefinition {
   tiles: MapTileDefinition[];
 }
 
+export interface CallActionDef {
+  id: CallActionId;
+  category: CallActionCategory;
+  label: string;
+  tone: Tone;
+  availableWhenBusy: boolean;
+  applicableObjectKinds?: MapObjectKind[];
+  durationSeconds: number;
+  handler: string;
+  params?: Record<string, unknown>;
+}
+
 export const eventProgramDefinitions = [
   ...forestEventDefinitionsContent.event_definitions,
   ...mountainEventDefinitionsContent.event_definitions,
@@ -278,6 +294,10 @@ export const eventDefinitions = eventsContent.events as unknown as EventDefiniti
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
 export const defaultMapConfig = defaultMapJson as unknown as MapConfigDefinition;
+export const callActionsContent = [
+  ...basicCallActionsContent.call_actions,
+  ...objectCallActionsContent.call_actions,
+] as unknown as CallActionDef[];
 
 export const eventDefinitionById = new Map(eventDefinitions.map((event) => [event.eventId, event]));
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));

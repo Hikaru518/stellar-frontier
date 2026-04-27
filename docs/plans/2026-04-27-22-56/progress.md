@@ -15,7 +15,7 @@ source:
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 扩展 maps schema 与默认地图内容 | completed | 1 |
-| 2 | TASK-002 | 新增 call-actions 内容与 schema | pending | 0 |
+| 2 | TASK-002 | 新增 call-actions 内容与 schema | completed | 1 |
 | 3 | TASK-003 | 实现 src/callActions.ts（buildCallView 纯函数） | pending | 0 |
 | 4 | TASK-004 | 实现 src/callActionSettlement.ts（handler 白名单 + settleAction） | pending | 0 |
 | 5 | TASK-005 | 事件 → 真实行动桥接层与 effect 输出对齐 | pending | 0 |
@@ -40,3 +40,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。扩展 `content/schemas/maps.schema.json` 的 `candidateActions` enum，补充 `specialState.dangerTags` 支持；为 `black-pine-stand`、`iron-ridge-deposit`、`crash-site-wreckage` 添加事件触发 tags，并给 `2-3` 的 `beast-approach` 添加 `dangerTags: ["beast_tracks"]`。
 - 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（16 files / 100 tests）；`npm run build` 通过。
+
+### TASK-002: 新增 call-actions 内容与 schema
+- 状态: completed
+- 开始时间: 2026-04-28 00:10
+- 完成时间: 2026-04-28 00:15
+- 尝试次数: 1
+- Monkey summary: 成功。新增 call-actions schema、basic/object action JSON、content validator 交叉校验和 `contentData.ts` typed 导出，并补充 validator 与 contentData 测试。
+- 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（17 files / 103 tests）；`npm run build` 通过；ReadLints 无新增错误。
