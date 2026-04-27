@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { crewDefinitions, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
 import { createInitialMapState, initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
-import { createEmptyEventRuntimeState } from "./events/types";
+import { createEmptyEventRuntimeState, type CrewActionState } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 
 describe("App", () => {
@@ -535,6 +535,171 @@ describe("App", () => {
     );
   });
 
+  it("bridges event-created move crew actions into active actions", () => {
+    vi.useFakeTimers();
+    const action = eventCrewAction({
+      id: "event-move",
+      crew_id: "mike",
+      type: "move",
+      from_tile_id: "1-1",
+      target_tile_id: "1-2",
+      path_tile_ids: ["1-2"],
+      started_at: 10,
+      duration_seconds: 30,
+      action_params: { reason: "event order" },
+    });
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 10,
+        crew: [{ id: "mike", currentTile: "1-1", activeAction: null, hasIncoming: false }],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
+
+    render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const mike = saved.crew.find((member: { id: string }) => member.id === "mike");
+    expect(mike.activeAction).toMatchObject({
+      id: "event-move",
+      actionType: "move",
+      status: "inProgress",
+      startTime: 10,
+      finishTime: 40,
+      targetTile: "1-2",
+    });
+  });
+
+  it("bridges event_waiting crew actions while keeping communication available", () => {
+    vi.useFakeTimers();
+    const action = eventCrewAction({
+      id: "event-wait",
+      crew_id: "amy",
+      type: "event_waiting",
+      target_tile_id: "2-3",
+      started_at: 20,
+      duration_seconds: 180,
+      action_params: { reason: "beast_tracks" },
+    });
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 20,
+        crew: [{ id: "amy", currentTile: "2-3", activeAction: null, hasIncoming: false, unavailable: false, canCommunicate: true }],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
+
+    render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const amy = saved.crew.find((member: { id: string }) => member.id === "amy");
+    expect(amy.activeAction).toMatchObject({ id: "event-wait", actionType: "event" });
+    expect(amy.unavailable).toBe(true);
+    expect(amy.canCommunicate).toBe(true);
+  });
+
+  it("replaces existing active actions with event actions and logs the interruption", () => {
+    vi.useFakeTimers();
+    const action = eventCrewAction({
+      id: "event-wait",
+      crew_id: "amy",
+      type: "event_waiting",
+      target_tile_id: "2-3",
+      started_at: 20,
+      duration_seconds: 180,
+    });
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 20,
+        crew: [
+          {
+            id: "amy",
+            currentTile: "2-3",
+            hasIncoming: false,
+            activeAction: {
+              id: "amy-survey",
+              actionType: "survey",
+              status: "inProgress",
+              startTime: 0,
+              durationSeconds: 180,
+              finishTime: 180,
+              targetTile: "2-3",
+            },
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
+
+    render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const amy = saved.crew.find((member: { id: string }) => member.id === "amy");
+    expect(amy.activeAction.id).toBe("event-wait");
+    expect(saved.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tone: "accent",
+          text: expect.stringContaining("被中断"),
+        }),
+      ]),
+    );
+  });
+
+  it("does not bridge crew actions from non-event sources", () => {
+    vi.useFakeTimers();
+    const action = eventCrewAction({
+      id: "player-action",
+      crew_id: "mike",
+      source: "player_command",
+      type: "move",
+      target_tile_id: "1-2",
+      started_at: 10,
+      duration_seconds: 30,
+    });
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 10,
+        crew: [{ id: "mike", currentTile: "1-1", activeAction: null, hasIncoming: false }],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
+
+    render(<App />);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const mike = saved.crew.find((member: { id: string }) => member.id === "mike");
+    expect(mike.activeAction).toBeNull();
+  });
+
   it("ignores legacy emergencyEvent fields when opening a call", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
@@ -945,6 +1110,31 @@ function createCompatibleSavedGameState(state: Record<string, unknown>) {
     map: createInitialMapState(),
     ...createEmptyEventRuntimeState(),
     ...state,
+  };
+}
+
+function eventCrewAction(overrides: Partial<CrewActionState>): CrewActionState {
+  return {
+    id: "event-action",
+    crew_id: "mike",
+    type: "move",
+    status: "active",
+    source: "event_action_request",
+    parent_event_id: "event-1",
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: "1-1",
+    to_tile_id: null,
+    target_tile_id: "1-2",
+    path_tile_ids: [],
+    started_at: 0,
+    ends_at: null,
+    progress_seconds: 0,
+    duration_seconds: 60,
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+    action_params: {},
+    ...overrides,
   };
 }
 

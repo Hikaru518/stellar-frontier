@@ -4,7 +4,7 @@ import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { MapPage } from "./pages/MapPage";
-import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
+import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
 import { buildEventContentIndex } from "./events/contentIndex";
@@ -13,6 +13,7 @@ import type { GraphRunnerGameState } from "./events/graphRunner";
 import {
   createEmptyEventRuntimeState,
   type CrewState,
+  type CrewActionState,
   type EventRuntimeState,
   type Id,
   type InventoryState,
@@ -824,11 +825,13 @@ function toEventEngineState(state: GameState): GraphRunnerGameState {
 
 function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
   const views = syncEventRuntimeToViews(state, eventState);
+  const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventState);
 
   return {
     ...state,
-    crew: views.crew,
+    crew: bridged.crew,
     tiles: views.tiles,
+    logs: bridged.logs,
     active_events: eventState.active_events,
     active_calls: eventState.active_calls,
     objectives: eventState.objectives,
@@ -839,6 +842,65 @@ function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameSta
     inventories: eventState.inventories,
     rng_state: eventState.rng_state,
   };
+}
+
+function bridgeCrewActions(state: GameState, eventState: GraphRunnerGameState): { crew: CrewMember[]; logs: SystemLog[] } {
+  const actionByCrew = collectBridgeableCrewActions(eventState.crew_actions);
+  let logs = state.logs;
+
+  const crew = state.crew.map((member) => {
+    const eventAction = actionByCrew.get(member.id);
+    if (!eventAction) {
+      return member;
+    }
+
+    const isSameAction = member.activeAction?.id === eventAction.id;
+    const activeAction = isSameAction ? member.activeAction : createActiveActionFromCrewAction(member, eventAction);
+    if (member.activeAction && !isSameAction) {
+      logs = appendLogEntry(logs, `${member.name} 的当前行动被中断，事件指令接管。`, "accent", state.elapsedGameSeconds);
+    }
+
+    if (eventAction.type === "event_waiting") {
+      return {
+        ...member,
+        status: "遭遇事件，等待通讯接通。",
+        statusTone: "danger" as Tone,
+        activeAction,
+        unavailable: true,
+        canCommunicate: true,
+      };
+    }
+
+    return {
+      ...member,
+      activeAction,
+    };
+  });
+
+  return { crew, logs };
+}
+
+function collectBridgeableCrewActions(crewActions: Record<Id, CrewActionState>) {
+  const actionByCrew = new Map<Id, CrewActionState>();
+
+  for (const action of Object.values(crewActions)) {
+    if (action.source !== "event_action_request" || action.status !== "active") {
+      continue;
+    }
+
+    const existing = actionByCrew.get(action.crew_id);
+    if (!existing || compareCrewActionRecency(action, existing) > 0) {
+      actionByCrew.set(action.crew_id, action);
+    }
+  }
+
+  return actionByCrew;
+}
+
+function compareCrewActionRecency(left: CrewActionState, right: CrewActionState) {
+  const leftStartedAt = left.started_at ?? 0;
+  const rightStartedAt = right.started_at ?? 0;
+  return leftStartedAt === rightStartedAt ? left.id.localeCompare(right.id) : leftStartedAt - rightStartedAt;
 }
 
 function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameState) {

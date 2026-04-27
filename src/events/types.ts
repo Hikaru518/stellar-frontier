@@ -634,6 +634,7 @@ export interface CrewActionState {
   ends_at?: GameSeconds | null;
   progress_seconds: number;
   duration_seconds: number;
+  action_params: JsonObject;
   can_interrupt: boolean;
   interrupt_duration_seconds: number;
   blocking_claim_id?: Id | null;

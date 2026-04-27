@@ -355,20 +355,28 @@ function createCrewAction(
   }
 
   const actionId = stringParam(effect.params.action_id) ?? `${effect.id}:action`;
+  const startedAt = numberParam(effect.params.started_at, now(context));
+  const actionParams = readObject(effect, "action_params", path, false).value ?? {};
+  const targetTileId = stringParam(effect.params.target_tile_id) ?? stringParam(effect.params.to_tile_id) ?? crew.target.value.tile_id;
+  const durationSeconds = numberParam(effect.params.duration_seconds, 0);
   const action: CrewActionState = {
     id: actionId,
     crew_id: crew.target.id,
     type: actionType.value as CrewActionType,
-    status: "queued",
+    status: "active",
     source: "event_action_request",
     parent_event_id: currentEventId(context) ?? null,
     objective_id: stringParam(effect.params.objective_id) ?? null,
     action_request_id: stringParam(effect.params.action_request_id) ?? null,
     from_tile_id: crew.target.value.tile_id,
     to_tile_id: stringParam(effect.params.to_tile_id),
-    target_tile_id: stringParam(effect.params.target_tile_id),
+    target_tile_id: targetTileId,
+    path_tile_ids: readStringArray(effect.params.path_tile_ids),
+    started_at: startedAt,
+    ends_at: startedAt + durationSeconds,
     progress_seconds: numberParam(effect.params.progress_seconds, 0),
-    duration_seconds: numberParam(effect.params.duration_seconds, 0),
+    duration_seconds: durationSeconds,
+    action_params: actionParams,
     can_interrupt: booleanParam(effect.params.can_interrupt, true),
     interrupt_duration_seconds: numberParam(effect.params.interrupt_duration_seconds, 10),
   };

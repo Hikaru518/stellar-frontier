@@ -264,6 +264,7 @@ function createState(): ConditionGameState {
         target_tile_id: "2-3",
         progress_seconds: 30,
         duration_seconds: 60,
+        action_params: {},
         can_interrupt: true,
         interrupt_duration_seconds: 10,
       },

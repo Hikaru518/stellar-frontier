@@ -126,6 +126,33 @@ describe("structured effect executor", () => {
     );
   });
 
+  it("creates active crew actions with bridge-ready fields", () => {
+    const result = executeEffects(
+      [
+        effect("dispatch", "create_crew_action", { type: "primary_crew" }, {
+          type: "move",
+          target_tile_id: "base",
+          duration_seconds: 45,
+          action_params: { reason: "event order" },
+        }),
+      ],
+      createContext(createState()),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.state.crew_actions["dispatch:action"]).toMatchObject({
+      id: "dispatch:action",
+      crew_id: "amy",
+      type: "move",
+      status: "active",
+      source: "event_action_request",
+      started_at: 120,
+      duration_seconds: 45,
+      target_tile_id: "base",
+      action_params: { reason: "event order" },
+    });
+  });
+
   it("calls only registered effect handlers and returns clear handler errors", () => {
     const state = createState();
     const context = createContext(state, {
