@@ -115,19 +115,22 @@ describe("App", () => {
     expect(signalChoice?.effects?.some((effect) => effect.type === "addLog" && /通讯|定位|额外信息/.test(effect.text ?? ""))).toBe(true);
   });
 
-  it("enables a light response choice when the caller has a usable light item", async () => {
-    const user = userEvent.setup();
+  it("creates a runtime event when a crew member completes a sample trigger action", () => {
+    vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
         crew: [
           {
-            id: "lin_xia",
-            status: "洞穴低光区域，等待指令。",
-            statusTone: "danger",
-            hasIncoming: true,
-            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
+            id: "garry",
+            currentTile: "2-3",
+            location: "木材",
+            coord: "(2,3)",
+            status: "森林边缘待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: undefined,
           },
         ],
         tiles: initialTiles,
@@ -138,95 +141,54 @@ describe("App", () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /通讯台/ }));
-    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
-    expect(linCard).not.toBeNull();
-    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "接通" }));
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
 
-    const lightButton = screen.getByRole("button", { name: /使用照明道具继续确认洞内路径/ });
-    expect(lightButton).toBeEnabled();
-    expect(screen.getByText("照明道具：将使用手持照明灯，不会消耗。")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
 
-    await user.click(lightButton);
-    expect(screen.getByText("照明稳定后，队员确认了洞内可通行路径和湿滑边界。")).toBeInTheDocument();
-  });
-
-  it("disables a light response choice when the caller has no usable light item", async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [
-          {
-            id: "lin_xia",
-            status: "洞穴低光区域，等待指令。",
-            statusTone: "danger",
-            hasIncoming: true,
-            inventory: [],
-            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
-          },
-        ],
-        tiles: initialTiles,
-        logs: initialLogs,
-        resources: initialResources,
-      })),
-    );
-
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: /通讯台/ }));
-    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
-    expect(linCard).not.toBeNull();
-    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "接通" }));
-
-    expect(screen.getByRole("button", { name: /使用照明道具继续确认洞内路径/ })).toBeDisabled();
-    expect(screen.getByText("需要可用的照明道具才能安全进入低光区域。")).toBeInTheDocument();
-  });
-
-  it("uses a signal response item and records the consumed item in the result logs", async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [
-          {
-            id: "kael",
-            currentTile: "3-2",
-            status: "通讯定位偏移，等待指令。",
-            statusTone: "danger",
-            hasIncoming: true,
-            emergencyEvent: createSavedEmergencyEvent("kael", "emergency_signal_assist_comms"),
-          },
-        ],
-        tiles: initialTiles,
-        logs: initialLogs,
-        resources: initialResources,
-      })),
-    );
-
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: /通讯台/ }));
-    const kaelCard = screen.getByText("Kael，轨道城邦祭司学徒").closest("article");
-    expect(kaelCard).not.toBeNull();
-    await user.click(within(kaelCard as HTMLElement).getByRole("button", { name: "接通" }));
-
-    const signalButton = screen.getByRole("button", { name: /使用信号道具辅助定位/ });
-    expect(signalButton).toBeEnabled();
-    expect(screen.getByText("信号道具：将使用信号弹，使用后消耗。")).toBeInTheDocument();
-
-    await user.click(signalButton);
-
-    expect(screen.getByText("信号辅助后通讯噪声下降，定位坐标被重新校准，并回传了一段额外环境信息。")).toBeInTheDocument();
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(saved.logs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ text: "Kael 使用了信号弹，道具已消耗。" }),
-        expect.objectContaining({ text: "信号辅助后通讯噪声下降，定位坐标被重新校准，并回传了一段额外环境信息。" }),
-      ]),
+    expect(Object.values(saved.active_events).map((event) => (event as { event_definition_id: string }).event_definition_id)).toContain(
+      "forest_trace_small_camp",
     );
+    expect(Object.keys(saved.active_calls)).toContain("forest_trace_small_camp:180:trace_report:call");
+  });
+
+  it("ignores legacy emergencyEvent fields when opening a call", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "lin_xia",
+            status: "洞穴低光区域，等待指令。",
+            statusTone: "danger",
+            hasIncoming: true,
+            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /通讯台/ }));
+    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
+    expect(linCard).not.toBeNull();
+    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByRole("heading", { name: "通话页面：林夏 状态确认" })).toBeInTheDocument();
+    expect(screen.queryByText(/使用照明道具继续确认洞内路径/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
   });
 
   it("handles an incoming Amy call and settles a decision", async () => {
@@ -238,14 +200,9 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "接通" }));
-    expect(screen.getByRole("heading", { name: "通话页面：Amy 紧急事件" })).toBeInTheDocument();
-    expect(screen.getByText("队员压低声音报告：附近有大型野兽正在靠近。")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "立刻撤离" }));
-
-    expect(screen.getByText("队员成功撤离。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "立刻撤离" })).toBeDisabled();
-    expect(screen.getAllByRole("button", { name: "结束通话" })).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "通话页面：Amy 状态确认" })).toBeInTheDocument();
+    expect(screen.queryByText("队员压低声音报告：附近有大型野兽正在靠近。")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "返回通讯台" }).length).toBeGreaterThan(0);
   });
 
   it("selects a move target from the map and confirms movement in the call", async () => {
@@ -385,6 +342,7 @@ describe("App", () => {
       { itemId: "ration", quantity: 1 },
     ]);
     expect(JSON.stringify(saved)).not.toContain("bag");
+    expect(JSON.stringify(saved)).not.toContain("emergencyEvent");
   });
 
   it("uses the debug toolbox to accelerate game time", () => {

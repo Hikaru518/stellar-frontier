@@ -49,54 +49,18 @@ interface EffectExecutionResult {
   baseInventory: InventoryEntry[];
 }
 
-export function getEmergencyEventDefinition(member: CrewMember) {
-  return member.emergencyEvent ? eventDefinitionById.get(member.emergencyEvent.eventId) : undefined;
+export function getEmergencyEventDefinition(member: CrewMember): EventDefinition | undefined {
+  void member;
+  return undefined;
 }
 
-export function getEmergencyChoices(member: CrewMember) {
-  return getEmergencyEventDefinition(member)?.choices ?? [];
+export function getEmergencyChoices(member: CrewMember): EventChoiceDefinition[] {
+  void member;
+  return [];
 }
 
 export function triggerEvents(options: TriggerEventOptions) {
-  const tile = options.tiles.find((item) => item.id === options.member.currentTile);
-  if (!tile) {
-    return { ...options, member: options.member, changed: false };
-  }
-
-  const candidates = eventDefinitions
-    .filter((event) => event.trigger.source === options.source)
-    .filter((event) => matchesTile(event, tile))
-    .filter((event) => isEventAvailable(event, options.member, tile, options.eventHistory, options.elapsedGameSeconds))
-    .map((event) => ({ event, chance: getFinalChance(event, options.member, tile, options.eventHistory) }))
-    .filter(({ event, chance }) => chance >= getDeterministicRoll(`${event.eventId}:${options.member.id}:${tile.id}:${options.source}:${options.elapsedGameSeconds}`))
-    .sort((a, b) => b.event.priority - a.event.priority);
-
-  const selected = candidates[0]?.event;
-  if (!selected) {
-    return { ...options, member: options.member, changed: false };
-  }
-
-  const applied = executeEventEffects({
-    event: selected,
-    effects: selected.effects,
-    member: options.member,
-    tile,
-    tiles: options.tiles,
-    resources: options.resources,
-    logs: options.logs,
-    baseInventory: options.baseInventory,
-    elapsedGameSeconds: options.elapsedGameSeconds,
-  });
-
-  return {
-    ...options,
-    ...applied,
-    eventHistory: {
-      ...options.eventHistory,
-      [getHistoryKey(selected, options.member, tile)]: options.elapsedGameSeconds,
-    },
-    changed: true,
-  };
+  return { ...options, member: options.member, changed: false };
 }
 
 export function resolveEmergencyChoice(

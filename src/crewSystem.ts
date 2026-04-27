@@ -37,10 +37,6 @@ export function createMovePreview(member: CrewMember, targetTileId: string, tile
     return blockedPreview(member, targetTileId, "信号中断，无法下达指令。");
   }
 
-  if (member.emergencyEvent && !member.emergencyEvent.settled) {
-    return blockedPreview(member, targetTileId, "需先处理当前紧急事件。");
-  }
-
   if (member.activeAction?.actionType === "move" && member.activeAction.status === "inProgress") {
     return blockedPreview(member, targetTileId, "移动中不能直接改派目标，需要先停止当前行动。");
   }
@@ -203,6 +199,7 @@ export function normalizeCrewMember(member: CrewMember, initialMember: CrewMembe
     currentTile: member.currentTile ?? initialMember.currentTile,
     canCommunicate: member.canCommunicate ?? !member.unavailable,
     lastContactTime: member.lastContactTime ?? 0,
+    emergencyEvent: undefined,
   };
 }
 

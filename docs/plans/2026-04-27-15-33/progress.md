@@ -25,7 +25,7 @@ branch: "feature/event-program-model-player-journey"
 | 9 | TASK-009 | 实现 trigger intake、候选选择与时间唤醒 | completed | 1 |
 | 10 | TASK-010 | 实现 lightweight objective runtime | completed | 1 |
 | 11 | TASK-011 | 生产五个样例事件资产与 dry-run fixture | completed | 1 |
-| 12 | TASK-012 | 把事件引擎接入 App 时间与行动流程 | pending | 0 |
+| 12 | TASK-012 | 把事件引擎接入 App 时间与行动流程 | completed | 1 |
 | 13 | TASK-013 | 替换通讯台与通话页为 runtime call UI | pending | 0 |
 | 14 | TASK-014 | 展示事件摘要、地块标记与目标状态 | pending | 0 |
 | 15 | TASK-015 | 完成内容校验、单测与端到端回归 | pending | 0 |
@@ -69,6 +69,18 @@ branch: "feature/event-program-model-player-journey"
 - 完成时间: 2026-04-27 18:09
 - 尝试次数: 1
 - Monkey summary: 成功。生产五个 approved 样例事件资产，新增 dry-run fixture 和测试，覆盖普通发现、紧急多通话、等待节点、跨队员 objective 与长期后果。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+
+### TASK-012: 把事件引擎接入 App 时间与行动流程
+- 状态: completed
+- 开始时间: 2026-04-27 18:10
+- 完成时间: 2026-04-27 18:18
+- 尝试次数: 1
+- Monkey summary: 成功。App 时间与行动完成路径接入新事件引擎；旧 emergencyEvent 不再作为通话或行动结算 source of truth；旧 save schema 被拒绝后可通过 Debug reset 回到新初始状态。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS
