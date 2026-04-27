@@ -1,6 +1,17 @@
 import eventsContent from "../../content/events/events.json";
+import forestCallTemplatesContent from "../../content/events/call_templates/forest.json";
+import forestEventDefinitionsContent from "../../content/events/definitions/forest.json";
+import handlerRegistryContent from "../../content/events/handler_registry.json";
+import forestPresetsContent from "../../content/events/presets/forest.json";
 import crewContent from "../../content/crew/crew.json";
 import itemsContent from "../../content/items/items.json";
+import type { EventContentLibrary } from "../events/contentIndex";
+import type {
+  CallTemplate,
+  EventDefinition as ProgramEventDefinition,
+  HandlerDefinition,
+  PresetDefinition,
+} from "../events/types";
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
 export type CrewStatus = "idle" | "moving" | "working" | "inEvent" | "lost" | "dead";
@@ -168,6 +179,17 @@ export interface ItemDefinition {
   tags: string[];
   effects: Array<{ type: string; target?: string; value?: number; condition?: string }>;
 }
+
+export const eventProgramDefinitions = forestEventDefinitionsContent.event_definitions as unknown as ProgramEventDefinition[];
+export const callTemplates = forestCallTemplatesContent.call_templates as unknown as CallTemplate[];
+export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
+export const presetDefinitions = forestPresetsContent.presets as unknown as PresetDefinition[];
+export const eventContentLibrary: EventContentLibrary = {
+  event_definitions: eventProgramDefinitions,
+  call_templates: callTemplates,
+  handlers: handlerDefinitions,
+  presets: presetDefinitions,
+};
 
 export const eventDefinitions = eventsContent.events as unknown as EventDefinition[];
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
