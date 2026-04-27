@@ -2,6 +2,31 @@
 
 本文件记录与 stellar-frontier 项目设计 / 文档体系相关的、目前**有意搁置**但未来值得做的事项。代码实现层面的 TODO 不在这里登记；`audit-wiki` skill 在每轮审计中产生的"待代码处理" TODO 留在对应 `docs/plans/audits/<YYYY-MM-DD-HH-MM>/audit-report.md` 中。
 
+## 事件图节点扩展
+
+**当前状态**：在 `docs/plans/2026-04-27-15-33/` 的事件程序模型头脑风暴中，第一版 event node 类型暂定不包含并行编排能力。
+
+**后续要补充的节点类型**：
+
+- `parallel`：允许一个事件同时开启多个下游节点，用于多队员、多目标或多地点同时推进的复杂事件。
+- `join`：允许多个上游节点完成后汇合，用于等待多个目标完成、多个条件满足后进入同一后续阶段。
+
+本轮先固定 `call`、`wait`、`check`、`random`、`action_request`、`objective`、`spawn_event`、`log_only`、`end` 九类节点；`parallel` / `join` 等并行图能力留到后续事件图扩展轮次处理。
+
+## 编辑器级事件内容校验
+
+**当前状态**：在 `docs/plans/2026-04-27-15-33/` 的事件程序模型头脑风暴中，第一版内容校验暂定做到生产级校验，不包含编辑器级分析报告。
+
+**后续要补充的校验能力**：
+
+- 事件分支覆盖率统计。
+- 通话 variant 命中率与永远不可达 variant 报告。
+- 隐藏选项报告与隐藏原因统计。
+- 事件池概率、优先级和互斥关系分析。
+- 面向内容生产的质量评分或风险提示。
+
+本轮先保证 schema、ID / 引用、图可达性、终点路径、option / template 对齐、condition / effect 字段类型、handler 参数 schema 和样例事件 dry-run。
+
 ## Wiki 索引页 / 子系统总览（已收口于 audit-wiki skill）
 
 **当前状态**：已由 `audit-wiki` skill 处理。

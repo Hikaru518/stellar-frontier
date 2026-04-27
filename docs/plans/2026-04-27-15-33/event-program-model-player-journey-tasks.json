@@ -1,0 +1,441 @@
+{
+  "topic": "event-program-model-player-journey",
+  "created": "2026-04-27",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "建立事件程序模型 TypeScript 契约",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": "US-001",
+      "description": "把 game model spec 中的静态资产、运行时 event/call/objective、trigger context、event log、world history 和 save state 抽成 TypeScript 契约。该任务只建立类型边界和初始空状态，不实现事件推进逻辑，为后续引擎和 UI 任务提供统一字段名。",
+      "files": {
+        "create": [
+          "src/events/types.ts"
+        ],
+        "modify": [
+          "src/data/gameData.ts",
+          "src/timeSystem.ts"
+        ],
+        "test": [
+          "src/events/types.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 新 GameState 类型包含 active_events、active_calls、objectives、event_logs、world_history、world_flags、crew_actions、inventories 和 rng_state。",
+        "AC2: 旧 save schema 被识别为不兼容输入时，load 路径不会静默返回部分旧状态。",
+        "AC3: TypeScript 编译能证明事件模型字段使用 snake_case，不引入与 spec 冲突的同义字段。"
+      ],
+      "tech_notes": "遵循 ADR-001 和 ADR-006；只建立契约，不保留旧 CrewMember.emergencyEvent 作为新模型 source of truth。"
+    },
+    {
+      "id": "TASK-002",
+      "title": "搭建全局事件资产库加载与索引",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "user_story": "US-002",
+      "description": "建立 content/events 的新目录入口，并让 src/content/contentData.ts 加载 event_definition、call_template、handler registry 和 preset。实现 EventContentIndex，按 definition id、template id、handler type、trigger type、domain、tag 和 mutex group 建索引。",
+      "files": {
+        "create": [
+          "content/events/call_templates/forest.json",
+          "content/events/definitions/forest.json",
+          "content/events/handler_registry.json",
+          "content/events/presets/forest.json",
+          "src/events/contentIndex.ts"
+        ],
+        "modify": [
+          "src/content/contentData.ts"
+        ],
+        "test": [
+          "src/events/contentIndex.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 空或最小事件资产库能被加载并构建 EventContentIndex。",
+        "AC2: 重复 event_definition id、call_template id 或 handler_type 会产生可定位的错误。",
+        "AC3: 按 trigger_type 查询时只返回对应候选事件定义。"
+      ],
+      "tech_notes": "遵循 ADR-002；definitions 和 call_templates 分离，content/generated 不作为手写输入。"
+    },
+    {
+      "id": "TASK-003",
+      "title": "新增事件 JSON Schema 与基础内容校验入口",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-002"
+      ],
+      "user_story": "US-004",
+      "description": "为新事件资产建立 schema 文件，并改造 validate-content 脚本，让它能校验事件定义、事件图、节点、condition、effect、call template 和 handler registry。该任务聚焦字段结构和基础 schema 通过，不实现完整图遍历和 dry-run。",
+      "files": {
+        "create": [
+          "content/schemas/events/call-template.schema.json",
+          "content/schemas/events/condition.schema.json",
+          "content/schemas/events/effect.schema.json",
+          "content/schemas/events/event-definition.schema.json",
+          "content/schemas/events/event-graph.schema.json",
+          "content/schemas/events/handler-registry.schema.json"
+        ],
+        "modify": [
+          "scripts/validate-content.mjs"
+        ],
+        "test": [
+          "scripts/validate-content.test.mjs"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: npm run validate:content 会读取 content/events 新目录并执行 schema 校验。",
+        "AC2: 缺少必填字段或出现禁止的 editor/runtime 字段时，校验输出包含字段路径。",
+        "AC3: 未支持的 trigger.type、node.type、condition.type 或 effect.type 会校验失败。"
+      ],
+      "tech_notes": "遵循 ADR-003 和 ADR-007；schema 使用 type 分发，禁止额外字段。"
+    },
+    {
+      "id": "TASK-004",
+      "title": "实现事件图、引用和模板一致性校验",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-003"
+      ],
+      "user_story": "US-003",
+      "description": "在基础 schema 之上增加生产级 cross-reference 校验。校验器需要检查图可达性、无环、终点路径、option_node_mapping、effect refs、log template refs、call_template 与 call node 的 option 对齐，以及 handler registry 引用。",
+      "files": {
+        "create": [
+          "src/events/validation.ts"
+        ],
+        "modify": [
+          "scripts/validate-content.mjs"
+        ],
+        "test": [
+          "src/events/validation.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 无入口节点、孤儿节点、循环图和无终点路径都会校验失败。",
+        "AC2: call_template.option_lines 缺少或多出 option_id 时会校验失败。",
+        "AC3: effect_refs、event_log_template_id、handler_type 或 call_template_id 指向不存在 ID 时会校验失败。"
+      ],
+      "tech_notes": "遵循 ADR-004 和 ADR-007；错误报告必须包含 asset id 与字段路径。"
+    },
+    {
+      "id": "TASK-005",
+      "title": "实现结构化 condition evaluator",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "user_story": "US-004",
+      "description": "实现结构化 condition 的纯函数解释器，覆盖 compare_field、tag、crew condition、attribute、inventory、resource、tile state、world flag、world history、objective status、event status、crew action status、time_compare 和 handler_condition 的第一批 MVP 能力。",
+      "files": {
+        "create": [
+          "src/events/conditions.ts"
+        ],
+        "modify": [
+          "content/events/handler_registry.json"
+        ],
+        "test": [
+          "src/events/conditions.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: evaluator 能对 crew、tile、inventory、world_history 和 world_flags 执行只读条件判断。",
+        "AC2: handler_condition 只能调用 handler_registry 中 kind 为 condition 的 handler。",
+        "AC3: 读取不存在字段、op 与字段类型不匹配或 handler 参数非法时返回可定位错误。"
+      ],
+      "tech_notes": "遵循 ADR-003；condition evaluator 不修改 GameState，不访问 React 或 localStorage。"
+    },
+    {
+      "id": "TASK-006",
+      "title": "实现结构化 effect executor",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001",
+        "TASK-005"
+      ],
+      "user_story": "US-004",
+      "description": "实现 effect 执行器，支持队员状态、属性、标签、地块字段、危险标签、事件标记、库存/资源、objective、world flag、world history、event log、日记和 handler_effect 的 MVP 效果。所有效果通过 target_ref 写入 GameState。",
+      "files": {
+        "create": [
+          "src/events/effects.ts"
+        ],
+        "modify": [
+          "src/diarySystem.ts",
+          "src/events/types.ts"
+        ],
+        "test": [
+          "src/events/effects.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: effect executor 能写入 event_logs、world_history 和 world_flags。",
+        "AC2: effect executor 能更新 crew、tile、inventory 和 objective 的事件可访问字段。",
+        "AC3: target 无法解析、failure_policy 为 fail_event 或 handler_effect 未注册时返回明确错误。"
+      ],
+      "tech_notes": "遵循 ADR-003 和 ADR-005；长期玩家历史只写摘要，不保存完整 call/debug 细节。"
+    },
+    {
+      "id": "TASK-007",
+      "title": "实现事件图 runner 与 runtime event 生命周期",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-004",
+        "TASK-006"
+      ],
+      "user_story": "US-003",
+      "description": "实现 event_graph 节点进入、退出和推进。runner 需要支持 call、wait、check、random、action_request、objective、spawn_event、log_only、end 九类节点的状态转换，但 call 渲染和 objective 分配的细节由后续任务补齐。",
+      "files": {
+        "create": [
+          "src/events/graphRunner.ts",
+          "src/events/random.ts"
+        ],
+        "modify": [
+          "src/events/types.ts"
+        ],
+        "test": [
+          "src/events/graphRunner.test.ts",
+          "src/events/random.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: event 创建后从 entry_node_id 进入，并按 auto_next、branch 或 option mapping 推进 current_node_id。",
+        "AC2: wait 节点会写入 next_wakeup_at，end 节点会释放 blocking claims 并产生 result_summary。",
+        "AC3: random 节点结果会写入 random_results，同一输入 seed 能得到稳定结果。"
+      ],
+      "tech_notes": "遵循 ADR-004；MVP 不支持 parallel/join 或多个 current_node_id。"
+    },
+    {
+      "id": "TASK-008",
+      "title": "实现 runtime call renderer 与选项回写",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-007"
+      ],
+      "user_story": "US-003",
+      "description": "实现 call_template 渲染和玩家选择回写。call renderer 根据 render context 选择 opening/body/option variants，并把渲染结果保存到 active_calls。selectCallOption 只接受 call_id 和 option_id，再由 graph runner 推进事件。",
+      "files": {
+        "create": [
+          "src/events/callRenderer.ts",
+          "src/events/eventEngine.ts"
+        ],
+        "modify": [
+          "src/events/graphRunner.ts"
+        ],
+        "test": [
+          "src/events/callRenderer.test.ts",
+          "src/events/eventEngine.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: runtime call 保存 rendered_lines、available_options、render_context_snapshot 和 expires_at。",
+        "AC2: 玩家选择展示文本不同的按钮时，事件只记录稳定 option_id。",
+        "AC3: 选择不可用 option_id 或已结束 call 时，事件不推进并返回运行时错误。"
+      ],
+      "tech_notes": "遵循 ADR-002 和 ADR-005；旧通话硬编码不能参与新 call 分支逻辑。"
+    },
+    {
+      "id": "TASK-009",
+      "title": "实现 trigger intake、候选选择与时间唤醒",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-008"
+      ],
+      "user_story": "US-004",
+      "description": "实现事件引擎的 processTrigger 和 processEventWakeups。候选选择需要按 trigger_type、condition、repeat_policy、world_history、cooldown、mutex_group、blocking slot、priority 和 weight 过滤或抽取事件。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/events/eventEngine.ts",
+          "src/events/random.ts"
+        ],
+        "test": [
+          "src/events/eventEngine.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: action_complete、arrival、call_choice、objective_completed 和 time_wakeup context 能创建或推进事件。",
+        "AC2: 冷却中、超过 max_trigger_count、互斥冲突或 blocking slot 不可用的事件不会被选中。",
+        "AC3: 多个候选事件满足条件时，priority 和 weight 决定可解释的选择结果。"
+      ],
+      "tech_notes": "遵循 ADR-006；候选报告可用于 dry-run 和测试，不要求长期进入玩家存档。"
+    },
+    {
+      "id": "TASK-010",
+      "title": "实现 lightweight objective runtime",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-009"
+      ],
+      "user_story": "US-005",
+      "description": "实现事件创建、分配和完成 objective 的运行时能力。objective 只服务事件后续行动，不扩展为完整 quest system。完成 objective 后需要发出 objective_completed context 并推进 parent event。",
+      "files": {
+        "create": [
+          "src/events/objectives.ts"
+        ],
+        "modify": [
+          "src/events/eventEngine.ts",
+          "src/events/graphRunner.ts"
+        ],
+        "test": [
+          "src/events/objectives.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: objective 节点能创建 available objective，并记录 parent_event_id 和 created_by_node_id。",
+        "AC2: 符合条件的队员能被分配到 objective，并创建或关联 crew action。",
+        "AC3: 不符合 eligible_crew_conditions 的队员不能接取 objective，parent event 不推进。"
+      ],
+      "tech_notes": "遵循 ADR-008；objective 不包含奖励、优先级 UI 或复杂任务链。"
+    },
+    {
+      "id": "TASK-011",
+      "title": "生产五个样例事件资产与 dry-run fixture",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-010"
+      ],
+      "user_story": "US-005",
+      "description": "用新资产模型创建 5 个自包含样例事件：forest_trace_small_camp、forest_beast_encounter、mountain_signal_probe、volcanic_ash_trace、lost_relic_argument。每个样例都要有 event_definition、call_template、sample_contexts、effect groups 和必要 handler/preset 引用。",
+      "files": {
+        "create": [
+          "content/events/call_templates/crew_kael.json",
+          "content/events/call_templates/desert.json",
+          "content/events/call_templates/mountain.json",
+          "content/events/definitions/crew_kael.json",
+          "content/events/definitions/desert.json",
+          "content/events/definitions/mountain.json",
+          "src/events/sampleFixtures.ts"
+        ],
+        "modify": [
+          "content/events/call_templates/forest.json",
+          "content/events/definitions/forest.json"
+        ],
+        "test": [
+          "src/events/sampleFixtures.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 五个样例事件都能通过 npm run validate:content。",
+        "AC2: 样例覆盖普通发现、紧急多通话、等待节点、跨队员 objective 和长期角色/世界后果。",
+        "AC3: 每个 approved event_definition 至少有一个 sample_contexts，并能 dry-run 到一个 terminal path。"
+      ],
+      "tech_notes": "遵循 ADR-007；样例文本只需验证模型路径，不要求大量正式剧情生产。"
+    },
+    {
+      "id": "TASK-012",
+      "title": "把事件引擎接入 App 时间与行动流程",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-011"
+      ],
+      "user_story": "US-005",
+      "description": "替换 App 中旧 triggerEvents、settleEmergencyEvent、resolveEmergencyChoice 和硬编码行动完成事件分支。抵达、调查/采集/建设完成、待命、通话选择、objective 完成和时间唤醒都应通过新事件引擎入口进入。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/App.tsx",
+          "src/crewSystem.ts",
+          "src/data/gameData.ts",
+          "src/eventSystem.ts",
+          "src/timeSystem.ts"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 队员完成样例触发条件时，GameState 中创建 runtime event 或 event_log。",
+        "AC2: 旧 CrewMember.emergencyEvent 不再决定 CallPage 或行动结算。",
+        "AC3: 旧 save schema 加载失败时，应用可通过 Debug reset 回到新初始状态。"
+      ],
+      "tech_notes": "遵循 ADR-001 和 ADR-006；eventSystem.ts 可以被替换为兼容导出或删除路径，但不能继续作为旧模型 source of truth。"
+    },
+    {
+      "id": "TASK-013",
+      "title": "替换通讯台与通话页为 runtime call UI",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-012"
+      ],
+      "user_story": "US-005",
+      "description": "让 CommunicationStation 和 CallPage 读取 active_calls、crew communication_state 和 objectives。CallPage 只展示 rendered_lines 与 available_options，点击后提交 option_id。通讯台展示来电、排队消息和可分配目标。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/App.tsx",
+          "src/pages/CallPage.tsx",
+          "src/pages/CommunicationStation.tsx"
+        ],
+        "test": [
+          "src/App.test.tsx",
+          "tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 有 active call 时，通讯台能进入通话页并展示 runtime call 文本。",
+        "AC2: 选择 runtime option 后，call 状态结束，event 按 option_node_mapping 推进。",
+        "AC3: 没有 active call 或 call 已过期时，通话页不展示旧硬编码紧急选项。"
+      ],
+      "tech_notes": "遵循 ADR-002 和 ADR-005；UI 文案不是逻辑主键。"
+    },
+    {
+      "id": "TASK-014",
+      "title": "展示事件摘要、地块标记与目标状态",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-013"
+      ],
+      "user_story": "US-005",
+      "description": "把事件结果接到玩家可见页面。地图展示 event_marks 和 danger_tags，队员详情展示事件摘要和日记变化，控制中心或通讯台展示轻量 objective 状态和近期 event_logs。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/pages/ControlCenter.tsx",
+          "src/pages/CrewDetail.tsx",
+          "src/pages/MapPage.tsx",
+          "src/pages/CommunicationStation.tsx"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: forest_trace_small_camp 结束后，地图能显示对应地块事件标记或摘要。",
+        "AC2: lost_relic_argument 结束后，队员详情能反映日记或标签变化。",
+        "AC3: 没有 event_logs 或 objectives 时，页面显示空状态，不产生运行时错误。"
+      ],
+      "tech_notes": "遵循 player_history_policy；页面展示摘要，不展示完整 debug trace 或隐藏选项原因。"
+    },
+    {
+      "id": "TASK-015",
+      "title": "完成内容校验、单测与端到端回归",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-014"
+      ],
+      "user_story": "US-005",
+      "description": "收束新事件系统的自动化验证。确保 validate:content、lint、unit tests 和 e2e 能覆盖五个样例事件的核心路径，并删除或更新依赖旧紧急事件、旧 CallPage 文案和旧 eventHistory 的断言。",
+      "files": {
+        "create": [],
+        "modify": [
+          "scripts/validate-content.mjs",
+          "src/App.test.tsx",
+          "tests/e2e/app.spec.ts"
+        ],
+        "test": [
+          "src/App.test.tsx",
+          "src/events/eventEngine.test.ts",
+          "src/events/validation.test.ts",
+          "tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: npm run validate:content 通过，并能在注入坏引用的测试 fixture 中失败。",
+        "AC2: npm run lint 和 npm run test 通过。",
+        "AC3: npm run test:e2e 覆盖至少一个 runtime call 选择路径和一个 objective 完成路径。"
+      ],
+      "tech_notes": "这是收束任务，不新增核心模型能力；若发现模型缺口，回到对应前置任务修正。"
+    }
+  ]
+}
