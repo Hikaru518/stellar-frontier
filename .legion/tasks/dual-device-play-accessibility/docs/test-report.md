@@ -14,6 +14,7 @@ PASS
 - `node common/scripts/install-run-rush.js build`: pass, protocol dist, PC Vite build, mobile Vite build, and relay-server build pass.
 - `node ../../common/scripts/install-run-rushx.js install:browsers` from `apps/pc-client`: pass, installed Chromium into `common/temp/playwright-browsers`.
 - `node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client`: pass, PC Playwright suite passed.
+- `CI=1 node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client`: pass after replacing the Playwright webServer command with direct `vite --host 127.0.0.1`.
 
 ## Why These Commands
 
@@ -29,6 +30,7 @@ PASS
 - Removed root `type: module` because Rush generated scripts are CommonJS.
 - Moved the real content validator under `apps/pc-client/scripts` so Ajv resolves from a Rush project package; kept `scripts/validate-content.mjs` as a compatibility wrapper.
 - Added a repo-local Playwright browser path under `common/temp/playwright-browsers` for local E2E runs.
+- Avoided nested Rush inside Playwright webServer startup; CI should start Vite directly from the PC project.
 
 ## Skipped
 

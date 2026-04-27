@@ -8,3 +8,4 @@
 - Implemented Rush + pnpm monorepo structure, shared protocol, mobile companion shell, relay-server skeleton, PC communication-station affordance, and Rush-based CI/docs updates.
 - Verification passed: Rush update/install, content validation, lint, unit tests, build, Playwright browser install to repo temp, and PC E2E.
 - Review evidence written: `docs/review-rfc.md`, `docs/test-report.md`, `docs/review-change.md`, `docs/report-walkthrough.md`, and `docs/pr-body.md`.
+- After PR check failure, reproduced CI-style E2E locally with `CI=1`; fixed Playwright webServer startup by using direct `vite --host 127.0.0.1` instead of nested `rushx dev`.
