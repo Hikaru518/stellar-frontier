@@ -6,7 +6,8 @@ import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { MapPage } from "./pages/MapPage";
 import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents, type EventHistory } from "./eventSystem";
+import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents } from "./eventSystem";
+import { createEmptyEventRuntimeState } from "./events/types";
 import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
 import {
   createBaseInventoryFromResources,
@@ -18,6 +19,7 @@ import {
   type ActionStatus,
   type CallContext,
   type CrewId,
+  type GameState,
   type CrewMember,
   type MapReturnTarget,
   type MapTile,
@@ -26,17 +28,7 @@ import {
   type SystemLog,
   type Tone,
 } from "./data/gameData";
-import { formatDuration, formatGameTime, GAME_SAVE_KEY, loadGameSave, saveGameState } from "./timeSystem";
-
-interface GameState {
-  elapsedGameSeconds: number;
-  crew: CrewMember[];
-  baseInventory: InventoryEntry[];
-  tiles: MapTile[];
-  logs: SystemLog[];
-  resources: ResourceSummary;
-  eventHistory: EventHistory;
-}
+import { formatDuration, formatGameTime, GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState, loadGameSave, saveGameState } from "./timeSystem";
 
 type SavedCrewMember = Partial<CrewMember> & { id: CrewId; bag?: unknown };
 
@@ -390,7 +382,9 @@ function App() {
 export default App;
 
 function createInitialGameState(): GameState {
-  const saved = loadGameSave<SavedGameState>();
+  const saved = loadGameSave<SavedGameState>(isCompatibleGameSaveState);
+  const now = new Date().toISOString();
+  const emptyEventState = createEmptyEventRuntimeState();
 
   if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.tiles && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
@@ -407,16 +401,31 @@ function createInitialGameState(): GameState {
     const crewWithNewDefaults = [...normalizedCrew, ...initialCrew.filter((member) => !savedCrewIds.has(member.id))];
     return {
       ...saved,
+      schema_version: GAME_SAVE_SCHEMA_VERSION,
+      created_at_real_time: saved.created_at_real_time ?? now,
+      updated_at_real_time: now,
       crew: crewWithNewDefaults,
       baseInventory: Array.isArray(saved.baseInventory)
         ? saved.baseInventory
         : createBaseInventoryFromResources(saved.resources),
       tiles: syncTileCrew(saved.tiles, crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
+      active_events: saved.active_events ?? emptyEventState.active_events,
+      active_calls: saved.active_calls ?? emptyEventState.active_calls,
+      objectives: saved.objectives ?? emptyEventState.objectives,
+      event_logs: saved.event_logs ?? emptyEventState.event_logs,
+      world_history: saved.world_history ?? emptyEventState.world_history,
+      world_flags: saved.world_flags ?? emptyEventState.world_flags,
+      crew_actions: saved.crew_actions ?? emptyEventState.crew_actions,
+      inventories: saved.inventories ?? emptyEventState.inventories,
+      rng_state: saved.rng_state ?? emptyEventState.rng_state,
     } as GameState;
   }
 
   const state = {
+    schema_version: GAME_SAVE_SCHEMA_VERSION,
+    created_at_real_time: now,
+    updated_at_real_time: now,
     elapsedGameSeconds: 0,
     crew: initialCrew,
     baseInventory: createBaseInventoryFromResources(initialResources),
@@ -424,6 +433,7 @@ function createInitialGameState(): GameState {
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
+    ...emptyEventState,
   };
 
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
