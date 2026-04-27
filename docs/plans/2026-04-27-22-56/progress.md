@@ -17,7 +17,7 @@ source:
 | 1 | TASK-001 | 扩展 maps schema 与默认地图内容 | completed | 1 |
 | 2 | TASK-002 | 新增 call-actions 内容与 schema | completed | 1 |
 | 3 | TASK-003 | 实现 src/callActions.ts（buildCallView 纯函数） | completed | 1 |
-| 4 | TASK-004 | 实现 src/callActionSettlement.ts（handler 白名单 + settleAction） | pending | 0 |
+| 4 | TASK-004 | 实现 src/callActionSettlement.ts（handler 白名单 + settleAction） | completed | 1 |
 | 5 | TASK-005 | 事件 → 真实行动桥接层与 effect 输出对齐 | pending | 0 |
 | 6 | TASK-006 | 重构 App.tsx 删除硬编码分支并接入 callActionSettlement | pending | 0 |
 | 7 | TASK-007 | 重构 CallPage 用 buildCallView 渲染按钮 | pending | 0 |
@@ -56,3 +56,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 `src/callActions.ts`，实现 `loadCallActions()` 与 `buildCallView()` 纯函数；新增 `src/callActions.test.ts` 覆盖待命、忙碌、未调查对象、runtime call、缺失 action id 容错。
 - 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（18 files / 108 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-004: 实现 src/callActionSettlement.ts（handler 白名单 + settleAction）
+- 状态: completed
+- 开始时间: 2026-04-28 00:21
+- 完成时间: 2026-04-28 00:27
+- 尝试次数: 1
+- Monkey summary: 成功。新增 `src/callActionSettlement.ts`，实现 `actionHandlers` 白名单与 `applyImmediateOrCreateAction` / `settleAction`；新增测试覆盖 standby、activeAction 创建、survey reveal、gather yield、未注册 handler 容错。
+- 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（19 files / 117 tests）；`npm run build` 通过；ReadLints 无新增错误。
