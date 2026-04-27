@@ -1,8 +1,12 @@
 import eventsContent from "../../content/events/events.json";
 import crewKaelCallTemplatesContent from "../../content/events/call_templates/crew_kael.json";
+import desertCallTemplatesContent from "../../content/events/call_templates/desert.json";
 import forestCallTemplatesContent from "../../content/events/call_templates/forest.json";
+import mountainCallTemplatesContent from "../../content/events/call_templates/mountain.json";
 import crewKaelEventDefinitionsContent from "../../content/events/definitions/crew_kael.json";
+import desertEventDefinitionsContent from "../../content/events/definitions/desert.json";
 import forestEventDefinitionsContent from "../../content/events/definitions/forest.json";
+import mountainEventDefinitionsContent from "../../content/events/definitions/mountain.json";
 import handlerRegistryContent from "../../content/events/handler_registry.json";
 import forestPresetsContent from "../../content/events/presets/forest.json";
 import crewContent from "../../content/crew/crew.json";
@@ -184,10 +188,14 @@ export interface ItemDefinition {
 
 export const eventProgramDefinitions = [
   ...forestEventDefinitionsContent.event_definitions,
+  ...mountainEventDefinitionsContent.event_definitions,
+  ...desertEventDefinitionsContent.event_definitions,
   ...crewKaelEventDefinitionsContent.event_definitions,
 ] as unknown as ProgramEventDefinition[];
 export const callTemplates = [
   ...forestCallTemplatesContent.call_templates,
+  ...mountainCallTemplatesContent.call_templates,
+  ...desertCallTemplatesContent.call_templates,
   ...crewKaelCallTemplatesContent.call_templates,
 ] as unknown as CallTemplate[];
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];

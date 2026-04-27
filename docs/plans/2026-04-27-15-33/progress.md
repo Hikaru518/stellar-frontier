@@ -28,7 +28,7 @@ branch: "feature/event-program-model-player-journey"
 | 12 | TASK-012 | 把事件引擎接入 App 时间与行动流程 | completed | 1 |
 | 13 | TASK-013 | 替换通讯台与通话页为 runtime call UI | completed | 1 |
 | 14 | TASK-014 | 展示事件摘要、地块标记与目标状态 | completed | 1 |
-| 15 | TASK-015 | 完成内容校验、单测与端到端回归 | pending | 0 |
+| 15 | TASK-015 | 完成内容校验、单测与端到端回归 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -106,6 +106,19 @@ branch: "feature/event-program-model-player-journey"
 - 完成时间: 2026-04-27 18:36
 - 尝试次数: 1
 - Monkey summary: 成功。控制中心、通讯台、地图和队员详情展示玩家可见事件摘要、目标状态、地块标记、危险标签与相关事件影响；补充回归覆盖森林营地标记、遗物争执队员影响和空事件状态。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+  - `npm run test:e2e`: PASS
+
+### TASK-015: 完成内容校验、单测与端到端回归
+- 状态: completed
+- 开始时间: 2026-04-27 18:38
+- 完成时间: 2026-04-27 18:44
+- 尝试次数: 1
+- Monkey summary: 成功。补充 validate-content 坏引用 fixture；运行时内容加载接入全部五个 approved 样例；App 单测和 e2e 覆盖 runtime call option 提交与 objective 完成路径。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS

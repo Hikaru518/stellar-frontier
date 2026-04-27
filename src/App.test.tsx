@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { crewDefinitions, eventDefinitionById, itemDefinitions } from "./content/contentData";
+import { crewDefinitions, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
 import { initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
 import { createEmptyEventRuntimeState } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION } from "./timeSystem";
@@ -100,7 +100,7 @@ describe("App", () => {
     );
   });
 
-  it("keeps the MVP item and event content slice wired through content data", () => {
+  it("keeps items and all five approved event program samples wired through content data", () => {
     const lightItem = itemDefinitions.find((item) => item.tags.includes("light") && item.usableInResponse);
     expect(lightItem).toBeDefined();
     expect(
@@ -109,21 +109,20 @@ describe("App", () => {
 
     expect(itemDefinitions.some((item) => item.tags.includes("clue"))).toBe(true);
 
-    expect(eventDefinitionById.get("survey_forest_scattered_wood")?.effects).toEqual(
-      expect.arrayContaining([{ type: "addItem", itemId: "wood", target: "crewInventory", amount: 2 }]),
+    expect(eventProgramDefinitions.map((definition) => definition.id)).toEqual(
+      expect.arrayContaining([
+        "forest_trace_small_camp",
+        "forest_beast_encounter",
+        "mountain_signal_probe",
+        "volcanic_ash_trace",
+        "lost_relic_argument",
+      ]),
     );
-    expect(eventDefinitionById.get("survey_hill_loose_ore")?.effects).toEqual(
-      expect.arrayContaining([{ type: "addItem", itemId: "iron_ore", target: "crewInventory", amount: 1 }]),
-    );
-
-    const lightChoice = eventDefinitionById.get("emergency_mountain_cave_darkness")?.choices.find((choice) => choice.choiceId === "use_light");
-    expect(lightChoice?.usesItemTag).toBe("light");
-    expect(lightChoice?.effects).toEqual(expect.arrayContaining([{ type: "useItemByTag", itemTag: "light" }]));
-
-    const signalChoice = eventDefinitionById.get("emergency_signal_assist_comms")?.choices.find((choice) => choice.choiceId === "boost_with_signal");
-    expect(signalChoice?.usesItemTag).toBe("signal");
-    expect(signalChoice?.effects).toEqual(expect.arrayContaining([{ type: "useItemByTag", itemTag: "signal" }]));
-    expect(signalChoice?.effects?.some((effect) => effect.type === "addLog" && /通讯|定位|额外信息/.test(effect.text ?? ""))).toBe(true);
+    expect(
+      eventProgramDefinitions
+        .find((definition) => definition.id === "volcanic_ash_trace")
+        ?.event_graph.nodes.some((node) => node.type === "objective"),
+    ).toBe(true);
   });
 
   it("creates a runtime event when a crew member completes a sample trigger action", () => {
@@ -316,6 +315,68 @@ describe("App", () => {
 
     expect(screen.getByText("relic_burdened")).toBeInTheDocument();
     expect(screen.getAllByText("Kael kept the relic lead, changing his long-term outlook.").length).toBeGreaterThan(0);
+  });
+
+  it("completes an assigned runtime objective when its crew action finishes", () => {
+    vi.useFakeTimers();
+    const { eventId, objectiveId, actionId, eventState } = createVolcanicObjectiveState();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: "4-3",
+            location: "火山灰沙漠",
+            coord: "(4,3)",
+            status: "等待火山灰复核结果。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: undefined,
+          },
+          {
+            id: "lin_xia",
+            currentTile: "4-3",
+            location: "火山灰沙漠",
+            coord: "(4,3)",
+            status: "复核火山灰轨迹中。",
+            statusTone: "accent",
+            hasIncoming: false,
+            activeAction: {
+              id: actionId,
+              actionType: "survey",
+              status: "inProgress",
+              startTime: 0,
+              durationSeconds: 1,
+              finishTime: 1,
+              targetTile: "4-3",
+            },
+          },
+        ],
+        tiles: volcanicTiles(),
+        logs: initialLogs,
+        resources: initialResources,
+        active_events: eventState.active_events,
+        objectives: eventState.objectives,
+      })),
+    );
+
+    render(<App />);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.objectives[objectiveId].status).toBe("completed");
+    expect(saved.active_events[eventId].status).toBe("resolved");
+    expect(saved.active_events[eventId].current_node_id).toBe("ash_mapped_end");
+    expect(saved.event_logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ summary: "A second crew member mapped the volcanic ash trace." }),
+      ]),
+    );
   });
 
   it("ignores legacy emergencyEvent fields when opening a call", async () => {
@@ -741,4 +802,106 @@ function createLostRelicArgumentState() {
       },
     },
   };
+}
+
+function createVolcanicObjectiveState() {
+  const eventId = "volcanic_ash_trace:480";
+  const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
+  const actionId = "lin-xia-ash-survey";
+
+  return {
+    eventId,
+    objectiveId,
+    actionId,
+    eventState: {
+      active_events: {
+        [eventId]: {
+          id: eventId,
+          event_definition_id: "volcanic_ash_trace",
+          event_definition_version: 1,
+          status: "waiting_objective",
+          current_node_id: "ash_cross_crew_objective",
+          primary_crew_id: "garry",
+          related_crew_ids: [],
+          primary_tile_id: "4-3",
+          related_tile_ids: [],
+          parent_event_id: null,
+          child_event_ids: [],
+          objective_ids: [objectiveId],
+          active_call_id: null,
+          selected_options: {
+            ash_trace_call: "assign_probe",
+          },
+          random_results: {},
+          blocking_claim_ids: [],
+          created_at: 480,
+          updated_at: 480,
+          deadline_at: null,
+          next_wakeup_at: null,
+          trigger_context_snapshot: {
+            trigger_type: "action_complete",
+            occurred_at: 480,
+            source: "crew_action",
+            crew_id: "garry",
+            tile_id: "4-3",
+            action_id: "garry-survey-4-3",
+            event_id: eventId,
+            event_definition_id: "volcanic_ash_trace",
+            node_id: null,
+            call_id: null,
+            objective_id: null,
+            selected_option_id: null,
+            world_flag_key: null,
+            proximity: null,
+            payload: {
+              action_type: "survey",
+            },
+          },
+          history_keys: [],
+          result_key: null,
+          result_summary: null,
+        },
+      },
+      objectives: {
+        [objectiveId]: {
+          id: objectiveId,
+          status: "assigned",
+          parent_event_id: eventId,
+          created_by_node_id: "ash_cross_crew_objective",
+          title: "Survey the volcanic ash trace",
+          summary: "Send another crew member to verify the ash line before it blows over.",
+          target_tile_id: "4-3",
+          eligible_crew_conditions: [],
+          required_action_type: "survey",
+          required_action_params: {
+            duration_seconds: 45,
+            can_interrupt: true,
+          },
+          assigned_crew_id: "lin_xia",
+          action_id: actionId,
+          created_at: 481,
+          assigned_at: 482,
+          completed_at: null,
+          deadline_at: 1080,
+          completion_trigger_type: "objective_completed",
+          result_key: null,
+        },
+      },
+    },
+  };
+}
+
+function volcanicTiles() {
+  return initialTiles.map((tile) =>
+    tile.id === "4-3"
+      ? {
+          ...tile,
+          terrain: "火山灰沙漠",
+          resources: ["火山灰"],
+          crew: ["garry", "lin_xia"],
+          danger: "灰线不稳定",
+          status: "复核中",
+        }
+      : tile,
+  );
 }

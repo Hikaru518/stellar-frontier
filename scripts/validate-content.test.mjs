@@ -73,6 +73,23 @@ describe("validate-content", () => {
     expect(result.output).toContain("/event_definitions/0/event_graph/nodes/0/type");
     expect(result.output).toContain("/event_definitions/0/effect_groups/0/effects/0/type");
   });
+
+  it("rejects bad event program cross-references with useful paths", () => {
+    const root = createContentRoot();
+    const definition = minimalEventDefinition();
+    definition.event_graph.entry_node_id = "call";
+    definition.event_graph.nodes.unshift(minimalCallNode({ call_template_id: "missing_call_template" }));
+    writeJson(root, "content/events/definitions/forest.json", {
+      event_definitions: [definition],
+    });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Event cross-reference validation failed:");
+    expect(result.output).toContain("unknown_call_template");
+    expect(result.output).toContain("event_graph.nodes[0].call_template_id");
+  });
 });
 
 function createContentRoot() {
@@ -184,5 +201,35 @@ function minimalEffect() {
       write_world_history: false,
       history_key_template: null,
     },
+  };
+}
+
+function minimalCallNode(overrides = {}) {
+  return {
+    id: "call",
+    type: "call",
+    title: "Call",
+    call_template_id: "forest_trace_call",
+    speaker_crew_ref: {
+      type: "primary_crew",
+    },
+    urgency: "normal",
+    delivery: "queued_message",
+    options: [
+      {
+        id: "accept",
+        is_default: true,
+      },
+    ],
+    option_node_mapping: {
+      accept: "end",
+    },
+    blocking: {
+      occupies_crew_action: false,
+      occupies_communication: true,
+      blocking_key_template: null,
+    },
+    expires_in_seconds: 120,
+    ...overrides,
   };
 }
