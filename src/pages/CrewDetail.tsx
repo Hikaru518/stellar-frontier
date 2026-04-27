@@ -1,8 +1,10 @@
 import { FieldList, Panel, StatusTag } from "../components/Layout";
+import { defaultMapConfig } from "../content/contentData";
 import { getDiaryAvailabilityLabel, getVisibleDiaryEntries } from "../diarySystem";
 import type { CrewMember, Tone } from "../data/gameData";
 import type { EventLog } from "../events/types";
 import { getInventoryView } from "../inventorySystem";
+import { getTileLocationLabel } from "../mapSystem";
 import { formatGameTime } from "../timeSystem";
 
 const attributeLabels: Array<[keyof CrewMember["attributes"], string]> = [
@@ -29,6 +31,7 @@ export function CrewDetail({ member, eventLogs = [] }: { member: CrewMember; eve
           rows={[
             ["原世界", member.profile.originWorld],
             ["原职业", member.profile.originProfession],
+            ["当前位置", getTileLocationLabel(defaultMapConfig, member.currentTile)],
             ["经历", member.profile.experience],
             ["一句话", member.profile.selfIntro],
           ]}

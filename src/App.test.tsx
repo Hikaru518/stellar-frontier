@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { crewDefinitions, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
-import { initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
+import { createInitialMapState, initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
 import { createEmptyEventRuntimeState } from "./events/types";
-import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION } from "./timeSystem";
+import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 
 describe("App", () => {
   beforeEach(() => {
@@ -20,6 +20,37 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
     expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /通讯台/ })).toBeInTheDocument();
+  });
+
+  it("creates the initial runtime map state from the default map config", () => {
+    render(<App />);
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.saveVersion).toBe(GAME_SAVE_VERSION);
+    expect(saved.map).toMatchObject({
+      configId: "default-map",
+      configVersion: 1,
+      rows: 8,
+      cols: 8,
+      originTileId: "4-4",
+      discoveredTileIds: ["4-4"],
+      investigationReportsById: {},
+    });
+    expect(saved.map.tilesById["4-4"].discovered).toBe(true);
+  });
+
+  it("ignores old v1 saves when starting a v2 game", () => {
+    window.localStorage.setItem(
+      LEGACY_GAME_SAVE_KEY,
+      JSON.stringify({ elapsedGameSeconds: 999, crew: [], tiles: initialTiles.slice(0, 16), logs: [], resources: initialResources }),
+    );
+
+    render(<App />);
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.elapsedGameSeconds).toBe(0);
+    expect(saved.map.rows).toBe(8);
+    expect(saved.tiles).toHaveLength(64);
   });
 
   it("shows empty event log and objective states without crashing", () => {
@@ -43,6 +74,20 @@ describe("App", () => {
     });
 
     expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
+  });
+
+  it("settles arrival event checks against derived legacy tiles without crashing", () => {
+    vi.useFakeTimers();
+
+    render(<App />);
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.map.discoveredTileIds).toContain("2-1");
+    expect(saved.tiles).toHaveLength(64);
   });
 
   it("settles Garry mining into Garry's inventory from the time system", () => {
@@ -98,6 +143,81 @@ describe("App", () => {
         expect.objectContaining({ text: "Garry 敲了三下岩壁，找出一条地图没有标注的铁矿细脉。" }),
       ]),
     );
+
+    const endButtons = screen.getAllByRole("button", { name: "结束通话" });
+    fireEvent.click(endButtons[endButtons.length - 1]);
+    fireEvent.click(screen.getByRole("button", { name: /返回/ }));
+    fireEvent.click(screen.getByRole("button", { name: "查看报告" }));
+    expect(screen.getByText("未确认新的地块对象")).toBeInTheDocument();
+  });
+
+  it("creates an investigation report, reveals investigated map facts, and opens it from the log", () => {
+    vi.useFakeTimers();
+    const map = createInitialMapState();
+    map.discoveredTileIds = ["4-4", "6-1"];
+    map.tilesById["6-1"] = { ...map.tilesById["6-1"], discovered: true, investigated: false, revealedObjectIds: [], revealedSpecialStateIds: [] };
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        schema_version: GAME_SAVE_SCHEMA_VERSION,
+        elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
+        ...createEmptyEventRuntimeState(),
+        crew: [{ id: "garry", currentTile: "6-1", activeAction: null }],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const runtimeTile = saved.map.tilesById["6-1"];
+    expect(runtimeTile.investigated).toBe(true);
+    expect(runtimeTile.revealedObjectIds).toContain("acidic-marsh");
+    expect(runtimeTile.revealedSpecialStateIds).toContain("acid-rain-pool");
+    expect(runtimeTile.lastInvestigationReportId).toBeTruthy();
+    const report = saved.map.investigationReportsById[runtimeTile.lastInvestigationReportId];
+    expect(report).toMatchObject({
+      tileId: "6-1",
+      crewId: "garry",
+      areaName: "南湖湿地",
+      playerCoord: "(-3,-2)",
+      terrain: "水",
+      weather: "酸雨",
+      environment: expect.objectContaining({ temperatureCelsius: 17, humidityPercent: 84 }),
+      revealedObjects: [expect.objectContaining({ id: "acidic-marsh", name: "酸性湿地" })],
+      revealedSpecialStates: [expect.objectContaining({ id: "acid-rain-pool", name: "酸雨积水" })],
+    });
+    expect(saved.logs).toEqual(expect.arrayContaining([expect.objectContaining({ text: "Garry 完成一轮调查。", reportId: report.id })]));
+
+    const endButtons = screen.getAllByRole("button", { name: "结束通话" });
+    fireEvent.click(endButtons[endButtons.length - 1]);
+    fireEvent.click(screen.getByRole("button", { name: /返回/ }));
+    fireEvent.click(screen.getByRole("button", { name: "查看报告" }));
+
+    expect(screen.getByRole("heading", { name: "调查报告" })).toBeInTheDocument();
+    expect(screen.getByText("Garry")).toBeInTheDocument();
+    expect(screen.getByText("南湖湿地")).toBeInTheDocument();
+    expect(screen.getByText("(-3,-2)")).toBeInTheDocument();
+    expect(screen.getByText("酸雨")).toBeInTheDocument();
+    expect(screen.getByText("17 °C")).toBeInTheDocument();
+    expect(screen.getByText("84%")).toBeInTheDocument();
+    expect(screen.getByText("56 μT")).toBeInTheDocument();
+    expect(screen.getByText("酸性湿地")).toBeInTheDocument();
+    expect(screen.getByText("酸雨积水")).toBeInTheDocument();
   });
 
   it("creates a manual runtime call when default Garry mine survey finishes", () => {
@@ -161,6 +281,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [
           {
             id: "garry",
@@ -174,6 +295,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       })),
@@ -204,6 +326,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [
           {
             id: "garry",
@@ -217,6 +340,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       })),
@@ -262,6 +386,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [
           {
             id: "garry",
@@ -300,7 +425,7 @@ describe("App", () => {
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
     fireEvent.click(screen.getByRole("button", { name: "返回控制中心" }));
     fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
-    fireEvent.click(screen.getByRole("button", { name: /\(2,3\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\(-1,2\).*黑松林缘/ }));
 
     expect(screen.getAllByText("小型营地痕迹").length).toBeGreaterThan(0);
     expect(screen.getByText("一处森林小型营地痕迹已标记，等待后续复核。")).toBeInTheDocument();
@@ -320,6 +445,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
         active_events: eventState.active_events,
@@ -540,23 +666,116 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /地图二级菜单/ }));
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /\(3,2\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\(-1,0\)/ }));
     fireEvent.click(screen.getByRole("button", { name: "标记为目的地，返回通话确认" }));
 
     expect(screen.getByText("移动确认")).toBeInTheDocument();
     expect(screen.getByText(/当前采集，未完成的一轮不会结算/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 \(3,2\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }));
 
     expect(screen.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(150_000);
     });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.map.discoveredTileIds).toContain("4-3");
 
     const endButtons = screen.getAllByRole("button", { name: "结束通话" });
     fireEvent.click(endButtons[endButtons.length - 1]);
     expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
-    expect(screen.getByText("位于 (3,2)，待命中。")).toBeInTheDocument();
+    expect(screen.getByText("位于 (-1,0)，待命中。")).toBeInTheDocument();
+  });
+
+  it("shows crew locations by area and player coordinates without resource names", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    expect(within(garryCard as HTMLElement).getByText("位置：铁脊矿带 (-1,1)")).toBeInTheDocument();
+    expect(within(garryCard as HTMLElement).queryByText("iron_ore")).not.toBeInTheDocument();
+
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "查看档案" }));
+    expect(screen.getAllByText("铁脊矿带 (-1,1)").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/row|col/)).not.toBeInTheDocument();
+  });
+
+  it("lets the call page select frontier targets without revealing unknown details", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /请求前往/ }));
+
+    const targetList = screen.getByLabelText("移动目标列表");
+    expect(within(targetList).getByRole("button", { name: /坠毁区域 \(0,0\).*地形：平原/ })).toBeInTheDocument();
+    const frontierTarget = within(targetList).getByRole("button", { name: /未探索信号（-1,0）/ });
+    expect(frontierTarget).toBeEnabled();
+    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+    expect(screen.queryByText("沙漠")).not.toBeInTheDocument();
+    expect(screen.queryByText("阴天")).not.toBeInTheDocument();
+
+    fireEvent.click(frontierTarget);
+
+    expect(screen.getByText(/已标记候选目的地 未探索信号（-1,0）/)).toBeInTheDocument();
+    expect(screen.getAllByText("未探索信号（-1,0）").length).toBeGreaterThan(0);
+    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+    expect(screen.queryByText("沙漠")).not.toBeInTheDocument();
+  });
+
+  it("renders the map as a dynamic visible matrix without fixed grid copy", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+    expect(screen.queryByText(/4x4|4 x 4/)).not.toBeInTheDocument();
+
+    const grid = screen.getByLabelText(/雷达可见矩形/);
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
+    expect(screen.getAllByRole("button", { name: /未探索信号/ })).toHaveLength(8);
+    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
+    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("天气：阴天");
+    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("对象：坠毁残骸");
+    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+  });
+
+  it("keeps frontier and unknown-hole map cells redacted", () => {
+    const map = createInitialMapState();
+    map.discoveredTileIds = ["4-4", "4-8"];
+    map.tilesById["4-4"] = { ...map.tilesById["4-4"], discovered: true, investigated: true };
+    map.tilesById["4-8"] = { ...map.tilesById["4-8"], discovered: true, investigated: true };
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
+        crew: [],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+
+    const grid = screen.getByLabelText(/雷达可见矩形/);
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" });
+    expect(screen.queryByText("东侧砾原")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /未探索信号/ }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索信号/ }));
+    const detailPanel = screen.getByRole("heading", { name: "坐标详情：(2,0)" }).closest("section");
+    expect(detailPanel).not.toBeNull();
+    expect(within(detailPanel as HTMLElement).getByText("信号未确认")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("需通过通讯台联系队员前往或调查后确认详情")).toBeInTheDocument();
+    expect(screen.queryByText("强风")).not.toBeInTheDocument();
   });
 
   it("opens a crew profile with attributes, tags, expertise, and diary entries", () => {
@@ -614,8 +833,10 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [{ id: "mike", inventory: [] }],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       })),
@@ -637,8 +858,10 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 12,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [{ id: "mike", bag: ["legacy item"] }],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: { ...initialResources, iron: 7, wood: 3, food: 2, water: 4 },
       }),
@@ -715,9 +938,11 @@ function lastElement<T>(items: T[]): T {
 
 function createCompatibleSavedGameState(state: Record<string, unknown>) {
   return {
+    saveVersion: GAME_SAVE_VERSION,
     schema_version: GAME_SAVE_SCHEMA_VERSION,
     created_at_real_time: "2026-04-27T00:00:00.000Z",
     updated_at_real_time: "2026-04-27T00:00:00.000Z",
+    map: createInitialMapState(),
     ...createEmptyEventRuntimeState(),
     ...state,
   };

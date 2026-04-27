@@ -1,6 +1,8 @@
 import { EVENT_SAVE_SCHEMA_VERSION } from "./events/types";
 
-export const GAME_SAVE_KEY = "stellar-frontier-save-v1";
+export const LEGACY_GAME_SAVE_KEY = "stellar-frontier-save-v1";
+export const GAME_SAVE_KEY = "stellar-frontier-save-v2";
+export const GAME_SAVE_VERSION = 2;
 export const GAME_SAVE_SCHEMA_VERSION = EVENT_SAVE_SCHEMA_VERSION;
 
 export function formatGameTime(elapsedGameSeconds: number) {
@@ -38,6 +40,10 @@ export function loadGameSave<T = unknown>(isCompatible?: (value: unknown) => boo
     }
 
     const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed) || (parsed.saveVersion !== undefined && parsed.saveVersion !== GAME_SAVE_VERSION)) {
+      return null;
+    }
+
     if (isCompatible && !isCompatible(parsed)) {
       return null;
     }
@@ -54,6 +60,11 @@ export function saveGameState<T>(state: T) {
   } catch {
     // Losing a browser save should not stop the running prototype.
   }
+}
+
+export function clearGameSaves() {
+  window.localStorage.removeItem(GAME_SAVE_KEY);
+  window.localStorage.removeItem(LEGACY_GAME_SAVE_KEY);
 }
 
 export function isCompatibleGameSaveState(value: unknown) {
@@ -90,6 +101,7 @@ function withSaveMetadata<T>(state: T): T {
   const now = new Date().toISOString();
   return {
     ...state,
+    saveVersion: GAME_SAVE_VERSION,
     schema_version: GAME_SAVE_SCHEMA_VERSION,
     created_at_real_time: typeof state.created_at_real_time === "string" ? state.created_at_real_time : now,
     updated_at_real_time: now,

@@ -11,6 +11,7 @@ import handlerRegistryContent from "../../content/events/handler_registry.json";
 import forestPresetsContent from "../../content/events/presets/forest.json";
 import crewContent from "../../content/crew/crew.json";
 import itemsContent from "../../content/items/items.json";
+import defaultMapJson from "../../content/maps/default-map.json";
 import type { EventContentLibrary } from "../events/contentIndex";
 import type {
   CallTemplate,
@@ -27,6 +28,11 @@ export type TriggerSource = "arrival" | "surveyComplete" | "gatherComplete" | "b
 export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
 export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
 export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recovered";
+export type MapVisibility = "onDiscovered" | "onInvestigated" | "hidden";
+export type MapRadiationLevel = "none" | "low" | "medium" | "high" | "critical";
+export type MapObjectKind = "resourceNode" | "structure" | "signal" | "hazard" | "facility" | "ruin" | "landmark";
+export type MapCandidateAction = "move" | "survey" | "gather" | "build" | "standby";
+export type MapSpecialStateSeverity = "low" | "medium" | "high" | "critical";
 
 export interface CrewAttributeMap {
   physical: number;
@@ -186,6 +192,67 @@ export interface ItemDefinition {
   effects: Array<{ type: string; target?: string; value?: number; condition?: string }>;
 }
 
+export interface MapEnvironmentDefinition {
+  temperatureCelsius: number;
+  humidityPercent: number;
+  magneticFieldMicroTesla: number;
+  radiationLevel: MapRadiationLevel;
+  toxicityLevel?: MapRadiationLevel;
+  atmosphericPressureKpa?: number;
+  notes?: string;
+}
+
+export interface MapObjectDefinition {
+  id: string;
+  kind: MapObjectKind;
+  name: string;
+  description?: string;
+  visibility: Exclude<MapVisibility, "hidden">;
+  tags?: string[];
+  legacyResource?: string;
+  legacyBuilding?: string;
+  legacyInstrument?: string;
+  candidateActions?: MapCandidateAction[];
+}
+
+export interface MapSpecialStateDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  visibility: MapVisibility;
+  severity: MapSpecialStateSeverity;
+  tags?: string[];
+  startsActive: boolean;
+  durationGameSeconds?: number;
+  legacyDanger?: string;
+}
+
+export interface MapTileDefinition {
+  id: string;
+  row: number;
+  col: number;
+  areaName: string;
+  terrain: string;
+  weather: string;
+  environment: MapEnvironmentDefinition;
+  objects: MapObjectDefinition[];
+  specialStates: MapSpecialStateDefinition[];
+}
+
+export interface MapConfigDefinition {
+  $schema?: string;
+  id: string;
+  name: string;
+  version: number;
+  size: {
+    rows: number;
+    cols: number;
+  };
+  originTileId: string;
+  initialDiscoveredTileIds: string[];
+  tiles: MapTileDefinition[];
+}
+
 export const eventProgramDefinitions = [
   ...forestEventDefinitionsContent.event_definitions,
   ...mountainEventDefinitionsContent.event_definitions,
@@ -210,6 +277,7 @@ export const eventContentLibrary: EventContentLibrary = {
 export const eventDefinitions = eventsContent.events as unknown as EventDefinition[];
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
+export const defaultMapConfig = defaultMapJson as unknown as MapConfigDefinition;
 
 export const eventDefinitionById = new Map(eventDefinitions.map((event) => [event.eventId, event]));
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag, SystemLogPanel } from "../components/Layout";
-import { facilities, type CrewMember, type ResourceSummary, type SystemLog } from "../data/gameData";
+import { facilities, type CrewMember, type GameMapState, type InvestigationReport, type ResourceSummary, type SystemLog } from "../data/gameData";
+import { formatGameTime } from "../timeSystem";
 import type { EventLog, Objective } from "../events/types";
 
 interface ControlCenterProps {
@@ -9,6 +10,7 @@ interface ControlCenterProps {
   eventLogs: EventLog[];
   objectives: Record<string, Objective>;
   resources: ResourceSummary;
+  map: GameMapState;
   gameTimeLabel: string;
   onOpenStation: () => void;
   onOpenMap: () => void;
@@ -22,6 +24,7 @@ export function ControlCenter({
   eventLogs,
   objectives,
   resources,
+  map,
   gameTimeLabel,
   onOpenStation,
   onOpenMap,
@@ -29,8 +32,10 @@ export function ControlCenter({
   onAppendLog,
 }: ControlCenterProps) {
   const [modal, setModal] = useState<string | null>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
   const incomingCount = crew.filter((member) => member.hasIncoming).length;
   const amy = crew.find((member) => member.id === "amy");
+  const report = reportId ? map.investigationReportsById[reportId] : undefined;
   const visibleEventLogs = eventLogs
     .filter((log) => log.visibility === "player_visible")
     .slice()
@@ -130,7 +135,7 @@ export function ControlCenter({
           ) : null}
         </Panel>
 
-        <SystemLogPanel logs={logs} />
+        <SystemLogPanel logs={logs} onOpenReport={setReportId} />
       </div>
 
       {modal && modalContent ? (
@@ -138,7 +143,50 @@ export function ControlCenter({
           {modalContent.body}
         </Modal>
       ) : null}
+
+      {report ? (
+        <Modal title="调查报告" onClose={() => setReportId(null)}>
+          <InvestigationReportView report={report} crew={crew} />
+        </Modal>
+      ) : null}
     </ConsoleShell>
+  );
+}
+
+function InvestigationReportView({ report, crew }: { report: InvestigationReport; crew: CrewMember[] }) {
+  const member = crew.find((item) => item.id === report.crewId);
+  const environment = report.environment;
+  return (
+    <div className="report-modal">
+      <FieldList
+        rows={[
+          ["队员", member?.name ?? report.crewId],
+          ["时间", formatGameTime(report.createdAtGameSeconds)],
+          ["区域", report.areaName],
+          ["坐标", report.playerCoord],
+          ["地形", report.terrain],
+          ["天气", report.weather],
+          ["温度", `${environment.temperatureCelsius} °C`],
+          ["湿度", `${environment.humidityPercent}%`],
+          ["磁场", `${environment.magneticFieldMicroTesla} μT`],
+          ["辐射", environment.radiationLevel],
+          ["毒性", environment.toxicityLevel ?? "none"],
+          ["气压", environment.atmosphericPressureKpa ? `${environment.atmosphericPressureKpa} kPa` : "未知"],
+        ]}
+      />
+      <section>
+        <h3>揭示对象</h3>
+        {report.revealedObjects.length ? <ul>{report.revealedObjects.map((object) => <li key={object.id}>{object.name}</li>)}</ul> : <p>未确认新的地块对象</p>}
+      </section>
+      <section>
+        <h3>特殊状态</h3>
+        {report.revealedSpecialStates.length ? (
+          <ul>{report.revealedSpecialStates.map((state) => <li key={state.id}>{state.name}</li>)}</ul>
+        ) : (
+          <p>未确认新的特殊状态</p>
+        )}
+      </section>
+    </div>
   );
 }
 

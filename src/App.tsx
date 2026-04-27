@@ -21,11 +21,13 @@ import {
   type TriggerContext,
 } from "./events/types";
 import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
+import { defaultMapConfig } from "./content/contentData";
+import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
+  createInitialMapState,
   initialCrew,
   initialLogs,
-  initialTiles,
   resources as initialResources,
   type ActiveAction,
   type ActionStatus,
@@ -33,6 +35,8 @@ import {
   type CrewId,
   type GameState,
   type CrewMember,
+  type GameMapState,
+  type InvestigationReport,
   type MapReturnTarget,
   type MapTile,
   type PageId,
@@ -40,7 +44,8 @@ import {
   type SystemLog,
   type Tone,
 } from "./data/gameData";
-import { formatDuration, formatGameTime, GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState, loadGameSave, saveGameState } from "./timeSystem";
+import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
+import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
 
 const eventContentIndexResult = buildEventContentIndex(eventContentLibrary);
 if (eventContentIndexResult.errors.length > 0) {
@@ -88,7 +93,7 @@ function App() {
   const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
   const [debugOpen, setDebugOpen] = useState(false);
 
-  const { elapsedGameSeconds, crew, tiles, logs, resources } = gameState;
+  const { elapsedGameSeconds, crew, map, tiles, logs, resources } = gameState;
   const gameTimeLabel = formatGameTime(elapsedGameSeconds);
 
   useEffect(() => {
@@ -124,7 +129,7 @@ function App() {
   }
 
   function resetGame() {
-    window.localStorage.removeItem(GAME_SAVE_KEY);
+    clearGameSaves();
     const freshState = createInitialGameState();
     setGameState(freshState);
     setCurrentCall(null);
@@ -234,14 +239,14 @@ function App() {
         return nextMember;
       });
 
-      const updatedTiles = decision.tileUpdate
-        ? patchTile(state.tiles, decision.tileUpdate.id, decision.tileUpdate.patch)
-        : state.tiles;
+      const updatedMap = decision.tileUpdate ? patchMapFromLegacyTile(state.map, decision.tileUpdate.id, decision.tileUpdate.patch) : state.map;
+      const updatedTiles = decision.tileUpdate ? patchTile(deriveLegacyTiles(defaultMapConfig, updatedMap), decision.tileUpdate.id, decision.tileUpdate.patch) : state.tiles;
 
       const advancedState = {
         ...state,
         elapsedGameSeconds: state.elapsedGameSeconds + (decision.advanceSeconds ?? 0),
         crew: updatedCrew,
+        map: syncMapCrew(updatedMap, updatedCrew),
         tiles: updatedTiles,
         baseInventory: decision.baseInventory ?? state.baseInventory,
         resources: decision.resources ?? state.resources,
@@ -274,12 +279,13 @@ function App() {
   }
 
   function selectMoveTarget(tileId: string) {
+    const targetLabel = getMoveTargetSelectionLabel(gameState.map, tileId);
     setCurrentCall((call) =>
       call?.selectingMoveTarget
         ? {
             ...call,
             selectedTargetTileId: tileId,
-            result: `已标记候选目的地 ${tileId}。返回通话后确认是否下达移动指令。`,
+            result: `已标记候选目的地 ${targetLabel}。返回通话后确认是否下达移动指令。`,
           }
         : call,
     );
@@ -310,7 +316,15 @@ function App() {
         return state;
       }
 
-      const preview = createMovePreview(member, currentCall.selectedTargetTileId!, state.tiles);
+      const targetTileId = currentCall.selectedTargetTileId!;
+      if (!canMoveToTile(defaultMapConfig, state.map, targetTileId)) {
+        return {
+          ...state,
+          logs: appendLogEntry(state.logs, "移动确认失败：目标不在当前已发现或 frontier 信号范围内。", "danger", state.elapsedGameSeconds),
+        };
+      }
+
+      const preview = createMovePreview(member, targetTileId, state.tiles);
       if (!preview.canMove) {
         return {
           ...state,
@@ -323,10 +337,12 @@ function App() {
         item.id === currentCall.crewId ? startCrewMove(item, preview, state.tiles, state.elapsedGameSeconds) : item,
       );
 
+      const nextMap = syncMapCrew(state.map, updatedCrew);
       return {
         ...state,
         crew: updatedCrew,
-        tiles: syncTileCrew(state.tiles, updatedCrew),
+        map: nextMap,
+        tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, nextMap), updatedCrew),
         logs: appendLogEntry(
           state.logs,
           `${member.name} 开始前往 ${targetTile?.coord ?? preview.targetTileId}，预计 ${formatDuration(preview.totalDurationSeconds)}。`,
@@ -369,12 +385,14 @@ function App() {
           call={currentCall}
           crew={crew}
           tiles={tiles}
+          map={map}
           activeCalls={gameState.active_calls}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
           onDecision={handleDecision}
           onConfirmMove={confirmMove}
           onClearMoveTarget={clearMoveTarget}
+          onSelectMoveTarget={selectMoveTarget}
           onOpenMap={() => openMap("call")}
           onEndCall={endCall}
           onOpenStation={() => setPage("station")}
@@ -386,6 +404,7 @@ function App() {
     return (
         <MapPage
           tiles={tiles}
+          map={map}
           crew={crew}
           eventLogs={gameState.event_logs}
           elapsedGameSeconds={elapsedGameSeconds}
@@ -412,6 +431,7 @@ function App() {
         onOpenMap={() => openMap("control")}
         onOpenDebug={() => setDebugOpen(true)}
         onAppendLog={appendLog}
+        map={map}
       />
       {debugOpen ? (
         <DebugToolbox
@@ -432,7 +452,7 @@ function createInitialGameState(): GameState {
   const now = new Date().toISOString();
   const emptyEventState = createEmptyEventRuntimeState();
 
-  if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.tiles && saved.logs && saved.resources) {
+  if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       const { bag: _deprecatedBag, ...memberWithoutBag } = member;
@@ -445,6 +465,8 @@ function createInitialGameState(): GameState {
     });
     const savedCrewIds = new Set(normalizedCrew.map((member) => member.id));
     const crewWithNewDefaults = [...normalizedCrew, ...initialCrew.filter((member) => !savedCrewIds.has(member.id))];
+    const map = normalizeSavedMap(saved.map);
+    const syncedMap = syncMapCrew(map, crewWithNewDefaults);
     return {
       ...saved,
       schema_version: GAME_SAVE_SCHEMA_VERSION,
@@ -454,7 +476,8 @@ function createInitialGameState(): GameState {
       baseInventory: Array.isArray(saved.baseInventory)
         ? saved.baseInventory
         : createBaseInventoryFromResources(saved.resources),
-      tiles: syncTileCrew(saved.tiles, crewWithNewDefaults),
+      map: syncedMap,
+      tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, syncedMap), crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
       active_events: saved.active_events ?? emptyEventState.active_events,
       active_calls: saved.active_calls ?? emptyEventState.active_calls,
@@ -468,6 +491,7 @@ function createInitialGameState(): GameState {
     } as GameState;
   }
 
+  const map = syncMapCrew(createInitialMapState(), initialCrew);
   const state = {
     schema_version: GAME_SAVE_SCHEMA_VERSION,
     created_at_real_time: now,
@@ -475,7 +499,8 @@ function createInitialGameState(): GameState {
     elapsedGameSeconds: 0,
     crew: initialCrew,
     baseInventory: createBaseInventoryFromResources(initialResources),
-    tiles: initialTiles,
+    map,
+    tiles: deriveLegacyTiles(defaultMapConfig, map),
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
@@ -485,9 +510,19 @@ function createInitialGameState(): GameState {
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
 }
 
+function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
+  const cell = getVisibleTileWindow(defaultMapConfig, map).cells.find((item) => item.id === tileId);
+  if (cell?.status === "frontier") {
+    return `未探索信号（${cell.displayX},${cell.displayY}）`;
+  }
+
+  return getTileLocationLabel(defaultMapConfig, tileId);
+}
+
 function settleGameTime(state: GameState): GameState {
   let changed = false;
   let resources = state.resources;
+  let map = state.map;
   let tiles = state.tiles;
   let logs = state.logs;
   let baseInventory = state.baseInventory;
@@ -503,6 +538,8 @@ function settleGameTime(state: GameState): GameState {
       changed = changed || settled.changed;
 
       if (settled.changed && member.activeAction && !nextMember.activeAction) {
+        map = discoverMapTile(map, nextMember.currentTile);
+        tiles = syncTileCrew(deriveLegacyTiles(defaultMapConfig, map), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
         nextMember = appendArrivalDiary(nextMember, state.elapsedGameSeconds);
         triggerContexts.push({
           trigger_type: "arrival",
@@ -521,11 +558,12 @@ function settleGameTime(state: GameState): GameState {
     } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
       const completedActionType = member.activeAction.actionType;
       const completedActionId = member.activeAction.id;
-      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs);
+      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs, map);
       nextMember = settled.member;
       resources = settled.resources;
       tiles = settled.tiles;
       logs = settled.logs;
+      map = settled.map;
       changed = true;
 
       if (shouldTriggerActionComplete(completedActionType)) {
@@ -544,7 +582,8 @@ function settleGameTime(state: GameState): GameState {
     return nextMember;
   });
 
-  let nextState = changed ? { ...state, crew, resources, baseInventory, tiles: syncTileCrew(tiles, crew), logs } : state;
+  const syncedMap = syncMapCrew(map, crew);
+  let nextState = changed ? { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs } : state;
   nextState = processObjectiveCompletions(nextState, triggerContexts);
 
   for (const context of triggerContexts) {
@@ -560,10 +599,11 @@ function settleCrewAction(
   resources: ResourceSummary,
   tiles: MapTile[],
   logs: SystemLog[],
+  map: GameMapState,
 ) {
   const action = member.activeAction;
   if (!action) {
-    return { member, resources, tiles, logs };
+    return { member, resources, tiles, logs, map };
   }
 
   if (member.id === "garry" && action.actionType === "gather" && (action.resource === "iron" || action.resource === "iron_ore")) {
@@ -603,6 +643,7 @@ function settleCrewAction(
       resources,
       tiles,
       logs: appendLogEntry(logs, `Garry 完成了 ${completedRounds} 轮铁矿采集，获得 ${ironYield} 铁矿石。`, "success", elapsedGameSeconds),
+      map,
     };
   }
 
@@ -621,6 +662,7 @@ function settleCrewAction(
       resources,
       tiles: patchTile(tiles, "2-1", { status: "观察中" }),
       logs: appendLogEntry(logs, "Mike 抵达湖泊边缘，开始观察异常水位。", "neutral", elapsedGameSeconds),
+      map,
     };
   }
 
@@ -636,6 +678,7 @@ function settleCrewAction(
       resources,
       tiles: patchTile(tiles, "3-3", { buildings: ["采矿厂：铁 #2", "临时支架"], status: "设施已加固" }),
       logs: appendLogEntry(logs, "丘陵地块的临时支架已安装完成。", "success", elapsedGameSeconds),
+      map,
     };
   }
 
@@ -656,12 +699,14 @@ function settleCrewAction(
       },
     );
     const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
+    const investigation = completeInvestigation(map, member.currentTile, member.id, elapsedGameSeconds);
 
     return {
       member: withExpertise.member,
       resources: withExpertise.resources,
-      tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
+      tiles: patchTile(deriveLegacyTiles(defaultMapConfig, investigation.map), member.currentTile, { investigated: true, status: "已调查" }),
+      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds, investigation.report.id),
+      map: investigation.map,
     };
   }
 
@@ -682,12 +727,14 @@ function settleCrewAction(
       },
     );
     const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
+    const investigation = completeInvestigation(map, member.currentTile, member.id, elapsedGameSeconds);
 
     return {
       member: withExpertise.member,
       resources: withExpertise.resources,
-      tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
+      tiles: patchTile(deriveLegacyTiles(defaultMapConfig, investigation.map), member.currentTile, { investigated: true, status: "已调查" }),
+      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds, investigation.report.id),
+      map: investigation.map,
     };
   }
 
@@ -696,6 +743,7 @@ function settleCrewAction(
     resources,
     tiles,
     logs: appendLogEntry(logs, `${member.name} 的行动已完成。`, "neutral", elapsedGameSeconds),
+    map,
   };
 }
 
@@ -970,13 +1018,159 @@ function inferTileTags(tile: MapTile) {
   return Array.from(tags);
 }
 
-function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number) {
+function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {
   const id = logs.reduce((highest, log) => Math.max(highest, log.id), 0) + 1;
-  return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone }];
+  return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone, ...(reportId ? { reportId } : {}) }];
+}
+
+function completeInvestigation(map: GameMapState, tileId: string, crewId: CrewId, elapsedGameSeconds: number) {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  const previous = map.tilesById[tileId] ?? {};
+  const reportId = `investigation-${tileId.replace("-", "_")}-${crewId}-${elapsedGameSeconds}`;
+
+  if (!configTile) {
+    const report: InvestigationReport = {
+      id: reportId,
+      tileId,
+      crewId,
+      createdAtGameSeconds: elapsedGameSeconds,
+      areaName: tileId,
+      playerCoord: tileId,
+      terrain: "未知",
+      weather: "未知",
+      environment: { temperatureCelsius: 0, humidityPercent: 0, magneticFieldMicroTesla: 0, radiationLevel: "unknown" },
+      revealedObjects: [],
+      revealedSpecialStates: [],
+    };
+    return { report, map: { ...map, investigationReportsById: { ...map.investigationReportsById, [reportId]: report } } };
+  }
+
+  const revealedObjectIds = configTile.objects.filter((object) => object.visibility === "onInvestigated").map((object) => object.id);
+  const activeStateIds = previous.activeSpecialStateIds ?? configTile.specialStates.filter((state) => state.startsActive).map((state) => state.id);
+  const revealedSpecialStateIds = configTile.specialStates
+    .filter((state) => state.visibility === "onInvestigated" && activeStateIds.includes(state.id))
+    .map((state) => state.id);
+  const origin = defaultMapConfig.tiles.find((tile) => tile.id === defaultMapConfig.originTileId);
+  const playerCoord = origin ? `(${configTile.col - origin.col},${origin.row - configTile.row})` : `(${configTile.row},${configTile.col})`;
+  const report: InvestigationReport = {
+    id: reportId,
+    tileId,
+    crewId,
+    createdAtGameSeconds: elapsedGameSeconds,
+    areaName: configTile.areaName,
+    playerCoord,
+    terrain: configTile.terrain,
+    weather: configTile.weather,
+    environment: configTile.environment,
+    revealedObjects: configTile.objects
+      .filter((object) => revealedObjectIds.includes(object.id) && !(previous.revealedObjectIds ?? []).includes(object.id))
+      .map((object) => ({ id: object.id, name: object.name, kind: object.kind })),
+    revealedSpecialStates: configTile.specialStates
+      .filter((state) => revealedSpecialStateIds.includes(state.id) && !(previous.revealedSpecialStateIds ?? []).includes(state.id))
+      .map((state) => ({ id: state.id, name: state.name, severity: state.severity })),
+  };
+
+  return {
+    report,
+    map: {
+      ...map,
+      discoveredTileIds: map.discoveredTileIds.includes(tileId) ? map.discoveredTileIds : [...map.discoveredTileIds, tileId],
+      investigationReportsById: { ...map.investigationReportsById, [reportId]: report },
+      tilesById: {
+        ...map.tilesById,
+        [tileId]: {
+          ...previous,
+          discovered: true,
+          investigated: true,
+          status: "已调查",
+          revealedObjectIds: addUnique(previous.revealedObjectIds ?? [], ...revealedObjectIds),
+          revealedSpecialStateIds: addUnique(previous.revealedSpecialStateIds ?? [], ...revealedSpecialStateIds),
+          lastInvestigationReportId: reportId,
+        },
+      },
+    },
+  };
 }
 
 function patchTile(tiles: MapTile[], id: string, patch: Partial<MapTile>) {
   return tiles.map((tile) => (tile.id === id ? { ...tile, ...patch } : tile));
+}
+
+function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
+  const fresh = createInitialMapState();
+  if (map.configId !== defaultMapConfig.id || map.configVersion !== defaultMapConfig.version) {
+    return fresh;
+  }
+
+  const discoveredTileIds = Array.isArray(map.discoveredTileIds) ? map.discoveredTileIds.filter((id) => defaultMapConfig.tiles.some((tile) => tile.id === id)) : fresh.discoveredTileIds;
+  return {
+    configId: defaultMapConfig.id,
+    configVersion: defaultMapConfig.version,
+    rows: defaultMapConfig.size.rows,
+    cols: defaultMapConfig.size.cols,
+    originTileId: defaultMapConfig.originTileId,
+    tilesById: { ...fresh.tilesById, ...(map.tilesById ?? {}) },
+    discoveredTileIds,
+    investigationReportsById: map.investigationReportsById ?? {},
+  };
+}
+
+function syncMapCrew(map: GameMapState, crew: CrewMember[]): GameMapState {
+  const tilesById = { ...map.tilesById };
+  for (const tile of defaultMapConfig.tiles) {
+    tilesById[tile.id] = {
+      ...tilesById[tile.id],
+      crew: crew.filter((member) => member.currentTile === tile.id && !member.unavailable).map((member) => member.id),
+    };
+  }
+
+  return { ...map, tilesById };
+}
+
+function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  if (!configTile) {
+    return map;
+  }
+
+  const discoveredTileIds = map.discoveredTileIds.includes(tileId) ? map.discoveredTileIds : [...map.discoveredTileIds, tileId];
+  const previous = map.tilesById[tileId] ?? {};
+  return {
+    ...map,
+    discoveredTileIds,
+    tilesById: {
+      ...map.tilesById,
+      [tileId]: {
+        ...previous,
+        discovered: true,
+        revealedObjectIds: addUnique(previous.revealedObjectIds ?? [], ...configTile.objects.filter((object) => object.visibility === "onDiscovered").map((object) => object.id)),
+        revealedSpecialStateIds: addUnique(
+          previous.revealedSpecialStateIds ?? [],
+          ...configTile.specialStates.filter((state) => state.visibility === "onDiscovered" && (previous.activeSpecialStateIds ?? []).includes(state.id)).map((state) => state.id),
+        ),
+      },
+    },
+  };
+}
+
+function patchMapFromLegacyTile(map: GameMapState, tileId: string, patch: Partial<MapTile>): GameMapState {
+  const previous = map.tilesById[tileId] ?? {};
+  return {
+    ...map,
+    tilesById: {
+      ...map.tilesById,
+      [tileId]: {
+        ...previous,
+        status: patch.status ?? previous.status,
+        investigated: patch.investigated ?? previous.investigated,
+        crew: patch.crew ?? previous.crew,
+      },
+    },
+  };
+}
+
+function addUnique<T>(items: T[], ...values: T[]) {
+  return [...items, ...values.filter((value) => !items.includes(value))];
 }
 
 function appendArrivalDiary(member: CrewMember, elapsedGameSeconds: number) {

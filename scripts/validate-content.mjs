@@ -13,6 +13,7 @@ const legacyPairs = [
   ["content/events/events.json", "content/schemas/events.schema.json"],
   ["content/crew/crew.json", "content/schemas/crew.schema.json"],
   ["content/items/items.json", "content/schemas/items.schema.json"],
+  ["content/maps/default-map.json", "content/schemas/maps.schema.json"],
 ];
 
 const eventSchemaPaths = [
@@ -203,6 +204,7 @@ function validateReferences(data) {
   const events = data["content/events/events.json"].events;
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
+  const defaultMap = data["content/maps/default-map.json"];
 
   const eventIds = new Set();
   const itemIds = new Set();
@@ -271,6 +273,81 @@ function validateReferences(data) {
     if (member.emergencyEvent && !eventIds.has(member.emergencyEvent.eventId)) {
       hasError = report(`Unknown emergency eventId in crew ${member.crewId}: ${member.emergencyEvent.eventId}`);
     }
+  }
+
+  hasError = validateMap(defaultMap) || hasError;
+
+  return hasError;
+}
+
+function validateMap(map) {
+  let hasError = false;
+  const { rows, cols } = map.size;
+  const tileIds = new Set();
+  const tileById = new Map();
+  const objectIds = new Set();
+  const initialDiscoveredTileIds = new Set(map.initialDiscoveredTileIds);
+
+  if (rows !== 8 || cols !== 8) {
+    hasError = report(`Default map must be 8 x 8, got ${rows} x ${cols}`) || hasError;
+  }
+
+  if (!initialDiscoveredTileIds.has(map.originTileId)) {
+    hasError = report(`Map initialDiscoveredTileIds must include originTileId: ${map.originTileId}`) || hasError;
+  }
+
+  for (const tile of map.tiles) {
+    const expectedTileId = `${tile.row}-${tile.col}`;
+
+    if (!addUnique(tileIds, tile.id)) {
+      hasError = report(`Duplicate map tile id: ${tile.id}`) || hasError;
+    } else {
+      tileById.set(tile.id, tile);
+    }
+
+    if (tile.id !== expectedTileId) {
+      hasError = report(`Map tile id must match row/col: ${tile.id} should be ${expectedTileId}`) || hasError;
+    }
+
+    if (tile.row < 1 || tile.row > rows || tile.col < 1 || tile.col > cols) {
+      hasError = report(`Map tile coordinate out of bounds: ${tile.id} (${tile.row},${tile.col}) for ${rows} x ${cols}`) || hasError;
+    }
+
+    for (const object of tile.objects) {
+      if (!addUnique(objectIds, object.id)) {
+        hasError = report(`Duplicate map object id: ${object.id}`) || hasError;
+      }
+    }
+
+    const specialStateIds = new Set();
+    for (const specialState of tile.specialStates) {
+      if (!addUnique(specialStateIds, specialState.id)) {
+        hasError = report(`Duplicate special state id in tile ${tile.id}: ${specialState.id}`) || hasError;
+      }
+    }
+  }
+
+  if (!tileById.has(map.originTileId)) {
+    hasError = report(`Map originTileId does not exist: ${map.originTileId}`) || hasError;
+  }
+
+  for (const tileId of initialDiscoveredTileIds) {
+    if (!tileById.has(tileId)) {
+      hasError = report(`Unknown initialDiscoveredTileId: ${tileId}`) || hasError;
+    }
+  }
+
+  for (let row = 1; row <= rows; row += 1) {
+    for (let col = 1; col <= cols; col += 1) {
+      const tileId = `${row}-${col}`;
+      if (!tileById.has(tileId)) {
+        hasError = report(`Missing map tile for complete coverage: ${tileId}`) || hasError;
+      }
+    }
+  }
+
+  if (tileById.size !== rows * cols) {
+    hasError = report(`Map tile count must match size coverage: expected ${rows * cols}, got ${tileById.size}`) || hasError;
   }
 
   return hasError;

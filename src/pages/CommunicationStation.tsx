@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
+import { defaultMapConfig } from "../content/contentData";
 import { getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember } from "../data/gameData";
 import type { EventLog, Objective, RuntimeCall } from "../events/types";
 import { getInventoryView, type InventoryItemView } from "../inventorySystem";
+import { getTileLocationLabel } from "../mapSystem";
 import { CrewDetail } from "./CrewDetail";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
@@ -180,7 +182,7 @@ export function CommunicationStation({
           <FieldList
             rows={[
               ["身份", detailCrew.role],
-              ["位置", `${detailCrew.location} ${detailCrew.coord}`],
+              ["位置", getCrewLocationLabel(detailCrew)],
               ["当前状态", detailCrew.status],
               ["时间状态", getCrewTiming(detailCrew, elapsedGameSeconds)],
             ]}
@@ -222,6 +224,7 @@ function CrewCard({
           {member.hasIncoming ? <StatusTag tone="danger">来电</StatusTag> : <StatusTag tone={member.statusTone}>在线</StatusTag>}
         </div>
         <p className={`crew-status status-${member.statusTone}`}>{member.status}</p>
+        <p className="muted-text">位置：{getCrewLocationLabel(member)}</p>
         <p className="muted-text">{getCrewTiming(member, elapsedGameSeconds)}</p>
         <p className="muted-text">{member.summary}</p>
       </div>
@@ -290,6 +293,10 @@ function formatItemTags(item: InventoryItemView) {
 
 function formatBoolean(value: boolean) {
   return value ? "是" : "否";
+}
+
+function getCrewLocationLabel(member: CrewMember) {
+  return getTileLocationLabel(defaultMapConfig, member.currentTile);
 }
 
 function getCrewTiming(member: CrewMember, elapsedGameSeconds: number) {

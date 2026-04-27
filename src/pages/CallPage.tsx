@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
+import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, formatMoveRoute } from "../crewSystem";
-import { garryActions, type ActionOption, type CallContext, type CrewMember, type MapTile } from "../data/gameData";
+import { garryActions, type ActionOption, type CallContext, type CrewMember, type GameMapState, type MapTile } from "../data/gameData";
 import type { RuntimeCall } from "../events/types";
 import { findUsableInventoryItemByTag, getItemTagLabel } from "../inventorySystem";
+import { getTileLocationLabel, getVisibleTileWindow, type VisibleTileCell } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 type CallActionOption = ActionOption & {
@@ -26,12 +28,14 @@ interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
   tiles: MapTile[];
+  map: GameMapState;
   activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   onDecision: (actionId: string) => void;
   onConfirmMove: () => void;
   onClearMoveTarget: () => void;
+  onSelectMoveTarget: (tileId: string) => void;
   onOpenMap: () => void;
   onEndCall: () => void;
   onOpenStation: () => void;
@@ -41,12 +45,14 @@ export function CallPage({
   call,
   crew,
   tiles,
+  map,
   activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
   onDecision,
   onConfirmMove,
   onClearMoveTarget,
+  onSelectMoveTarget,
   onOpenMap,
   onEndCall,
   onOpenStation,
@@ -59,12 +65,16 @@ export function CallPage({
   const callClosed = Boolean(call?.settled || runtimeCallClosed);
   const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
   const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
+  const visibleMoveCells = getVisibleTileWindow(defaultMapConfig, map).cells.filter(
+    (cell) => cell.status === "discovered" || cell.status === "frontier",
+  );
 
   const callView = useMemo<CallView | null>(() => {
     if (!call || !member) {
       return null;
     }
 
+    const currentLocation = getTileLocationLabel(defaultMapConfig, member.currentTile);
     if (call.runtimeCallId) {
       if (!runtimeCall || !isRuntimeCallActive(runtimeCall, elapsedGameSeconds)) {
         return {
@@ -99,8 +109,8 @@ export function CallPage({
         title: "通话页面：Garry 普通状态",
         subtitle: "当前只与 Garry 通话。地图和通讯录是辅助浮层，不会切换通话对象。",
         scene: "通话中的图片 / 矿床 / 灰尘 / 正常采矿",
-        lines: ["头儿，我正在矿床采矿，有什么事吗？"],
-        meta: "地点：矿床 / 状态：采矿中",
+        lines: ["头儿，我正在当前矿带采矿，有什么事吗？"],
+        meta: `地点：${currentLocation} / 状态：采矿中`,
         actions: garryActions satisfies CallActionOption[],
         badge: "普通通话",
         isRuntime: false,
@@ -112,7 +122,7 @@ export function CallPage({
       subtitle: "当前只处理这一条通话事件。其他队员可以查看，但不能接入第二条通话。",
       scene: "通话中的图片 / 湖泊 / 低频风声 / 画面延迟",
       lines: ["收到。湖泊边缘不在原来的位置，但我还在走。"],
-      meta: "地点：湖泊 / 状态：行进中",
+      meta: `地点：${currentLocation} / 状态：行进中`,
       actions: [
         { id: "mike-status", label: "要求继续前进", hint: "维持行进状态。" },
         { id: "mike-hold", label: "原地等待", hint: "暂停探索，避免进入未知水域。" },
@@ -191,9 +201,14 @@ export function CallPage({
             <MoveConfirmPanel
               member={member}
               targetTile={selectedMoveTarget}
+              targetCell={visibleMoveCells.find((cell) => cell.id === call.selectedTargetTileId)}
+              moveCells={visibleMoveCells}
+              tiles={tiles}
               preview={movePreview}
               callClosed={callClosed}
+              selectedTargetTileId={call.selectedTargetTileId}
               onOpenMap={onOpenMap}
+              onSelectMoveTarget={onSelectMoveTarget}
               onConfirmMove={onConfirmMove}
               onClearMoveTarget={onClearMoveTarget}
             />
@@ -265,17 +280,27 @@ export function CallPage({
 function MoveConfirmPanel({
   member,
   targetTile,
+  targetCell,
+  moveCells,
+  tiles,
   preview,
   callClosed,
+  selectedTargetTileId,
   onOpenMap,
+  onSelectMoveTarget,
   onConfirmMove,
   onClearMoveTarget,
 }: {
   member: CrewMember;
   targetTile: MapTile | undefined;
+  targetCell: VisibleTileCell | undefined;
+  moveCells: VisibleTileCell[];
+  tiles: MapTile[];
   preview: ReturnType<typeof createMovePreview> | null;
   callClosed: boolean;
+  selectedTargetTileId: string | undefined;
   onOpenMap: () => void;
+  onSelectMoveTarget: (tileId: string) => void;
   onConfirmMove: () => void;
   onClearMoveTarget: () => void;
 }) {
@@ -283,7 +308,15 @@ function MoveConfirmPanel({
     return (
       <div className="move-confirm-box">
         <strong>目的地未标记</strong>
-        <p>打开地图，选择一个地块并标记为候选目的地。地图不会直接下达移动指令。</p>
+        <p>从下方列表或地图选择一个候选目的地。移动指令仍需在通话中确认。</p>
+        <MoveTargetList
+          member={member}
+          moveCells={moveCells}
+          tiles={tiles}
+          selectedTargetTileId={selectedTargetTileId}
+          callClosed={callClosed}
+          onSelectMoveTarget={onSelectMoveTarget}
+        />
         <button type="button" className="secondary-button full-width" onClick={onOpenMap} disabled={callClosed}>
           打开地图标记目的地
         </button>
@@ -298,18 +331,16 @@ function MoveConfirmPanel({
         <div>
           <dt>起点</dt>
           <dd>
-            {member.coord} {member.location}
+            {getTileLocationLabel(defaultMapConfig, member.currentTile)}
           </dd>
         </div>
         <div>
           <dt>目标</dt>
-          <dd>
-            {targetTile.coord} {targetTile.terrain}
-          </dd>
+          <dd>{formatMoveTargetLabel(targetCell, targetTile)}</dd>
         </div>
         <div>
           <dt>路线</dt>
-          <dd>{preview.canMove ? formatMoveRoute(preview) : preview.reason}</dd>
+          <dd>{preview.canMove ? formatVisibleMoveRoute(preview, moveCells) : preview.reason}</dd>
         </div>
         <div>
           <dt>预计耗时</dt>
@@ -317,10 +348,18 @@ function MoveConfirmPanel({
         </div>
       </dl>
       {preview.interruptionWarning ? <p className="danger-text">{preview.interruptionWarning}</p> : null}
+      <MoveTargetList
+        member={member}
+        moveCells={moveCells}
+        tiles={tiles}
+        selectedTargetTileId={selectedTargetTileId}
+        callClosed={callClosed}
+        onSelectMoveTarget={onSelectMoveTarget}
+      />
       <p className="muted-text">确认后才会下达移动指令。抵达目标地块后，{member.name} 将原地待命。</p>
       <div className="move-confirm-actions">
         <button type="button" className="primary-button" onClick={onConfirmMove} disabled={!preview.canMove || callClosed}>
-          确认请求 {member.name} 前往 {targetTile.coord}
+          确认请求 {member.name} 前往 {formatMoveTargetShortLabel(targetCell, targetTile)}
         </button>
         <button type="button" className="secondary-button" onClick={onClearMoveTarget} disabled={callClosed}>
           清除候选
@@ -328,6 +367,86 @@ function MoveConfirmPanel({
       </div>
     </div>
   );
+}
+
+function MoveTargetList({
+  member,
+  moveCells,
+  tiles,
+  selectedTargetTileId,
+  callClosed,
+  onSelectMoveTarget,
+}: {
+  member: CrewMember;
+  moveCells: VisibleTileCell[];
+  tiles: MapTile[];
+  selectedTargetTileId: string | undefined;
+  callClosed: boolean;
+  onSelectMoveTarget: (tileId: string) => void;
+}) {
+  return (
+    <div className="move-target-list" aria-label="移动目标列表">
+      {moveCells.map((cell) => {
+        const tile = tiles.find((item) => item.id === cell.id);
+        const preview = createMovePreview(member, cell.id, tiles);
+        const selected = selectedTargetTileId === cell.id;
+        return (
+          <button
+            type="button"
+            key={cell.id}
+            className={`choice-button ${selected ? "choice-accent" : "choice-neutral"}`}
+            disabled={callClosed || !tile || !preview.canMove}
+            onClick={() => onSelectMoveTarget(cell.id)}
+          >
+            <span>{formatMoveTargetLabel(cell, tile)}</span>
+            <small>{preview.canMove ? `预计 ${formatDuration(preview.totalDurationSeconds)}` : preview.reason ?? "不可达"}</small>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatMoveTargetLabel(cell: VisibleTileCell | undefined, tile: MapTile | undefined) {
+  if (!cell) {
+    return tile?.coord ?? "未知目标";
+  }
+
+  if (cell.status === "frontier") {
+    return `未探索信号（${cell.displayX},${cell.displayY}）`;
+  }
+
+  return `${getTileLocationLabel(defaultMapConfig, cell.id)} / 地形：${cell.tile?.terrain ?? tile?.terrain ?? "未知地形"}`;
+}
+
+function formatMoveTargetShortLabel(cell: VisibleTileCell | undefined, tile: MapTile | undefined) {
+  if (!cell) {
+    return tile?.coord ?? "未知目标";
+  }
+
+  if (cell.status === "frontier") {
+    return `未探索信号（${cell.displayX},${cell.displayY}）`;
+  }
+
+  return getTileLocationLabel(defaultMapConfig, cell.id);
+}
+
+function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMovePreview>>, moveCells: VisibleTileCell[]) {
+  const cellsById = new Map(moveCells.map((cell) => [cell.id, cell]));
+  return preview.steps
+    .map((step) => {
+      const cell = cellsById.get(step.tileId);
+      if (cell?.status === "frontier") {
+        return `未探索信号（${cell.displayX},${cell.displayY}）`;
+      }
+
+      if (cell?.status === "discovered") {
+        return `${getTileLocationLabel(defaultMapConfig, cell.id)} ${step.terrain}`;
+      }
+
+      return step.coord;
+    })
+    .join(" → ");
 }
 
 function getChoiceItemAvailability(action: CallActionOption, member: CrewMember) {

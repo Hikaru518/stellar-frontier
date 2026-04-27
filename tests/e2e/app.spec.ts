@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const GAME_SAVE_KEY = "stellar-frontier-save-v1";
+test.beforeEach(async ({ page }) => {
+  await page.clock.install();
+});
+
+const GAME_SAVE_KEY = "stellar-frontier-save-v2";
+const GAME_SAVE_VERSION = 2;
 const GAME_SAVE_SCHEMA_VERSION = "event-program-model-v1";
 const initialResources = {
   energy: 620,
@@ -51,8 +56,43 @@ test("opens the communication station and shows a crew inventory", async ({ page
   await expect(page.getByText("可在失联或救援相关事件中提供定位帮助。")).toBeVisible();
 });
 
+test("shows only the crash site and frontier window on a new map", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /卫星雷达/ }).click();
+
+  const grid = page.getByLabel(/雷达可见矩形/);
+  await expect(grid).toBeVisible();
+  await expect(grid.getByRole("button")).toHaveCount(9);
+  await expect(grid.getByRole("button", { name: /坠毁区域/ })).toBeVisible();
+  await expect(grid.getByRole("button", { name: /未探索信号/ })).toHaveCount(8);
+  await expect(page.getByText(/4x4|4 x 4/)).toHaveCount(0);
+  await expect(grid.getByText("坠毁西缘")).toHaveCount(0);
+  await expect(grid.getByText("北部玄武高地")).toHaveCount(0);
+});
+
+test("moves Garry to a frontier tile and expands the visible map", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
+  await garryCard.getByRole("button", { name: "通话" }).click();
+  await page.getByRole("button", { name: /请求前往/ }).click();
+
+  await page.getByRole("button", { name: /未探索信号（-1,0）/ }).click();
+  await page.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }).click();
+  await expect(page.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeVisible();
+
+  await page.clock.runFor(150_000);
+  await expect(page.getByText(/地点：坠毁西缘 \(-1,0\)/)).toBeVisible();
+
+  await page.getByRole("button", { name: /地图二级菜单/ }).click();
+  const grid = page.getByLabel(/雷达可见矩形/);
+  await expect(grid.getByRole("button", { name: /坠毁西缘/ })).toBeVisible();
+  await expect(grid.getByRole("button")).toHaveCount(25);
+});
+
 test("creates a manual Garry mine anomaly call after the default survey path", async ({ page }) => {
-  await page.clock.install();
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
@@ -61,6 +101,7 @@ test("creates a manual Garry mine anomaly call after the default survey path", a
   await page.getByRole("button", { name: /开展调查/ }).click();
 
   await page.clock.runFor(180_000);
+
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
     return Object.values(save.active_events ?? {}).some(
@@ -73,6 +114,26 @@ test("creates a manual Garry mine anomaly call after the default survey path", a
   await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
   await expect(page.getByText("Garry 报告 3-3 的矿床下方传来空洞回声。")).toBeVisible();
   await expect(page.getByRole("button", { name: "标记异常，交给工程复核。" })).toBeVisible();
+});
+
+test("opens an investigation report from the log with environment fields", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
+  await garryCard.getByRole("button", { name: "通话" }).click();
+  await page.getByRole("button", { name: /开展调查/ }).click();
+
+  await page.clock.runFor(180_000);
+  await page.getByRole("button", { name: "结束通话" }).last().click();
+  await page.getByRole("button", { name: /返回/ }).click();
+
+  await page.getByRole("button", { name: "查看报告" }).first().click();
+  await expect(page.getByRole("heading", { name: "调查报告" })).toBeVisible();
+  await expect(page.getByText("铁脊矿带")).toBeVisible();
+  await expect(page.getByText("18 °C")).toBeVisible();
+  await expect(page.getByText("32%")).toBeVisible();
+  await expect(page.getByText("72 μT")).toBeVisible();
 });
 
 test("submits a seeded forest runtime call option through the communication UI", async ({ page }) => {
@@ -175,9 +236,11 @@ test("completes a seeded assigned objective when its crew action finishes", asyn
 
 async function installSave(page: Page, partial: Record<string, unknown>) {
   const save = {
+    saveVersion: GAME_SAVE_VERSION,
     schema_version: GAME_SAVE_SCHEMA_VERSION,
     created_at_real_time: "2026-04-27T00:00:00.000Z",
     updated_at_real_time: "2026-04-27T00:00:00.000Z",
+    map: createInitialMapState(),
     ...createEmptyEventRuntimeState(),
     ...partial,
   };
@@ -413,6 +476,35 @@ function createEmptyEventRuntimeState() {
     crew_actions: {},
     inventories: {},
     rng_state: null,
+  };
+}
+
+function createInitialMapState() {
+  return {
+    configId: "default-map",
+    configVersion: 1,
+    rows: 8,
+    cols: 8,
+    originTileId: "4-4",
+    discoveredTileIds: ["4-4"],
+    investigationReportsById: {},
+    tilesById: Object.fromEntries(
+      Array.from({ length: 8 }, (_, rowIndex) =>
+        Array.from({ length: 8 }, (_, colIndex) => {
+          const id = `${rowIndex + 1}-${colIndex + 1}`;
+          return [
+            id,
+            {
+              discovered: id === "4-4",
+              investigated: id === "4-4",
+              activeSpecialStateIds: [],
+              revealedObjectIds: [],
+              revealedSpecialStateIds: [],
+            },
+          ];
+        }),
+      ).flat(),
+    ),
   };
 }
 
