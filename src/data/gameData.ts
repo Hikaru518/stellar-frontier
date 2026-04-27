@@ -358,7 +358,3 @@ function getInitialStatus(member: CrewDefinition) {
       return "待命中。";
   }
 }
-
-function getTileLocation(tile: MapTile) {
-  return tile.resources[0] ?? tile.terrain;
-}

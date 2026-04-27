@@ -9,7 +9,7 @@ import { appendDiaryEntry } from "./diarySystem";
 import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents, type EventHistory } from "./eventSystem";
 import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
 import { defaultMapConfig } from "./content/contentData";
-import { canMoveToTile, deriveLegacyTiles } from "./mapSystem";
+import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
@@ -249,12 +249,13 @@ function App() {
   }
 
   function selectMoveTarget(tileId: string) {
+    const targetLabel = getMoveTargetSelectionLabel(gameState.map, tileId);
     setCurrentCall((call) =>
       call?.selectingMoveTarget
         ? {
             ...call,
             selectedTargetTileId: tileId,
-            result: `已标记候选目的地 ${tileId}。返回通话后确认是否下达移动指令。`,
+            result: `已标记候选目的地 ${targetLabel}。返回通话后确认是否下达移动指令。`,
           }
         : call,
     );
@@ -351,11 +352,13 @@ function App() {
           call={currentCall}
           crew={crew}
           tiles={tiles}
+          map={map}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
           onDecision={handleDecision}
           onConfirmMove={confirmMove}
           onClearMoveTarget={clearMoveTarget}
+          onSelectMoveTarget={selectMoveTarget}
           onOpenMap={() => openMap("call")}
           onEndCall={endCall}
           onOpenStation={() => setPage("station")}
@@ -449,6 +452,15 @@ function createInitialGameState(): GameState {
   };
 
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
+}
+
+function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
+  const cell = getVisibleTileWindow(defaultMapConfig, map).cells.find((item) => item.id === tileId);
+  if (cell?.status === "frontier") {
+    return `未探索信号（${cell.displayX},${cell.displayY}）`;
+  }
+
+  return getTileLocationLabel(defaultMapConfig, tileId);
 }
 
 function settleGameTime(state: GameState): GameState {

@@ -319,7 +319,7 @@ describe("App", () => {
 
     expect(screen.getByText("移动确认")).toBeInTheDocument();
     expect(screen.getByText(/当前采集，未完成的一轮不会结算/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 \(-1,0\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }));
 
     expect(screen.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeInTheDocument();
 
@@ -334,6 +334,45 @@ describe("App", () => {
     fireEvent.click(endButtons[endButtons.length - 1]);
     expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
     expect(screen.getByText("位于 (-1,0)，待命中。")).toBeInTheDocument();
+  });
+
+  it("shows crew locations by area and player coordinates without resource names", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    expect(within(garryCard as HTMLElement).getByText("位置：铁脊矿带 (-1,1)")).toBeInTheDocument();
+    expect(within(garryCard as HTMLElement).queryByText("iron_ore")).not.toBeInTheDocument();
+
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "查看档案" }));
+    expect(screen.getAllByText("铁脊矿带 (-1,1)").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/row|col/)).not.toBeInTheDocument();
+  });
+
+  it("lets the call page select frontier targets without revealing unknown details", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /请求前往/ }));
+
+    const targetList = screen.getByLabelText("移动目标列表");
+    expect(within(targetList).getByRole("button", { name: /坠毁区域 \(0,0\).*地形：平原/ })).toBeInTheDocument();
+    const frontierTarget = within(targetList).getByRole("button", { name: /未探索信号（-1,0）/ });
+    expect(frontierTarget).toBeEnabled();
+    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+    expect(screen.queryByText("沙漠")).not.toBeInTheDocument();
+    expect(screen.queryByText("阴天")).not.toBeInTheDocument();
+
+    fireEvent.click(frontierTarget);
+
+    expect(screen.getByText(/已标记候选目的地 未探索信号（-1,0）/)).toBeInTheDocument();
+    expect(screen.getAllByText("未探索信号（-1,0）").length).toBeGreaterThan(0);
+    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+    expect(screen.queryByText("沙漠")).not.toBeInTheDocument();
   });
 
   it("renders the map as a dynamic visible matrix without fixed grid copy", () => {

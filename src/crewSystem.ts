@@ -1,4 +1,6 @@
+import { defaultMapConfig } from "./content/contentData";
 import type { ActiveAction, CrewMember, MapTile, SystemLog, Tone } from "./data/gameData";
+import { getTileLocationLabel } from "./mapSystem";
 import { formatDuration, formatGameTime, getRemainingSeconds } from "./timeSystem";
 
 export interface MoveStepPreview {
@@ -341,12 +343,8 @@ function updateCrewTile(member: CrewMember, tileId: string, tile?: MapTile) {
     ...member,
     currentTile: tileId,
     coord: tile?.coord ?? member.coord,
-    location: tile ? getTileLocation(tile) : member.location,
+    location: getTileLocationLabel(defaultMapConfig, tileId),
   };
-}
-
-function getTileLocation(tile: MapTile) {
-  return tile.resources[0] ?? tile.terrain;
 }
 
 function getTargetLabel(targetTileId: string | undefined, tiles: MapTile[]) {
