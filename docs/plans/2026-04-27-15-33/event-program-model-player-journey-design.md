@@ -1,7 +1,9 @@
 ---
 topic: event-program-model-player-journey
 date: 2026-04-27
-status: approved
+status: merged
+merged_into: docs/gameplay/event-system/event-system.md
+merged_at: 2026-04-27T21:21:54+08:00
 source:
   initial: docs/plans/2026-04-27-15-33/initial.md
   research: docs/plans/2026-04-27-15-33/research.md

@@ -1,13 +1,15 @@
 ---
 topic: configurable-map-system
 date: 2026-04-27
-status: approved
+status: merged
 scope: system
 source:
   initial: docs/plans/2026-04-27-17-37/initial.md
   research: docs/plans/2026-04-27-17-37/research.md
   interview: docs/plans/2026-04-27-17-37/configurable-map-system-interview.md
 target_wiki: docs/gameplay/map-system/map-system.md
+merged_into: docs/gameplay/map-system/map-system.md
+merged_at: 2026-04-27T21:52:00+08:00
 ---
 
 # 可配置地图系统
