@@ -77,11 +77,13 @@ export function MapPage({
             const tile = tiles.find((item) => item.id === cell.id);
             const runtimeTile = map.tilesById[cell.id];
             const isDiscovered = cell.status === "discovered";
+            const visibleCrewIds = crewIdsForCell(runtimeTile, tile);
+            const hasCrewSignal = !isDiscovered && Boolean(cell.tile) && visibleCrewIds.length > 0;
             const dangerTags = isDiscovered && tile ? (tile.dangerTags ?? []) : [];
             const hasDanger = isDiscovered && tile ? dangerTags.length > 0 || (tile.danger !== "未发现即时危险" && tile.danger !== "未知详情") : false;
             const isRouteTile = movePreview?.route.includes(cell.id) ?? false;
             const isMoveTarget = selectedMoveTargetId === cell.id;
-            const hasCurrentCrew = isDiscovered && crew.some((member) => member.currentTile === cell.id);
+            const hasCurrentCrew = visibleCrewIds.length > 0;
             const firstEventMark = tile?.eventMarks?.[0];
             return (
               <button
@@ -117,6 +119,20 @@ export function MapPage({
                       </small>
                     ))}
                   </>
+                ) : hasCrewSignal && cell.tile ? (
+                  <>
+                    <span>未探索信号</span>
+                    <small>地形：{cell.tile.terrain}</small>
+                    <small>天气：{cell.tile.weather}</small>
+                    {visibleCrewIds.map((crewId) => {
+                      const member = crewById.get(crewId);
+                      return member ? (
+                        <small key={crewId} className={member.statusTone === "danger" ? "danger-text" : ""}>
+                          {member.name}：{shortStatus(member.status)}
+                        </small>
+                      ) : null;
+                    })}
+                  </>
                 ) : (
                   <>
                     <span>未探索信号</span>
@@ -132,7 +148,7 @@ export function MapPage({
 
         <Panel className="map-legend">
           <p>
-            选中：橙色描边 · 危险：橙色文字 · 未探索信号：灰色低对比 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
+            选中：橙色描边 · 队员回传：浅色底 · 危险：橙色文字 · 未探索信号：灰色低对比 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
           </p>
         </Panel>
 
@@ -152,6 +168,18 @@ export function MapPage({
                 ["事件标记", formatEventMarks(selectedTile)],
                 ["事件摘要", formatEventSummaries(selectedTileLogs)],
                 ["状态", selectedTile.status],
+                ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
+              ]}
+            />
+          ) : selectedCell && selectedTile && selectedCell.tile && crewIdsForCell(map.tilesById[selectedCell.id], selectedTile).length > 0 ? (
+            <FieldList
+              rows={[
+                ["信号状态", "队员回传"],
+                ["地形", selectedCell.tile.terrain],
+                ["天气", selectedCell.tile.weather],
+                ["手下状态", crewStatus({ ...selectedTile, crew: crewIdsForCell(map.tilesById[selectedCell.id], selectedTile) }, crewById)],
+                ["计时状态", crewTiming({ ...selectedTile, crew: crewIdsForCell(map.tilesById[selectedCell.id], selectedTile) }, crewById, elapsedGameSeconds)],
+                ["行动提示", "队员可回传粗略环境；需要调查后确认对象与特殊状态详情"],
                 ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
               ]}
             />
@@ -232,6 +260,10 @@ function revealedSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState[
   const activeIds = new Set(runtimeTile?.activeSpecialStateIds ?? cell.tile.specialStates.filter((state) => state.startsActive).map((state) => state.id));
   const revealedIds = new Set(runtimeTile?.revealedSpecialStateIds ?? []);
   return cell.tile.specialStates.filter((state) => activeIds.has(state.id) && (state.visibility === "onDiscovered" || revealedIds.has(state.id)));
+}
+
+function crewIdsForCell(runtimeTile: GameMapState["tilesById"][string], tile?: Pick<MapTile, "crew">) {
+  return runtimeTile?.crew?.length ? runtimeTile.crew : (tile?.crew ?? []);
 }
 
 function objectSummary(objects: MapObjectDefinition[]) {

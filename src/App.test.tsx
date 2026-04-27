@@ -838,7 +838,7 @@ describe("App", () => {
     expect(within(callCard as HTMLElement).getByText("剩余 02:00")).toBeInTheDocument();
   });
 
-  it("prioritizes an event call over the same crew's player call entry", () => {
+  it("shows connect on a contact card when that crew has an active runtime call", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -874,9 +874,10 @@ describe("App", () => {
     expect(eventCallCard).not.toBeNull();
     expect(contactCard).not.toBeNull();
 
-    expect(screen.getAllByRole("button", { name: "接通" })).toHaveLength(1);
-    expect(within(contactCard as HTMLElement).queryByRole("button", { name: "接通" })).not.toBeInTheDocument();
-    expect(within(contactCard as HTMLElement).getByRole("button", { name: "通话" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "接通" })).toHaveLength(2);
+    fireEvent.click(within(contactCard as HTMLElement).getByRole("button", { name: "接通" }));
+    expect(screen.getByRole("heading", { name: "通话页面：Garry 事件通话" })).toBeInTheDocument();
+    expect(screen.getByText("Garry 的事件频道等待接入。")).toBeInTheDocument();
     expect((eventCallCard as HTMLElement).compareDocumentPosition(contactCard as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -1317,6 +1318,58 @@ describe("App", () => {
     expect(screen.getAllByRole("button", { name: "返回通讯台" }).length).toBeGreaterThan(0);
   });
 
+  it("shows coarse terrain, weather, and crew status for a crew-occupied frontier tile without revealing objects", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "amy",
+            currentTile: "2-3",
+            location: "黑松林缘",
+            coord: "(-1,2)",
+            status: "等待指令。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            canCommunicate: true,
+            unavailable: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles("3-3"),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+
+    const grid = screen.getByLabelText(/雷达可见矩形/);
+    const amyTile = within(grid).getByRole("button", { name: /\(-1,2\)/ });
+    expect(within(amyTile).getByText("未探索信号")).toBeInTheDocument();
+    expect(within(amyTile).getByText("地形：森林 / 山")).toBeInTheDocument();
+    expect(within(amyTile).getByText("天气：薄雾")).toBeInTheDocument();
+    expect(within(amyTile).getByText("Amy：等待指令。")).toBeInTheDocument();
+    expect(within(amyTile).queryByText("黑松木材带")).not.toBeInTheDocument();
+
+    fireEvent.click(amyTile);
+    expect(screen.getByText("队员回传")).toBeInTheDocument();
+    expect(screen.getByText("地形")).toBeInTheDocument();
+    expect(screen.getAllByText("森林 / 山").length).toBeGreaterThan(0);
+    expect(screen.getByText("天气")).toBeInTheDocument();
+    expect(screen.getAllByText("薄雾").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Amy：等待指令。").length).toBeGreaterThan(0);
+    expect(screen.queryByText("黑松木材带")).not.toBeInTheDocument();
+
+    const saved = readSavedGameState();
+    expect(saved.map.discoveredTileIds).not.toContain("2-3");
+    expect(saved.map.tilesById["2-3"].discovered).toBe(false);
+  });
+
   it("renders grouped base and revealed object actions for an idle crew member", () => {
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
@@ -1437,6 +1490,68 @@ describe("App", () => {
     fireEvent.click(endButtons[endButtons.length - 1]);
     expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
     expect(screen.getByText("位于 (-1,0)，待命中。")).toBeInTheDocument();
+  });
+
+  it("advances an incomplete saved move action one route step at a time instead of jumping to the target", () => {
+    vi.useFakeTimers();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "mike",
+            currentTile: "2-1",
+            location: "浅水裂湖",
+            coord: "(-3,2)",
+            status: "正在前往目标地点，行进中。",
+            statusTone: "muted",
+            hasIncoming: false,
+            canCommunicate: true,
+            unavailable: false,
+            activeAction: {
+              id: "mike-move-4-5",
+              actionType: "move",
+              status: "inProgress",
+              startTime: 0,
+              durationSeconds: 360,
+              finishTime: 360,
+              fromTile: "2-1",
+              targetTile: "4-5",
+              route: ["4-5"],
+              routeStepIndex: 0,
+              stepStartedAt: 0,
+              stepFinishTime: 360,
+              totalDurationSeconds: 360,
+            },
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles("2-1"),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    const saved = readSavedGameState();
+    const mike = savedCrew(saved, "mike");
+    expect(mike.currentTile).toBe("2-2");
+    expect(mike.activeAction).toMatchObject({
+      targetTile: "4-5",
+      routeStepIndex: 1,
+    });
+    expect(saved.map.discoveredTileIds).toContain("2-2");
+    expect(saved.map.tilesById["2-2"]).toMatchObject({
+      discovered: true,
+    });
+    expect(saved.map.tilesById["2-2"].investigated).not.toBe(true);
+    expect(saved.map.discoveredTileIds).not.toContain("4-5");
   });
 
   it("shows crew locations by area and player coordinates without resource names", () => {

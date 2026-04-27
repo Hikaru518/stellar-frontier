@@ -116,6 +116,7 @@ export function CommunicationStation({
                   key={member.id}
                   member={member}
                   elapsedGameSeconds={elapsedGameSeconds}
+                  hasRuntimeCall={activeCallCrewIds.has(member.id)}
                   onOpenDetail={() => setDetailCrewId(member.id)}
                   onOpenInventory={() => setInventoryCrewId(member.id)}
                   onStartCall={() => onStartCall(member.id)}
@@ -204,25 +205,29 @@ export function CommunicationStation({
 function CrewCard({
   member,
   elapsedGameSeconds,
+  hasRuntimeCall,
   onOpenDetail,
   onOpenInventory,
   onStartCall,
 }: {
   member: CrewMember;
   elapsedGameSeconds: number;
+  hasRuntimeCall: boolean;
   onOpenDetail: () => void;
   onOpenInventory: () => void;
   onStartCall: () => void;
 }) {
+  const hasCallEntry = member.hasIncoming || hasRuntimeCall;
+  const callDisabled = member.unavailable && !hasRuntimeCall;
   return (
-    <article className={`crew-card ${member.hasIncoming ? "crew-card-alert" : ""}`}>
+    <article className={`crew-card ${hasCallEntry ? "crew-card-alert" : ""}`}>
       <div className="avatar-box">头像</div>
       <div className="crew-card-body">
         <div className="crew-card-heading">
           <h3>
             {member.name}，{member.role}
           </h3>
-          {member.hasIncoming ? <StatusTag tone="danger">来电</StatusTag> : <StatusTag tone={member.statusTone}>在线</StatusTag>}
+          {hasCallEntry ? <StatusTag tone={hasRuntimeCall ? "accent" : "danger"}>来电</StatusTag> : <StatusTag tone={member.statusTone}>在线</StatusTag>}
         </div>
         <p className={`crew-status status-${member.statusTone}`}>{member.status}</p>
         <p className="muted-text">位置：{getCrewLocationLabel(member)}</p>
@@ -230,10 +235,10 @@ function CrewCard({
         <p className="muted-text">{member.summary}</p>
       </div>
       <div className="crew-actions">
-        {member.hasIncoming ? (
+        {hasCallEntry ? (
           <>
-            <button type="button" className="primary-button" disabled={member.unavailable} onClick={onStartCall}>
-              {member.unavailable ? "信号中断" : "通话"}
+            <button type="button" className="primary-button" disabled={callDisabled} onClick={onStartCall}>
+              {callDisabled ? "信号中断" : hasRuntimeCall ? "接通" : "通话"}
             </button>
             <button type="button" className="secondary-button" onClick={onOpenInventory}>
               查看背包

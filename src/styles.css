@@ -631,6 +631,8 @@ blockquote {
 
 .map-cell-crew-current {
   border-left: 4px solid #24384f;
+  background: #f4eadf;
+  color: #24384f;
 }
 
 .route-text {
