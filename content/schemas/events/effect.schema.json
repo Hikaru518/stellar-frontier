@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/effect.schema.json",
+  "title": "Stellar Frontier Event Effect",
+  "$ref": "#/$defs/effect",
+  "$defs": {
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "target", "params", "failure_policy", "record_policy"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "add_crew_condition",
+            "remove_crew_condition",
+            "update_crew_attribute",
+            "add_personality_tag",
+            "remove_personality_tag",
+            "add_expertise_tag",
+            "update_crew_location",
+            "create_crew_action",
+            "cancel_crew_action",
+            "update_crew_action",
+            "update_tile_field",
+            "add_tile_tag",
+            "add_danger_tag",
+            "set_discovery_state",
+            "set_survey_state",
+            "add_event_mark",
+            "add_item",
+            "remove_item",
+            "transfer_item",
+            "add_resource",
+            "remove_resource",
+            "update_tile_resource",
+            "create_objective",
+            "update_objective",
+            "complete_objective",
+            "fail_objective",
+            "set_world_flag",
+            "increment_world_counter",
+            "write_world_history",
+            "add_event_log",
+            "add_diary_entry",
+            "spawn_event",
+            "unlock_event_definition",
+            "handler_effect"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/target_ref"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "failure_policy": {
+          "$ref": "#/$defs/effect_failure_policy"
+        },
+        "record_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["write_event_log", "write_world_history"],
+          "properties": {
+            "write_event_log": {
+              "type": "boolean"
+            },
+            "write_world_history": {
+              "type": "boolean"
+            },
+            "history_key_template": {
+              "type": ["string", "null"],
+              "minLength": 1
+            }
+          }
+        },
+        "idempotency_key_template": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "handler_type": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "target_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/target_type"
+        },
+        "id": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "ref": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effect_failure_policy": {
+      "type": "string",
+      "enum": ["fail_event", "skip_effect", "skip_group", "retry_later"]
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "primary_crew",
+        "related_crew",
+        "crew_id",
+        "event_tile",
+        "tile_id",
+        "active_event",
+        "parent_event",
+        "child_event",
+        "objective_id",
+        "crew_inventory",
+        "base_inventory",
+        "base_resources",
+        "tile_resources",
+        "world_flags",
+        "world_history",
+        "event_log"
+      ]
+    }
+  }
+}

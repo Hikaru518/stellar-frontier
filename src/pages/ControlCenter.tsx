@@ -2,10 +2,13 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag, SystemLogPanel } from "../components/Layout";
 import { facilities, type CrewMember, type GameMapState, type InvestigationReport, type ResourceSummary, type SystemLog } from "../data/gameData";
 import { formatGameTime } from "../timeSystem";
+import type { EventLog, Objective } from "../events/types";
 
 interface ControlCenterProps {
   crew: CrewMember[];
   logs: SystemLog[];
+  eventLogs: EventLog[];
+  objectives: Record<string, Objective>;
   resources: ResourceSummary;
   map: GameMapState;
   gameTimeLabel: string;
@@ -18,6 +21,8 @@ interface ControlCenterProps {
 export function ControlCenter({
   crew,
   logs,
+  eventLogs,
+  objectives,
   resources,
   map,
   gameTimeLabel,
@@ -31,6 +36,12 @@ export function ControlCenter({
   const incomingCount = crew.filter((member) => member.hasIncoming).length;
   const amy = crew.find((member) => member.id === "amy");
   const report = reportId ? map.investigationReportsById[reportId] : undefined;
+  const visibleEventLogs = eventLogs
+    .filter((log) => log.visibility === "player_visible")
+    .slice()
+    .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
+    .slice(0, 3);
+  const objectiveList = Object.values(objectives).sort((left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
 
   const modalContent = useMemo(() => getFacilityModal(modal), [modal]);
 
@@ -100,6 +111,30 @@ export function ControlCenter({
           </p>
         </Panel>
 
+        <Panel title="事件态势" className="control-hint" tone={visibleEventLogs.length || objectiveList.length ? "accent" : "neutral"}>
+          <FieldList
+            rows={[
+              ["近期事件", visibleEventLogs.length ? `${visibleEventLogs.length} 条可见记录` : "暂无事件记录。"],
+              ["目标状态", objectiveList.length ? `${objectiveList.length} 条事件目标` : "暂无事件目标。"],
+            ]}
+          />
+          {visibleEventLogs.length ? (
+            <ol className="diary-list">
+              {visibleEventLogs.map((log) => (
+                <li key={log.id}>
+                  <div className="diary-meta">
+                    <span>{formatEventTime(log.occurred_at)}</span>
+                    <StatusTag tone={log.importance === "major" || log.importance === "critical" ? "accent" : "muted"}>
+                      {formatEventImportance(log.importance)}
+                    </StatusTag>
+                  </div>
+                  <p>{log.summary}</p>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </Panel>
+
         <SystemLogPanel logs={logs} onOpenReport={setReportId} />
       </div>
 
@@ -165,6 +200,23 @@ const facilityLog: Record<string, string> = {
   trade: "星际贸易线路等待授权。价格已经先开始波动。",
   gate: "星际之门没有开启。总部的沉默非常总部。",
 };
+
+function formatEventTime(seconds: number) {
+  return `T+${seconds}s`;
+}
+
+function formatEventImportance(importance: EventLog["importance"]) {
+  if (importance === "critical") {
+    return "紧急";
+  }
+  if (importance === "major") {
+    return "重要";
+  }
+  if (importance === "normal") {
+    return "记录";
+  }
+  return "简报";
+}
 
 function getFacilityModal(id: string | null): { title: string; body: ReactNode } | null {
   switch (id) {

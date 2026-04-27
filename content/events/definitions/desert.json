@@ -1,0 +1,332 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "volcanic_ash_trace",
+      "version": 1,
+      "domain": "desert",
+      "title": "火山灰痕迹",
+      "summary": "沙漠灰线需要另一名队员复核目标地块。",
+      "tags": ["sample", "cross_crew_objective", "desert"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "tags",
+            "value": "volcanic"
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 35,
+        "weight": 1,
+        "mutex_group": null,
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": false
+      },
+      "repeat_policy": {
+        "scope": "tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 0,
+        "history_key_template": "event:{event_definition_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "ash_trace_call",
+        "nodes": [
+          {
+            "id": "ash_trace_call",
+            "type": "call",
+            "title": "报告灰线痕迹",
+            "call_template_id": "volcanic_ash_trace.call.briefing",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              {
+                "id": "assign_probe",
+                "is_default": true
+              },
+              {
+                "id": "seal_sample"
+              }
+            ],
+            "option_node_mapping": {
+              "assign_probe": "ash_cross_crew_objective",
+              "seal_sample": "ash_sample_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 180
+          },
+          {
+            "id": "ash_cross_crew_objective",
+            "type": "objective",
+            "title": "跨队员灰线调查",
+            "objective_template": {
+              "title": "调查火山灰痕迹",
+              "summary": "在风吹散灰线前，派另一名队员复核这处痕迹。",
+              "target_tile_ref": {
+                "type": "event_tile"
+              },
+              "eligible_crew_conditions": [
+                {
+                  "type": "attribute_check",
+                  "target": {
+                    "type": "primary_crew"
+                  },
+                  "field": "perception",
+                  "op": "gte",
+                  "value": 4
+                }
+              ],
+              "required_action_type": "survey",
+              "required_action_params": {
+                "duration_seconds": 45,
+                "can_interrupt": true
+              }
+            },
+            "mode": "create_and_wait",
+            "on_completed_node_id": "ash_mapped_end",
+            "on_failed_node_id": "ash_failed_end",
+            "expires_in_seconds": 600,
+            "parent_event_link": true,
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            }
+          },
+          {
+            "id": "ash_mapped_end",
+            "type": "end",
+            "title": "灰线痕迹已测绘",
+            "resolution": "resolved",
+            "result_key": "ash_trace_mapped",
+            "final_effect_refs": ["ash_mapped_effects"],
+            "event_log_template_id": "ash_mapped_log",
+            "history_writes": [
+              {
+                "key_template": "volcanic_ash_trace:{tile_id}",
+                "scope": "tile",
+                "value": "ash_trace_mapped"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "ash_sample_end",
+            "type": "end",
+            "title": "灰线样本已封存",
+            "resolution": "resolved",
+            "result_key": "ash_sample_sealed",
+            "final_effect_refs": ["ash_sample_effects"],
+            "event_log_template_id": "ash_sample_log",
+            "history_writes": [
+              {
+                "key_template": "volcanic_ash_trace:{tile_id}",
+                "scope": "tile",
+                "value": "ash_sample_sealed"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "ash_failed_end",
+            "type": "end",
+            "title": "灰线痕迹已丢失",
+            "resolution": "failed",
+            "result_key": "ash_trace_lost",
+            "final_effect_refs": ["ash_failed_effects"],
+            "event_log_template_id": "ash_failed_log",
+            "history_writes": [
+              {
+                "key_template": "volcanic_ash_trace:{tile_id}",
+                "scope": "tile",
+                "value": "ash_trace_lost"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["ash_mapped_end", "ash_sample_end", "ash_failed_end"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "ash_mapped_effects",
+          "effects": [
+            {
+              "id": "ash_add_danger_tag",
+              "type": "add_danger_tag",
+              "target": {
+                "type": "event_tile"
+              },
+              "params": {
+                "tag": "ash_instability"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "ash_mapped_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "第二名队员完成了火山灰痕迹测绘。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "ash_trace_mapped"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "ash_sample_effects",
+          "effects": [
+            {
+              "id": "ash_sample_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "灰线痕迹已作为样本封存，未进行二次调查。",
+                "importance": "minor",
+                "visibility": "player_visible",
+                "result_key": "ash_sample_sealed"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "ash_failed_effects",
+          "effects": [
+            {
+              "id": "ash_failed_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "灰线痕迹在完成测绘前已经消失。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "ash_trace_lost"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "ash_mapped_log",
+          "summary": "火山灰痕迹已测绘",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "ash_sample_log",
+          "summary": "火山灰样本已封存",
+          "importance": "minor",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "ash_failed_log",
+          "summary": "火山灰痕迹已丢失",
+          "importance": "normal",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["volcanic_ash_trace.call.briefing"],
+        "crew_ids": ["garry", "lin_xia"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "action_complete",
+          "occurred_at": 480,
+          "source": "crew_action",
+          "crew_id": "garry",
+          "tile_id": "4-3",
+          "action_id": "garry-survey-4-3",
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "action_type": "survey",
+            "dry_run_assignee_crew_id": "lin_xia"
+          }
+        }
+      ]
+    }
+  ]
+}

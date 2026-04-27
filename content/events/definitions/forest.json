@@ -1,0 +1,644 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "forest_trace_small_camp",
+      "version": 1,
+      "domain": "forest",
+      "title": "森林小型营地痕迹",
+      "summary": "队员在森林中发现一处废弃小营地痕迹。",
+      "tags": ["sample", "normal_discovery", "forest"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "tags",
+            "value": "forest"
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 30,
+        "weight": 1,
+        "mutex_group": null,
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": false
+      },
+      "repeat_policy": {
+        "scope": "crew_tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 0,
+        "history_key_template": "event:{event_definition_id}:{crew_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "trace_report",
+        "nodes": [
+          {
+            "id": "trace_report",
+            "type": "call",
+            "title": "报告营地痕迹",
+            "call_template_id": "forest_trace_small_camp.call.report",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              {
+                "id": "mark_camp",
+                "effect_refs": ["trace_mark_camp"],
+                "is_default": true
+              },
+              {
+                "id": "note_only"
+              }
+            ],
+            "option_node_mapping": {
+              "mark_camp": "trace_resolved",
+              "note_only": "trace_noted"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 180
+          },
+          {
+            "id": "trace_resolved",
+            "type": "end",
+            "title": "营地痕迹已标记",
+            "resolution": "resolved",
+            "result_key": "camp_marked",
+            "final_effect_refs": ["trace_log_discovery"],
+            "event_log_template_id": "trace_discovery_log",
+            "history_writes": [
+              {
+                "key_template": "forest_trace_small_camp:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "camp_marked"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "trace_noted",
+            "type": "end",
+            "title": "营地痕迹已记录",
+            "resolution": "resolved",
+            "result_key": "camp_noted",
+            "final_effect_refs": ["trace_log_note"],
+            "event_log_template_id": "trace_note_log",
+            "history_writes": [
+              {
+                "key_template": "forest_trace_small_camp:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "camp_noted"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["trace_resolved", "trace_noted"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "trace_mark_camp",
+          "effects": [
+            {
+              "id": "trace_mark_tile",
+              "type": "add_event_mark",
+              "target": {
+                "type": "event_tile"
+              },
+              "params": {
+                "id": "small_camp_trace",
+                "label": "小型营地痕迹"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "trace_log_discovery",
+          "effects": [
+            {
+              "id": "trace_discovery_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "一处森林小型营地痕迹已标记，等待后续复核。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "camp_marked"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "trace_history_effect",
+              "type": "write_world_history",
+              "target": {
+                "type": "world_history"
+              },
+              "params": {
+                "key": "forest_trace_small_camp:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "camp_marked",
+                "last_result": "camp_marked"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "trace_log_note",
+          "effects": [
+            {
+              "id": "trace_note_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "森林营地痕迹已记录，但未标记地块。",
+                "importance": "minor",
+                "visibility": "player_visible",
+                "result_key": "camp_noted"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "trace_discovery_log",
+          "summary": "森林痕迹已标记",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "trace_note_log",
+          "summary": "森林痕迹已记录",
+          "importance": "minor",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["forest_trace_small_camp.call.report"],
+        "crew_ids": ["amy"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "action_complete",
+          "occurred_at": 120,
+          "source": "crew_action",
+          "crew_id": "amy",
+          "tile_id": "2-3",
+          "action_id": "amy-survey-2-3",
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "action_type": "survey"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "forest_beast_encounter",
+      "version": 1,
+      "domain": "forest",
+      "title": "森林野兽遭遇",
+      "summary": "队员在森林待命时遭遇附近野兽，事件会通过两次紧急通话升级。",
+      "tags": ["sample", "emergency_multi_call", "forest"],
+      "status": "approved",
+      "trigger": {
+        "type": "idle_time",
+        "required_context": ["crew_id", "tile_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "danger_tags",
+            "value": "beast_tracks"
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 90,
+        "weight": 1,
+        "mutex_group": "crew_emergency",
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": true
+      },
+      "repeat_policy": {
+        "scope": "crew_tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 300,
+        "history_key_template": "event:{event_definition_id}:{crew_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "beast_first_call",
+        "nodes": [
+          {
+            "id": "beast_first_call",
+            "type": "call",
+            "title": "首次野兽接触",
+            "call_template_id": "forest_beast_encounter.call.first",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "emergency",
+            "delivery": "incoming_call",
+            "options": [
+              {
+                "id": "hold_position",
+                "effect_refs": ["beast_hold_effect"],
+                "is_default": true
+              },
+              {
+                "id": "fall_back"
+              }
+            ],
+            "option_node_mapping": {
+              "hold_position": "beast_wait",
+              "fall_back": "beast_retreat_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 90
+          },
+          {
+            "id": "beast_wait",
+            "type": "wait",
+            "title": "等待野兽离开",
+            "duration_seconds": 20,
+            "wake_trigger_type": "time_wakeup",
+            "next_node_id": "beast_followup_call",
+            "set_next_wakeup_at": true,
+            "crew_action_during_wait": {
+              "type": "guarding_event_site",
+              "status": "active",
+              "action_params": {
+                "stance": "silent"
+              }
+            },
+            "interrupt_policy": "not_interruptible",
+            "on_interrupted": null,
+            "blocking": {
+              "occupies_crew_action": true,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            }
+          },
+          {
+            "id": "beast_followup_call",
+            "type": "call",
+            "title": "野兽后续通话",
+            "call_template_id": "forest_beast_encounter.call.followup",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "urgent",
+            "delivery": "incoming_call",
+            "options": [
+              {
+                "id": "drive_off",
+                "is_default": true
+              },
+              {
+                "id": "stay_hidden"
+              }
+            ],
+            "option_node_mapping": {
+              "drive_off": "beast_safe_end",
+              "stay_hidden": "beast_shaken_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 120
+          },
+          {
+            "id": "beast_safe_end",
+            "type": "end",
+            "title": "野兽已驱离",
+            "resolution": "resolved",
+            "result_key": "beast_driven_off",
+            "final_effect_refs": ["beast_safe_effects"],
+            "event_log_template_id": "beast_safe_log",
+            "history_writes": [
+              {
+                "key_template": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_driven_off"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "beast_shaken_end",
+            "type": "end",
+            "title": "队员继续躲藏",
+            "resolution": "resolved",
+            "result_key": "beast_avoided",
+            "final_effect_refs": ["beast_hidden_effects"],
+            "event_log_template_id": "beast_hidden_log",
+            "history_writes": [
+              {
+                "key_template": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_avoided"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "beast_retreat_end",
+            "type": "end",
+            "title": "队员后撤",
+            "resolution": "resolved",
+            "result_key": "beast_retreat",
+            "final_effect_refs": ["beast_retreat_effects"],
+            "event_log_template_id": "beast_retreat_log",
+            "history_writes": [
+              {
+                "key_template": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_retreat"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["beast_safe_end", "beast_shaken_end", "beast_retreat_end"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "beast_hold_effect",
+          "effects": [
+            {
+              "id": "beast_add_braced",
+              "type": "add_crew_condition",
+              "target": {
+                "type": "primary_crew"
+              },
+              "params": {
+                "condition": "braced"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "beast_safe_effects",
+          "effects": [
+            {
+              "id": "beast_add_danger_tag",
+              "type": "add_danger_tag",
+              "target": {
+                "type": "event_tile"
+              },
+              "params": {
+                "tag": "beast_sighted"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "beast_safe_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "队员保持位置后，森林野兽已经退走。",
+                "importance": "major",
+                "visibility": "player_visible",
+                "result_key": "beast_driven_off"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "beast_history_effect",
+              "type": "write_world_history",
+              "target": {
+                "type": "world_history"
+              },
+              "params": {
+                "key": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_driven_off",
+                "last_result": "beast_driven_off"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "beast_hidden_effects",
+          "effects": [
+            {
+              "id": "beast_hidden_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "队员继续躲藏，直到野兽离开。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "beast_avoided"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "beast_retreat_effects",
+          "effects": [
+            {
+              "id": "beast_retreat_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "队员从森林野兽踪迹附近后撤。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "beast_retreat"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "beast_safe_log",
+          "summary": "野兽遭遇已稳定",
+          "importance": "major",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "beast_hidden_log",
+          "summary": "野兽遭遇已避开",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "beast_retreat_log",
+          "summary": "野兽遭遇已后撤",
+          "importance": "normal",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["forest_beast_encounter.call.first", "forest_beast_encounter.call.followup"],
+        "crew_ids": ["amy"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "idle_time",
+          "occurred_at": 240,
+          "source": "time_system",
+          "crew_id": "amy",
+          "tile_id": "2-3",
+          "action_id": null,
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "idle_seconds": 300
+          }
+        }
+      ]
+    }
+  ]
+}

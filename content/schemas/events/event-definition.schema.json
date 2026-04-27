@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/event-definition.schema.json",
+  "title": "Stellar Frontier Event Definition File",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_definitions"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "event_definitions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event_definition"
+      }
+    }
+  },
+  "$defs": {
+    "event_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "version",
+        "domain",
+        "title",
+        "summary",
+        "status",
+        "trigger",
+        "candidate_selection",
+        "repeat_policy",
+        "event_graph",
+        "sample_contexts"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "domain": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "tags": {
+          "$ref": "#/$defs/string_array"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "ready_for_test", "approved", "disabled"]
+        },
+        "trigger": {
+          "$ref": "#/$defs/trigger_definition"
+        },
+        "candidate_selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["priority", "weight", "max_instances_per_trigger", "requires_blocking_slot"],
+          "properties": {
+            "priority": {
+              "type": "number"
+            },
+            "weight": {
+              "type": "number",
+              "minimum": 0
+            },
+            "mutex_group": {
+              "$ref": "#/$defs/nullable_string"
+            },
+            "max_instances_per_trigger": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "requires_blocking_slot": {
+              "type": "boolean"
+            }
+          }
+        },
+        "repeat_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope", "cooldown_seconds", "history_key_template", "allow_while_active"],
+          "properties": {
+            "scope": {
+              "$ref": "#/$defs/world_history_scope"
+            },
+            "max_trigger_count": {
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "history_key_template": {
+              "$ref": "#/$defs/non_empty_string"
+            },
+            "allow_while_active": {
+              "type": "boolean"
+            }
+          }
+        },
+        "event_graph": {
+          "$ref": "https://stellar-frontier.local/schemas/events/event-graph.schema.json#/$defs/event_graph"
+        },
+        "effect_groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effect_group"
+          }
+        },
+        "log_templates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event_log_template"
+          }
+        },
+        "content_refs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "call_template_ids": {
+              "$ref": "#/$defs/string_array"
+            },
+            "item_ids": {
+              "$ref": "#/$defs/string_array"
+            },
+            "resource_ids": {
+              "$ref": "#/$defs/string_array"
+            },
+            "crew_ids": {
+              "$ref": "#/$defs/string_array"
+            }
+          }
+        },
+        "sample_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/trigger_context"
+          }
+        }
+      }
+    },
+    "trigger_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/trigger_type"
+        },
+        "conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "probability": {
+          "$ref": "#/$defs/probability"
+        },
+        "required_context": {
+          "$ref": "#/$defs/string_array"
+        },
+        "dedupe_key_template": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "probability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base"],
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/probability_value"
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/probability_modifier"
+          }
+        },
+        "min": {
+          "$ref": "#/$defs/probability_value"
+        },
+        "max": {
+          "$ref": "#/$defs/probability_value"
+        }
+      }
+    },
+    "probability_modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["conditions"],
+      "properties": {
+        "conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "add": {
+          "type": "number"
+        },
+        "multiply": {
+          "type": "number"
+        }
+      }
+    },
+    "effect_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effects"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "https://stellar-frontier.local/schemas/events/effect.schema.json#/$defs/effect"
+          }
+        },
+        "description": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "event_log_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "summary", "importance", "visibility"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "importance": {
+          "type": "string",
+          "enum": ["minor", "normal", "major", "critical"]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["player_visible", "hidden_until_resolved"]
+        }
+      }
+    },
+    "trigger_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger_type", "occurred_at", "source"],
+      "properties": {
+        "trigger_type": {
+          "$ref": "#/$defs/trigger_type"
+        },
+        "occurred_at": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source": {
+          "type": "string",
+          "enum": ["crew_action", "tile_system", "call", "event_node", "objective", "world_flag", "time_system"]
+        },
+        "crew_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "tile_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "action_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "event_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "event_definition_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "node_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "call_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "objective_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "selected_option_id": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "world_flag_key": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "previous_value": true,
+        "new_value": true,
+        "proximity": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["origin_tile_id", "nearby_tile_ids", "distance"],
+              "properties": {
+                "origin_tile_id": {
+                  "$ref": "#/$defs/id"
+                },
+                "nearby_tile_ids": {
+                  "$ref": "#/$defs/string_array"
+                },
+                "distance": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "condition_array": {
+      "type": "array",
+      "items": {
+        "$ref": "https://stellar-frontier.local/schemas/events/condition.schema.json#/$defs/condition"
+      }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_string": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "string_array": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/non_empty_string"
+      }
+    },
+    "probability_value": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "arrival",
+        "proximity",
+        "action_complete",
+        "idle_time",
+        "call_choice",
+        "event_node_finished",
+        "objective_created",
+        "objective_completed",
+        "world_flag_changed",
+        "time_wakeup"
+      ]
+    },
+    "world_history_scope": {
+      "type": "string",
+      "enum": ["world", "crew", "tile", "crew_tile", "objective", "event"]
+    }
+  }
+}

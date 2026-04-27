@@ -1,12 +1,12 @@
 import {
   crewDefinitions,
   defaultMapConfig,
-  eventDefinitionById,
   type CrewDefinition,
   type CrewProfile,
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
 } from "../content/contentData";
+import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 import { deriveLegacyTiles, getTileLocationLabel, type RuntimeMapState } from "../mapSystem";
 
@@ -23,6 +23,20 @@ export type MapReturnTarget = "control" | "call";
 export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
 
 export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
+
+export interface GameState extends EventRuntimeState {
+  schema_version: string;
+  created_at_real_time: string;
+  updated_at_real_time: string;
+  elapsedGameSeconds: number;
+  crew: CrewMember[];
+  baseInventory: InventoryEntry[];
+  map: GameMapState;
+  tiles: MapTile[];
+  logs: SystemLog[];
+  resources: ResourceSummary;
+  eventHistory: Record<string, number>;
+}
 
 export interface ActiveAction {
   id: string;
@@ -105,6 +119,8 @@ export interface MapTile {
   danger: string;
   status: string;
   investigated: boolean;
+  eventMarks?: EventMark[];
+  dangerTags?: string[];
 }
 
 export interface SystemLog {
@@ -143,6 +159,7 @@ export interface CallContext {
   type: CallType;
   settled: boolean;
   result?: string;
+  runtimeCallId?: string;
   selectingMoveTarget?: boolean;
   selectedTargetTileId?: string;
 }
@@ -299,8 +316,6 @@ function tile(
 
 function createInitialCrewMember(member: CrewDefinition): CrewMember {
   const tile = deriveInitialLegacyTiles().find((item) => item.id === member.currentTile);
-  const emergencyDefinition = member.emergencyEvent ? eventDefinitionById.get(member.emergencyEvent.eventId) : undefined;
-  const emergency = member.emergencyEvent && emergencyDefinition?.emergency;
   const activeAction = member.activeAction ? createInitialAction(member, member.activeAction) : undefined;
 
   return {
@@ -326,19 +341,6 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     canCommunicate: member.canCommunicate,
     lastContactTime: member.lastContactTime,
     activeAction,
-    emergencyEvent:
-      member.emergencyEvent && emergency
-        ? {
-            instanceId: `${member.crewId}-${member.emergencyEvent.eventId}-0`,
-            eventId: member.emergencyEvent.eventId,
-            createdAt: 0,
-            callReceivedTime: 0,
-            dangerStage: member.emergencyEvent.dangerStage,
-            nextEscalationTime: emergency.firstWaitSeconds,
-            deadlineTime: member.emergencyEvent.deadlineSeconds,
-            settled: false,
-          }
-        : undefined,
     unavailable: member.unavailable,
   };
 }

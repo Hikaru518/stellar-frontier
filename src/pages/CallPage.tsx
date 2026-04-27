@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
-import { createMovePreview } from "../crewSystem";
-import { getEmergencyChoices, getEmergencyEventDefinition } from "../eventSystem";
+import { createMovePreview, formatMoveRoute } from "../crewSystem";
 import { garryActions, type ActionOption, type CallContext, type CrewMember, type GameMapState, type MapTile } from "../data/gameData";
+import type { RuntimeCall } from "../events/types";
 import { findUsableInventoryItemByTag, getItemTagLabel } from "../inventorySystem";
 import { getTileLocationLabel, getVisibleTileWindow, type VisibleTileCell } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
@@ -13,11 +13,23 @@ type CallActionOption = ActionOption & {
   unavailableHint?: string;
 };
 
+interface CallView {
+  title: string;
+  subtitle: string;
+  scene: string;
+  lines: string[];
+  meta: string;
+  actions: CallActionOption[];
+  badge: string;
+  isRuntime: boolean;
+}
+
 interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
   tiles: MapTile[];
   map: GameMapState;
+  activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   onDecision: (actionId: string) => void;
@@ -34,6 +46,7 @@ export function CallPage({
   crew,
   tiles,
   map,
+  activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
   onDecision,
@@ -46,37 +59,48 @@ export function CallPage({
 }: CallPageProps) {
   const [contactsOpen, setContactsOpen] = useState(false);
   const member = crew.find((item) => item.id === call?.crewId);
-  const emergencyEvent = member?.emergencyEvent;
-  const callClosed = Boolean(call?.settled || (call?.type === "emergency" && emergencyEvent?.settled));
+  const runtimeCall = call?.runtimeCallId ? activeCalls[call.runtimeCallId] : null;
+  const isRuntimeContext = Boolean(call?.runtimeCallId);
+  const runtimeCallClosed = isRuntimeContext && (!runtimeCall || !isRuntimeCallActive(runtimeCall, elapsedGameSeconds));
+  const callClosed = Boolean(call?.settled || runtimeCallClosed);
   const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
   const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
   const visibleMoveCells = getVisibleTileWindow(defaultMapConfig, map).cells.filter(
     (cell) => cell.status === "discovered" || cell.status === "frontier",
   );
 
-  const callView = useMemo(() => {
+  const callView = useMemo<CallView | null>(() => {
     if (!call || !member) {
       return null;
     }
 
     const currentLocation = getTileLocationLabel(defaultMapConfig, member.currentTile);
-    const emergencyDefinition = getEmergencyEventDefinition(member);
-    if (emergencyDefinition) {
+    if (call.runtimeCallId) {
+      if (!runtimeCall || !isRuntimeCallActive(runtimeCall, elapsedGameSeconds)) {
+        return {
+          title: `通话页面：${member.name} 事件通话`,
+          subtitle: "这条事件通话已经结束、过期或不可用。",
+          scene: "通话中的图片 / 信号静默 / 事件快照不可用",
+          lines: ["当前没有可处理的 runtime call。请返回通讯台查看其他频道。"],
+          meta: "事件通话已关闭",
+          actions: [] satisfies CallActionOption[],
+          badge: "已关闭",
+          isRuntime: true,
+        };
+      }
+
       return {
-        title: `通话页面：${member.name} 紧急事件`,
-        subtitle: `当前只与 ${member.name} 通话。紧急选择会按事件配置结算风险。`,
-        scene: "通话中的图片 / 森林 / 噪声 / 有东西在靠近",
-        line: emergencyDefinition.resultText.start ?? emergencyDefinition.title,
-        meta: `地点：${currentLocation} / 危险阶段 ${member.emergencyEvent?.dangerStage ?? 0}`,
-        actions: getEmergencyChoices(member).map((choice) => ({
-          id: choice.choiceId,
-          label: choice.text,
-          hint: choice.hint,
-          tone: choice.tone,
-          usesItemTag: choice.usesItemTag,
-          unavailableHint: choice.unavailableHint,
+        title: `通话页面：${member.name} 事件通话`,
+        subtitle: "本页只展示事件引擎保存的通话快照，并提交稳定 option_id。",
+        scene: "通话中的图片 / runtime call / 已渲染快照",
+        lines: runtimeCall.rendered_lines.length ? runtimeCall.rendered_lines.map((line) => line.text) : ["通讯内容为空。"],
+        meta: `事件：${runtimeCall.event_id} / 节点：${runtimeCall.event_node_id}`,
+        actions: runtimeCall.available_options.map((option) => ({
+          id: option.option_id,
+          label: option.text,
         })) satisfies CallActionOption[],
-        badge: "紧急来电",
+        badge: formatRuntimeCallStatus(runtimeCall),
+        isRuntime: true,
       };
     }
 
@@ -85,10 +109,11 @@ export function CallPage({
         title: "通话页面：Garry 普通状态",
         subtitle: "当前只与 Garry 通话。地图和通讯录是辅助浮层，不会切换通话对象。",
         scene: "通话中的图片 / 矿床 / 灰尘 / 正常采矿",
-        line: "头儿，我正在当前矿带采矿，有什么事吗？",
+        lines: ["头儿，我正在当前矿带采矿，有什么事吗？"],
         meta: `地点：${currentLocation} / 状态：采矿中`,
         actions: garryActions satisfies CallActionOption[],
         badge: "普通通话",
+        isRuntime: false,
       };
     }
 
@@ -96,15 +121,16 @@ export function CallPage({
       title: `通话页面：${member.name} 状态确认`,
       subtitle: "当前只处理这一条通话事件。其他队员可以查看，但不能接入第二条通话。",
       scene: "通话中的图片 / 湖泊 / 低频风声 / 画面延迟",
-      line: "收到。湖泊边缘不在原来的位置，但我还在走。",
+      lines: ["收到。湖泊边缘不在原来的位置，但我还在走。"],
       meta: `地点：${currentLocation} / 状态：行进中`,
       actions: [
         { id: "mike-status", label: "要求继续前进", hint: "维持行进状态。" },
         { id: "mike-hold", label: "原地等待", hint: "暂停探索，避免进入未知水域。" },
       ] satisfies CallActionOption[],
       badge: "普通通话",
+      isRuntime: false,
     };
-  }, [call, member]);
+  }, [call, elapsedGameSeconds, member, runtimeCall]);
 
   if (!call || !member || !callView) {
     return (
@@ -150,16 +176,28 @@ export function CallPage({
             <StatusTag tone={call.type === "emergency" ? "danger" : "muted"}>{callView.badge}</StatusTag>
           </div>
 
-          <blockquote>{call.result ?? (emergencyEvent?.settled ? member.summary : callView.line)}</blockquote>
+          <blockquote>
+            {call.result && !callView.isRuntime ? (
+              call.result
+            ) : (
+              callView.lines.map((line) => (
+                <p key={line}>{line}</p>
+              ))
+            )}
+          </blockquote>
 
-          <p className="muted-text">{getCallTiming(member, elapsedGameSeconds)}</p>
+          <p className="muted-text">
+            {callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : getCallTiming(member, elapsedGameSeconds)}
+          </p>
 
-          <button type="button" className={`map-chip ${call.selectingMoveTarget ? "map-chip-active" : ""}`} onClick={onOpenMap}>
-            <strong>地图二级菜单</strong>
-            <span>{call.selectingMoveTarget ? "标记候选目的地" : "只读查看坐标，不下指令"}</span>
-          </button>
+          {!callView.isRuntime ? (
+            <button type="button" className={`map-chip ${call.selectingMoveTarget ? "map-chip-active" : ""}`} onClick={onOpenMap}>
+              <strong>地图二级菜单</strong>
+              <span>{call.selectingMoveTarget ? "标记候选目的地" : "只读查看坐标，不下指令"}</span>
+            </button>
+          ) : null}
 
-          {call.selectingMoveTarget ? (
+          {!callView.isRuntime && call.selectingMoveTarget ? (
             <MoveConfirmPanel
               member={member}
               targetTile={selectedMoveTarget}
@@ -204,12 +242,22 @@ export function CallPage({
 
         <Panel title="辅助浮层入口" className="call-helper">
           <p>
-            可以打开地图查看坐标，或打开通讯录查看其他队员，但本页仍只处理 {member.name} 的当前事件。
+            {callView.isRuntime
+              ? `可以打开通讯录查看其他队员，但本页不会解释事件图，只处理 ${member.name} 的 runtime call 快照。`
+              : `可以打开地图查看坐标，或打开通讯录查看其他队员，但本页仍只处理 ${member.name} 的当前事件。`}
           </p>
         </Panel>
 
         <Panel title="本页反馈" className="call-feedback">
-          <p>{callClosed ? "本轮选择已结算。按钮已禁用，通讯台与地图状态已同步。" : "选择行动后会写入日志，并更新队员、地块或通讯状态。"}</p>
+          <p>
+            {callView.isRuntime
+              ? callClosed
+                ? "这条事件通话已关闭。按钮已禁用。"
+                : "选择后只提交 option_id，事件推进由 runtime engine 负责。"
+              : callClosed
+                ? "本轮选择已结算。按钮已禁用，通讯台与地图状态已同步。"
+                : "选择行动后会写入日志，并更新队员、地块或通讯状态。"}
+          </p>
         </Panel>
 
         {contactsOpen ? (
@@ -422,20 +470,38 @@ function getChoiceItemAvailability(action: CallActionOption, member: CrewMember)
 }
 
 function getCallTiming(member: CrewMember, elapsedGameSeconds: number) {
-  if (member.emergencyEvent && !member.emergencyEvent.settled) {
-    const remaining = getRemainingSeconds(member.emergencyEvent.deadlineTime, elapsedGameSeconds);
-    const nextStage = getRemainingSeconds(member.emergencyEvent.nextEscalationTime, elapsedGameSeconds);
-    return `紧急倒计时：剩余 ${formatDuration(remaining)} / 下一次升级 ${formatDuration(nextStage)} / 危险阶段 ${member.emergencyEvent.dangerStage}`;
-  }
-
-  if (member.emergencyEvent?.settled) {
-    return "紧急事件已结算。";
-  }
-
   if (member.activeAction?.status === "inProgress") {
     const remaining = getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds);
     return `当前行动剩余 ${formatDuration(remaining)}`;
   }
 
   return "当前通话没有强制倒计时。";
+}
+
+function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {
+  return (
+    (call.status === "incoming" || call.status === "connected" || call.status === "awaiting_choice") &&
+    (typeof call.expires_at !== "number" || call.expires_at > elapsedGameSeconds)
+  );
+}
+
+function formatRuntimeCallStatus(call: RuntimeCall) {
+  if (call.status === "awaiting_choice") {
+    return "等待选择";
+  }
+  if (call.status === "incoming") {
+    return "来电";
+  }
+  if (call.status === "connected") {
+    return "已接通";
+  }
+  return "已关闭";
+}
+
+function getRuntimeCallTiming(call: RuntimeCall, elapsedGameSeconds: number) {
+  if (typeof call.expires_at === "number") {
+    return `事件通话剩余 ${formatDuration(getRemainingSeconds(call.expires_at, elapsedGameSeconds))}`;
+  }
+
+  return "事件通话没有强制倒计时。";
 }

@@ -1,0 +1,116 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mountain_signal_probe.call.report",
+      "version": 1,
+      "domain": "mountain",
+      "event_definition_id": "mountain_signal_probe",
+      "node_id": "signal_probe_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "signal_opening_default",
+            "text": "{{crew_display_name}} 在 {{tile_id}} 听到一段断裂载波。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "max_lines": 1,
+          "variants": [
+            {
+              "id": "signal_body_default",
+              "text": "探针需要一段安静窗口来锁定信号。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "tune_signal": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "signal_tune_default",
+              "text": "调谐信号并等待锁定。",
+              "priority": 0
+            }
+          ]
+        },
+        "ignore_signal": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "signal_ignore_default",
+              "text": "先记录，稍后再处理。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "garry_mine_anomaly_report.call.report",
+      "version": 1,
+      "domain": "mountain",
+      "event_definition_id": "garry_mine_anomaly_report",
+      "node_id": "mine_anomaly_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "mine_anomaly_opening_default",
+            "text": "{{crew_display_name}} 报告 {{tile_id}} 的矿床下方传来空洞回声。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "max_lines": 1,
+          "variants": [
+            {
+              "id": "mine_anomaly_body_default",
+              "text": "温度计先升后降，像岩层刚刚吐出一口气。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "mark_anomaly": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "mine_anomaly_mark_default",
+              "text": "标记异常，交给工程复核。",
+              "priority": 0
+            }
+          ]
+        },
+        "log_reading": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "mine_anomaly_log_default",
+              "text": "记录读数，暂时保持矿床静默。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

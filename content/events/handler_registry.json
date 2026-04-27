@@ -1,0 +1,26 @@
+{
+  "handlers": [
+    {
+      "handler_type": "world_history_value_equals",
+      "kind": "condition",
+      "description": "检查 world_history 条目是否保存了预期值。",
+      "params_schema_ref": "#/$defs/world_history_value_equals_params",
+      "allowed_target_types": ["world_history"],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": ["world_history_value_equals.safe_camp"]
+    },
+    {
+      "handler_type": "trigger_context_value_equals",
+      "kind": "condition",
+      "description": "检查 trigger_context 字段是否保存了预期值。",
+      "params_schema_ref": "#/$defs/trigger_context_value_equals_params",
+      "allowed_target_types": [],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": ["trigger_context_value_equals.garry_survey"]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout"
 import { defaultMapConfig, type MapObjectDefinition, type MapSpecialStateDefinition } from "../content/contentData";
 import { createMovePreview, formatMoveRoute, getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
+import type { EventLog } from "../events/types";
 import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
@@ -10,6 +11,7 @@ interface MapPageProps {
   tiles: MapTile[];
   map: GameMapState;
   crew: CrewMember[];
+  eventLogs: EventLog[];
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   returnTarget: MapReturnTarget;
@@ -23,6 +25,7 @@ export function MapPage({
   tiles,
   map,
   crew,
+  eventLogs,
   elapsedGameSeconds,
   gameTimeLabel,
   returnTarget,
@@ -39,6 +42,7 @@ export function MapPage({
   const moveSelectionMember = crew.find((member) => member.id === moveSelectionCrewId);
   const movePreview = moveSelectionMember && selectedCell ? createMovePreview(moveSelectionMember, selectedCell.id, tiles) : null;
   const visibleColumns = Math.max(1, visibleWindow.maxCol - visibleWindow.minCol + 1);
+  const selectedTileLogs = selectedTile ? getTileEventLogs(eventLogs, selectedTile.id) : [];
 
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),
@@ -73,10 +77,12 @@ export function MapPage({
             const tile = tiles.find((item) => item.id === cell.id);
             const runtimeTile = map.tilesById[cell.id];
             const isDiscovered = cell.status === "discovered";
-            const hasDanger = isDiscovered && tile ? tile.danger !== "未发现即时危险" && tile.danger !== "未知详情" : false;
+            const dangerTags = isDiscovered && tile ? (tile.dangerTags ?? []) : [];
+            const hasDanger = isDiscovered && tile ? dangerTags.length > 0 || (tile.danger !== "未发现即时危险" && tile.danger !== "未知详情") : false;
             const isRouteTile = movePreview?.route.includes(cell.id) ?? false;
             const isMoveTarget = selectedMoveTargetId === cell.id;
             const hasCurrentCrew = isDiscovered && crew.some((member) => member.currentTile === cell.id);
+            const firstEventMark = tile?.eventMarks?.[0];
             return (
               <button
                 type="button"
@@ -104,6 +110,12 @@ export function MapPage({
                         </small>
                       ) : null;
                     })}
+                    {firstEventMark ? <small className="route-text">{firstEventMark.label}</small> : null}
+                    {dangerTags.slice(0, 1).map((tag) => (
+                      <small key={tag} className="danger-text">
+                        {tag}
+                      </small>
+                    ))}
                   </>
                 ) : (
                   <>
@@ -135,6 +147,11 @@ export function MapPage({
                 ["特殊状态", specialStateSummary(revealedSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
                 ["手下状态", crewStatus(selectedTile, crewById)],
                 ["计时状态", crewTiming(selectedTile, crewById, elapsedGameSeconds)],
+                ["危险", selectedTile.danger],
+                ["危险标签", formatList(selectedTile.dangerTags)],
+                ["事件标记", formatEventMarks(selectedTile)],
+                ["事件摘要", formatEventSummaries(selectedTileLogs)],
+                ["状态", selectedTile.status],
                 ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
               ]}
             />
@@ -238,6 +255,25 @@ function crewMapLocation(member: CrewMember, map: GameMapState) {
   }
 
   return `未探索信号 ${formatCellCoord(getDisplayCoord(coord, origin))}`;
+}
+
+function getTileEventLogs(eventLogs: EventLog[], tileId: string) {
+  return eventLogs
+    .filter((log) => log.visibility === "player_visible" && log.tile_ids.includes(tileId))
+    .slice()
+    .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id));
+}
+
+function formatList(values: string[] | undefined) {
+  return values?.length ? values.join(" / ") : "无";
+}
+
+function formatEventMarks(tile: MapTile) {
+  return tile.eventMarks?.length ? tile.eventMarks.map((mark) => mark.label).join(" / ") : "无";
+}
+
+function formatEventSummaries(eventLogs: EventLog[]) {
+  return eventLogs.length ? eventLogs.map((log) => log.summary).join(" / ") : "暂无事件摘要";
 }
 
 function crewStatus(tile: MapTile, crewById: Map<string, CrewMember>) {
