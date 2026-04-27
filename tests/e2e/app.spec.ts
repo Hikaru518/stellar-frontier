@@ -306,6 +306,21 @@ test("moves a crew member along intermediate route steps instead of jumping to t
 
   await page.getByRole("button", { name: /通讯台/ }).click();
   await expect(page.getByText("位置：浅水裂湖 (-2,2)")).toBeVisible();
+
+  await page.clock.runFor(120_000);
+  await page.waitForFunction((key) => {
+    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "2-3";
+  }, GAME_SAVE_KEY);
+
+  const afterLeaving = await readSave(page);
+  const movedMike = findSavedCrew(afterLeaving, "mike");
+  expect(movedMike.currentTile).toBe("2-3");
+  expect(afterLeaving.map.tilesById["2-2"].crew ?? []).not.toContain("mike");
+  expect(afterLeaving.map.discoveredTileIds).toContain("2-2");
+  expect(afterLeaving.map.tilesById["2-2"]).toMatchObject({ discovered: true });
+  expect(afterLeaving.map.tilesById["2-2"].investigated).not.toBe(true);
+  expect(afterLeaving.map.discoveredTileIds).not.toContain("4-5");
 });
 
 test("moves Garry to a frontier tile and expands the visible map", async ({ page }) => {

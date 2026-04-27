@@ -1552,6 +1552,21 @@ describe("App", () => {
     });
     expect(saved.map.tilesById["2-2"].investigated).not.toBe(true);
     expect(saved.map.discoveredTileIds).not.toContain("4-5");
+
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+
+    const afterLeaving = readSavedGameState();
+    const movedMike = savedCrew(afterLeaving, "mike");
+    expect(movedMike.currentTile).toBe("2-3");
+    expect(afterLeaving.map.tilesById["2-2"].crew ?? []).not.toContain("mike");
+    expect(afterLeaving.map.discoveredTileIds).toContain("2-2");
+    expect(afterLeaving.map.tilesById["2-2"]).toMatchObject({
+      discovered: true,
+    });
+    expect(afterLeaving.map.tilesById["2-2"].investigated).not.toBe(true);
+    expect(afterLeaving.map.discoveredTileIds).not.toContain("4-5");
   });
 
   it("shows crew locations by area and player coordinates without resource names", () => {
