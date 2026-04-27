@@ -150,7 +150,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["move", "survey", "gather", "build", "standby"]
+            "enum": ["move", "survey", "gather", "build", "standby", "extract", "scan"]
           }
         }
       }
@@ -177,6 +177,12 @@
           "enum": ["low", "medium", "high", "critical"]
         },
         "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          }
+        },
+        "dangerTags": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/tag"
