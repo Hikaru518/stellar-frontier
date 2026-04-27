@@ -9,12 +9,14 @@ export interface RelayJoinRequest {
   roomId: string;
   clientId: string;
   role: RelayClientRole;
+  token: string;
 }
 
 export interface RelayOutboundClient {
   clientId: string;
   roomId: string;
   role: RelayClientRole;
+  token: string;
   send: (payload: string) => void;
 }
 
@@ -38,6 +40,8 @@ export interface RelayServerHandle {
 
 interface RelayRoom {
   roomId: string;
+  token: string;
+  phoneClientId?: string;
   clients: Map<string, RelayOutboundClient>;
 }
 
@@ -48,8 +52,12 @@ export function createRelayRoomRegistry(): RelayRoomRegistry {
 
   return {
     join(client) {
-      const room = getOrCreateRoom(rooms, client.roomId);
+      const room = getOrCreateRoom(rooms, client);
+      validateRoomJoin(room, client);
       room.clients.set(client.clientId, client);
+      if (client.role === "phone") {
+        room.phoneClientId = client.clientId;
+      }
       return snapshotRoom(room);
     },
     leave(client) {
@@ -91,12 +99,13 @@ export function parseRelayJoinRequest(requestUrl = "/", host = "localhost"): Rel
   const roomId = url.searchParams.get("roomId")?.trim() ?? "";
   const clientId = url.searchParams.get("clientId")?.trim() ?? "";
   const role = url.searchParams.get("role")?.trim() ?? "";
+  const token = url.searchParams.get("token")?.trim() ?? "";
 
-  if (!roomId || !clientId || (role !== "pc" && role !== "phone")) {
+  if (!roomId || !clientId || !token || (role !== "pc" && role !== "phone")) {
     return null;
   }
 
-  return { roomId, clientId, role };
+  return { roomId, clientId, role, token };
 }
 
 export function createRelayServer(registry: RelayRoomRegistry = createRelayRoomRegistry()): RelayServerHandle {
@@ -114,9 +123,16 @@ export function createRelayServer(registry: RelayRoomRegistry = createRelayRoomR
       ...joinRequest,
       send: (payload) => sendIfOpen(socket, payload),
     };
-    const snapshot = registry.join(client);
+    let snapshot: RelayRoomSnapshot;
+    try {
+      snapshot = registry.join(client);
+    } catch (error) {
+      socket.close(1008, error instanceof Error ? error.message : "Invalid relay join request");
+      return;
+    }
 
     sendIfOpen(socket, JSON.stringify(createConnectedMessage(client, snapshot)));
+    registry.broadcast(createConnectedMessage(client, snapshot));
 
     socket.on("message", (data) => {
       const message = parseClientMessage(data.toString());
@@ -176,15 +192,29 @@ function sendIfOpen(socket: WebSocket, payload: string) {
   }
 }
 
-function getOrCreateRoom(rooms: Map<string, RelayRoom>, roomId: string) {
-  const existing = rooms.get(roomId);
+function getOrCreateRoom(rooms: Map<string, RelayRoom>, client: RelayOutboundClient) {
+  const existing = rooms.get(client.roomId);
   if (existing) {
     return existing;
   }
 
-  const room = { roomId, clients: new Map<string, RelayOutboundClient>() };
-  rooms.set(roomId, room);
+  if (client.role !== "pc") {
+    throw new Error("PC host must create relay room first");
+  }
+
+  const room: RelayRoom = { roomId: client.roomId, token: client.token, clients: new Map<string, RelayOutboundClient>() };
+  rooms.set(client.roomId, room);
   return room;
+}
+
+function validateRoomJoin(room: RelayRoom, client: RelayOutboundClient) {
+  if (room.token !== client.token) {
+    throw new Error("Invalid pairing token");
+  }
+
+  if (client.role === "phone" && room.phoneClientId && room.phoneClientId !== client.clientId) {
+    throw new Error("Relay room already locked to a phone");
+  }
 }
 
 function snapshotRoom(room: RelayRoom): RelayRoomSnapshot {

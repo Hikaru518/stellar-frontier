@@ -56,6 +56,7 @@
 - **事件触发**：抵达地块、调查完成、采集完成、建设完成、长时间待命、通话选项均可触发事件；事件依据队员属性 / 携带物 / 标签 / 概率结算；紧急事件以来电进入通讯台并形成倒计时。
 - **人物表达**：每名队员具备背景档案、通话语气、5 维轻量属性（体能 / 敏捷 / 智力 / 感知 / 运气，取值 `1-6`）、自由性格标签、专长标签与关键节点日记。
 - **日记可见性**：日记按 `已传回 / 未传回 / 失联锁定 / 找回解锁` 四态控制可见性。
+- **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，接收 PC 授权的私密信号并回传 typed events；relay-server 只做 token 校验、首台手机锁定与消息中转。
 - **存档**：以 `localStorage`（key `stellar-frontier-save-v1`）保存全量游戏状态；Debug toolbox 提供重置入口。
 
 ### 内容数据
@@ -125,7 +126,7 @@
 │   │   ├── src/*System.ts                 # crew / diary / event / time / inventory / map 系统
 │   │   └── tests/e2e/app.spec.ts          # Playwright 端到端流程测试
 │   ├── mobile-client/                    # 手机 companion terminal 浏览器客户端
-│   └── relay-server/                     # 国内 WSS room broker 骨架，不持有 GameState
+│   └── relay-server/                     # WSS room broker 骨架：token 校验、首台手机锁定、消息中转，不持有 GameState
 ├── packages/
 │   └── protocol/                         # 三端共享的配对、传输选择、消息 envelope 与 fallback 规则
 ├── common/config/rush/                   # Rush + pnpm 配置、command-line、pnpm lock、repo state

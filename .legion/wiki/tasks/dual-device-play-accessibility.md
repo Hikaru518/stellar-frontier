@@ -11,6 +11,7 @@ Implemented and verified locally; PR lifecycle still pending.
 - Mobile client renders the companion terminal waiting-for-pairing shell.
 - Relay-server provides an in-memory WSS/HTTP room broker skeleton.
 - Shared protocol package owns transport priority, pairing, message validation, and fallback helpers.
+- Imported design docs from `docs/plans/2026-04-27-22-52/` and implemented the visible P0 slice: QR/manual-code pairing, token expiry, mobile private signal handling, PC fallback, and token-locked relay room semantics.
 
 ## Evidence
 

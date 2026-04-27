@@ -15,7 +15,15 @@ export interface DualDeviceTransportSelection {
   reason: string;
 }
 
-export type DualDeviceMessageType = "phone.message.read" | "phone.call.answer" | "phone.choice.select" | "link.heartbeat" | "link.connected";
+export type DualDeviceMessageType =
+  | "phone.message.delivered"
+  | "phone.message.read"
+  | "phone.call.incoming"
+  | "phone.call.answer"
+  | "phone.choice.select"
+  | "phone.fallback.enabled"
+  | "link.heartbeat"
+  | "link.connected";
 
 export interface DualDeviceMessage {
   type: DualDeviceMessageType;
@@ -30,6 +38,35 @@ export interface DualDeviceLinkStatus {
   transport: DualDeviceTransportKind;
   lastHeartbeatAt?: number;
   fallbackAfterMs: number;
+}
+
+export interface DualDevicePairingSession {
+  roomId: string;
+  pcClientId: string;
+  pairingCode: string;
+  token: string;
+  relayUrl: string;
+  mobileUrl: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface CreatePairingSessionOptions {
+  nowMs?: number;
+  expiresInMs?: number;
+  relayUrl: string;
+  mobileBaseUrl: string;
+  pcClientId?: string;
+  randomBytes?: (length: number) => Uint8Array;
+}
+
+export interface CreateDualDeviceMessageOptions {
+  type: DualDeviceMessageType;
+  roomId: string;
+  clientId: string;
+  sequence: number;
+  payload?: Record<string, unknown>;
+  nowMs?: number;
 }
 
 export interface DualDeviceDeploymentPlan {
@@ -49,6 +86,7 @@ const TRANSPORT_PRIORITY: Record<DualDeviceTransportKind, number> = {
 };
 
 const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const DEFAULT_PAIRING_TTL_MS = 5 * 60 * 1000;
 
 export const paidMainlandHybridPlan: DualDeviceDeploymentPlan = {
   name: "Paid Mainland Hybrid",
@@ -111,6 +149,69 @@ export function formatPairingCode(bytes: Uint8Array): string {
 
 export function createPairingCode(randomBytes: (length: number) => Uint8Array = createRandomBytes): string {
   return formatPairingCode(randomBytes(6));
+}
+
+export function createPairingSession({
+  nowMs = Date.now(),
+  expiresInMs = DEFAULT_PAIRING_TTL_MS,
+  relayUrl,
+  mobileBaseUrl,
+  pcClientId = "pc-host",
+  randomBytes = createRandomBytes,
+}: CreatePairingSessionOptions): DualDevicePairingSession {
+  const roomEntropy = randomBytes(10);
+  const tokenEntropy = randomBytes(16);
+  const pairingCode = formatPairingCode(roomEntropy);
+  const roomId = `sf-${formatToken(roomEntropy).slice(0, 12)}`;
+  const token = formatToken(tokenEntropy);
+  const expiresAt = nowMs + expiresInMs;
+
+  return {
+    roomId,
+    pcClientId,
+    pairingCode,
+    token,
+    relayUrl,
+    mobileUrl: buildMobilePairingUrl(mobileBaseUrl, { roomId, token, pairingCode, relayUrl }),
+    createdAt: nowMs,
+    expiresAt,
+  };
+}
+
+export function buildMobilePairingUrl(
+  mobileBaseUrl: string,
+  params: { roomId: string; token: string; pairingCode: string; relayUrl: string },
+): string {
+  const url = new URL(mobileBaseUrl);
+  url.searchParams.set("roomId", params.roomId);
+  url.searchParams.set("token", params.token);
+  url.searchParams.set("code", params.pairingCode);
+  url.searchParams.set("relayUrl", params.relayUrl);
+  return url.toString();
+}
+
+export function buildRelayJoinUrl(relayUrl: string, params: { roomId: string; clientId: string; role: "pc" | "phone"; token: string }): string {
+  const url = new URL(relayUrl);
+  url.searchParams.set("roomId", params.roomId);
+  url.searchParams.set("clientId", params.clientId);
+  url.searchParams.set("role", params.role);
+  url.searchParams.set("token", params.token);
+  return url.toString();
+}
+
+export function isPairingSessionExpired(session: Pick<DualDevicePairingSession, "expiresAt">, nowMs = Date.now()): boolean {
+  return nowMs >= session.expiresAt;
+}
+
+export function createDualDeviceMessage({
+  type,
+  roomId,
+  clientId,
+  sequence,
+  payload = {},
+  nowMs = Date.now(),
+}: CreateDualDeviceMessageOptions): DualDeviceMessage {
+  return { type, roomId, clientId, sequence, sentAt: nowMs, payload };
 }
 
 export function validateDualDeviceMessage(value: unknown): value is DualDeviceMessage {
@@ -192,8 +293,11 @@ function createRandomBytes(length: number) {
 function isDualDeviceMessageType(value: unknown): value is DualDeviceMessageType {
   return (
     value === "phone.message.read" ||
+    value === "phone.message.delivered" ||
+    value === "phone.call.incoming" ||
     value === "phone.call.answer" ||
     value === "phone.choice.select" ||
+    value === "phone.fallback.enabled" ||
     value === "link.heartbeat" ||
     value === "link.connected"
   );
@@ -201,4 +305,8 @@ function isDualDeviceMessageType(value: unknown): value is DualDeviceMessageType
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatToken(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

@@ -51,6 +51,24 @@ h1 {
   color: #c7d0d8;
 }
 
+.terminal-card-alert {
+  border-color: #f0a548;
+  background: rgba(49, 30, 18, 0.86);
+}
+
+.terminal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.terminal-actions button {
+  min-height: 42px;
+  border: 1px solid #f0a548;
+  background: #f6ead6;
+  color: #111820;
+}
+
 dl {
   display: grid;
   gap: 8px;
@@ -70,4 +88,5 @@ dt {
 dd {
   margin: 0;
   font-family: "Cascadia Mono", Consolas, monospace;
+  overflow-wrap: anywhere;
 }

@@ -4,6 +4,8 @@
 
 Build the first deployable dual-device foundation for Stellar Frontier: the PC client remains the authoritative game surface, while a phone can act as a private companion communication terminal. The repository should be reshaped into a Rush + pnpm monorepo so the PC client, mobile client, relay server, and shared protocol can evolve together.
 
+Design source: `docs/plans/2026-04-27-22-52/dual-device-play-design.md`, copied into this worktree from the main workspace after it was found as an untracked docs plan.
+
 ## Problem
 
 The current prototype is a single browser app. Dual-device play needs separate deliverables with a shared protocol boundary, plus a network path that works reliably in Mainland China. Free global relay choices are not the priority; stable low-latency domestic connectivity is.
@@ -15,6 +17,9 @@ The current prototype is a single browser app. Dual-device play needs separate d
 - A new `apps/mobile-client` provides a responsive companion-terminal shell that states its PC-authoritative role.
 - A new `apps/relay-server` provides a minimal WSS/HTTP room broker skeleton for PC-phone pairing and message forwarding.
 - A new `packages/protocol` owns shared dual-device transport, pairing, and typed message primitives.
+- PC shows QR/manual-code pairing with expiry and fallback controls based on the design plan's P0 slice.
+- Mobile reads pairing URL parameters, renders connection status, and can send read/answer typed events for a private signal.
+- Relay enforces PC-first room creation, token match, and one-phone room lock in memory.
 - CI and root scripts use Rush-oriented commands and pnpm-managed dependency installation.
 - Content validation and existing game behavior are not intentionally changed.
 - Delivery is via a PR from an isolated worktree branch; the PR must not be merged by this task.
@@ -23,10 +28,10 @@ The current prototype is a single browser app. Dual-device play needs separate d
 
 - Monorepo structure: `apps/pc-client`, `apps/mobile-client`, `apps/relay-server`, `packages/protocol`.
 - Rush + pnpm configuration, common dependency preferences, and command-line commands for build/lint/test/content validation.
-- Minimal protocol helpers and tests for transport priority, pairing codes, message envelopes, and fallback timing.
-- Mobile shell and tests showing waiting-for-pairing, recommended transport, and PC-authoritative constraints.
-- Relay skeleton with room join, heartbeat, typed message validation, and room broadcast behavior.
-- PC communication-station affordance that documents phone terminal availability without moving authority off the PC.
+- Protocol helpers and tests for transport priority, pairing sessions, URLs, typed message envelopes, and fallback timing.
+- Mobile shell and tests showing waiting-for-pairing, QR/manual URL entry, recommended transport, and PC-authoritative constraints.
+- Relay skeleton with token-checked room join, first-phone lock, heartbeat, typed message validation, and room broadcast behavior.
+- PC communication-station pairing/fallback/private-signal affordance without moving authority off the PC.
 
 ## Non-Goals
 

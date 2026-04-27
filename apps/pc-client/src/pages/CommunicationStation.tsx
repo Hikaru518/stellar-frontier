@@ -1,5 +1,16 @@
-import { useState } from "react";
-import { getLatencyTarget, paidMainlandHybridPlan, selectPreferredTransport } from "@stellar-frontier/protocol";
+import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
+import {
+  buildRelayJoinUrl,
+  createDualDeviceMessage,
+  createPairingSession,
+  getLatencyTarget,
+  isPairingSessionExpired,
+  paidMainlandHybridPlan,
+  selectPreferredTransport,
+  validateDualDeviceMessage,
+  type DualDevicePairingSession,
+} from "@stellar-frontier/protocol";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { getCrewActionTiming } from "../crewSystem";
@@ -9,6 +20,9 @@ import { getInventoryView, type InventoryItemView } from "../inventorySystem";
 import { getTileLocationLabel } from "../mapSystem";
 import { CrewDetail } from "./CrewDetail";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
+
+type PhoneConnectionStatus = "waiting" | "connected" | "weak" | "disconnected";
+type PrivateSignalStatus = "idle" | "sent" | "read" | "answered" | "fallback";
 
 interface CommunicationStationProps {
   crew: CrewMember[];
@@ -34,6 +48,12 @@ export function CommunicationStation({
   const [contactsOpen, setContactsOpen] = useState(true);
   const [detailCrewId, setDetailCrewId] = useState<CrewId | null>(null);
   const [inventoryCrewId, setInventoryCrewId] = useState<CrewId | null>(null);
+  const [pairingSession, setPairingSession] = useState(() => createPhoneTerminalPairingSession());
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [phoneConnectionStatus, setPhoneConnectionStatus] = useState<PhoneConnectionStatus>("waiting");
+  const [privateSignalStatus, setPrivateSignalStatus] = useState<PrivateSignalStatus>("idle");
+  const socketRef = useRef<WebSocket | null>(null);
+  const sequenceRef = useRef(1);
   const activeRuntimeCalls = Object.values(activeCalls)
     .filter((call) => isRuntimeCallActive(call, elapsedGameSeconds))
     .sort((left, right) => left.created_at - right.created_at || left.id.localeCompare(right.id));
@@ -55,6 +75,117 @@ export function CommunicationStation({
     { kind: "mainland-relay", health: "healthy", rttMs: 60 },
   ]);
   const relayTarget = getLatencyTarget(paidMainlandHybridPlan, "同区域国内 relay RTT") ?? "20-80ms";
+  const pairingExpired = isPairingSessionExpired(pairingSession);
+
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(pairingSession.mobileUrl, { margin: 1, scale: 4, color: { dark: "#171a1c", light: "#f4eadf" } })
+      .then((dataUrl) => {
+        if (!cancelled) {
+          setQrCodeUrl(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQrCodeUrl("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pairingSession.mobileUrl]);
+
+  useEffect(() => {
+    if (typeof WebSocket === "undefined") {
+      return;
+    }
+
+    setPhoneConnectionStatus("waiting");
+    const socket = new WebSocket(
+      buildRelayJoinUrl(pairingSession.relayUrl, {
+        roomId: pairingSession.roomId,
+        clientId: pairingSession.pcClientId,
+        role: "pc",
+        token: pairingSession.token,
+      }),
+    );
+    socketRef.current = socket;
+
+    socket.addEventListener("message", (event) => {
+      const message = parseRelayMessage(event.data);
+      if (!message) {
+        return;
+      }
+
+      if (message.type === "link.connected" && message.payload.role === "phone") {
+        setPhoneConnectionStatus("connected");
+      }
+      if (message.type === "phone.message.read") {
+        setPrivateSignalStatus("read");
+      }
+      if (message.type === "phone.call.answer") {
+        setPrivateSignalStatus("answered");
+      }
+      if (message.type === "link.heartbeat") {
+        setPhoneConnectionStatus("connected");
+      }
+    });
+
+    socket.addEventListener("error", () => setPhoneConnectionStatus("weak"));
+    socket.addEventListener("close", () => setPhoneConnectionStatus((status) => (status === "connected" ? "disconnected" : status)));
+
+    return () => {
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
+      socket.close();
+    };
+  }, [pairingSession]);
+
+  function regeneratePairingSession() {
+    setPairingSession(createPhoneTerminalPairingSession());
+    setPhoneConnectionStatus("waiting");
+    setPrivateSignalStatus("idle");
+  }
+
+  function sendPrivateSignal() {
+    const message = createDualDeviceMessage({
+      type: "phone.call.incoming",
+      roomId: pairingSession.roomId,
+      clientId: pairingSession.pcClientId,
+      sequence: sequenceRef.current,
+      payload: {
+        title: "Amy 私频来电",
+        body: "别在主频道回复。我在森林边缘听见了第二组脚步声。",
+        fallbackAfterMs: 10000,
+      },
+    });
+    sequenceRef.current += 1;
+
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(message));
+      setPrivateSignalStatus("sent");
+      return;
+    }
+
+    setPrivateSignalStatus("fallback");
+  }
+
+  function enablePhoneFallback() {
+    const message = createDualDeviceMessage({
+      type: "phone.fallback.enabled",
+      roomId: pairingSession.roomId,
+      clientId: pairingSession.pcClientId,
+      sequence: sequenceRef.current,
+      payload: { reason: "pc_manual_fallback" },
+    });
+    sequenceRef.current += 1;
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(message));
+    }
+    setPrivateSignalStatus("fallback");
+  }
 
   return (
     <ConsoleShell
@@ -140,19 +271,47 @@ export function CommunicationStation({
           <p>通话中也可打开通讯录，但不能直接开启第二个通话事件。</p>
         </Panel>
 
-        <Panel title="手机私人终端" className="station-rule" tone="accent">
+        <Panel title="手机私人终端" className="station-rule phone-terminal-panel" tone="accent">
           <div className="expertise-heading">
             <strong>PC 权威 / 手机私讯</strong>
-            <StatusTag tone="accent">{phoneTerminalLink.selected}</StatusTag>
+            <StatusTag tone={getPhoneStatusTone(phoneConnectionStatus)}>{formatPhoneConnectionStatus(phoneConnectionStatus)}</StatusTag>
           </div>
-          <p>手机端只接收 PC 授权的私密通讯，并回传已读、接听、选择等 typed events；游戏结算仍在本机完成。</p>
+          <p>手机端是可选增强：扫码或手输码进入私人通讯终端，只接收 PC 授权的私密通讯，并回传 typed events。</p>
+          <div className="phone-pairing-grid">
+            <div className="qr-frame" aria-label="手机终端 QR 码">
+              {qrCodeUrl ? <img src={qrCodeUrl} alt="手机终端配对 QR 码" /> : <span>QR 生成中</span>}
+            </div>
+            <div className="phone-pairing-copy">
+              <FieldList
+                rows={[
+                  ["短手输码", pairingSession.pairingCode],
+                  ["过期", pairingExpired ? "已过期，请重新生成" : formatPairingExpiry(pairingSession)],
+                  ["Relay", pairingSession.relayUrl],
+                  ["手机链接", pairingSession.mobileUrl],
+                ]}
+              />
+              <div className="phone-terminal-actions">
+                <button type="button" className="secondary-button" onClick={regeneratePairingSession}>
+                  重新生成配对
+                </button>
+                <button type="button" className="primary-button" onClick={sendPrivateSignal} disabled={pairingExpired}>
+                  发送测试私密来电
+                </button>
+                <button type="button" className="secondary-button" onClick={enablePhoneFallback}>
+                  手机不可用，在 PC 查看
+                </button>
+              </div>
+            </div>
+          </div>
           <FieldList
             rows={[
               ["同网优先", phoneTerminalLink.selected],
               ["公网基线", `${phoneTerminalLink.fallback} / ${relayTarget}`],
-              ["Relay 职责", "国内 WSS room broker，仅中转消息，不持有 GameState"],
+              ["私密信号", formatPrivateSignalStatus(privateSignalStatus)],
+              ["Relay 职责", "WSS room broker，仅中转 typed events，不持有 GameState"],
             ]}
           />
+          {privateSignalStatus === "fallback" ? <p className="accent-text">[PC 备份] Amy：别在主频道回复。我在森林边缘听见了第二组脚步声。</p> : null}
         </Panel>
 
         {openObjectives.length ? (
@@ -395,6 +554,106 @@ function formatEventImportance(importance: EventLog["importance"]) {
     return "记录";
   }
   return "简报";
+}
+
+function createPhoneTerminalPairingSession() {
+  return createPairingSession({
+    relayUrl: getConfiguredRelayUrl(),
+    mobileBaseUrl: getConfiguredMobileTerminalUrl(),
+    pcClientId: "pc-host",
+  });
+}
+
+function getConfiguredRelayUrl() {
+  const configured = import.meta.env.VITE_DUAL_DEVICE_RELAY_URL as string | undefined;
+  if (configured) {
+    return configured;
+  }
+
+  const url = new URL(window.location.href);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.port = "8787";
+  url.pathname = "/relay";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function getConfiguredMobileTerminalUrl() {
+  const configured = import.meta.env.VITE_MOBILE_TERMINAL_URL as string | undefined;
+  if (configured) {
+    return configured;
+  }
+
+  const url = new URL(window.location.href);
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+    url.port = "5174";
+    url.pathname = "/";
+  } else {
+    url.pathname = `${url.pathname.replace(/\/$/, "")}/mobile/`;
+  }
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function parseRelayMessage(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return validateDualDeviceMessage(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatPhoneConnectionStatus(status: PhoneConnectionStatus) {
+  if (status === "connected") {
+    return "已连接";
+  }
+  if (status === "weak") {
+    return "弱连接";
+  }
+  if (status === "disconnected") {
+    return "已断开";
+  }
+  return "等待配对";
+}
+
+function getPhoneStatusTone(status: PhoneConnectionStatus) {
+  if (status === "connected") {
+    return "success";
+  }
+  if (status === "weak") {
+    return "accent";
+  }
+  if (status === "disconnected") {
+    return "danger";
+  }
+  return "muted";
+}
+
+function formatPairingExpiry(session: DualDevicePairingSession) {
+  return `${Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000))} 秒后过期`;
+}
+
+function formatPrivateSignalStatus(status: PrivateSignalStatus) {
+  if (status === "sent") {
+    return "已发送到手机，等待 ack";
+  }
+  if (status === "read") {
+    return "手机已读，PC 权威确认";
+  }
+  if (status === "answered") {
+    return "手机已接听，PC 权威确认";
+  }
+  if (status === "fallback") {
+    return "PC fallback 已启用";
+  }
+  return "未投递";
 }
 
 function isCrewId(value: string): value is CrewId {

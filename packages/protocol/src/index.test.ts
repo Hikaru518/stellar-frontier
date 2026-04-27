@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildRelayJoinUrl,
+  createDualDeviceMessage,
   createPairingCode,
+  createPairingSession,
   formatPairingCode,
   getLatencyTarget,
+  isPairingSessionExpired,
   paidMainlandHybridPlan,
   selectPreferredTransport,
   shouldEnablePcFallback,
@@ -46,6 +50,41 @@ describe("dual-device protocol", () => {
       }),
     ).toBe(true);
     expect(validateDualDeviceMessage({ type: "phone.message.read", roomId: "room-1" })).toBe(false);
+  });
+
+  it("creates short-lived pairing sessions with mobile and relay URLs", () => {
+    const randomInputs = [new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), new Uint8Array(16).fill(15)];
+    const session = createPairingSession({
+      nowMs: 1000,
+      relayUrl: "wss://relay.example.test/relay",
+      mobileBaseUrl: "https://game.example.test/mobile",
+      randomBytes: () => randomInputs.shift() ?? new Uint8Array(16),
+    });
+
+    expect(session.pairingCode).toBe("ABCDEF");
+    expect(session.roomId).toBe("sf-000102030405");
+    expect(session.token).toBe("0f".repeat(16));
+    expect(session.expiresAt).toBe(301000);
+    expect(session.mobileUrl).toContain("roomId=sf-000102030405");
+    expect(session.mobileUrl).toContain("code=ABCDEF");
+    expect(buildRelayJoinUrl(session.relayUrl, { roomId: session.roomId, clientId: "pc-host", role: "pc", token: session.token })).toContain(
+      "role=pc",
+    );
+    expect(isPairingSessionExpired(session, 300999)).toBe(false);
+    expect(isPairingSessionExpired(session, 301000)).toBe(true);
+  });
+
+  it("creates PC-authored private signal messages", () => {
+    expect(
+      createDualDeviceMessage({
+        type: "phone.call.incoming",
+        roomId: "room-1",
+        clientId: "pc-host",
+        sequence: 2,
+        nowMs: 2000,
+        payload: { title: "私密来电" },
+      }),
+    ).toEqual({ type: "phone.call.incoming", roomId: "room-1", clientId: "pc-host", sequence: 2, sentAt: 2000, payload: { title: "私密来电" } });
   });
 
   it("enables PC fallback after heartbeat timeout", () => {
