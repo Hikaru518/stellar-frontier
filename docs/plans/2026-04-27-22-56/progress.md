@@ -16,7 +16,7 @@ source:
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 扩展 maps schema 与默认地图内容 | completed | 1 |
 | 2 | TASK-002 | 新增 call-actions 内容与 schema | completed | 1 |
-| 3 | TASK-003 | 实现 src/callActions.ts（buildCallView 纯函数） | pending | 0 |
+| 3 | TASK-003 | 实现 src/callActions.ts（buildCallView 纯函数） | completed | 1 |
 | 4 | TASK-004 | 实现 src/callActionSettlement.ts（handler 白名单 + settleAction） | pending | 0 |
 | 5 | TASK-005 | 事件 → 真实行动桥接层与 effect 输出对齐 | pending | 0 |
 | 6 | TASK-006 | 重构 App.tsx 删除硬编码分支并接入 callActionSettlement | pending | 0 |
@@ -48,3 +48,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 call-actions schema、basic/object action JSON、content validator 交叉校验和 `contentData.ts` typed 导出，并补充 validator 与 contentData 测试。
 - 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（17 files / 103 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-003: 实现 src/callActions.ts（buildCallView 纯函数）
+- 状态: completed
+- 开始时间: 2026-04-28 00:16
+- 完成时间: 2026-04-28 00:20
+- 尝试次数: 1
+- Monkey summary: 成功。新增 `src/callActions.ts`，实现 `loadCallActions()` 与 `buildCallView()` 纯函数；新增 `src/callActions.test.ts` 覆盖待命、忙碌、未调查对象、runtime call、缺失 action id 容错。
+- 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（18 files / 108 tests）；`npm run build` 通过；ReadLints 无新增错误。
