@@ -2,7 +2,7 @@
 plan: "communication-table-gameplay"
 branch: "feature/communication-table-gameplay"
 started: "2026-04-27 23:59"
-status: "in_progress"
+status: "completed"
 source:
   implementation_plan: "docs/plans/2026-04-27-22-56/communication-table-gameplay-implementation-plan.md"
   tasks_json: "docs/plans/2026-04-27-22-56/communication-table-gameplay-tasks.json"
@@ -25,7 +25,7 @@ source:
 | 9 | TASK-009 | 实现 Mike crash_site_wreckage_recon 事件内容与集成 | completed | 2 |
 | 10 | TASK-010 | 实现 Amy forest_beast_emergency 紧急事件 | completed | 1 |
 | 11 | TASK-011 | 实现 Garry mine_anomaly_report 事件 | completed | 1 |
-| 12 | TASK-012 | 新增 e2e 三事件验收用例 | pending | 0 |
+| 12 | TASK-012 | 新增 e2e 三事件验收用例 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -123,3 +123,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 Garry 矿床异常事件与模板，接入 runtime content library，并覆盖 mineral_deposit 正向触发与非 mineral_deposit 反向路径。
 - 质量检查: Wave 5 合并后 `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 139 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-012: 新增 e2e 三事件验收用例
+- 状态: completed
+- 开始时间: 2026-04-28 01:12
+- 完成时间: 2026-04-28 01:21
+- 尝试次数: 1
+- Monkey summary: 成功。新增 PS-001 / PS-002 / PS-003 e2e 覆盖，三个 MVP 事件均覆盖真实 UI 的来电、接通、选项处理与状态变化，并更新过期 e2e 假设以适配内容驱动按钮模型。
+- 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 139 tests）；`npm run build` 通过；`npm run test:e2e` 通过（13 tests）；ReadLints 无新增错误。

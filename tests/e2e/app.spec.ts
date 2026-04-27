@@ -24,6 +24,162 @@ const initialTiles = [
   tile("4-3", "(4,3)", 4, 3, "沙漠", [], [], [], [], "未发现即时危险", "待命"),
 ];
 
+test("PS-001 opens basic normal-call actions for Mike, Amy, and Garry", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [
+      idleCrew("mike", "4-4"),
+      idleCrew("amy", "2-3", { status: "森林边缘待命。" }),
+      idleCrew("garry", "3-3", { status: "矿带待命。" }),
+    ],
+    map: createMapWithDiscoveredTiles("2-3", "3-3", "4-4"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /通讯台/ }).click();
+
+  for (const crewLabel of ["Mike，特战干员", "Amy，千金大小姐", "Garry，退休老大爷"]) {
+    await startNormalCrewCall(page, crewLabel);
+    await expect(page.getByRole("heading", { name: /通话页面：.*状态确认/ })).toBeVisible();
+    await expect(page.getByText("基础行动")).toBeVisible();
+    await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "移动到指定区域" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "原地待命" })).toBeVisible();
+    await page.getByRole("button", { name: "返回通讯台" }).click();
+  }
+});
+
+test("PS-002 changes Mike's dynamic object actions after investigation", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("mike", "5-3", { status: "林地边缘待命。" })],
+    map: createMapWithDiscoveredTiles("5-3"),
+    logs: initialLogs,
+    resources: initialResources,
+    world_history: {
+      "event:forest_trace_small_camp:mike:5-3": triggeredEventHistory("forest_trace_small_camp", "mike", "5-3"),
+    },
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  await startNormalCrewCall(page, "Mike，特战干员");
+
+  await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "调查 潮湿木材" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "采集 潮湿木材" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "调查当前区域" }).click();
+  await page.clock.runFor(121_000);
+  await page.getByRole("button", { name: "结束通话" }).last().click();
+  await startNormalCrewCall(page, "Mike，特战干员");
+
+  await expect(page.getByRole("heading", { name: "潮湿木材" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "调查 潮湿木材" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "采集 潮湿木材" })).toBeVisible();
+});
+
+test("PS-003 resolves Mike's crash-site runtime call and reveals the wreckage object", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("mike", "4-4", { status: "残骸附近待命。" })],
+    map: createMapWithHiddenObject("4-4", "crash-site-wreckage"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  await startNormalCrewCall(page, "Mike，特战干员");
+  await page.getByRole("button", { name: "调查当前区域" }).click();
+  await page.clock.runFor(121_000);
+  await page.getByRole("button", { name: "结束通话" }).last().click();
+
+  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
+  await expect(runtimeCallPanel).toBeVisible();
+  await expect(runtimeCallPanel.getByText("Mike 报告 4-4 的残骸内部仍有微弱信号。")).toBeVisible();
+  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
+
+  await expect(page.getByText("信号像是从断裂舱段深处反射出来，无法确认是否还在移动。")).toBeVisible();
+  await page.getByRole("button", { name: "标记残骸内部信号。" }).click();
+
+  const saved = await readSave(page);
+  expect(saved.map.tilesById["4-4"].revealedObjectIds).toContain("crash-site-wreckage");
+  expect(saved.event_logs).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ summary: "Mike 已标记坠毁残骸内部的微弱信号。" }),
+    ]),
+  );
+});
+
+test("PS-003 resolves Amy's beast emergency and shows the urgent countdown", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("amy", "2-3", { status: "森林边缘待命。" })],
+    map: createForestBeastMap(),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  await startNormalCrewCall(page, "Amy，千金大小姐");
+  await page.getByRole("button", { name: "原地待命" }).click();
+  await page.getByRole("button", { name: "结束通话" }).last().click();
+
+  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
+  await expect(runtimeCallPanel).toBeVisible();
+  await expect(runtimeCallPanel.getByText("紧急")).toBeVisible();
+  await expect(runtimeCallPanel.getByText("剩余 03:00")).toBeVisible();
+  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
+
+  await expect(page.getByText("Amy 压低声音：大型野兽正在 2-3 周围逼近，我需要立刻指令。")).toBeVisible();
+  await page.getByRole("button", { name: "撤离到开阔地。" }).click();
+
+  const saved = await readSave(page);
+  const event = findSavedRuntimeEvent(saved, "forest_beast_emergency");
+  const amy = findSavedCrew(saved, "amy");
+  expect(event).toMatchObject({ status: "resolved", current_node_id: "beast_evacuated_end" });
+  expect(amy.activeAction).toBeUndefined();
+  expect(amy.unavailable).toBe(false);
+});
+
+test("PS-003 resolves Garry's mine anomaly call and records the anomaly log", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
+    map: createMapWithDiscoveredTiles("3-3"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  await startNormalCrewCall(page, "Garry，退休老大爷");
+  await page.getByRole("button", { name: "采集 铁矿床" }).click();
+  await page.clock.runFor(181_000);
+  await page.getByRole("button", { name: "结束通话" }).last().click();
+
+  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
+  await expect(runtimeCallPanel).toBeVisible();
+  await expect(runtimeCallPanel.getByText("Garry 报告 3-3 的矿脉深处传来异常空声。")).toBeVisible();
+  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
+
+  await expect(page.getByText("敲击回波不像实心矿体，更像有一段被掏空的裂腔。")).toBeVisible();
+  await page.getByRole("button", { name: "记录矿脉异常，采矿流程保持不变。" }).click();
+
+  const saved = await readSave(page);
+  const garry = findSavedCrew(saved, "garry");
+  expect(garry.conditions).toContain("noted_mine_anomaly");
+  expect(saved.event_logs).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ summary: "Garry 记录了铁脊矿带矿脉中的异常空声。" }),
+    ]),
+  );
+});
+
 test("loads the app and opens the incoming Amy channel without legacy emergency choices", async ({ page }) => {
   await page.goto("/");
 
@@ -31,7 +187,8 @@ test("loads the app and opens the incoming Amy channel without legacy emergency 
   await page.getByRole("button", { name: /通讯台/ }).click();
 
   await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "接通" }).click();
+  const amyCard = page.getByText("Amy，千金大小姐").locator("xpath=ancestor::article[1]");
+  await amyCard.getByRole("button", { name: "通话" }).click();
 
   await expect(page.getByRole("heading", { name: "通话页面：Amy 状态确认" })).toBeVisible();
   await expect(page.getByRole("button", { name: "立刻撤离" })).toHaveCount(0);
@@ -72,12 +229,20 @@ test("shows only the crash site and frontier window on a new map", async ({ page
 });
 
 test("moves Garry to a frontier tile and expands the visible map", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("garry", "4-4", { status: "坠毁区域待命。" })],
+    map: createMapWithDiscoveredTiles("4-4"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
   const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
   await garryCard.getByRole("button", { name: "通话" }).click();
-  await page.getByRole("button", { name: /请求前往/ }).click();
+  await page.getByRole("button", { name: "移动到指定区域" }).click();
 
   await page.getByRole("button", { name: /未探索信号（-1,0）/ }).click();
   await page.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }).click();
@@ -93,40 +258,55 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
 });
 
 test("creates a manual Garry mine anomaly call after the default survey path", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
+    map: createMapWithDiscoveredTiles("3-3"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
   const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
   await garryCard.getByRole("button", { name: "通话" }).click();
-  await page.getByRole("button", { name: /开展调查/ }).click();
+  await page.getByRole("button", { name: "采集 铁矿床" }).click();
 
   await page.clock.runFor(180_000);
 
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
     return Object.values(save.active_events ?? {}).some(
-      (event) => (event as { event_definition_id?: string }).event_definition_id === "garry_mine_anomaly_report",
+      (event) => (event as { event_definition_id?: string }).event_definition_id === "mine_anomaly_report",
     );
   }, GAME_SAVE_KEY);
 
   await page.getByRole("button", { name: "结束通话" }).last().click();
   const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
   await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
-  await expect(page.getByText("Garry 报告 3-3 的矿床下方传来空洞回声。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "标记异常，交给工程复核。" })).toBeVisible();
+  await expect(page.getByText("Garry 报告 3-3 的矿脉深处传来异常空声。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "记录矿脉异常，采矿流程保持不变。" })).toBeVisible();
 });
 
 test("opens an investigation report from the log with environment fields", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 120,
+    crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
+    map: {
+      ...createMapWithDiscoveredTiles("3-3"),
+      investigationReportsById: {
+        "report-3-3": createIronRidgeReport(),
+      },
+    },
+    logs: [
+      ...initialLogs,
+      { id: 2, time: "第 1 日 00 小时 02 分钟 00 秒", text: "Garry 完成一轮调查。", tone: "neutral", reportId: "report-3-3" },
+    ],
+    resources: initialResources,
+  });
+
   await page.goto("/");
-
-  await page.getByRole("button", { name: /通讯台/ }).click();
-  const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
-  await garryCard.getByRole("button", { name: "通话" }).click();
-  await page.getByRole("button", { name: /开展调查/ }).click();
-
-  await page.clock.runFor(180_000);
-  await page.getByRole("button", { name: "结束通话" }).last().click();
-  await page.getByRole("button", { name: /返回/ }).click();
 
   await page.getByRole("button", { name: "查看报告" }).first().click();
   await expect(page.getByRole("heading", { name: "调查报告" })).toBeVisible();
@@ -255,6 +435,85 @@ async function installSave(page: Page, partial: Record<string, unknown>) {
 
 async function readSave(page: Page) {
   return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) ?? "{}"), GAME_SAVE_KEY);
+}
+
+async function startNormalCrewCall(page: Page, crewLabel: string) {
+  const crewCard = page.getByText(crewLabel).locator("xpath=ancestor::article[1]");
+  await crewCard.getByRole("button", { name: "通话" }).click();
+}
+
+function idleCrew(
+  id: string,
+  currentTile: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    currentTile,
+    status: "待命中。",
+    statusTone: "neutral",
+    hasIncoming: false,
+    canCommunicate: true,
+    unavailable: false,
+    activeAction: null,
+    ...overrides,
+  };
+}
+
+function findSavedCrew(saved: { crew?: Array<Record<string, unknown>> }, crewId: string) {
+  const member = saved.crew?.find((item) => item.id === crewId);
+  expect(member).toBeDefined();
+  return member!;
+}
+
+function findSavedRuntimeEvent(saved: { active_events?: Record<string, unknown> }, eventDefinitionId: string) {
+  const event = Object.values(saved.active_events ?? {}).find(
+    (item) => (item as { event_definition_id?: string }).event_definition_id === eventDefinitionId,
+  );
+  expect(event).toBeDefined();
+  return event as Record<string, unknown>;
+}
+
+function triggeredEventHistory(eventDefinitionId: string, crewId: string, tileId: string) {
+  const key = `event:${eventDefinitionId}:${crewId}:${tileId}`;
+  return {
+    key,
+    scope: "crew_tile",
+    event_definition_id: eventDefinitionId,
+    event_id: `${eventDefinitionId}:seeded`,
+    crew_id: crewId,
+    tile_id: tileId,
+    objective_id: null,
+    first_triggered_at: 0,
+    last_triggered_at: 0,
+    trigger_count: 1,
+    last_result: "seeded",
+    cooldown_until: null,
+    value: "seeded",
+  };
+}
+
+function createIronRidgeReport() {
+  return {
+    id: "report-3-3",
+    tileId: "3-3",
+    crewId: "garry",
+    createdAtGameSeconds: 120,
+    areaName: "铁脊矿带",
+    playerCoord: "(-1,1)",
+    terrain: "丘陵",
+    weather: "晴朗",
+    environment: {
+      temperatureCelsius: 18,
+      humidityPercent: 32,
+      magneticFieldMicroTesla: 72,
+      radiationLevel: "low",
+      toxicityLevel: "none",
+      atmosphericPressureKpa: 92,
+    },
+    revealedObjects: [{ id: "iron-ridge-deposit", name: "铁矿床", kind: "resourceNode" }],
+    revealedSpecialStates: [],
+  };
 }
 
 function createForestRuntimeCallState() {
@@ -506,6 +765,39 @@ function createInitialMapState() {
       ).flat(),
     ),
   };
+}
+
+function createMapWithDiscoveredTiles(...tileIds: string[]) {
+  const map = createInitialMapState();
+  for (const tileId of tileIds) {
+    const previous = map.tilesById[tileId] ?? {};
+    map.discoveredTileIds = Array.from(new Set([...map.discoveredTileIds, tileId]));
+    map.tilesById[tileId] = {
+      ...previous,
+      discovered: true,
+    };
+  }
+  return map;
+}
+
+function createMapWithHiddenObject(tileId: string, objectId: string) {
+  const map = createMapWithDiscoveredTiles(tileId);
+  map.tilesById[tileId] = {
+    ...map.tilesById[tileId],
+    investigated: false,
+    revealedObjectIds: (map.tilesById[tileId]?.revealedObjectIds ?? []).filter((id) => id !== objectId),
+  };
+  return map;
+}
+
+function createForestBeastMap() {
+  const map = createMapWithDiscoveredTiles("2-3");
+  map.tilesById["2-3"] = {
+    ...map.tilesById["2-3"],
+    activeSpecialStateIds: ["beast-approach"],
+    revealedSpecialStateIds: ["beast-approach"],
+  };
+  return map;
 }
 
 function tile(
