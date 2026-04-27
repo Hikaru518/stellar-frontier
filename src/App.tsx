@@ -354,6 +354,7 @@ function App() {
         crew={crew}
         activeCalls={gameState.active_calls}
         objectives={gameState.objectives}
+        eventLogs={gameState.event_logs}
         elapsedGameSeconds={elapsedGameSeconds}
         gameTimeLabel={gameTimeLabel}
         onBack={() => setPage("control")}
@@ -386,6 +387,7 @@ function App() {
         <MapPage
           tiles={tiles}
           crew={crew}
+          eventLogs={gameState.event_logs}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
           returnTarget={mapReturnTarget}
@@ -402,6 +404,8 @@ function App() {
       <ControlCenter
         crew={crew}
         logs={logs}
+        eventLogs={gameState.event_logs}
+        objectives={gameState.objectives}
         resources={resources}
         gameTimeLabel={gameTimeLabel}
         onOpenStation={openStation}
@@ -771,8 +775,12 @@ function toEventEngineState(state: GameState): GraphRunnerGameState {
 }
 
 function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
+  const views = syncEventRuntimeToViews(state, eventState);
+
   return {
     ...state,
+    crew: views.crew,
+    tiles: views.tiles,
     active_events: eventState.active_events,
     active_calls: eventState.active_calls,
     objectives: eventState.objectives,
@@ -783,6 +791,47 @@ function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameSta
     inventories: eventState.inventories,
     rng_state: eventState.rng_state,
   };
+}
+
+function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameState) {
+  return {
+    crew: state.crew.map((member) => {
+      const runtimeCrew = eventState.crew[member.id];
+      if (!runtimeCrew) {
+        return member;
+      }
+
+      return {
+        ...member,
+        personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
+        conditions: mergeStringLists(member.conditions, runtimeCrew.condition_tags),
+      };
+    }),
+    tiles: state.tiles.map((tile) => {
+      const runtimeTile = eventState.tiles[tile.id];
+      if (!runtimeTile) {
+        return tile;
+      }
+
+      return {
+        ...tile,
+        dangerTags: mergeStringLists(tile.dangerTags ?? [], runtimeTile.danger_tags),
+        eventMarks: mergeEventMarks(tile.eventMarks ?? [], runtimeTile.event_marks),
+      };
+    }),
+  };
+}
+
+function mergeStringLists(existing: string[], incoming: string[]) {
+  return Array.from(new Set([...existing, ...incoming]));
+}
+
+function mergeEventMarks(existing: NonNullable<MapTile["eventMarks"]>, incoming: NonNullable<TileState["event_marks"]>) {
+  const marksById = new Map(existing.map((mark) => [mark.id, mark]));
+  for (const mark of incoming) {
+    marksById.set(mark.id, mark);
+  }
+  return Array.from(marksById.values()).sort((left, right) => left.created_at - right.created_at || left.id.localeCompare(right.id));
 }
 
 function toCrewState(member: CrewMember): CrewState {
@@ -821,7 +870,7 @@ function toTileState(tile: MapTile): TileState {
     },
     terrain_type: tile.terrain,
     tags: inferTileTags(tile),
-    danger_tags: tile.danger === "未发现即时危险" ? [] : [tile.danger],
+    danger_tags: tile.dangerTags ?? (tile.danger === "未发现即时危险" ? [] : [tile.danger]),
     discovery_state: tile.investigated ? "mapped" : "known",
     survey_state: tile.investigated ? "surveyed" : "unsurveyed",
     visibility: "visible",
@@ -834,7 +883,7 @@ function toTileState(tile: MapTile): TileState {
     })),
     site_objects: tile.instruments.map((instrument) => ({ id: `${tile.id}:${instrument}`, object_type: instrument, tags: [] })),
     buildings: tile.buildings.map((building) => ({ id: `${tile.id}:${building}`, building_type: building, status: "active" })),
-    event_marks: [],
+    event_marks: tile.eventMarks ?? [],
     history_keys: [],
   };
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember } from "../data/gameData";
-import type { Objective, RuntimeCall } from "../events/types";
+import type { EventLog, Objective, RuntimeCall } from "../events/types";
 import { getInventoryView, type InventoryItemView } from "../inventorySystem";
 import { CrewDetail } from "./CrewDetail";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
@@ -11,6 +11,7 @@ interface CommunicationStationProps {
   crew: CrewMember[];
   activeCalls: Record<string, RuntimeCall>;
   objectives: Record<string, Objective>;
+  eventLogs: EventLog[];
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   onBack: () => void;
@@ -21,6 +22,7 @@ export function CommunicationStation({
   crew,
   activeCalls,
   objectives,
+  eventLogs,
   elapsedGameSeconds,
   gameTimeLabel,
   onBack,
@@ -40,6 +42,11 @@ export function CommunicationStation({
   const detailCrew = crew.find((member) => member.id === detailCrewId);
   const inventoryCrew = crew.find((member) => member.id === inventoryCrewId);
   const latestRuntimeLine = activeRuntimeCalls[0]?.rendered_lines[0]?.text;
+  const recentEventLogs = eventLogs
+    .filter((log) => log.visibility === "player_visible")
+    .slice()
+    .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
+    .slice(0, 3);
 
   return (
     <ConsoleShell
@@ -141,7 +148,31 @@ export function CommunicationStation({
               ))}
             </div>
           </Panel>
-        ) : null}
+        ) : (
+          <Panel title="可分配目标" className="station-rule">
+            <p className="muted-text">暂无可分配目标。</p>
+          </Panel>
+        )}
+
+        <Panel title="近期事件摘要" className="station-rule" tone={recentEventLogs.length ? "accent" : "neutral"}>
+          {recentEventLogs.length ? (
+            <div className="expertise-list">
+              {recentEventLogs.map((log) => (
+                <article key={log.id} className="expertise-item">
+                  <div className="expertise-heading">
+                    <strong>{log.summary}</strong>
+                    <StatusTag tone={log.importance === "major" || log.importance === "critical" ? "accent" : "muted"}>
+                      {formatEventImportance(log.importance)}
+                    </StatusTag>
+                  </div>
+                  <p className="muted-text">{log.tile_ids.length ? `关联地块：${log.tile_ids.join(" / ")}` : "无关联地块"}</p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="muted-text">暂无事件记录。</p>
+          )}
+        </Panel>
       </div>
 
       {detailCrew ? (
@@ -154,7 +185,7 @@ export function CommunicationStation({
               ["时间状态", getCrewTiming(detailCrew, elapsedGameSeconds)],
             ]}
           />
-          <CrewDetail member={detailCrew} />
+          <CrewDetail member={detailCrew} eventLogs={eventLogs} />
         </Modal>
       ) : null}
 
@@ -308,6 +339,19 @@ function formatObjectiveStatus(objective: Objective) {
     return "进行中";
   }
   return objective.status;
+}
+
+function formatEventImportance(importance: EventLog["importance"]) {
+  if (importance === "critical") {
+    return "紧急";
+  }
+  if (importance === "major") {
+    return "重要";
+  }
+  if (importance === "normal") {
+    return "记录";
+  }
+  return "简报";
 }
 
 function isCrewId(value: string): value is CrewId {

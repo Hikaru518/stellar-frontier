@@ -22,6 +22,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /通讯台/ })).toBeInTheDocument();
   });
 
+  it("shows empty event log and objective states without crashing", () => {
+    render(<App />);
+
+    expect(screen.getByText("暂无事件记录。")).toBeInTheDocument();
+    expect(screen.getByText("暂无事件目标。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+
+    expect(screen.getByText("暂无可分配目标。")).toBeInTheDocument();
+  });
+
   it("advances game time while the app is running", () => {
     vi.useFakeTimers();
 
@@ -214,6 +225,97 @@ describe("App", () => {
     expect(event.status).toBe("resolved");
     expect(event.current_node_id).toBe("trace_resolved");
     expect(event.selected_options).toEqual({ trace_report: "mark_camp" });
+  });
+
+  it("shows the resolved forest camp trace on the map tile", () => {
+    vi.useFakeTimers();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: "2-3",
+            location: "木材",
+            coord: "(2,3)",
+            status: "森林边缘待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: undefined,
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    let garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
+
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark the camp trace." }));
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+    fireEvent.click(screen.getByRole("button", { name: "返回控制中心" }));
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\(2,3\)/ }));
+
+    expect(screen.getAllByText("Small camp trace").length).toBeGreaterThan(0);
+    expect(screen.getByText("A small forest camp trace was marked for later review.")).toBeInTheDocument();
+  });
+
+  it("shows lost relic argument effects in Kael's crew detail", () => {
+    const { eventState } = createLostRelicArgumentState();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 600,
+        crew: [
+          {
+            id: "kael",
+            hasIncoming: true,
+            personalityTags: ["relic_sensitive"],
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+        active_events: eventState.active_events,
+        active_calls: eventState.active_calls,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+    fireEvent.click(screen.getByRole("button", { name: "Trust Kael to carry the lead." }));
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+
+    const kaelCard = screen
+      .getAllByText("Kael，轨道城邦祭司学徒")
+      .map((node) => node.closest("article"))
+      .find((article) => article && within(article as HTMLElement).queryByRole("button", { name: "查看档案" }));
+    expect(kaelCard).not.toBeNull();
+    fireEvent.click(within(kaelCard as HTMLElement).getByRole("button", { name: "查看档案" }));
+
+    expect(screen.getByText("relic_burdened")).toBeInTheDocument();
+    expect(screen.getAllByText("Kael kept the relic lead, changing his long-term outlook.").length).toBeGreaterThan(0);
   });
 
   it("ignores legacy emergencyEvent fields when opening a call", async () => {
@@ -516,6 +618,10 @@ function createSavedEmergencyEvent(crewId: string, eventId: string) {
   };
 }
 
+function lastElement<T>(items: T[]): T {
+  return items[items.length - 1];
+}
+
 function createCompatibleSavedGameState(state: Record<string, unknown>) {
   return {
     schema_version: GAME_SAVE_SCHEMA_VERSION,
@@ -523,5 +629,116 @@ function createCompatibleSavedGameState(state: Record<string, unknown>) {
     updated_at_real_time: "2026-04-27T00:00:00.000Z",
     ...createEmptyEventRuntimeState(),
     ...state,
+  };
+}
+
+function createLostRelicArgumentState() {
+  const eventId = "lost_relic_argument:600";
+  const callId = `${eventId}:relic_argument_call:call`;
+
+  return {
+    eventId,
+    callId,
+    eventState: {
+      active_events: {
+        [eventId]: {
+          id: eventId,
+          event_definition_id: "lost_relic_argument",
+          event_definition_version: 1,
+          status: "waiting_call",
+          current_node_id: "relic_argument_call",
+          primary_crew_id: "kael",
+          related_crew_ids: [],
+          primary_tile_id: "4-2",
+          related_tile_ids: [],
+          parent_event_id: null,
+          child_event_ids: [],
+          objective_ids: [],
+          active_call_id: callId,
+          selected_options: {},
+          random_results: {},
+          blocking_claim_ids: [],
+          created_at: 600,
+          updated_at: 600,
+          deadline_at: 780,
+          next_wakeup_at: null,
+          trigger_context_snapshot: {
+            trigger_type: "proximity",
+            occurred_at: 600,
+            source: "tile_system",
+            crew_id: "kael",
+            tile_id: "4-2",
+            action_id: null,
+            event_id: eventId,
+            event_definition_id: "lost_relic_argument",
+            node_id: null,
+            call_id: null,
+            objective_id: null,
+            selected_option_id: null,
+            world_flag_key: null,
+            proximity: {
+              origin_tile_id: "4-2",
+              nearby_tile_ids: ["4-1", "4-3"],
+              distance: 1,
+            },
+            payload: {
+              relic_id: "lost_relic_alpha",
+            },
+          },
+          history_keys: [],
+          result_key: null,
+          result_summary: null,
+        },
+      },
+      active_calls: {
+        [callId]: {
+          id: callId,
+          event_id: eventId,
+          event_node_id: "relic_argument_call",
+          call_template_id: "lost_relic_argument.call.argument",
+          crew_id: "kael",
+          status: "awaiting_choice",
+          created_at: 600,
+          connected_at: null,
+          ended_at: null,
+          expires_at: 780,
+          render_context_snapshot: {
+            crew_id: "kael",
+            crew_display_name: "Kael",
+            tile_id: "4-2",
+            event_pressure: "urgent",
+            personality_tags: ["relic_sensitive"],
+          },
+          rendered_lines: [
+            {
+              template_variant_id: "relic_opening_default",
+              text: "Kael refuses to bag the relic without a promise.",
+              speaker_crew_id: "kael",
+            },
+            {
+              template_variant_id: "relic_body_default",
+              text: "He says it belongs to someone who never made it home.",
+              speaker_crew_id: "kael",
+            },
+          ],
+          available_options: [
+            {
+              option_id: "trust_kael",
+              template_variant_id: "relic_trust_default",
+              text: "Trust Kael to carry the lead.",
+              is_default: true,
+            },
+            {
+              option_id: "secure_relic",
+              template_variant_id: "relic_secure_default",
+              text: "Secure the relic under base protocol.",
+              is_default: false,
+            },
+          ],
+          selected_option_id: null,
+          blocking_claim_id: null,
+        },
+      },
+    },
   };
 }

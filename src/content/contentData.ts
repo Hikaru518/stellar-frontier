@@ -1,5 +1,7 @@
 import eventsContent from "../../content/events/events.json";
+import crewKaelCallTemplatesContent from "../../content/events/call_templates/crew_kael.json";
 import forestCallTemplatesContent from "../../content/events/call_templates/forest.json";
+import crewKaelEventDefinitionsContent from "../../content/events/definitions/crew_kael.json";
 import forestEventDefinitionsContent from "../../content/events/definitions/forest.json";
 import handlerRegistryContent from "../../content/events/handler_registry.json";
 import forestPresetsContent from "../../content/events/presets/forest.json";
@@ -180,8 +182,14 @@ export interface ItemDefinition {
   effects: Array<{ type: string; target?: string; value?: number; condition?: string }>;
 }
 
-export const eventProgramDefinitions = forestEventDefinitionsContent.event_definitions as unknown as ProgramEventDefinition[];
-export const callTemplates = forestCallTemplatesContent.call_templates as unknown as CallTemplate[];
+export const eventProgramDefinitions = [
+  ...forestEventDefinitionsContent.event_definitions,
+  ...crewKaelEventDefinitionsContent.event_definitions,
+] as unknown as ProgramEventDefinition[];
+export const callTemplates = [
+  ...forestCallTemplatesContent.call_templates,
+  ...crewKaelCallTemplatesContent.call_templates,
+] as unknown as CallTemplate[];
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
 export const presetDefinitions = forestPresetsContent.presets as unknown as PresetDefinition[];
 export const eventContentLibrary: EventContentLibrary = {

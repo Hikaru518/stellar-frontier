@@ -5,7 +5,7 @@ import {
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
 } from "../content/contentData";
-import type { EventRuntimeState } from "../events/types";
+import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 
 export type PageId = "control" | "station" | "call" | "map";
@@ -116,6 +116,8 @@ export interface MapTile {
   danger: string;
   status: string;
   investigated: boolean;
+  eventMarks?: EventMark[];
+  dangerTags?: string[];
 }
 
 export interface SystemLog {

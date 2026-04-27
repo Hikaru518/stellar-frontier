@@ -27,7 +27,7 @@ branch: "feature/event-program-model-player-journey"
 | 11 | TASK-011 | 生产五个样例事件资产与 dry-run fixture | completed | 1 |
 | 12 | TASK-012 | 把事件引擎接入 App 时间与行动流程 | completed | 1 |
 | 13 | TASK-013 | 替换通讯台与通话页为 runtime call UI | completed | 1 |
-| 14 | TASK-014 | 展示事件摘要、地块标记与目标状态 | pending | 0 |
+| 14 | TASK-014 | 展示事件摘要、地块标记与目标状态 | completed | 1 |
 | 15 | TASK-015 | 完成内容校验、单测与端到端回归 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -93,6 +93,19 @@ branch: "feature/event-program-model-player-journey"
 - 完成时间: 2026-04-27 18:26
 - 尝试次数: 1
 - Monkey summary: 成功。通讯台展示 active runtime call 与 objectives；通话页展示 rendered_lines/available_options 并提交稳定 option_id；过期或缺失 runtime call 不回退旧紧急选项。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+  - `npm run test:e2e`: PASS
+
+### TASK-014: 展示事件摘要、地块标记与目标状态
+- 状态: completed
+- 开始时间: 2026-04-27 18:27
+- 完成时间: 2026-04-27 18:36
+- 尝试次数: 1
+- Monkey summary: 成功。控制中心、通讯台、地图和队员详情展示玩家可见事件摘要、目标状态、地块标记、危险标签与相关事件影响；补充回归覆盖森林营地标记、遗物争执队员影响和空事件状态。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS
