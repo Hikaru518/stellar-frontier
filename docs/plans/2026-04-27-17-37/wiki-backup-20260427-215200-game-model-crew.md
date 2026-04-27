@@ -9,7 +9,7 @@ flowchart TD
   CrewJson["content/crew/crew.json"] --> CrewDefinition["CrewDefinition"]
   CrewDefinition --> InitialCrew["initialCrew"]
   InitialCrew --> CrewMember["CrewMember in GameState"]
-  CrewMember --> GameMapState["GameState.map currentTile"]
+  CrewMember --> MapTile["MapTile crew/currentTile"]
   CrewMember --> ActiveAction["ActiveAction"]
   CrewMember --> EmergencyEvent["EmergencyEvent"]
   CrewMember --> Inventory["InventoryEntry + ItemDefinition"]
@@ -36,10 +36,10 @@ flowchart TD
 
 | 代码名称 | 中文名 | 类型 / 约束 | 介绍 | 和其他模型的关系 |
 | --- | --- | --- | --- | --- |
-| `crewId` | 队员 ID | 小写字母开头，允许数字和下划线 | 内容层唯一标识，例如 `mike`、`lin_xia`。 | 转为运行时 `CrewMember.id`；被地图队员索引、通话、测试和部分手写行动逻辑引用。 |
+| `crewId` | 队员 ID | 小写字母开头，允许数字和下划线 | 内容层唯一标识，例如 `mike`、`lin_xia`。 | 转为运行时 `CrewMember.id`；被 `MapTile.crew`、通话、测试和部分手写行动逻辑引用。 |
 | `name` | 姓名 | 非空字符串 | UI 展示名。 | 通讯录、通话页、地图队员状态、日志文本都会展示。 |
 | `role` | 身份 / 职责 | 非空字符串 | 人物短职业或身份标签。 | 通讯录卡片和档案弹窗展示。 |
-| `currentTile` | 当前地块 | 形如 `row-col` 的字符串 | 队员初始所在地图格。 | 转为 `CrewMember.currentTile`；和地图配置中的 tile id 对应；地图运行时状态可据此派生每格驻留队员。 |
+| `currentTile` | 当前地块 | 形如 `1-1` 的字符串 | 队员初始所在地图格。 | 转为 `CrewMember.currentTile`；和 `MapTile.id` 对应；地图通过 `syncTileCrew` 反向同步每格驻留队员。 |
 | `status` | 初始规则状态 | `idle` / `moving` / `working` / `inEvent` / `lost` / `dead` | 内容层枚举状态，用来推导初始显示状态。 | `createInitialCrewMember` 通过 `getInitialStatus` 转为运行时中文 `status`；事件条件中的 `crew.status` 读取运行时规则状态而不是这段原始文本。 |
 | `statusTone` | 状态语气 | `neutral` / `muted` / `accent` / `danger` / `success` | UI 色调和风险提示强度。 | 通讯录、档案、地图等用它决定 `StatusTag` 或状态文本样式。 |
 | `summary` | 状态摘要 | 非空字符串 | 对队员当前情况的短描述。 | 通讯录卡片、档案通讯语气和通话结果会展示；行动和事件会更新运行时 `summary`。 |
@@ -213,8 +213,8 @@ crew.attributes.perception >= 3
 | 代码名称 | 中文名 | 介绍 | 关系 |
 | --- | --- | --- | --- |
 | `id` | 队员运行时 ID | `crewId` 转换后的运行时字段。 | 类型收窄为当前固定队员联合类型 `CrewId`。 |
-| `location` | 位置名称 | 从当前地图块区域名派生的显示文本。 | 位置文案应优先显示区域名；不得再用资源名或地块对象名冒充地点。 |
-| `coord` | 坐标文本 | 从地图系统的玩家显示坐标派生。 | 地图、通讯录和状态文本展示；普通 UI 不直接显示内部 row/col。 |
+| `location` | 位置名称 | 从当前地块资源或地形派生的显示文本。 | `getTileLocation` 优先取 `MapTile.resources[0]`，否则取 `terrain`。 |
+| `coord` | 坐标文本 | 从 `MapTile.coord` 派生。 | 地图、通讯录和状态文本展示。 |
 | `conditions` | 队员状态条件 | 运行时标签数组，初始为空。 | 事件效果 `addCrewCondition` 添加；事件条件支持 `crew.conditions.has(conditionId)`。 |
 | `hasIncoming` | 是否有来电 | 通讯台来电标记。 | 初始由 `emergencyEvent` 推导；紧急事件和状态更新会修改它。 |
 
@@ -235,9 +235,7 @@ crew.attributes.perception >= 3
 
 ## 地图模型关系
 
-`CrewMember.currentTile` 是队员位置的权威字段，地图系统可以根据队员列表派生每格驻留队员索引。同步规则是：某个队员的 `currentTile` 等于地图块 `id`，且队员没有 `unavailable`，就会出现在该地块的队员索引中。
-
-队员位置展示由地图系统提供区域名和玩家显示坐标。通讯台、队员卡片和人物详情应优先显示区域名，例如“灰熊丘陵（-1,2）”，而不是从资源、建筑或地块对象名称派生地点。
+`CrewMember.currentTile` 是队员位置的权威字段，`MapTile.crew` 是根据队员列表同步出来的反向索引。同步规则是：某个队员的 `currentTile` 等于地块 `id`，且队员没有 `unavailable`，就会出现在该地块的 `crew` 数组中。
 
 移动行动会按地图地形计算路线和时间：
 
@@ -249,8 +247,6 @@ crew.attributes.perception >= 3
 - 山 `180` 秒。
 
 地形耗时按代码中的判断顺序命中：丘陵、森林、山、沙漠、默认值。因此复合地形若同时包含森林和山，会先按森林耗时结算。
-
-地图模型的静态配置、运行时状态、玩家显示坐标和 legacy tile 投影详见 `docs/game_model/map.md`。
 
 ## 时间模型关系
 

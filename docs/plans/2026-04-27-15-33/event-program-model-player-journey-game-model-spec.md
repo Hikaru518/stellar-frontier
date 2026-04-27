@@ -1,7 +1,11 @@
 ---
 topic: event-program-model-player-journey-game-model-spec
 date: 2026-04-27
-status: approved
+status: merged
+merged_into:
+  - docs/game_model/event.md
+  - docs/game_model/event-integration.md
+merged_at: 2026-04-27T21:21:54+08:00
 source:
   design: docs/plans/2026-04-27-15-33/event-program-model-player-journey-design.md
   interview: docs/plans/2026-04-27-15-33/event-program-model-player-journey-interview.md
