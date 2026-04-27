@@ -5,7 +5,7 @@ import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { MapPage } from "./pages/MapPage";
 import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
-import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
+import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, hydrateMoveActionRoute, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary, type MapCandidateAction, type MapObjectDefinition } from "./content/contentData";
 import { buildEventContentIndex } from "./events/contentIndex";
@@ -461,15 +461,20 @@ function settleGameTime(state: GameState): GameState {
   const crew = state.crew.map((member) => {
     let nextMember = member;
 
-    if (member.activeAction?.actionType === "move" && member.activeAction.route) {
-      const settled = advanceCrewMovement(member, tiles, logs, state.elapsedGameSeconds);
+    if (member.activeAction?.actionType === "move") {
+      const movingMember = hydrateMoveActionRoute(member, tiles, state.elapsedGameSeconds);
+      const settled = advanceCrewMovement(movingMember, tiles, logs, state.elapsedGameSeconds);
       nextMember = settled.member;
       logs = settled.logs;
+      changed = changed || movingMember !== member;
       changed = changed || settled.changed;
 
-      if (settled.changed && member.activeAction && !nextMember.activeAction) {
+      if (settled.changed && nextMember.currentTile !== movingMember.currentTile) {
         map = discoverMapTile(map, nextMember.currentTile);
         tiles = syncTileCrew(deriveLegacyTiles(defaultMapConfig, map), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
+      }
+
+      if (settled.changed && movingMember.activeAction && !nextMember.activeAction) {
         nextMember = appendArrivalDiary(nextMember, state.elapsedGameSeconds);
         triggerContexts.push({
           trigger_type: "arrival",
@@ -477,11 +482,11 @@ function settleGameTime(state: GameState): GameState {
           source: "crew_action",
           crew_id: nextMember.id,
           tile_id: nextMember.currentTile,
-          action_id: member.activeAction.id,
+          action_id: movingMember.activeAction.id,
           payload: {
             action_type: "move",
-            from_tile_id: member.activeAction.fromTile ?? null,
-            target_tile_id: member.activeAction.targetTile ?? null,
+            from_tile_id: movingMember.activeAction.fromTile ?? null,
+            target_tile_id: movingMember.activeAction.targetTile ?? null,
           },
         });
       }

@@ -228,6 +228,86 @@ test("shows only the crash site and frontier window on a new map", async ({ page
   await expect(grid.getByText("北部玄武高地")).toHaveCount(0);
 });
 
+test("shows crew-returned coarse info on an occupied frontier tile without revealing objects", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("amy", "2-3", { status: "等待指令。" })],
+    map: createMapWithDiscoveredTiles("3-3"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /卫星雷达/ }).click();
+
+  const grid = page.getByLabel(/雷达可见矩形/);
+  const amyTile = grid.getByRole("button", { name: /\(-1,2\)/ });
+  await expect(amyTile.getByText("未探索信号")).toBeVisible();
+  await expect(amyTile.getByText("地形：森林 / 山")).toBeVisible();
+  await expect(amyTile.getByText("天气：薄雾")).toBeVisible();
+  await expect(amyTile.getByText("Amy：等待指令。")).toBeVisible();
+  await expect(amyTile.getByText("黑松木材带")).toHaveCount(0);
+
+  await amyTile.click();
+  const detail = page.locator(".map-detail");
+  await expect(detail.getByText("队员回传")).toBeVisible();
+  await expect(detail.getByText("森林 / 山")).toBeVisible();
+  await expect(detail.getByText("薄雾")).toBeVisible();
+  await expect(detail.getByText("Amy：等待指令。")).toBeVisible();
+  await expect(page.getByText("黑松木材带")).toHaveCount(0);
+});
+
+test("moves a crew member along intermediate route steps instead of jumping to the target", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [
+      idleCrew("mike", "2-1", {
+        location: "浅水裂湖",
+        coord: "(-3,2)",
+        status: "正在前往目标地点，行进中。",
+        statusTone: "muted",
+        activeAction: {
+          id: "mike-move-4-5",
+          actionType: "move",
+          status: "inProgress",
+          startTime: 0,
+          durationSeconds: 360,
+          finishTime: 360,
+          fromTile: "2-1",
+          targetTile: "4-5",
+          route: ["4-5"],
+          routeStepIndex: 0,
+          stepStartedAt: 0,
+          stepFinishTime: 360,
+          totalDurationSeconds: 360,
+        },
+      }),
+    ],
+    map: createMapWithDiscoveredTiles("2-1"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+
+  await page.goto("/");
+  await page.clock.runFor(60_000);
+  await page.waitForFunction((key) => {
+    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "2-2";
+  }, GAME_SAVE_KEY);
+
+  const saved = await readSave(page);
+  const mike = findSavedCrew(saved, "mike");
+  expect(mike.currentTile).toBe("2-2");
+  expect((mike.activeAction as { routeStepIndex?: number }).routeStepIndex).toBe(1);
+  expect(saved.map.discoveredTileIds).toContain("2-2");
+  expect(saved.map.tilesById["2-2"]).toMatchObject({ discovered: true });
+  expect(saved.map.tilesById["2-2"].investigated).not.toBe(true);
+  expect(saved.map.discoveredTileIds).not.toContain("4-5");
+
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  await expect(page.getByText("位置：浅水裂湖 (-2,2)")).toBeVisible();
+});
+
 test("moves Garry to a frontier tile and expands the visible map", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,

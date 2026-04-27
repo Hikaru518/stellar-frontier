@@ -215,6 +215,37 @@ export function advanceCrewMovement(
   return { member: nextMember, logs: nextLogs, changed };
 }
 
+export function hydrateMoveActionRoute(member: CrewMember, tiles: MapTile[], _elapsedGameSeconds: number): CrewMember {
+  const action = member.activeAction;
+  if (action?.actionType !== "move" || action.status !== "inProgress" || !action.targetTile) {
+    return member;
+  }
+
+  const route = action.route ?? [];
+  const shouldHydrate = route.length === 0 || (route.length === 1 && route[0] === action.targetTile && !isAdjacentTile(member.currentTile, action.targetTile, tiles));
+  if (!shouldHydrate) {
+    return member;
+  }
+
+  const hydratedRoute = findRoute(tiles, member.currentTile, action.targetTile);
+  const firstStep = hydratedRoute[0] ? getTile(tiles, hydratedRoute[0]) : undefined;
+  if (!hydratedRoute.length || !firstStep) {
+    return member;
+  }
+
+  const stepStartedAt = action.stepStartedAt ?? action.startTime;
+  return {
+    ...member,
+    activeAction: {
+      ...action,
+      route: hydratedRoute,
+      routeStepIndex: 0,
+      stepStartedAt,
+      stepFinishTime: stepStartedAt + getTerrainMoveCost(firstStep),
+    },
+  };
+}
+
 export function syncTileCrew(tiles: MapTile[], crew: CrewMember[]) {
   return tiles.map((tile) => ({
     ...tile,
@@ -354,7 +385,17 @@ function getTerrainMoveCost(tile: MapTile) {
 }
 
 function isTilePassable(tile: MapTile) {
-  return !tile.terrain.includes("水");
+  return !tile.terrain.includes("不可通行");
+}
+
+function isAdjacentTile(fromTileId: string, targetTileId: string, tiles: MapTile[]) {
+  const fromTile = getTile(tiles, fromTileId);
+  const targetTile = getTile(tiles, targetTileId);
+  if (!fromTile || !targetTile) {
+    return false;
+  }
+
+  return Math.abs(fromTile.row - targetTile.row) + Math.abs(fromTile.col - targetTile.col) === 1;
 }
 
 function getInterruptionWarning(member: CrewMember) {
