@@ -126,18 +126,36 @@ describe("App", () => {
   it("settles Garry survey on the current mineral_deposit tile through content action metadata", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: mineralTile.id,
+            location: mineralTile.areaName,
+            coord: `(${mineralTile.row},${mineralTile.col})`,
+            status: "矿带待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
 
     render(<App />);
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+    fireEvent.click(screen.getByRole("button", { name: "调查 铁矿床" }));
 
     const actionStarted = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(savedCrew(actionStarted, "garry").activeAction).toMatchObject({
@@ -196,7 +214,7 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
     act(() => {
       vi.advanceTimersByTime(180_000);
@@ -225,7 +243,7 @@ describe("App", () => {
             status: "森林边缘待命。",
             statusTone: "neutral",
             hasIncoming: false,
-            activeAction: undefined,
+            activeAction: null,
           },
         ],
         tiles: initialTiles,
@@ -241,7 +259,7 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
     act(() => {
       vi.advanceTimersByTime(120_000);
@@ -278,7 +296,7 @@ describe("App", () => {
             status: "森林边缘待命。",
             statusTone: "neutral",
             hasIncoming: false,
-            activeAction: undefined,
+            activeAction: null,
           },
         ],
         tiles: initialTiles.map((tile) =>
@@ -296,7 +314,7 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /停止工作原地待命/ }));
+    fireEvent.click(screen.getByRole("button", { name: "原地待命" }));
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(Object.values(saved.active_events).map((event) => (event as { event_definition_id: string }).event_definition_id)).toContain(
@@ -345,7 +363,7 @@ describe("App", () => {
             status: "森林边缘待命。",
             statusTone: "neutral",
             hasIncoming: false,
-            activeAction: undefined,
+            activeAction: null,
           },
         ],
         tiles: initialTiles,
@@ -361,7 +379,7 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
     act(() => {
       vi.advanceTimersByTime(180_000);
@@ -394,7 +412,7 @@ describe("App", () => {
             status: "森林边缘待命。",
             statusTone: "neutral",
             hasIncoming: false,
-            activeAction: undefined,
+            activeAction: null,
           },
         ],
         tiles: initialTiles,
@@ -410,7 +428,7 @@ describe("App", () => {
     let garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
     act(() => {
       vi.advanceTimersByTime(180_000);
@@ -456,7 +474,7 @@ describe("App", () => {
             status: "森林边缘待命。",
             statusTone: "neutral",
             hasIncoming: false,
-            activeAction: undefined,
+            activeAction: null,
           },
         ],
         tiles: initialTiles,
@@ -471,7 +489,7 @@ describe("App", () => {
     let garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
     act(() => {
       vi.advanceTimersByTime(180_000);
@@ -549,7 +567,7 @@ describe("App", () => {
             status: "等待火山灰复核结果。",
             statusTone: "neutral",
             hasIncoming: false,
-            activeAction: undefined,
+            activeAction: null,
           },
           {
             id: "lin_xia",
@@ -875,8 +893,31 @@ describe("App", () => {
     expect(screen.getAllByRole("button", { name: "返回通讯台" }).length).toBeGreaterThan(0);
   });
 
-  it("selects a move target from the map and confirms movement in the call", async () => {
-    vi.useFakeTimers();
+  it("renders grouped base and revealed object actions for an idle crew member", () => {
+    const mineralTile = findTileWithObjectTag("mineral_deposit");
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: mineralTile.id,
+            location: mineralTile.areaName,
+            coord: `(${mineralTile.row},${mineralTile.col})`,
+            status: "矿带待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
@@ -884,8 +925,66 @@ describe("App", () => {
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
 
-    expect(screen.getByRole("heading", { name: "通话页面：Garry 普通状态" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /请求前往/ }));
+    expect(screen.getByText("基础行动")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "调查当前区域" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "移动到指定区域" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "原地待命" })).toBeInTheDocument();
+    expect(screen.getByText("铁矿床")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "调查 铁矿床" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "采集 铁矿床" })).toBeInTheDocument();
+  });
+
+  it("renders only busy-available call actions for a busy crew member", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByText("基础行动")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "原地待命" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "停止当前行动" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "调查当前区域" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "移动到指定区域" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "采集 铁矿床" })).not.toBeInTheDocument();
+  });
+
+  it("selects a move target from the map and confirms movement in the call", async () => {
+    vi.useFakeTimers();
+    const mineralTile = findTileWithObjectTag("mineral_deposit");
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: mineralTile.id,
+            location: mineralTile.areaName,
+            coord: `(${mineralTile.row},${mineralTile.col})`,
+            status: "矿带待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByRole("heading", { name: /通话页面：Garry/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "移动到指定区域" }));
     expect(screen.getByText("请在地图中标记候选目的地。移动指令仍需回到通话中确认。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /地图二级菜单/ }));
@@ -895,7 +994,6 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "标记为目的地，返回通话确认" }));
 
     expect(screen.getByText("移动确认")).toBeInTheDocument();
-    expect(screen.getByText(/当前采集，未完成的一轮不会结算/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }));
 
     expect(screen.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeInTheDocument();
@@ -932,13 +1030,36 @@ describe("App", () => {
   });
 
   it("lets the call page select frontier targets without revealing unknown details", () => {
+    const mineralTile = findTileWithObjectTag("mineral_deposit");
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: mineralTile.id,
+            location: mineralTile.areaName,
+            coord: `(${mineralTile.row},${mineralTile.col})`,
+            status: "矿带待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: /请求前往/ }));
+    fireEvent.click(screen.getByRole("button", { name: "移动到指定区域" }));
 
     const targetList = screen.getByLabelText("移动目标列表");
     expect(within(targetList).getByRole("button", { name: /坠毁区域 \(0,0\).*地形：平原/ })).toBeInTheDocument();
@@ -1184,6 +1305,18 @@ function findTileWithObjectTag(tag: string, filters: { visibility?: string } = {
   );
   expect(tile).toBeDefined();
   return tile!;
+}
+
+function createMapWithDiscoveredTiles(...tileIds: string[]) {
+  const map = createInitialMapState();
+  for (const tileId of tileIds) {
+    map.discoveredTileIds = Array.from(new Set([...map.discoveredTileIds, tileId]));
+    map.tilesById[tileId] = {
+      ...map.tilesById[tileId],
+      discovered: true,
+    };
+  }
+  return map;
 }
 
 function createCompatibleSavedGameState(state: Record<string, unknown>) {
