@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { crewDefinitions, eventDefinitionById, itemDefinitions } from "./content/contentData";
 import { initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
-import { GAME_SAVE_KEY } from "./timeSystem";
+import { createEmptyEventRuntimeState } from "./events/types";
+import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION } from "./timeSystem";
 
 describe("App", () => {
   beforeEach(() => {
@@ -118,7 +119,7 @@ describe("App", () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
-      JSON.stringify({
+      JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
         crew: [
           {
@@ -132,7 +133,7 @@ describe("App", () => {
         tiles: initialTiles,
         logs: initialLogs,
         resources: initialResources,
-      }),
+      })),
     );
 
     render(<App />);
@@ -154,7 +155,7 @@ describe("App", () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
-      JSON.stringify({
+      JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
         crew: [
           {
@@ -169,7 +170,7 @@ describe("App", () => {
         tiles: initialTiles,
         logs: initialLogs,
         resources: initialResources,
-      }),
+      })),
     );
 
     render(<App />);
@@ -187,7 +188,7 @@ describe("App", () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
-      JSON.stringify({
+      JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
         crew: [
           {
@@ -202,7 +203,7 @@ describe("App", () => {
         tiles: initialTiles,
         logs: initialLogs,
         resources: initialResources,
-      }),
+      })),
     );
 
     render(<App />);
@@ -335,13 +336,13 @@ describe("App", () => {
   it("shows an empty inventory message in the crew inventory modal", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
-      JSON.stringify({
+      JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
         crew: [{ id: "mike", inventory: [] }],
         tiles: initialTiles,
         logs: initialLogs,
         resources: initialResources,
-      }),
+      })),
     );
 
     render(<App />);
@@ -355,7 +356,7 @@ describe("App", () => {
     expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
   });
 
-  it("normalizes legacy saves to base inventory and structured crew inventory", () => {
+  it("rejects legacy saves and starts from the new event save schema", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify({
@@ -370,12 +371,13 @@ describe("App", () => {
     render(<App />);
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(saved.baseInventory).toEqual([
-      { itemId: "iron_ore", quantity: 7 },
-      { itemId: "wood", quantity: 3 },
-    ]);
-    expect(saved.resources.food).toBe(2);
-    expect(saved.resources.water).toBe(4);
+    expect(saved.schema_version).toBe(GAME_SAVE_SCHEMA_VERSION);
+    expect(saved.elapsedGameSeconds).toBe(0);
+    expect(saved.active_events).toEqual({});
+    expect(saved.active_calls).toEqual({});
+    expect(saved.baseInventory).toEqual([{ itemId: "iron_ore", quantity: 1240 }]);
+    expect(saved.resources.food).toBe(0);
+    expect(saved.resources.water).toBe(0);
     expect(saved.crew.find((member: { id: string }) => member.id === "mike").inventory).toEqual([
       { itemId: "folding_rifle", quantity: 1 },
       { itemId: "signal_flare", quantity: 2 },
@@ -427,5 +429,15 @@ function createSavedEmergencyEvent(crewId: string, eventId: string) {
     nextEscalationTime: 30,
     deadlineTime: 120,
     settled: false,
+  };
+}
+
+function createCompatibleSavedGameState(state: Record<string, unknown>) {
+  return {
+    schema_version: GAME_SAVE_SCHEMA_VERSION,
+    created_at_real_time: "2026-04-27T00:00:00.000Z",
+    updated_at_real_time: "2026-04-27T00:00:00.000Z",
+    ...createEmptyEventRuntimeState(),
+    ...state,
   };
 }

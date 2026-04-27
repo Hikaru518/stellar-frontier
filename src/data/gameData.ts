@@ -6,6 +6,7 @@ import {
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
 } from "../content/contentData";
+import type { EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 
 export type PageId = "control" | "station" | "call" | "map";
@@ -21,6 +22,19 @@ export type MapReturnTarget = "control" | "call";
 export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
 
 export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
+
+export interface GameState extends EventRuntimeState {
+  schema_version: string;
+  created_at_real_time: string;
+  updated_at_real_time: string;
+  elapsedGameSeconds: number;
+  crew: CrewMember[];
+  baseInventory: InventoryEntry[];
+  tiles: MapTile[];
+  logs: SystemLog[];
+  resources: ResourceSummary;
+  eventHistory: Record<string, number>;
+}
 
 export interface ActiveAction {
   id: string;

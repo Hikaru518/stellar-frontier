@@ -1,4 +1,7 @@
+import { EVENT_SAVE_SCHEMA_VERSION } from "./events/types";
+
 export const GAME_SAVE_KEY = "stellar-frontier-save-v1";
+export const GAME_SAVE_SCHEMA_VERSION = EVENT_SAVE_SCHEMA_VERSION;
 
 export function formatGameTime(elapsedGameSeconds: number) {
   const safeSeconds = Math.max(0, Math.floor(elapsedGameSeconds));
@@ -27,10 +30,19 @@ export function getRemainingSeconds(finishTime: number, elapsedGameSeconds: numb
   return Math.max(0, finishTime - elapsedGameSeconds);
 }
 
-export function loadGameSave<T>() {
+export function loadGameSave<T = unknown>(isCompatible?: (value: unknown) => boolean) {
   try {
     const raw = window.localStorage.getItem(GAME_SAVE_KEY);
-    return raw ? (JSON.parse(raw) as T) : null;
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (isCompatible && !isCompatible(parsed)) {
+      return null;
+    }
+
+    return parsed as T;
   } catch {
     return null;
   }
@@ -38,10 +50,28 @@ export function loadGameSave<T>() {
 
 export function saveGameState<T>(state: T) {
   try {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(state, omitDeprecatedSaveFields));
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(withSaveMetadata(state), omitDeprecatedSaveFields));
   } catch {
     // Losing a browser save should not stop the running prototype.
   }
+}
+
+export function isCompatibleGameSaveState(value: unknown) {
+  if (!isRecord(value) || value.schema_version !== GAME_SAVE_SCHEMA_VERSION) {
+    return false;
+  }
+
+  return (
+    isRecord(value.active_events) &&
+    isRecord(value.active_calls) &&
+    isRecord(value.objectives) &&
+    Array.isArray(value.event_logs) &&
+    isRecord(value.world_history) &&
+    isRecord(value.world_flags) &&
+    isRecord(value.crew_actions) &&
+    isRecord(value.inventories) &&
+    (value.rng_state === null || isRecord(value.rng_state))
+  );
 }
 
 function omitDeprecatedSaveFields(key: string, value: unknown) {
@@ -50,6 +80,24 @@ function omitDeprecatedSaveFields(key: string, value: unknown) {
   }
 
   return value;
+}
+
+function withSaveMetadata<T>(state: T): T {
+  if (!isRecord(state)) {
+    return state;
+  }
+
+  const now = new Date().toISOString();
+  return {
+    ...state,
+    schema_version: GAME_SAVE_SCHEMA_VERSION,
+    created_at_real_time: typeof state.created_at_real_time === "string" ? state.created_at_real_time : now,
+    updated_at_real_time: now,
+  } as T;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function pad2(value: number) {
