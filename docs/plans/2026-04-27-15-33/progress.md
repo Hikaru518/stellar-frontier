@@ -22,7 +22,7 @@ branch: "feature/event-program-model-player-journey"
 | 6 | TASK-006 | 实现结构化 effect executor | completed | 1 |
 | 7 | TASK-007 | 实现事件图 runner 与 runtime event 生命周期 | completed | 1 |
 | 8 | TASK-008 | 实现 runtime call renderer 与选项回写 | completed | 1 |
-| 9 | TASK-009 | 实现 trigger intake、候选选择与时间唤醒 | pending | 0 |
+| 9 | TASK-009 | 实现 trigger intake、候选选择与时间唤醒 | completed | 1 |
 | 10 | TASK-010 | 实现 lightweight objective runtime | pending | 0 |
 | 11 | TASK-011 | 生产五个样例事件资产与 dry-run fixture | pending | 0 |
 | 12 | TASK-012 | 把事件引擎接入 App 时间与行动流程 | pending | 0 |
@@ -45,6 +45,18 @@ branch: "feature/event-program-model-player-journey"
   - 尝试 1: Monkey 运行约 5 分钟后被用户中断；仅留下未完成的 `src/events/types.test.ts`，未返回 summary，未完成实现。
   - 尝试 2: 已重新派发 Monkey，要求复用或修正上次残留测试并完成契约、初始状态和 save schema 边界。
 - Monkey summary: 成功。建立 `src/events/types.ts` 事件程序模型契约与初始空运行时状态；扩展 `GameState` 事件 runtime 集合；为 save/load 增加新 schema metadata 与兼容性 gate；更新相关测试 fixture，使旧 legacy save 断言符合 ADR-001 cutover。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+
+### TASK-009: 实现 trigger intake、候选选择与时间唤醒
+- 状态: completed
+- 开始时间: 2026-04-27 17:51
+- 完成时间: 2026-04-27 17:56
+- 尝试次数: 1
+- Monkey summary: 成功。实现 `processTrigger` 和 `processEventWakeups`；补充候选报告、冷却/次数/互斥/blocking slot 过滤，以及 priority + weight 的确定性选择。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS

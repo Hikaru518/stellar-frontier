@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { EventContentIndex } from "./contentIndex";
-import { selectCallOption } from "./eventEngine";
+import { processEventWakeups, processTrigger, selectCallOption } from "./eventEngine";
 import { startRuntimeEvent, type GraphRunnerGameState } from "./graphRunner";
 import {
   createEmptyEventRuntimeState,
+  type ActionRequestNode,
   type CallNode,
   type CallTemplate,
   type CrewState,
   type EndNode,
   type EventDefinition,
   type EventNode,
+  type ObjectiveNode,
   type TriggerContext,
+  type WaitNode,
 } from "./types";
 
 describe("event engine call option selection", () => {
@@ -92,6 +95,195 @@ describe("event engine call option selection", () => {
   });
 });
 
+describe("event engine trigger intake", () => {
+  it("starts arrival candidates and advances call choice contexts", () => {
+    const definition = eventDefinition([
+      callNode("signal_call", { press_on: "success_end" }),
+      endNode("success_end", "resolved", "pressed_on", false),
+    ]);
+    const index = indexFor([definition], [callTemplate()]);
+    const started = processTrigger({
+      state: createState(),
+      index,
+      context: triggerContext(120),
+    });
+    const callId = started.event?.active_call_id ?? "";
+
+    expect(started.errors).toEqual([]);
+    expect(started.candidate_report?.selected_event_definition_ids).toEqual(["test_event"]);
+    expect(started.event?.status).toBe("waiting_call");
+    expect(started.state.active_calls[callId]?.status).toBe("awaiting_choice");
+
+    const selected = processTrigger({
+      state: started.state,
+      index,
+      context: {
+        ...triggerContext(130),
+        trigger_type: "call_choice",
+        source: "call",
+        event_id: started.event?.id,
+        event_definition_id: "test_event",
+        call_id: callId,
+        selected_option_id: "press_on",
+      },
+    });
+
+    expect(selected.errors).toEqual([]);
+    expect(selected.event?.status).toBe("resolved");
+    expect(selected.event?.selected_options).toEqual({ signal_call: "press_on" });
+  });
+
+  it("advances action completion and objective completion contexts", () => {
+    const actionDefinition = definitionWith({
+      id: "action_wait",
+      triggerType: "arrival",
+      nodes: [
+        actionRequestNode("request_scan", "action_done", "action_failed"),
+        endNode("action_done", "resolved", "action_done", false),
+        endNode("action_failed", "failed", "action_failed", false),
+      ],
+    });
+    const objectiveDefinition = definitionWith({
+      id: "objective_wait",
+      triggerType: "arrival",
+      nodes: [
+        objectiveNode("map_site", "objective_done", "objective_failed"),
+        endNode("objective_done", "resolved", "objective_done", false),
+        endNode("objective_failed", "failed", "objective_failed", false),
+      ],
+    });
+    const index = indexFor([actionDefinition, objectiveDefinition]);
+    const actionStarted = startRuntimeEvent(createState(), actionDefinition, {
+      ...triggerContext(200),
+      event_id: "evt_action",
+      event_definition_id: "action_wait",
+    });
+    const objectiveStarted = startRuntimeEvent(createState(), objectiveDefinition, {
+      ...triggerContext(210),
+      event_id: "evt_objective",
+      event_definition_id: "objective_wait",
+    });
+    const objectiveId = objectiveStarted.event.objective_ids[0];
+
+    const actionCompleted = processTrigger({
+      state: actionStarted.state,
+      index,
+      context: {
+        ...triggerContext(240),
+        trigger_type: "action_complete",
+        source: "crew_action",
+        event_id: "evt_action",
+        event_definition_id: "action_wait",
+        action_id: "action_evt_action",
+      },
+    });
+    const objectiveCompleted = processTrigger({
+      state: objectiveStarted.state,
+      index,
+      context: {
+        ...triggerContext(250),
+        trigger_type: "objective_completed",
+        source: "objective",
+        event_id: "evt_objective",
+        event_definition_id: "objective_wait",
+        objective_id: objectiveId,
+      },
+    });
+
+    expect(actionCompleted.errors).toEqual([]);
+    expect(actionCompleted.event?.status).toBe("resolved");
+    expect(actionCompleted.event?.result_key).toBe("action_done");
+    expect(objectiveCompleted.errors).toEqual([]);
+    expect(objectiveCompleted.event?.status).toBe("resolved");
+    expect(objectiveCompleted.event?.result_key).toBe("objective_done");
+  });
+
+  it("processes due time wakeups and leaves future wakeups untouched", () => {
+    const definition = definitionWith({
+      id: "timed_event",
+      triggerType: "arrival",
+      nodes: [waitNode("wait_for_signal", 30, "time_done"), endNode("time_done", "resolved", "time_done", false)],
+    });
+    const index = indexFor([definition]);
+    const started = startRuntimeEvent(createState(), definition, {
+      ...triggerContext(300),
+      event_id: "evt_timed",
+      event_definition_id: "timed_event",
+    });
+
+    const early = processEventWakeups({ state: started.state, index, elapsed_game_seconds: 329 });
+    const due = processEventWakeups({ state: started.state, index, elapsed_game_seconds: 330 });
+
+    expect(early.errors).toEqual([]);
+    expect(early.events ?? []).toEqual([]);
+    expect(early.state.active_events.evt_timed.status).toBe("waiting_time");
+    expect(due.errors).toEqual([]);
+    expect((due.events ?? []).map((event) => event.id)).toEqual(["evt_timed"]);
+    expect(due.state.active_events.evt_timed.status).toBe("resolved");
+  });
+
+  it("filters candidates blocked by cooldown, max count, mutex, or blocking slot", () => {
+    const selectedDefinition = definitionWith({ id: "selectable_event", triggerType: "arrival", priority: 1 });
+    const cooldownDefinition = definitionWith({ id: "cooldown_event", triggerType: "arrival", priority: 2, cooldownSeconds: 60 });
+    const maxedDefinition = definitionWith({ id: "maxed_event", triggerType: "arrival", priority: 2, maxTriggerCount: 1 });
+    const mutexDefinition = definitionWith({ id: "mutex_event", triggerType: "arrival", priority: 2, mutexGroup: "crew_crisis" });
+    const activeMutexDefinition = definitionWith({ id: "active_mutex_event", triggerType: "idle_time", mutexGroup: "crew_crisis" });
+    const blockingDefinition = definitionWith({
+      id: "blocking_event",
+      triggerType: "arrival",
+      priority: 2,
+      requiresBlockingSlot: true,
+    });
+    const state = {
+      ...createState(),
+      crew: {
+        amy: {
+          ...crew("amy"),
+          blocking_event_id: "evt_existing_block",
+        },
+      },
+      active_events: {
+        evt_mutex_active: runtimeEvent("evt_mutex_active", "active_mutex_event", "active"),
+      },
+      world_history: {
+        "event:cooldown_event": historyEntry("event:cooldown_event", "cooldown_event", 2, 170),
+        "event:maxed_event": historyEntry("event:maxed_event", "maxed_event", 1, null),
+      },
+    } satisfies GraphRunnerGameState;
+    const index = indexFor([
+      selectedDefinition,
+      cooldownDefinition,
+      maxedDefinition,
+      mutexDefinition,
+      activeMutexDefinition,
+      blockingDefinition,
+    ]);
+
+    const result = processTrigger({ state, index, context: triggerContext(120) });
+
+    expect(result.errors).toEqual([]);
+    expect(result.candidate_report?.filtered_by_history_ids).toEqual(["cooldown_event", "maxed_event"]);
+    expect(result.candidate_report?.filtered_by_mutex_ids).toEqual(["mutex_event"]);
+    expect(result.candidate_report?.filtered_by_blocking_ids).toEqual(["blocking_event"]);
+    expect(result.candidate_report?.selected_event_definition_ids).toEqual(["selectable_event"]);
+    expect(result.event?.event_definition_id).toBe("selectable_event");
+  });
+
+  it("uses priority first and weight for deterministic candidate selection", () => {
+    const lowPriority = definitionWith({ id: "low_priority", triggerType: "arrival", priority: 1, weight: 100 });
+    const zeroWeight = definitionWith({ id: "zero_weight", triggerType: "arrival", priority: 5, weight: 0 });
+    const weightedWinner = definitionWith({ id: "weighted_winner", triggerType: "arrival", priority: 5, weight: 10 });
+    const index = indexFor([lowPriority, zeroWeight, weightedWinner]);
+
+    const result = processTrigger({ state: createState(), index, context: triggerContext(120) });
+
+    expect(result.errors).toEqual([]);
+    expect(result.candidate_report?.selected_event_definition_ids).toEqual(["weighted_winner"]);
+    expect(result.candidate_report?.roll_seed).toBe("arrival:120:amy:2-3");
+    expect(result.event?.event_definition_id).toBe("weighted_winner");
+  });
+});
+
 function scenario(): { definition: EventDefinition; index: EventContentIndex } {
   const definition = eventDefinition([
     callNode("signal_call", { press_on: "success_end", retreat: "retreat_end" }),
@@ -152,8 +344,8 @@ function triggerContext(occurredAt: number): TriggerContext {
     crew_id: "amy",
     tile_id: "2-3",
     action_id: null,
-    event_id: "evt_test",
-    event_definition_id: "test_event",
+    event_id: null,
+    event_definition_id: null,
     node_id: null,
     call_id: null,
     objective_id: null,
@@ -203,6 +395,48 @@ function eventDefinition(nodes: EventNode[]): EventDefinition {
   };
 }
 
+function definitionWith(input: {
+  id: string;
+  triggerType: TriggerContext["trigger_type"];
+  nodes?: EventNode[];
+  priority?: number;
+  weight?: number;
+  mutexGroup?: string | null;
+  requiresBlockingSlot?: boolean;
+  cooldownSeconds?: number;
+  maxTriggerCount?: number | null;
+}): EventDefinition {
+  const nodes = input.nodes ?? [endNode("end", "resolved", `${input.id}_resolved`, false)];
+  return {
+    ...eventDefinition(nodes),
+    id: input.id,
+    title: input.id,
+    trigger: { type: input.triggerType, conditions: [] },
+    candidate_selection: {
+      priority: input.priority ?? 1,
+      weight: input.weight ?? 1,
+      mutex_group: input.mutexGroup ?? null,
+      max_instances_per_trigger: 1,
+      requires_blocking_slot: input.requiresBlockingSlot ?? false,
+    },
+    repeat_policy: {
+      scope: "world",
+      max_trigger_count: input.maxTriggerCount ?? null,
+      cooldown_seconds: input.cooldownSeconds ?? 0,
+      history_key_template: `event:${input.id}`,
+      allow_while_active: true,
+    },
+    sample_contexts: [{ ...triggerContext(120), trigger_type: input.triggerType, event_definition_id: input.id }],
+  };
+}
+
+function indexFor(definitions: EventDefinition[], templates: CallTemplate[] = []): EventContentIndex {
+  const index = new EventContentIndex();
+  definitions.forEach((definition) => index.addDefinition(definition));
+  templates.forEach((template) => index.addCallTemplate(template));
+  return index;
+}
+
 function baseNode(id: string, type: EventNode["type"]) {
   return {
     id,
@@ -213,6 +447,99 @@ function baseNode(id: string, type: EventNode["type"]) {
       occupies_communication: false,
       blocking_key_template: null,
     },
+  };
+}
+
+function actionRequestNode(id: string, onCompletedNodeId: string, onFailedNodeId: string): ActionRequestNode {
+  return {
+    ...baseNode(id, "action_request"),
+    type: "action_request",
+    request_id: `${id}_request`,
+    action_type: "survey",
+    target_crew_ref: { type: "primary_crew" },
+    target_tile_ref: { type: "event_tile" },
+    action_params: {},
+    acceptance_conditions: [],
+    completion_trigger: { type: "action_complete", conditions: [] },
+    on_completed_node_id: onCompletedNodeId,
+    on_failed_node_id: onFailedNodeId,
+    occupies_crew_action: false,
+  };
+}
+
+function objectiveNode(id: string, onCompletedNodeId: string, onFailedNodeId: string): ObjectiveNode {
+  return {
+    ...baseNode(id, "objective"),
+    type: "objective",
+    objective_template: {
+      title: "Map the site",
+      summary: "Map the site.",
+      target_tile_ref: { type: "event_tile" },
+      eligible_crew_conditions: [],
+      required_action_type: "survey",
+      required_action_params: {},
+    },
+    mode: "create_and_wait",
+    on_completed_node_id: onCompletedNodeId,
+    on_failed_node_id: onFailedNodeId,
+    parent_event_link: true,
+  };
+}
+
+function waitNode(id: string, durationSeconds: number, nextNodeId: string): WaitNode {
+  return {
+    ...baseNode(id, "wait"),
+    type: "wait",
+    duration_seconds: durationSeconds,
+    wake_trigger_type: "time_wakeup",
+    next_node_id: nextNodeId,
+    set_next_wakeup_at: true,
+    interrupt_policy: "not_interruptible",
+  };
+}
+
+function runtimeEvent(id: string, definitionId: string, status: GraphRunnerGameState["active_events"][string]["status"]) {
+  return {
+    id,
+    event_definition_id: definitionId,
+    event_definition_version: 1,
+    status,
+    current_node_id: "entry",
+    primary_crew_id: "amy",
+    related_crew_ids: [],
+    primary_tile_id: "2-3",
+    related_tile_ids: [],
+    child_event_ids: [],
+    objective_ids: [],
+    active_call_id: null,
+    selected_options: {},
+    random_results: {},
+    blocking_claim_ids: [],
+    created_at: 100,
+    updated_at: 100,
+    deadline_at: null,
+    next_wakeup_at: null,
+    trigger_context_snapshot: triggerContext(100),
+    history_keys: [],
+    result_key: null,
+    result_summary: null,
+  };
+}
+
+function historyEntry(key: string, eventDefinitionId: string, triggerCount: number, cooldownUntil: number | null) {
+  return {
+    key,
+    scope: "world" as const,
+    event_definition_id: eventDefinitionId,
+    event_id: null,
+    crew_id: "amy",
+    tile_id: "2-3",
+    objective_id: null,
+    first_triggered_at: 90,
+    last_triggered_at: 100,
+    trigger_count: triggerCount,
+    last_result: null,
+    cooldown_until: cooldownUntil,
   };
 }
 
@@ -235,7 +562,7 @@ function callNode(id: string, mapping: Record<string, string>): CallNode {
   };
 }
 
-function endNode(id: string, resolution: "resolved" | "cancelled", resultKey: string, deleteActiveCalls: boolean): EndNode {
+function endNode(id: string, resolution: EndNode["resolution"], resultKey: string, deleteActiveCalls: boolean): EndNode {
   return {
     ...baseNode(id, "end"),
     type: "end",

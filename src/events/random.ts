@@ -11,6 +11,10 @@ export interface WeightedPickResult<TBranch extends WeightedBranch> {
   seed: string;
 }
 
+export interface PrioritizedWeightedBranch extends WeightedBranch {
+  priority: number;
+}
+
 export function stableRandom(seed: string): number {
   let hash = 2166136261;
 
@@ -43,4 +47,23 @@ export function pickWeightedBranch<TBranch extends WeightedBranch>(
   }
 
   return { branch: weightedBranches[weightedBranches.length - 1] ?? null, roll, seed };
+}
+
+export function pickHighestPriorityWeightedBranch<TBranch extends PrioritizedWeightedBranch>(
+  branches: TBranch[],
+  seed: string,
+): WeightedPickResult<TBranch> {
+  const highestPriority = branches.reduce<number | null>(
+    (current, branch) => (current === null || branch.priority > current ? branch.priority : current),
+    null,
+  );
+
+  if (highestPriority === null) {
+    return { branch: null, roll: stableRandom(seed), seed };
+  }
+
+  return pickWeightedBranch(
+    branches.filter((branch) => branch.priority === highestPriority),
+    seed,
+  );
 }
