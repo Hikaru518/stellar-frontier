@@ -5,8 +5,8 @@
       "id": "volcanic_ash_trace",
       "version": 1,
       "domain": "desert",
-      "title": "Volcanic Ash Trace",
-      "summary": "A desert ash trace asks another crew member to survey the target tile as an objective.",
+      "title": "火山灰痕迹",
+      "summary": "沙漠灰线需要另一名队员复核目标地块。",
       "tags": ["sample", "cross_crew_objective", "desert"],
       "status": "approved",
       "trigger": {
@@ -43,7 +43,7 @@
           {
             "id": "ash_trace_call",
             "type": "call",
-            "title": "Report the ash trace",
+            "title": "报告灰线痕迹",
             "call_template_id": "volcanic_ash_trace.call.briefing",
             "speaker_crew_ref": {
               "type": "primary_crew"
@@ -73,10 +73,10 @@
           {
             "id": "ash_cross_crew_objective",
             "type": "objective",
-            "title": "Cross-crew ash survey",
+            "title": "跨队员灰线调查",
             "objective_template": {
-              "title": "Survey the volcanic ash trace",
-              "summary": "Send another crew member to verify the ash line before it blows over.",
+              "title": "调查火山灰痕迹",
+              "summary": "在风吹散灰线前，派另一名队员复核这处痕迹。",
               "target_tile_ref": {
                 "type": "event_tile"
               },
@@ -111,7 +111,7 @@
           {
             "id": "ash_mapped_end",
             "type": "end",
-            "title": "Ash trace mapped",
+            "title": "灰线痕迹已测绘",
             "resolution": "resolved",
             "result_key": "ash_trace_mapped",
             "final_effect_refs": ["ash_mapped_effects"],
@@ -137,7 +137,7 @@
           {
             "id": "ash_sample_end",
             "type": "end",
-            "title": "Ash sample sealed",
+            "title": "灰线样本已封存",
             "resolution": "resolved",
             "result_key": "ash_sample_sealed",
             "final_effect_refs": ["ash_sample_effects"],
@@ -163,7 +163,7 @@
           {
             "id": "ash_failed_end",
             "type": "end",
-            "title": "Ash trace lost",
+            "title": "灰线痕迹已丢失",
             "resolution": "failed",
             "result_key": "ash_trace_lost",
             "final_effect_refs": ["ash_failed_effects"],
@@ -221,7 +221,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "A second crew member mapped the volcanic ash trace.",
+                "summary": "第二名队员完成了火山灰痕迹测绘。",
                 "importance": "normal",
                 "visibility": "player_visible",
                 "result_key": "ash_trace_mapped"
@@ -244,7 +244,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The ash trace was sealed as a sample without a second survey.",
+                "summary": "灰线痕迹已作为样本封存，未进行二次调查。",
                 "importance": "minor",
                 "visibility": "player_visible",
                 "result_key": "ash_sample_sealed"
@@ -267,7 +267,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The ash trace was lost before it could be mapped.",
+                "summary": "灰线痕迹在完成测绘前已经消失。",
                 "importance": "normal",
                 "visibility": "player_visible",
                 "result_key": "ash_trace_lost"
@@ -284,19 +284,19 @@
       "log_templates": [
         {
           "id": "ash_mapped_log",
-          "summary": "Volcanic ash trace mapped",
+          "summary": "火山灰痕迹已测绘",
           "importance": "normal",
           "visibility": "player_visible"
         },
         {
           "id": "ash_sample_log",
-          "summary": "Volcanic ash sample sealed",
+          "summary": "火山灰样本已封存",
           "importance": "minor",
           "visibility": "player_visible"
         },
         {
           "id": "ash_failed_log",
-          "summary": "Volcanic ash trace lost",
+          "summary": "火山灰痕迹已丢失",
           "importance": "normal",
           "visibility": "player_visible"
         }

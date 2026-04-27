@@ -5,8 +5,8 @@
       "id": "lost_relic_argument",
       "version": 1,
       "domain": "crew_kael",
-      "title": "Lost Relic Argument",
-      "summary": "Kael argues over a recovered relic and leaves long-term character and world consequences.",
+      "title": "遗物争执",
+      "summary": "Kael 围绕一件找回的遗物提出异议，并留下长期角色与世界影响。",
       "tags": ["sample", "long_term_consequence", "crew_kael"],
       "status": "approved",
       "trigger": {
@@ -43,7 +43,7 @@
           {
             "id": "relic_argument_call",
             "type": "call",
-            "title": "Kael argues over the relic",
+            "title": "Kael 围绕遗物争执",
             "call_template_id": "lost_relic_argument.call.argument",
             "speaker_crew_ref": {
               "type": "primary_crew"
@@ -73,7 +73,7 @@
           {
             "id": "relic_trusted_end",
             "type": "end",
-            "title": "Kael keeps the relic lead",
+            "title": "Kael 保留遗物线索",
             "resolution": "resolved",
             "result_key": "kael_trusted",
             "final_effect_refs": ["relic_trusted_effects"],
@@ -99,7 +99,7 @@
           {
             "id": "relic_secured_end",
             "type": "end",
-            "title": "Relic secured by base protocol",
+            "title": "遗物按基地规程封存",
             "resolution": "resolved",
             "result_key": "relic_secured",
             "final_effect_refs": ["relic_secured_effects"],
@@ -207,7 +207,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "Kael kept the relic lead, changing his long-term outlook.",
+                "summary": "Kael 保留了遗物线索，他的长期态度发生变化。",
                 "importance": "major",
                 "visibility": "player_visible",
                 "result_key": "kael_trusted"
@@ -247,7 +247,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The relic was secured by base protocol after Kael objected.",
+                "summary": "Kael 提出异议后，遗物仍按基地规程封存。",
                 "importance": "major",
                 "visibility": "player_visible",
                 "result_key": "relic_secured"
@@ -264,13 +264,13 @@
       "log_templates": [
         {
           "id": "relic_trusted_log",
-          "summary": "Kael trusted with relic lead",
+          "summary": "Kael 获准保留遗物线索",
           "importance": "major",
           "visibility": "player_visible"
         },
         {
           "id": "relic_secured_log",
-          "summary": "Relic secured by protocol",
+          "summary": "遗物已按规程封存",
           "importance": "major",
           "visibility": "player_visible"
         }

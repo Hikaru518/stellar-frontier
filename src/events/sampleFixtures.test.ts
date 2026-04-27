@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SAMPLE_EVENT_COVERAGE,
   SAMPLE_EVENT_IDS,
+  SAMPLE_EVENT_REACHABILITY,
   buildSampleEventContentIndex,
   dryRunApprovedSampleEvents,
 } from "./sampleFixtures";
@@ -27,6 +28,16 @@ describe("sample event fixtures", () => {
         long_term_consequence: expect.arrayContaining(["lost_relic_argument"]),
       }),
     );
+  });
+
+  it("documents whether approved samples are manual, seeded, or future integration coverage", () => {
+    expect(SAMPLE_EVENT_REACHABILITY).toEqual({
+      forest_trace_small_camp: "seeded-regression",
+      forest_beast_encounter: "future-integration",
+      mountain_signal_probe: "manual-reachable",
+      volcanic_ash_trace: "seeded-regression",
+      lost_relic_argument: "seeded-regression",
+    });
   });
 
   it("builds an index that contains all sample definitions and call templates", () => {

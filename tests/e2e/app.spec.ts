@@ -51,7 +51,31 @@ test("opens the communication station and shows a crew inventory", async ({ page
   await expect(page.getByText("可在失联或救援相关事件中提供定位帮助。")).toBeVisible();
 });
 
-test("submits a runtime call option through the communication UI", async ({ page }) => {
+test("creates a manual Garry mine anomaly call after the default survey path", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
+  await garryCard.getByRole("button", { name: "通话" }).click();
+  await page.getByRole("button", { name: /开展调查/ }).click();
+
+  await page.clock.runFor(180_000);
+  await page.waitForFunction((key) => {
+    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    return Object.values(save.active_events ?? {}).some(
+      (event) => (event as { event_definition_id?: string }).event_definition_id === "garry_mine_anomaly_report",
+    );
+  }, GAME_SAVE_KEY);
+
+  await page.getByRole("button", { name: "结束通话" }).last().click();
+  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
+  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
+  await expect(page.getByText("Garry 报告 3-3 的矿床下方传来空洞回声。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "标记异常，交给工程复核。" })).toBeVisible();
+});
+
+test("submits a seeded forest runtime call option through the communication UI", async ({ page }) => {
   const { callId, eventId, eventState } = createForestRuntimeCallState();
   await installSave(page, {
     elapsedGameSeconds: 180,
@@ -79,9 +103,9 @@ test("submits a runtime call option through the communication UI", async ({ page
 
   const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
   await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
-  await expect(page.getByText("Garry reports a small camp trace near 2-3.")).toBeVisible();
+  await expect(page.getByText("Garry 报告 2-3 附近有一处小型营地痕迹。")).toBeVisible();
 
-  await page.getByRole("button", { name: "Mark the camp trace." }).click();
+  await page.getByRole("button", { name: "标记这处营地痕迹。" }).click();
 
   const saved = await readSave(page);
   expect(saved.active_calls[callId].status).toBe("ended");
@@ -90,7 +114,7 @@ test("submits a runtime call option through the communication UI", async ({ page
   expect(saved.active_events[eventId].current_node_id).toBe("trace_resolved");
 });
 
-test("completes an assigned objective when its crew action finishes", async ({ page }) => {
+test("completes a seeded assigned objective when its crew action finishes", async ({ page }) => {
   const { eventId, objectiveId, actionId, eventState } = createVolcanicObjectiveState();
   await installSave(page, {
     elapsedGameSeconds: 0,
@@ -144,7 +168,7 @@ test("completes an assigned objective when its crew action finishes", async ({ p
   expect(saved.active_events[eventId].current_node_id).toBe("ash_mapped_end");
   expect(saved.event_logs).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ summary: "A second crew member mapped the volcanic ash trace." }),
+      expect.objectContaining({ summary: "第二名队员完成了火山灰痕迹测绘。" }),
     ]),
   );
 });
@@ -245,12 +269,12 @@ function createForestRuntimeCallState() {
           rendered_lines: [
             {
               template_variant_id: "trace_opening_default",
-              text: "Garry reports a small camp trace near 2-3.",
+              text: "Garry 报告 2-3 附近有一处小型营地痕迹。",
               speaker_crew_id: "garry",
             },
             {
               template_variant_id: "trace_body_default",
-              text: "No movement, just old ash and a tied branch.",
+              text: "没有活动迹象，只有冷灰和一根被绑过的树枝。",
               speaker_crew_id: "garry",
             },
           ],
@@ -258,13 +282,13 @@ function createForestRuntimeCallState() {
             {
               option_id: "mark_camp",
               template_variant_id: "trace_mark_default",
-              text: "Mark the camp trace.",
+              text: "标记这处营地痕迹。",
               is_default: true,
             },
             {
               option_id: "note_only",
               template_variant_id: "trace_note_default",
-              text: "Note it and move on.",
+              text: "记录下来，继续行动。",
               is_default: false,
             },
           ],

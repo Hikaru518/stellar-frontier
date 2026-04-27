@@ -13,7 +13,7 @@
         "variants": [
           {
             "id": "ash_opening_default",
-            "text": "{{crew_display_name}} found a gray ash line cutting across {{tile_id}}.",
+            "text": "{{crew_display_name}} 在 {{tile_id}} 发现一道横穿地表的灰色灰线。",
             "priority": 0
           }
         ]
@@ -25,7 +25,7 @@
           "variants": [
             {
               "id": "ash_body_default",
-              "text": "It is fading under wind; another crew member can verify it.",
+              "text": "风正在抹掉痕迹，需要另一名队员尽快复核。",
               "priority": 0
             }
           ]
@@ -37,7 +37,7 @@
           "variants": [
             {
               "id": "ash_assign_default",
-              "text": "Create a cross-crew survey objective.",
+              "text": "创建跨队员调查目标。",
               "priority": 0
             }
           ]
@@ -47,7 +47,7 @@
           "variants": [
             {
               "id": "ash_sample_default",
-              "text": "Seal a sample and skip the survey.",
+              "text": "封存样本，跳过二次调查。",
               "priority": 0
             }
           ]

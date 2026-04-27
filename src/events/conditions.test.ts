@@ -91,6 +91,51 @@ describe("structured condition evaluator", () => {
     expect(calls).toEqual(["custom_condition"]);
   });
 
+  it("checks trigger context fields through the built-in trigger_context_value_equals handler", () => {
+    const context = createContext(createState(), {
+      trigger_context: {
+        ...triggerContext(),
+        action_id: "garry-survey-mine",
+        payload: { action_type: "survey" },
+      },
+      handler_registry: [
+        handlerDefinition({
+          handler_type: "trigger_context_value_equals",
+          allowed_target_types: [],
+        }),
+      ],
+    });
+
+    expect(
+      evaluateConditions(
+        [
+          {
+            type: "handler_condition",
+            handler_type: "trigger_context_value_equals",
+            params: { field: "action_id", value: "garry-survey-mine" },
+          },
+          {
+            type: "handler_condition",
+            handler_type: "trigger_context_value_equals",
+            params: { field: "payload.action_type", value: "survey" },
+          },
+        ],
+        context,
+      ),
+    ).toEqual({ passed: true, errors: [] });
+
+    expect(
+      evaluateCondition(
+        {
+          type: "handler_condition",
+          handler_type: "trigger_context_value_equals",
+          params: { field: "payload.action_type", value: "gather" },
+        },
+        context,
+      ).passed,
+    ).toBe(false);
+  });
+
   it("returns located errors for missing fields, incompatible operators, and invalid handler params", () => {
     const context = createContext(createState(), {
       handler_registry: [

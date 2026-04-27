@@ -13,7 +13,7 @@
         "variants": [
           {
             "id": "relic_opening_default",
-            "text": "{{crew_display_name}} refuses to bag the relic without a promise.",
+            "text": "{{crew_display_name}} 拒绝把遗物装袋，除非基地先给出承诺。",
             "priority": 0
           }
         ]
@@ -25,7 +25,7 @@
           "variants": [
             {
               "id": "relic_body_default",
-              "text": "He says it belongs to someone who never made it home.",
+              "text": "他说那东西属于一个再也没能回家的人。",
               "priority": 0
             }
           ]
@@ -37,7 +37,7 @@
           "variants": [
             {
               "id": "relic_trust_default",
-              "text": "Trust Kael to carry the lead.",
+              "text": "信任 Kael，让他继续追查线索。",
               "priority": 0
             }
           ]
@@ -47,7 +47,7 @@
           "variants": [
             {
               "id": "relic_secure_default",
-              "text": "Secure the relic under base protocol.",
+              "text": "按基地规程封存遗物。",
               "priority": 0
             }
           ]
