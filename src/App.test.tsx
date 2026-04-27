@@ -158,6 +158,64 @@ describe("App", () => {
     expect(Object.keys(saved.active_calls)).toContain("forest_trace_small_camp:180:trace_report:call");
   });
 
+  it("opens an active runtime call from the station and submits its stable option_id", () => {
+    vi.useFakeTimers();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: "2-3",
+            location: "木材",
+            coord: "(2,3)",
+            status: "森林边缘待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: undefined,
+          },
+        ],
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    let garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
+
+    const endButtons = screen.getAllByRole("button", { name: "结束通话" });
+    fireEvent.click(endButtons[endButtons.length - 1]);
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByText("Garry reports a small camp trace near 2-3.")).toBeInTheDocument();
+    expect(screen.getByText("No movement, just old ash and a tied branch.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark the camp trace." }));
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const call = saved.active_calls["forest_trace_small_camp:180:trace_report:call"];
+    const event = saved.active_events["forest_trace_small_camp:180"];
+
+    expect(call.status).toBe("ended");
+    expect(call.selected_option_id).toBe("mark_camp");
+    expect(event.status).toBe("resolved");
+    expect(event.current_node_id).toBe("trace_resolved");
+    expect(event.selected_options).toEqual({ trace_report: "mark_camp" });
+  });
+
   it("ignores legacy emergencyEvent fields when opening a call", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
@@ -188,6 +246,74 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "通话页面：林夏 状态确认" })).toBeInTheDocument();
     expect(screen.queryByText(/使用照明道具继续确认洞内路径/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
+  });
+
+  it("does not fall back to legacy emergency choices for an expired runtime call", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 200,
+        crew: [
+          {
+            id: "amy",
+            currentTile: "2-3",
+            location: "森林 / 山",
+            coord: "(2,3)",
+            status: "森林紧急频道等待接入。",
+            statusTone: "danger",
+            hasIncoming: true,
+            emergencyEvent: createSavedEmergencyEvent("amy", "emergency_forest_beast"),
+          },
+        ],
+        active_calls: {
+          "expired-call": {
+            id: "expired-call",
+            event_id: "expired-event",
+            event_node_id: "beast_first_call",
+            call_template_id: "forest_beast_encounter.call.first",
+            crew_id: "amy",
+            status: "expired",
+            created_at: 0,
+            connected_at: null,
+            ended_at: null,
+            expires_at: 90,
+            render_context_snapshot: {},
+            rendered_lines: [
+              {
+                template_variant_id: "beast_first_opening_default",
+                text: "Amy whispers: something large is circling 2-3.",
+                speaker_crew_id: "amy",
+              },
+            ],
+            available_options: [
+              {
+                option_id: "fall_back",
+                template_variant_id: "beast_fallback_default",
+                text: "Fall back now.",
+                is_default: false,
+              },
+            ],
+            selected_option_id: null,
+            blocking_claim_id: null,
+          },
+        },
+        tiles: initialTiles,
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /通讯台/ }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    await user.click(within(amyCard as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.queryByRole("button", { name: "立刻撤离" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fall back now." })).not.toBeInTheDocument();
     expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
   });
 

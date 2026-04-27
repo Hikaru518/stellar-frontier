@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("loads the app and completes the Amy emergency flow", async ({ page }) => {
+test("loads the app and opens the incoming Amy channel without legacy emergency choices", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
@@ -9,15 +9,13 @@ test("loads the app and completes the Amy emergency flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "接通" }).click();
 
-  await expect(page.getByRole("heading", { name: "通话页面：Amy 紧急事件" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "通话页面：Amy 状态确认" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "立刻撤离" })).toHaveCount(0);
   await page.getByRole("button", { name: /地图二级菜单/ }).click();
 
   await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
   await page.getByRole("button", { name: "返回当前通话" }).click();
-
-  await page.getByRole("button", { name: "立刻撤离" }).click();
-  await expect(page.getByText("队员成功撤离。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "结束通话" }).last()).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回通讯台" }).last()).toBeVisible();
 });
 
 test("opens the communication station and shows a crew inventory", async ({ page }) => {
