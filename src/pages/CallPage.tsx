@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { buildCallView } from "../callActions";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, formatMoveRoute } from "../crewSystem";
-import { garryActions, type ActionOption, type CallContext, type CrewMember, type GameMapState, type MapTile } from "../data/gameData";
+import type { ActionOption, CallContext, CrewMember, GameMapState, GameState, MapTile } from "../data/gameData";
 import type { RuntimeCall } from "../events/types";
 import { findUsableInventoryItemByTag, getItemTagLabel } from "../inventorySystem";
 import { getTileLocationLabel, getVisibleTileWindow, type VisibleTileCell } from "../mapSystem";
@@ -11,6 +12,8 @@ import { formatDuration, getRemainingSeconds } from "../timeSystem";
 type CallActionOption = ActionOption & {
   usesItemTag?: string;
   unavailableHint?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 };
 
 interface CallView {
@@ -20,8 +23,14 @@ interface CallView {
   lines: string[];
   meta: string;
   actions: CallActionOption[];
+  actionGroups: CallActionGroupView[];
   badge: string;
   isRuntime: boolean;
+}
+
+interface CallActionGroupView {
+  title: string;
+  actions: CallActionOption[];
 }
 
 interface CallPageProps {
@@ -84,6 +93,7 @@ export function CallPage({
           lines: ["当前没有可处理的 runtime call。请返回通讯台查看其他频道。"],
           meta: "事件通话已关闭",
           actions: [] satisfies CallActionOption[],
+          actionGroups: [],
           badge: "已关闭",
           isRuntime: true,
         };
@@ -99,38 +109,33 @@ export function CallPage({
           id: option.option_id,
           label: option.text,
         })) satisfies CallActionOption[],
+        actionGroups: [],
         badge: formatRuntimeCallStatus(runtimeCall),
         isRuntime: true,
       };
     }
 
-    if (member.id === "garry") {
-      return {
-        title: "通话页面：Garry 普通状态",
-        subtitle: "当前只与 Garry 通话。地图和通讯录是辅助浮层，不会切换通话对象。",
-        scene: "通话中的图片 / 矿床 / 灰尘 / 正常采矿",
-        lines: ["头儿，我正在当前矿带采矿，有什么事吗？"],
-        meta: `地点：${currentLocation} / 状态：采矿中`,
-        actions: garryActions satisfies CallActionOption[],
-        badge: "普通通话",
-        isRuntime: false,
-      };
-    }
+    const currentTile = tiles.find((tile) => tile.id === member.currentTile);
+    const actionGroups = currentTile
+      ? buildCallView({
+          member,
+          tile: currentTile,
+          gameState: { map, active_calls: activeCalls } as GameState,
+        }).groups
+      : [];
 
     return {
       title: `通话页面：${member.name} 状态确认`,
-      subtitle: "当前只处理这一条通话事件。其他队员可以查看，但不能接入第二条通话。",
-      scene: "通话中的图片 / 湖泊 / 低频风声 / 画面延迟",
-      lines: ["收到。湖泊边缘不在原来的位置，但我还在走。"],
-      meta: `地点：${currentLocation} / 状态：行进中`,
-      actions: [
-        { id: "mike-status", label: "要求继续前进", hint: "维持行进状态。" },
-        { id: "mike-hold", label: "原地等待", hint: "暂停探索，避免进入未知水域。" },
-      ] satisfies CallActionOption[],
+      subtitle: "当前只处理这一条通话。其他队员可以查看，但不能接入第二条通话。",
+      scene: "通话中的图片 / 常规频道 / 当前坐标回传",
+      lines: [member.activeAction ? `${member.name} 正在执行行动，通讯台只开放可用指令。` : `${member.name} 正在等待新的行动指令。`],
+      meta: `地点：${currentLocation} / 状态：${member.status}`,
+      actions: [] satisfies CallActionOption[],
+      actionGroups: actionGroups satisfies CallActionGroupView[],
       badge: "普通通话",
       isRuntime: false,
     };
-  }, [call, elapsedGameSeconds, member, runtimeCall]);
+  }, [activeCalls, call, elapsedGameSeconds, map, member, runtimeCall, tiles]);
 
   if (!call || !member || !callView) {
     return (
@@ -214,24 +219,18 @@ export function CallPage({
             />
           ) : null}
 
-          <div className="action-stack">
-            {callView.actions.map((action) => {
-              const itemAvailability = getChoiceItemAvailability(action, member);
-              return (
-                <button
-                  type="button"
-                  key={action.id}
-                  className={`choice-button choice-${action.tone ?? "neutral"}`}
-                  onClick={() => onDecision(action.id)}
-                  disabled={callClosed || itemAvailability.disabled}
-                >
-                  <span>{action.label}</span>
-                  {action.hint ? <small>{action.hint}</small> : null}
-                  {itemAvailability.description ? <small>{itemAvailability.description}</small> : null}
-                </button>
-              );
-            })}
-          </div>
+          {callView.isRuntime ? (
+            <div className="action-stack">{callView.actions.map((action) => renderActionButton(action, member, callClosed, onDecision))}</div>
+          ) : (
+            <div className="action-stack">
+              {callView.actionGroups.map((group) => (
+                <section key={group.title} className="call-action-group">
+                  <h3>{group.title}</h3>
+                  <div className="action-stack">{group.actions.map((action) => renderActionButton(action, member, callClosed, onDecision))}</div>
+                </section>
+              ))}
+            </div>
+          )}
 
           {callClosed ? (
             <button type="button" className="primary-button full-width" onClick={onEndCall}>
@@ -274,6 +273,26 @@ export function CallPage({
         ) : null}
       </div>
     </ConsoleShell>
+  );
+}
+
+function renderActionButton(action: CallActionOption, member: CrewMember, callClosed: boolean, onDecision: (actionId: string) => void) {
+  const itemAvailability = getChoiceItemAvailability(action, member);
+  const disabled = callClosed || action.disabled || itemAvailability.disabled;
+
+  return (
+    <button
+      type="button"
+      key={action.id}
+      className={`choice-button choice-${action.tone ?? "neutral"}`}
+      onClick={() => onDecision(action.id)}
+      disabled={disabled}
+    >
+      <span>{action.label}</span>
+      {action.hint ? <small>{action.hint}</small> : null}
+      {action.disabledReason ? <small>{action.disabledReason}</small> : null}
+      {itemAvailability.description ? <small>{itemAvailability.description}</small> : null}
+    </button>
   );
 }
 
