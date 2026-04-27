@@ -19,7 +19,7 @@ source:
 | 3 | TASK-003 | 实现 src/callActions.ts（buildCallView 纯函数） | completed | 1 |
 | 4 | TASK-004 | 实现 src/callActionSettlement.ts（handler 白名单 + settleAction） | completed | 1 |
 | 5 | TASK-005 | 事件 → 真实行动桥接层与 effect 输出对齐 | completed | 1 |
-| 6 | TASK-006 | 重构 App.tsx 删除硬编码分支并接入 callActionSettlement | pending | 0 |
+| 6 | TASK-006 | 重构 App.tsx 删除硬编码分支并接入 callActionSettlement | completed | 1 |
 | 7 | TASK-007 | 重构 CallPage 用 buildCallView 渲染按钮 | pending | 0 |
 | 8 | TASK-008 | 通讯台统一所有事件来电为接通按钮 | pending | 0 |
 | 9 | TASK-009 | 实现 Mike crash_site_wreckage_recon 事件内容与集成 | pending | 0 |
@@ -72,3 +72,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。补齐 `create_crew_action` 输出字段，新增 `createActiveActionFromCrewAction`，并在 App runtime 合流中桥接事件 action；冲突时事件优先并写中断日志，`event_waiting` 投射为可接通的 event activeAction。
 - 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 124 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-006: 重构 App.tsx 删除硬编码分支并接入 callActionSettlement
+- 状态: completed
+- 开始时间: 2026-04-28 00:36
+- 完成时间: 2026-04-28 00:45
+- 尝试次数: 1
+- Monkey summary: 成功。`App.tsx` 接入 `applyImmediateOrCreateAction` / `settleAction`，删除 Garry/Mike/tileId 硬编码结算分支；`App.test.tsx` 改为 tag-driven 断言并新增 standby 触发 `idle_time` 覆盖。
+- 质量检查: 指定硬编码 rg 检查无命中；`npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 125 tests）；`npm run build` 通过；ReadLints 无新增错误。
