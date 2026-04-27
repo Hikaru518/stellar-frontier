@@ -1,0 +1,60 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mountain_signal_probe.call.report",
+      "version": 1,
+      "domain": "mountain",
+      "event_definition_id": "mountain_signal_probe",
+      "node_id": "signal_probe_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "signal_opening_default",
+            "text": "{{crew_display_name}} hears a broken carrier from {{tile_id}}.",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "max_lines": 1,
+          "variants": [
+            {
+              "id": "signal_body_default",
+              "text": "The probe needs a quiet lock window.",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "tune_signal": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "signal_tune_default",
+              "text": "Tune the signal and wait.",
+              "priority": 0
+            }
+          ]
+        },
+        "ignore_signal": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "signal_ignore_default",
+              "text": "Leave it for later.",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

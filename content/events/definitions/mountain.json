@@ -1,0 +1,263 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mountain_signal_probe",
+      "version": 1,
+      "domain": "mountain",
+      "title": "Mountain Signal Probe",
+      "summary": "A mountain signal probe requires a short timed wait before it resolves.",
+      "tags": ["sample", "wait_node", "mountain"],
+      "status": "approved",
+      "trigger": {
+        "type": "arrival",
+        "required_context": ["crew_id", "tile_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "tags",
+            "value": "mountain_signal"
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 40,
+        "weight": 1,
+        "mutex_group": null,
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": false
+      },
+      "repeat_policy": {
+        "scope": "tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 0,
+        "history_key_template": "event:{event_definition_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "signal_probe_call",
+        "nodes": [
+          {
+            "id": "signal_probe_call",
+            "type": "call",
+            "title": "Tune the mountain signal",
+            "call_template_id": "mountain_signal_probe.call.report",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              {
+                "id": "tune_signal",
+                "is_default": true
+              },
+              {
+                "id": "ignore_signal"
+              }
+            ],
+            "option_node_mapping": {
+              "tune_signal": "signal_wait",
+              "ignore_signal": "signal_ignored_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 180
+          },
+          {
+            "id": "signal_wait",
+            "type": "wait",
+            "title": "Wait for signal lock",
+            "duration_seconds": 30,
+            "wake_trigger_type": "time_wakeup",
+            "next_node_id": "signal_locked_end",
+            "set_next_wakeup_at": true,
+            "crew_action_during_wait": {
+              "type": "event_waiting",
+              "status": "active",
+              "action_params": {
+                "reason": "signal_lock"
+              }
+            },
+            "interrupt_policy": "not_interruptible",
+            "on_interrupted": null,
+            "blocking": {
+              "occupies_crew_action": true,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            }
+          },
+          {
+            "id": "signal_locked_end",
+            "type": "end",
+            "title": "Signal locked",
+            "resolution": "resolved",
+            "result_key": "signal_locked",
+            "final_effect_refs": ["signal_lock_effects"],
+            "event_log_template_id": "signal_locked_log",
+            "history_writes": [
+              {
+                "key_template": "mountain_signal_probe:{tile_id}",
+                "scope": "tile",
+                "value": "signal_locked"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "signal_ignored_end",
+            "type": "end",
+            "title": "Signal ignored",
+            "resolution": "resolved",
+            "result_key": "signal_ignored",
+            "final_effect_refs": ["signal_ignore_effects"],
+            "event_log_template_id": "signal_ignored_log",
+            "history_writes": [
+              {
+                "key_template": "mountain_signal_probe:{tile_id}",
+                "scope": "tile",
+                "value": "signal_ignored"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["signal_locked_end", "signal_ignored_end"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "signal_lock_effects",
+          "effects": [
+            {
+              "id": "signal_world_flag",
+              "type": "set_world_flag",
+              "target": {
+                "type": "world_flags"
+              },
+              "params": {
+                "key": "mountain_signal_locked",
+                "value": true,
+                "tags": ["signal"]
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "signal_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "The mountain signal was locked after a short wait.",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "signal_locked"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "signal_ignore_effects",
+          "effects": [
+            {
+              "id": "signal_ignore_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "The mountain signal was left for later.",
+                "importance": "minor",
+                "visibility": "player_visible",
+                "result_key": "signal_ignored"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "signal_locked_log",
+          "summary": "Mountain signal locked",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "signal_ignored_log",
+          "summary": "Mountain signal ignored",
+          "importance": "minor",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["mountain_signal_probe.call.report"],
+        "crew_ids": ["kael"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "arrival",
+          "occurred_at": 360,
+          "source": "tile_system",
+          "crew_id": "kael",
+          "tile_id": "4-2",
+          "action_id": null,
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "arrival_reason": "entered_signal_zone"
+          }
+        }
+      ]
+    }
+  ]
+}
