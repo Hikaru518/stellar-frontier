@@ -1,4 +1,6 @@
 import { evaluateConditions, type ConditionEvaluationContext } from "./conditions";
+import type { EventContentIndex } from "./contentIndex";
+import { renderRuntimeCall } from "./callRenderer";
 import { executeEffects, type EffectGameState } from "./effects";
 import { pickWeightedBranch } from "./random";
 import type {
@@ -28,6 +30,7 @@ export type GraphRunnerErrorCode =
   | "missing_node"
   | "requirements_failed"
   | "effect_failed"
+  | "call_render_failed"
   | "missing_option"
   | "missing_transition"
   | "progression_limit";
@@ -46,6 +49,7 @@ export interface GraphRunnerOptions {
   handler_registry?: ConditionEvaluationContext["handler_registry"];
   condition_handlers?: ConditionEvaluationContext["condition_handlers"];
   effect_handlers?: Parameters<typeof executeEffects>[1]["effect_handlers"];
+  content_index?: EventContentIndex;
 }
 
 export interface GraphRunnerResult {
@@ -267,7 +271,7 @@ function resolveEnteredNode(
 ): GraphRunnerResult & { next_node_id?: Id | null } {
   switch (node.type) {
     case "call":
-      return waitForCall(state, event, node, triggerContext);
+      return waitForCall(state, event, node, triggerContext, options);
     case "wait":
       return waitForTime(state, event, node, triggerContext);
     case "check":
@@ -300,7 +304,9 @@ function advanceCallChoice(
   const optionId = triggerContext.selected_option_id;
   const nextNodeId = optionId ? node.option_node_mapping[optionId] : undefined;
   const option = optionId ? node.options.find((item) => item.id === optionId) : undefined;
-  if (!optionId || !nextNodeId || !option) {
+  const activeCall = event.active_call_id ? state.active_calls[event.active_call_id] : undefined;
+  const optionIsAvailable = !activeCall || activeCall.available_options.some((item) => item.option_id === optionId);
+  if (!optionId || !nextNodeId || !option || !optionIsAvailable) {
     return { state, event, errors: [missingOption(event, node.id, optionId)], transitions: [] };
   }
 
@@ -424,30 +430,13 @@ function waitForCall(
   event: RuntimeEvent,
   node: CallNode,
   triggerContext: TriggerContext,
+  options: GraphRunnerOptions,
 ): GraphRunnerResult & { next_node_id?: Id | null } {
   const callId = event.active_call_id ?? `${event.id}:${node.id}:call`;
-  const call: RuntimeCall = state.active_calls[callId] ?? {
-    id: callId,
-    event_id: event.id,
-    event_node_id: node.id,
-    call_template_id: node.call_template_id,
-    crew_id: event.primary_crew_id ?? triggerContext.crew_id ?? "unknown_crew",
-    status: "incoming",
-    created_at: now(triggerContext, state),
-    connected_at: null,
-    ended_at: null,
-    expires_at: typeof node.expires_in_seconds === "number" ? now(triggerContext, state) + node.expires_in_seconds : null,
-    render_context_snapshot: {},
-    rendered_lines: [],
-    available_options: node.options.map((option) => ({
-      option_id: option.id,
-      template_variant_id: "pending_renderer",
-      text: option.id,
-      is_default: option.is_default ?? false,
-    })),
-    selected_option_id: null,
-    blocking_claim_id: node.blocking.occupies_communication ? `${event.id}:${node.id}:communication` : null,
-  };
+  const call = state.active_calls[callId] ?? renderCall(state, event, node, triggerContext, options);
+  if (Array.isArray(call)) {
+    return { state, event, errors: call, transitions: [], next_node_id: null };
+  }
   const nextEvent = {
     ...event,
     status: "waiting_call" as const,
@@ -458,6 +447,59 @@ function waitForCall(
   const nextState = upsertEvent({ ...state, active_calls: { ...state.active_calls, [callId]: call } }, nextEvent);
 
   return { state: nextState, event: nextEvent, errors: [], transitions: [], next_node_id: null };
+}
+
+function renderCall(
+  state: GraphRunnerGameState,
+  event: RuntimeEvent,
+  node: CallNode,
+  triggerContext: TriggerContext,
+  options: GraphRunnerOptions,
+): RuntimeCall | GraphRunnerError[] {
+  const template = options.content_index?.callTemplatesById.get(node.call_template_id);
+  if (!template) {
+    return {
+      id: event.active_call_id ?? `${event.id}:${node.id}:call`,
+      event_id: event.id,
+      event_node_id: node.id,
+      call_template_id: node.call_template_id,
+      crew_id: event.primary_crew_id ?? triggerContext.crew_id ?? "unknown_crew",
+      status: "incoming",
+      created_at: now(triggerContext, state),
+      connected_at: null,
+      ended_at: null,
+      expires_at: typeof node.expires_in_seconds === "number" ? now(triggerContext, state) + node.expires_in_seconds : null,
+      render_context_snapshot: {},
+      rendered_lines: [],
+      available_options: node.options.map((option) => ({
+        option_id: option.id,
+        template_variant_id: "pending_renderer",
+        text: option.id,
+        is_default: option.is_default ?? false,
+      })),
+      selected_option_id: null,
+      blocking_claim_id: node.blocking.occupies_communication ? `${event.id}:${node.id}:communication` : null,
+    };
+  }
+
+  const rendered = renderRuntimeCall({
+    state,
+    event,
+    node,
+    template,
+    trigger_context: triggerContext,
+  });
+  if (rendered.errors.length > 0) {
+    return rendered.errors.map((error) => ({
+      code: "call_render_failed" as const,
+      event_id: event.id,
+      node_id: node.id,
+      path: error.path,
+      message: error.message,
+    }));
+  }
+
+  return rendered.call;
 }
 
 function waitForTime(
