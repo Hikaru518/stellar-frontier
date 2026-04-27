@@ -6,8 +6,20 @@ import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { MapPage } from "./pages/MapPage";
 import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents } from "./eventSystem";
-import { createEmptyEventRuntimeState } from "./events/types";
+import { eventContentLibrary } from "./content/contentData";
+import { buildEventContentIndex } from "./events/contentIndex";
+import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
+import type { GraphRunnerGameState } from "./events/graphRunner";
+import {
+  createEmptyEventRuntimeState,
+  type CrewState,
+  type EventRuntimeState,
+  type Id,
+  type InventoryState,
+  type RuntimeCall,
+  type TileState,
+  type TriggerContext,
+} from "./events/types";
 import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
 import {
   createBaseInventoryFromResources,
@@ -29,6 +41,12 @@ import {
   type Tone,
 } from "./data/gameData";
 import { formatDuration, formatGameTime, GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState, loadGameSave, saveGameState } from "./timeSystem";
+
+const eventContentIndexResult = buildEventContentIndex(eventContentLibrary);
+if (eventContentIndexResult.errors.length > 0) {
+  throw new Error(`Event content index failed: ${eventContentIndexResult.errors.map((error) => error.message).join("; ")}`);
+}
+const eventContentIndex = eventContentIndexResult.index;
 
 type SavedCrewMember = Partial<CrewMember> & { id: CrewId; bag?: unknown };
 
@@ -122,15 +140,16 @@ function App() {
       return;
     }
 
-    const type = member.emergencyEvent && !member.emergencyEvent.settled ? "emergency" : "normal";
-    setCurrentCall({ crewId, type, settled: false });
+    const runtimeCall = findRuntimeCallForCrew(gameState, crewId);
+    const type = "normal";
+    setCurrentCall({ crewId, type, settled: false, runtimeCallId: runtimeCall?.id });
     setGameState((state) => ({
       ...state,
       crew: state.crew.map((item) => (item.id === crewId ? { ...item, hasIncoming: false } : item)),
       logs: appendLogEntry(
         state.logs,
-        `${member.name} 的${type === "emergency" ? "紧急来电已接通" : "普通通话已接通"}。`,
-        type === "emergency" ? "danger" : "neutral",
+        `${member.name} 的普通通话已接通。`,
+        "neutral",
         state.elapsedGameSeconds,
       ),
     }));
@@ -165,16 +184,28 @@ function App() {
       return;
     }
 
-    const callMember = crew.find((member) => member.id === currentCall.crewId);
-    const emergencySettled = callMember?.emergencyEvent?.settled ?? false;
-    if (currentCall.settled || emergencySettled) {
+    if (currentCall.settled) {
       return;
     }
 
-    const decision =
-      currentCall.type === "emergency" && callMember?.emergencyEvent && !callMember.emergencyEvent.settled
-        ? resolveEmergencyChoice(callMember, actionId, elapsedGameSeconds, resources, gameState.baseInventory, logs, tiles)
-        : resolveDecision(currentCall.crewId, actionId, elapsedGameSeconds);
+    if (currentCall.runtimeCallId) {
+      setGameState((state) =>
+        mergeEventRuntimeState(
+          state,
+          selectCallOption({
+            state: toEventEngineState(state),
+            index: eventContentIndex,
+            call_id: currentCall.runtimeCallId!,
+            option_id: actionId,
+            occurred_at: state.elapsedGameSeconds,
+          }).state,
+        ),
+      );
+      setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
+      return;
+    }
+
+    const decision = resolveDecision(currentCall.crewId, actionId, elapsedGameSeconds);
     if (!decision) {
       return;
     }
@@ -198,12 +229,9 @@ function App() {
           canCommunicate: decision.canCommunicate ?? member.canCommunicate,
           conditions: decision.conditions ?? member.conditions,
           inventory: decision.inventory ?? member.inventory,
-          emergencyEvent: decision.emergencySettled && member.emergencyEvent ? { ...member.emergencyEvent, settled: true } : member.emergencyEvent,
         };
 
-        return currentCall.type === "emergency" && decision.emergencySettled
-          ? appendEmergencyDiary(nextMember, actionId, state.elapsedGameSeconds)
-          : nextMember;
+        return nextMember;
       });
 
       const updatedTiles = decision.tileUpdate
@@ -220,7 +248,18 @@ function App() {
         logs: decision.logs ?? appendLogEntry(state.logs, decision.log, decision.tone, state.elapsedGameSeconds),
       };
 
-      return settleGameTime(advancedState);
+      const settledState = settleGameTime(advancedState);
+      return actionId === "standby"
+        ? processAppEventTrigger(settledState, {
+            trigger_type: "idle_time",
+            occurred_at: settledState.elapsedGameSeconds,
+            source: "crew_action",
+            crew_id: currentCall.crewId,
+            tile_id: updatedCrew.find((member) => member.id === currentCall.crewId)?.currentTile ?? null,
+            action_id: null,
+            payload: { action_type: "standby" },
+          })
+        : settledState;
     });
 
     setCurrentCall((call) =>
@@ -444,8 +483,8 @@ function settleGameTime(state: GameState): GameState {
   let resources = state.resources;
   let tiles = state.tiles;
   let logs = state.logs;
-  let eventHistory = state.eventHistory ?? {};
   let baseInventory = state.baseInventory;
+  const triggerContexts: TriggerContext[] = [];
 
   const crew = state.crew.map((member) => {
     let nextMember = member;
@@ -458,26 +497,23 @@ function settleGameTime(state: GameState): GameState {
 
       if (settled.changed && member.activeAction && !nextMember.activeAction) {
         nextMember = appendArrivalDiary(nextMember, state.elapsedGameSeconds);
-        const eventResult = triggerEvents({
-          member: nextMember,
-          source: "arrival",
-          elapsedGameSeconds: state.elapsedGameSeconds,
-          tiles,
-          resources,
-          logs,
-          eventHistory,
-          baseInventory,
+        triggerContexts.push({
+          trigger_type: "arrival",
+          occurred_at: state.elapsedGameSeconds,
+          source: "crew_action",
+          crew_id: nextMember.id,
+          tile_id: nextMember.currentTile,
+          action_id: member.activeAction.id,
+          payload: {
+            action_type: "move",
+            from_tile_id: member.activeAction.fromTile ?? null,
+            target_tile_id: member.activeAction.targetTile ?? null,
+          },
         });
-        nextMember = eventResult.member;
-        tiles = eventResult.tiles;
-        resources = eventResult.resources;
-        logs = eventResult.logs;
-        baseInventory = eventResult.baseInventory;
-        eventHistory = eventResult.eventHistory;
-        changed = changed || eventResult.changed;
       }
     } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
       const completedActionType = member.activeAction.actionType;
+      const completedActionId = member.activeAction.id;
       const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs);
       nextMember = settled.member;
       resources = settled.resources;
@@ -485,42 +521,30 @@ function settleGameTime(state: GameState): GameState {
       logs = settled.logs;
       changed = true;
 
-      const source = getEventTriggerSource(completedActionType);
-      if (source) {
-        const eventResult = triggerEvents({
-          member: nextMember,
-          source,
-          elapsedGameSeconds: state.elapsedGameSeconds,
-          tiles,
-          resources,
-          logs,
-          eventHistory,
-          baseInventory,
+      if (shouldTriggerActionComplete(completedActionType)) {
+        triggerContexts.push({
+          trigger_type: "action_complete",
+          occurred_at: state.elapsedGameSeconds,
+          source: "crew_action",
+          crew_id: nextMember.id,
+          tile_id: nextMember.currentTile,
+          action_id: completedActionId,
+          payload: { action_type: completedActionType },
         });
-        nextMember = eventResult.member;
-        tiles = eventResult.tiles;
-        resources = eventResult.resources;
-        logs = eventResult.logs;
-        baseInventory = eventResult.baseInventory;
-        eventHistory = eventResult.eventHistory;
-        changed = changed || eventResult.changed;
       }
-    }
-
-    if (nextMember.emergencyEvent && !nextMember.emergencyEvent.settled) {
-      const settled = settleEmergencyEvent(nextMember, state.elapsedGameSeconds, tiles, logs, resources, baseInventory);
-      nextMember = settled.member;
-      tiles = settled.tiles;
-      logs = settled.logs;
-      resources = settled.resources;
-      baseInventory = settled.baseInventory;
-      changed = changed || settled.changed;
     }
 
     return nextMember;
   });
 
-  return changed ? { ...state, crew, resources, baseInventory, tiles: syncTileCrew(tiles, crew), logs, eventHistory } : state;
+  let nextState = changed ? { ...state, crew, resources, baseInventory, tiles: syncTileCrew(tiles, crew), logs } : state;
+  nextState = processObjectiveCompletions(nextState, triggerContexts);
+
+  for (const context of triggerContexts) {
+    nextState = processAppEventTrigger(nextState, context);
+  }
+
+  return processAppEventWakeups(nextState);
 }
 
 function settleCrewAction(
@@ -668,114 +692,227 @@ function settleCrewAction(
   };
 }
 
-function settleEmergencyEvent(
-  member: CrewMember,
-  elapsedGameSeconds: number,
-  tiles: MapTile[],
-  logs: SystemLog[],
-  resources: ResourceSummary,
-  baseInventory: InventoryEntry[],
-) {
-  const event = member.emergencyEvent;
-  if (!event) {
-    return { member, tiles, logs, resources, baseInventory, changed: false };
-  }
+function shouldTriggerActionComplete(actionType: ActiveAction["actionType"]) {
+  return actionType === "survey" || actionType === "gather" || actionType === "build";
+}
 
-  if (elapsedGameSeconds >= event.deadlineTime) {
-    const decision = createAutoEmergencyDecision(member, elapsedGameSeconds, resources, baseInventory, logs, tiles);
-    if (decision) {
-      const nextMember = appendEmergencyDiary(
-        {
-          ...member,
-          status: decision.status,
-          statusTone: decision.tone,
-          summary: decision.summary,
-          hasIncoming: false,
-          unavailable: decision.unavailable ?? member.unavailable,
-          canCommunicate: decision.canCommunicate ?? member.canCommunicate,
-          conditions: decision.conditions ?? member.conditions,
-          inventory: decision.inventory ?? member.inventory,
-          emergencyEvent: { ...event, dangerStage: 4, settled: true },
-        },
-        "auto",
-        elapsedGameSeconds,
-      );
+function processAppEventTrigger(state: GameState, context: TriggerContext): GameState {
+  const result = processTrigger({
+    state: toEventEngineState(state),
+    index: eventContentIndex,
+    context,
+  });
 
-      return {
-        member: nextMember,
-        tiles: decision.tileUpdate ? patchTile(tiles, decision.tileUpdate.id, decision.tileUpdate.patch) : tiles,
-        logs: decision.logs ?? appendLogEntry(logs, decision.log, decision.tone, elapsedGameSeconds),
-        resources: decision.resources ?? resources,
-        baseInventory: decision.baseInventory ?? baseInventory,
-        changed: true,
-      };
+  return mergeEventRuntimeState(state, result.state);
+}
+
+function processAppEventWakeups(state: GameState): GameState {
+  const result = processEventWakeups({
+    state: toEventEngineState(state),
+    index: eventContentIndex,
+    elapsed_game_seconds: state.elapsedGameSeconds,
+  });
+
+  return mergeEventRuntimeState(state, result.state);
+}
+
+function processObjectiveCompletions(state: GameState, contexts: TriggerContext[]): GameState {
+  let nextState = state;
+
+  for (const context of contexts) {
+    if (context.trigger_type !== "action_complete" || !context.action_id) {
+      continue;
     }
 
-    return {
-      member: appendDiaryEntry(
-        {
-          ...member,
-          status: "受重伤并失联。",
-          statusTone: "danger" as Tone,
-          summary: "Amy 错过处理窗口，通讯只剩断续噪声。",
-          hasIncoming: false,
-          unavailable: true,
-          canCommunicate: false,
-          emergencyEvent: { ...event, dangerStage: 4, settled: true },
-        },
-        {
-          entryId: `amy_lost_timeout_${elapsedGameSeconds}`,
-          triggerNode: "紧急事件超时",
-          gameSecond: elapsedGameSeconds,
-          text: "我等了够久。下次如果还有下次，请让中控台学会在野兽靠近时闭嘴。",
-        },
-      ),
-      tiles: patchTile(tiles, "2-3", { danger: "紧急事件自动结算：Amy 失联", status: "失联" }),
-      logs: appendLogEntry(logs, "Amy 的紧急事件超过最终期限，系统按坏结果自动结算。", "danger", elapsedGameSeconds),
-      resources,
-      baseInventory,
-      changed: true,
-    };
+    const objective = Object.values(nextState.objectives).find(
+      (item) => item.action_id === context.action_id && (item.status === "assigned" || item.status === "in_progress"),
+    );
+    if (!objective) {
+      continue;
+    }
+
+    const completed = completeObjective({
+      state: toEventEngineState(nextState),
+      index: eventContentIndex,
+      objective_id: objective.id,
+      occurred_at: context.occurred_at,
+      result_key: "action_completed",
+    });
+    nextState = mergeEventRuntimeState(nextState, completed.state);
   }
 
-  let nextStage = event.dangerStage;
-  let nextEscalationTime = event.nextEscalationTime;
-  while (elapsedGameSeconds >= nextEscalationTime && nextEscalationTime < event.deadlineTime) {
-    nextStage += 1;
-    nextEscalationTime += 30;
-  }
+  return nextState;
+}
 
-  if (nextStage === event.dangerStage) {
-    return { member, tiles, logs, resources, baseInventory, changed: false };
-  }
+function findRuntimeCallForCrew(state: GameState, crewId: CrewId): RuntimeCall | undefined {
+  return Object.values(state.active_calls).find(
+    (call) => call.crew_id === crewId && (call.status === "incoming" || call.status === "connected" || call.status === "awaiting_choice"),
+  );
+}
 
+function toEventEngineState(state: GameState): GraphRunnerGameState {
   return {
-    member: {
-      ...member,
-      status: `森林危险阶段 ${nextStage}，等待决策。`,
-      statusTone: "danger" as Tone,
-      summary: "Amy 的情况正在恶化。倒计时没有停止。",
-      emergencyEvent: { ...event, dangerStage: nextStage, nextEscalationTime },
+    ...state,
+    elapsed_game_seconds: state.elapsedGameSeconds,
+    crew: Object.fromEntries(state.crew.map((member) => [member.id, toCrewState(member)])),
+    tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile)])),
+    resources: numericResources(state.resources),
+    inventories: {
+      ...toInventoryStates(state),
+      ...state.inventories,
     },
-    tiles: patchTile(tiles, "2-3", { danger: `大型野兽接近，危险阶段 ${nextStage}`, status: "危险升级" }),
-    logs: appendLogEntry(logs, `Amy 的情况正在恶化，危险等级提升到 ${nextStage}。`, "danger", elapsedGameSeconds),
-    resources,
-    baseInventory,
-    changed: true,
   };
 }
 
-function getEventTriggerSource(actionType: ActiveAction["actionType"]) {
-  if (actionType === "survey") {
-    return "surveyComplete" as const;
+function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
+  return {
+    ...state,
+    active_events: eventState.active_events,
+    active_calls: eventState.active_calls,
+    objectives: eventState.objectives,
+    event_logs: eventState.event_logs,
+    world_history: eventState.world_history,
+    world_flags: eventState.world_flags,
+    crew_actions: eventState.crew_actions,
+    inventories: eventState.inventories,
+    rng_state: eventState.rng_state,
+  };
+}
+
+function toCrewState(member: CrewMember): CrewState {
+  return {
+    id: member.id,
+    display_name: member.name,
+    tile_id: member.currentTile,
+    status: toCrewRuntimeStatus(member),
+    attributes: {
+      strength: member.attributes.physical,
+      agility: member.attributes.agility,
+      intelligence: member.attributes.intellect,
+      perception: member.attributes.perception,
+      luck: member.attributes.luck,
+    },
+    personality_tags: member.personalityTags,
+    expertise_tags: member.expertise.map((item) => item.expertiseId),
+    condition_tags: member.conditions,
+    communication_state: member.unavailable || !member.canCommunicate ? "lost_contact" : "available",
+    current_action_id: member.activeAction?.id ?? null,
+    blocking_event_id: null,
+    blocking_call_id: null,
+    background_event_ids: [],
+    inventory_id: crewInventoryId(member.id),
+    diary_entry_ids: member.diaryEntries.map((entry) => entry.entryId),
+    event_history_keys: [],
+  };
+}
+
+function toTileState(tile: MapTile): TileState {
+  return {
+    id: tile.id,
+    coordinates: {
+      x: tile.col,
+      y: tile.row,
+    },
+    terrain_type: tile.terrain,
+    tags: inferTileTags(tile),
+    danger_tags: tile.danger === "未发现即时危险" ? [] : [tile.danger],
+    discovery_state: tile.investigated ? "mapped" : "known",
+    survey_state: tile.investigated ? "surveyed" : "unsurveyed",
+    visibility: "visible",
+    current_crew_ids: tile.crew,
+    resource_nodes: tile.resources.map((resource) => ({
+      id: `${tile.id}:${resource}`,
+      resource_id: resource,
+      amount: 1,
+      state: "discovered" as const,
+    })),
+    site_objects: tile.instruments.map((instrument) => ({ id: `${tile.id}:${instrument}`, object_type: instrument, tags: [] })),
+    buildings: tile.buildings.map((building) => ({ id: `${tile.id}:${building}`, building_type: building, status: "active" })),
+    event_marks: [],
+    history_keys: [],
+  };
+}
+
+function toInventoryStates(state: GameState): Record<Id, InventoryState> {
+  const crewInventories = Object.fromEntries(
+    state.crew.map((member) => [
+      crewInventoryId(member.id),
+      {
+        id: crewInventoryId(member.id),
+        owner_type: "crew" as const,
+        owner_id: member.id,
+        items: member.inventory.map((item) => ({ item_id: item.itemId, quantity: item.quantity })),
+        resources: {},
+      },
+    ]),
+  );
+
+  return {
+    base: {
+      id: "base",
+      owner_type: "base",
+      owner_id: "base",
+      items: state.baseInventory.map((item) => ({ item_id: item.itemId, quantity: item.quantity })),
+      resources: numericResources(state.resources),
+    },
+    ...crewInventories,
+  };
+}
+
+function toCrewRuntimeStatus(member: CrewMember): CrewState["status"] {
+  if (member.unavailable) {
+    return "unavailable";
   }
-  if (actionType === "gather") {
-    return "gatherComplete" as const;
+  if (!member.canCommunicate) {
+    return "lost_contact";
   }
-  if (actionType === "build") {
-    return "buildComplete" as const;
+  if (member.activeAction?.actionType === "move") {
+    return "moving";
   }
-  return null;
+  if (member.activeAction) {
+    return "acting";
+  }
+  return "idle";
+}
+
+function numericResources(resources: ResourceSummary): Record<string, number> {
+  return {
+    energy: resources.energy,
+    iron: resources.iron,
+    wood: resources.wood,
+    food: resources.food,
+    water: resources.water,
+    baseIntegrity: resources.baseIntegrity,
+    sol: resources.sol,
+    power: resources.power,
+  };
+}
+
+function crewInventoryId(crewId: CrewId) {
+  return `crew:${crewId}`;
+}
+
+function inferTileTags(tile: MapTile) {
+  const text = [tile.terrain, tile.status, tile.danger, ...tile.resources, ...tile.buildings, ...tile.instruments].join(" ");
+  const tags = new Set<string>();
+
+  if (/森林|木材|野生动物/.test(text)) {
+    tags.add("forest");
+  }
+  if (/山|丘陵/.test(text)) {
+    tags.add("mountain");
+  }
+  if (/断续信号|广播塔|中继器|回声/.test(text)) {
+    tags.add("mountain_signal");
+  }
+  if (/沙漠/.test(text)) {
+    tags.add("desert");
+  }
+  if (/火山|灰|ash/i.test(text)) {
+    tags.add("volcanic");
+  }
+
+  return Array.from(tags);
 }
 
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number) {
