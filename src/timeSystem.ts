@@ -1,4 +1,6 @@
-export const GAME_SAVE_KEY = "stellar-frontier-save-v1";
+export const LEGACY_GAME_SAVE_KEY = "stellar-frontier-save-v1";
+export const GAME_SAVE_KEY = "stellar-frontier-save-v2";
+export const GAME_SAVE_VERSION = 2;
 
 export function formatGameTime(elapsedGameSeconds: number) {
   const safeSeconds = Math.max(0, Math.floor(elapsedGameSeconds));
@@ -30,7 +32,8 @@ export function getRemainingSeconds(finishTime: number, elapsedGameSeconds: numb
 export function loadGameSave<T>() {
   try {
     const raw = window.localStorage.getItem(GAME_SAVE_KEY);
-    return raw ? (JSON.parse(raw) as T) : null;
+    const parsed = raw ? (JSON.parse(raw) as T & { saveVersion?: number }) : null;
+    return parsed?.saveVersion === GAME_SAVE_VERSION ? (parsed as T) : null;
   } catch {
     return null;
   }
@@ -38,10 +41,15 @@ export function loadGameSave<T>() {
 
 export function saveGameState<T>(state: T) {
   try {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(state, omitDeprecatedSaveFields));
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify({ ...state, saveVersion: GAME_SAVE_VERSION }, omitDeprecatedSaveFields));
   } catch {
     // Losing a browser save should not stop the running prototype.
   }
+}
+
+export function clearGameSaves() {
+  window.localStorage.removeItem(GAME_SAVE_KEY);
+  window.localStorage.removeItem(LEGACY_GAME_SAVE_KEY);
 }
 
 function omitDeprecatedSaveFields(key: string, value: unknown) {

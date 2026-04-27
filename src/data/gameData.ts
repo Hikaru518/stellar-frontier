@@ -1,5 +1,6 @@
 import {
   crewDefinitions,
+  defaultMapConfig,
   eventDefinitionById,
   type CrewDefinition,
   type CrewProfile,
@@ -7,6 +8,7 @@ import {
   type ExpertiseDefinition,
 } from "../content/contentData";
 import type { InventoryEntry } from "../inventorySystem";
+import { deriveLegacyTiles, getTileLocationLabel, type RuntimeMapState } from "../mapSystem";
 
 export type PageId = "control" | "station" | "call" | "map";
 
@@ -112,6 +114,8 @@ export interface SystemLog {
   tone: Tone;
 }
 
+export type GameMapState = RuntimeMapState;
+
 export interface CallContext {
   crewId: CrewId;
   type: CallType;
@@ -180,6 +184,39 @@ export const initialTiles: MapTile[] = [
   tile("4-4", "(4,4)", 4, 4, "沙漠"),
 ];
 
+export function createInitialMapState(): GameMapState {
+  const discoveredTileIds = [...defaultMapConfig.initialDiscoveredTileIds];
+  const tilesById: GameMapState["tilesById"] = Object.fromEntries(
+    defaultMapConfig.tiles.map((mapTile) => [
+      mapTile.id,
+      {
+        discovered: discoveredTileIds.includes(mapTile.id),
+        investigated: discoveredTileIds.includes(mapTile.id),
+        activeSpecialStateIds: mapTile.specialStates.filter((state) => state.startsActive).map((state) => state.id),
+        revealedObjectIds: mapTile.objects.filter((object) => object.visibility === "onDiscovered" && discoveredTileIds.includes(mapTile.id)).map((object) => object.id),
+        revealedSpecialStateIds: mapTile.specialStates
+          .filter((state) => state.visibility === "onDiscovered" && state.startsActive && discoveredTileIds.includes(mapTile.id))
+          .map((state) => state.id),
+      },
+    ]),
+  );
+
+  return {
+    configId: defaultMapConfig.id,
+    configVersion: defaultMapConfig.version,
+    rows: defaultMapConfig.size.rows,
+    cols: defaultMapConfig.size.cols,
+    originTileId: defaultMapConfig.originTileId,
+    tilesById,
+    discoveredTileIds,
+    investigationReportsById: {},
+  };
+}
+
+export function deriveInitialLegacyTiles(map = createInitialMapState()) {
+  return deriveLegacyTiles(defaultMapConfig, map);
+}
+
 export const initialCrew: CrewMember[] = crewDefinitions.map((member) => createInitialCrewMember(member));
 
 export const initialLogs: SystemLog[] = [
@@ -239,7 +276,7 @@ function tile(
 }
 
 function createInitialCrewMember(member: CrewDefinition): CrewMember {
-  const tile = initialTiles.find((item) => item.id === member.currentTile);
+  const tile = deriveInitialLegacyTiles().find((item) => item.id === member.currentTile);
   const emergencyDefinition = member.emergencyEvent ? eventDefinitionById.get(member.emergencyEvent.eventId) : undefined;
   const emergency = member.emergencyEvent && emergencyDefinition?.emergency;
   const activeAction = member.activeAction ? createInitialAction(member, member.activeAction) : undefined;
@@ -249,7 +286,7 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     name: member.name,
     role: member.role,
     currentTile: member.currentTile,
-    location: tile ? getTileLocation(tile) : member.currentTile,
+    location: tile ? getTileLocationLabel(defaultMapConfig, tile.id) : member.currentTile,
     coord: tile?.coord ?? member.currentTile,
     status: getInitialStatus(member),
     statusTone: member.statusTone,

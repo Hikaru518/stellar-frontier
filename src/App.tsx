@@ -8,17 +8,20 @@ import { advanceCrewMovement, createMovePreview, normalizeCrewMember, startCrewM
 import { appendDiaryEntry } from "./diarySystem";
 import { createAutoEmergencyDecision, resolveEmergencyChoice, triggerEvents, type EventHistory } from "./eventSystem";
 import { addInventoryItem, type InventoryEntry } from "./inventorySystem";
+import { defaultMapConfig } from "./content/contentData";
+import { canMoveToTile, deriveLegacyTiles } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
+  createInitialMapState,
   initialCrew,
   initialLogs,
-  initialTiles,
   resources as initialResources,
   type ActiveAction,
   type ActionStatus,
   type CallContext,
   type CrewId,
   type CrewMember,
+  type GameMapState,
   type MapReturnTarget,
   type MapTile,
   type PageId,
@@ -26,12 +29,15 @@ import {
   type SystemLog,
   type Tone,
 } from "./data/gameData";
-import { formatDuration, formatGameTime, GAME_SAVE_KEY, loadGameSave, saveGameState } from "./timeSystem";
+import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 
 interface GameState {
+  saveVersion?: number;
   elapsedGameSeconds: number;
   crew: CrewMember[];
   baseInventory: InventoryEntry[];
+  map: GameMapState;
+  // Compatibility projection for pages and event rules that still read legacy MapTile fields.
   tiles: MapTile[];
   logs: SystemLog[];
   resources: ResourceSummary;
@@ -114,7 +120,7 @@ function App() {
   }
 
   function resetGame() {
-    window.localStorage.removeItem(GAME_SAVE_KEY);
+    clearGameSaves();
     const freshState = createInitialGameState();
     setGameState(freshState);
     setCurrentCall(null);
@@ -214,14 +220,14 @@ function App() {
           : nextMember;
       });
 
-      const updatedTiles = decision.tileUpdate
-        ? patchTile(state.tiles, decision.tileUpdate.id, decision.tileUpdate.patch)
-        : state.tiles;
+      const updatedMap = decision.tileUpdate ? patchMapFromLegacyTile(state.map, decision.tileUpdate.id, decision.tileUpdate.patch) : state.map;
+      const updatedTiles = decision.tileUpdate ? patchTile(deriveLegacyTiles(defaultMapConfig, updatedMap), decision.tileUpdate.id, decision.tileUpdate.patch) : state.tiles;
 
       const advancedState = {
         ...state,
         elapsedGameSeconds: state.elapsedGameSeconds + (decision.advanceSeconds ?? 0),
         crew: updatedCrew,
+        map: syncMapCrew(updatedMap, updatedCrew),
         tiles: updatedTiles,
         baseInventory: decision.baseInventory ?? state.baseInventory,
         resources: decision.resources ?? state.resources,
@@ -279,7 +285,15 @@ function App() {
         return state;
       }
 
-      const preview = createMovePreview(member, currentCall.selectedTargetTileId!, state.tiles);
+      const targetTileId = currentCall.selectedTargetTileId!;
+      if (!canMoveToTile(defaultMapConfig, state.map, targetTileId)) {
+        return {
+          ...state,
+          logs: appendLogEntry(state.logs, "移动确认失败：目标不在当前已发现或 frontier 信号范围内。", "danger", state.elapsedGameSeconds),
+        };
+      }
+
+      const preview = createMovePreview(member, targetTileId, state.tiles);
       if (!preview.canMove) {
         return {
           ...state,
@@ -292,10 +306,12 @@ function App() {
         item.id === currentCall.crewId ? startCrewMove(item, preview, state.tiles, state.elapsedGameSeconds) : item,
       );
 
+      const nextMap = syncMapCrew(state.map, updatedCrew);
       return {
         ...state,
         crew: updatedCrew,
-        tiles: syncTileCrew(state.tiles, updatedCrew),
+        map: nextMap,
+        tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, nextMap), updatedCrew),
         logs: appendLogEntry(
           state.logs,
           `${member.name} 开始前往 ${targetTile?.coord ?? preview.targetTileId}，预计 ${formatDuration(preview.totalDurationSeconds)}。`,
@@ -392,7 +408,7 @@ export default App;
 function createInitialGameState(): GameState {
   const saved = loadGameSave<SavedGameState>();
 
-  if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.tiles && saved.logs && saved.resources) {
+  if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       const { bag: _deprecatedBag, ...memberWithoutBag } = member;
@@ -405,22 +421,27 @@ function createInitialGameState(): GameState {
     });
     const savedCrewIds = new Set(normalizedCrew.map((member) => member.id));
     const crewWithNewDefaults = [...normalizedCrew, ...initialCrew.filter((member) => !savedCrewIds.has(member.id))];
+    const map = normalizeSavedMap(saved.map);
+    const syncedMap = syncMapCrew(map, crewWithNewDefaults);
     return {
       ...saved,
       crew: crewWithNewDefaults,
       baseInventory: Array.isArray(saved.baseInventory)
         ? saved.baseInventory
         : createBaseInventoryFromResources(saved.resources),
-      tiles: syncTileCrew(saved.tiles, crewWithNewDefaults),
+      map: syncedMap,
+      tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, syncedMap), crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
     } as GameState;
   }
 
+  const map = syncMapCrew(createInitialMapState(), initialCrew);
   const state = {
     elapsedGameSeconds: 0,
     crew: initialCrew,
     baseInventory: createBaseInventoryFromResources(initialResources),
-    tiles: initialTiles,
+    map,
+    tiles: deriveLegacyTiles(defaultMapConfig, map),
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
@@ -432,6 +453,7 @@ function createInitialGameState(): GameState {
 function settleGameTime(state: GameState): GameState {
   let changed = false;
   let resources = state.resources;
+  let map = state.map;
   let tiles = state.tiles;
   let logs = state.logs;
   let eventHistory = state.eventHistory ?? {};
@@ -447,6 +469,8 @@ function settleGameTime(state: GameState): GameState {
       changed = changed || settled.changed;
 
       if (settled.changed && member.activeAction && !nextMember.activeAction) {
+        map = discoverMapTile(map, nextMember.currentTile);
+        tiles = syncTileCrew(deriveLegacyTiles(defaultMapConfig, map), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
         nextMember = appendArrivalDiary(nextMember, state.elapsedGameSeconds);
         const eventResult = triggerEvents({
           member: nextMember,
@@ -510,7 +534,12 @@ function settleGameTime(state: GameState): GameState {
     return nextMember;
   });
 
-  return changed ? { ...state, crew, resources, baseInventory, tiles: syncTileCrew(tiles, crew), logs, eventHistory } : state;
+  if (!changed) {
+    return state;
+  }
+
+  const syncedMap = syncMapCrew(map, crew);
+  return { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs, eventHistory };
 }
 
 function settleCrewAction(
@@ -775,6 +804,83 @@ function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGame
 
 function patchTile(tiles: MapTile[], id: string, patch: Partial<MapTile>) {
   return tiles.map((tile) => (tile.id === id ? { ...tile, ...patch } : tile));
+}
+
+function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
+  const fresh = createInitialMapState();
+  if (map.configId !== defaultMapConfig.id || map.configVersion !== defaultMapConfig.version) {
+    return fresh;
+  }
+
+  const discoveredTileIds = Array.isArray(map.discoveredTileIds) ? map.discoveredTileIds.filter((id) => defaultMapConfig.tiles.some((tile) => tile.id === id)) : fresh.discoveredTileIds;
+  return {
+    configId: defaultMapConfig.id,
+    configVersion: defaultMapConfig.version,
+    rows: defaultMapConfig.size.rows,
+    cols: defaultMapConfig.size.cols,
+    originTileId: defaultMapConfig.originTileId,
+    tilesById: { ...fresh.tilesById, ...(map.tilesById ?? {}) },
+    discoveredTileIds,
+    investigationReportsById: map.investigationReportsById ?? {},
+  };
+}
+
+function syncMapCrew(map: GameMapState, crew: CrewMember[]): GameMapState {
+  const tilesById = { ...map.tilesById };
+  for (const tile of defaultMapConfig.tiles) {
+    tilesById[tile.id] = {
+      ...tilesById[tile.id],
+      crew: crew.filter((member) => member.currentTile === tile.id && !member.unavailable).map((member) => member.id),
+    };
+  }
+
+  return { ...map, tilesById };
+}
+
+function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  if (!configTile) {
+    return map;
+  }
+
+  const discoveredTileIds = map.discoveredTileIds.includes(tileId) ? map.discoveredTileIds : [...map.discoveredTileIds, tileId];
+  const previous = map.tilesById[tileId] ?? {};
+  return {
+    ...map,
+    discoveredTileIds,
+    tilesById: {
+      ...map.tilesById,
+      [tileId]: {
+        ...previous,
+        discovered: true,
+        revealedObjectIds: addUnique(previous.revealedObjectIds ?? [], ...configTile.objects.filter((object) => object.visibility === "onDiscovered").map((object) => object.id)),
+        revealedSpecialStateIds: addUnique(
+          previous.revealedSpecialStateIds ?? [],
+          ...configTile.specialStates.filter((state) => state.visibility === "onDiscovered" && (previous.activeSpecialStateIds ?? []).includes(state.id)).map((state) => state.id),
+        ),
+      },
+    },
+  };
+}
+
+function patchMapFromLegacyTile(map: GameMapState, tileId: string, patch: Partial<MapTile>): GameMapState {
+  const previous = map.tilesById[tileId] ?? {};
+  return {
+    ...map,
+    tilesById: {
+      ...map.tilesById,
+      [tileId]: {
+        ...previous,
+        status: patch.status ?? previous.status,
+        investigated: patch.investigated ?? previous.investigated,
+        crew: patch.crew ?? previous.crew,
+      },
+    },
+  };
+}
+
+function addUnique<T>(items: T[], ...values: T[]) {
+  return [...items, ...values.filter((value) => !items.includes(value))];
 }
 
 function appendArrivalDiary(member: CrewMember, elapsedGameSeconds: number) {

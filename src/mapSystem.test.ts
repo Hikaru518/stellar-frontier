@@ -14,8 +14,13 @@ import {
 
 function runtime(discoveredTileIds: string[], tilesById: RuntimeMapState["tilesById"] = {}): RuntimeMapState {
   return {
+    configId: defaultMapConfig.id,
+    configVersion: defaultMapConfig.version,
+    rows: defaultMapConfig.size.rows,
+    cols: defaultMapConfig.size.cols,
     originTileId: defaultMapConfig.originTileId,
     discoveredTileIds,
+    investigationReportsById: {},
     tilesById,
   };
 }

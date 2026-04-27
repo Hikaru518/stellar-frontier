@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { crewDefinitions, eventDefinitionById, itemDefinitions } from "./content/contentData";
-import { initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
-import { GAME_SAVE_KEY } from "./timeSystem";
+import { createInitialMapState, initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
+import { GAME_SAVE_KEY, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 
 describe("App", () => {
   beforeEach(() => {
@@ -21,6 +21,37 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /通讯台/ })).toBeInTheDocument();
   });
 
+  it("creates the initial runtime map state from the default map config", () => {
+    render(<App />);
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.saveVersion).toBe(GAME_SAVE_VERSION);
+    expect(saved.map).toMatchObject({
+      configId: "default-map",
+      configVersion: 1,
+      rows: 8,
+      cols: 8,
+      originTileId: "4-4",
+      discoveredTileIds: ["4-4"],
+      investigationReportsById: {},
+    });
+    expect(saved.map.tilesById["4-4"].discovered).toBe(true);
+  });
+
+  it("ignores old v1 saves when starting a v2 game", () => {
+    window.localStorage.setItem(
+      LEGACY_GAME_SAVE_KEY,
+      JSON.stringify({ elapsedGameSeconds: 999, crew: [], tiles: initialTiles.slice(0, 16), logs: [], resources: initialResources }),
+    );
+
+    render(<App />);
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.elapsedGameSeconds).toBe(0);
+    expect(saved.map.rows).toBe(8);
+    expect(saved.tiles).toHaveLength(64);
+  });
+
   it("advances game time while the app is running", () => {
     vi.useFakeTimers();
 
@@ -31,6 +62,20 @@ describe("App", () => {
     });
 
     expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
+  });
+
+  it("settles arrival event checks against derived legacy tiles without crashing", () => {
+    vi.useFakeTimers();
+
+    render(<App />);
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.map.discoveredTileIds).toContain("2-1");
+    expect(saved.tiles).toHaveLength(64);
   });
 
   it("settles Garry mining into Garry's inventory from the time system", () => {
@@ -120,6 +165,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [
           {
             id: "lin_xia",
@@ -130,6 +176,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       }),
@@ -156,6 +203,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [
           {
             id: "lin_xia",
@@ -167,6 +215,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       }),
@@ -189,6 +238,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [
           {
             id: "kael",
@@ -200,6 +250,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       }),
@@ -263,23 +314,26 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /地图二级菜单/ }));
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /\(3,2\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\(-1,0\)/ }));
     fireEvent.click(screen.getByRole("button", { name: "标记为目的地，返回通话确认" }));
 
     expect(screen.getByText("移动确认")).toBeInTheDocument();
     expect(screen.getByText(/当前采集，未完成的一轮不会结算/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 \(3,2\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 \(-1,0\)/ }));
 
     expect(screen.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(150_000);
     });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.map.discoveredTileIds).toContain("4-3");
 
     const endButtons = screen.getAllByRole("button", { name: "结束通话" });
     fireEvent.click(endButtons[endButtons.length - 1]);
     expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
-    expect(screen.getByText("位于 (3,2)，待命中。")).toBeInTheDocument();
+    expect(screen.getByText("位于 (-1,0)，待命中。")).toBeInTheDocument();
   });
 
   it("opens a crew profile with attributes, tags, expertise, and diary entries", () => {
@@ -337,8 +391,10 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [{ id: "mike", inventory: [] }],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: initialResources,
       }),
@@ -360,8 +416,10 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 12,
+        saveVersion: GAME_SAVE_VERSION,
         crew: [{ id: "mike", bag: ["legacy item"] }],
         tiles: initialTiles,
+        map: createInitialMapState(),
         logs: initialLogs,
         resources: { ...initialResources, iron: 7, wood: 3, food: 2, water: 4 },
       }),

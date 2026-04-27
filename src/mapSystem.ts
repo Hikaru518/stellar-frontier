@@ -24,8 +24,13 @@ export interface RuntimeMapTileState {
 }
 
 export interface RuntimeMapState {
+  configId: string;
+  configVersion: number;
+  rows: number;
+  cols: number;
   originTileId: string;
   discoveredTileIds: string[];
+  investigationReportsById: Record<string, unknown>;
   tilesById: Record<string, RuntimeMapTileState | undefined>;
 }
 
