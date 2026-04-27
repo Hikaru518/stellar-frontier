@@ -27,28 +27,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: node common/scripts/install-run-rush.js install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        working-directory: apps/pc-client
+        run: node ../../common/scripts/install-run-rushx.js install:browsers
 
       - name: Type check
-        run: npm run lint
+        run: node common/scripts/install-run-rush.js lint
 
       - name: Validate content data
-        run: npm run validate:content
+        run: node common/scripts/install-run-rush.js validate-content
 
       - name: Run unit tests
-        run: npm run test
+        run: node common/scripts/install-run-rush.js test
 
       - name: Run end-to-end tests
-        run: npm run test:e2e
+        run: node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client
 
       - name: Build
-        run: npm run build
+        run: node common/scripts/install-run-rush.js build
 
       - name: Configure Pages
         if: github.event_name != 'pull_request'
@@ -58,7 +58,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: apps/pc-client/dist
 
   deploy:
     if: github.event_name != 'pull_request'

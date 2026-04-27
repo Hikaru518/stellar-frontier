@@ -1,0 +1,33 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/rush/v5/rush.schema.json",
+  "rushVersion": "5.175.0",
+  "pnpmVersion": "10.33.1",
+  "nodeSupportedVersionRange": "^20.19.0 || >=22.12.0",
+  "repository": {
+    "url": "https://github.com/Hikaru518/stellar-frontier",
+    "defaultBranch": "main",
+    "defaultRemote": "origin"
+  },
+  "projects": [
+    {
+      "packageName": "@stellar-frontier/pc-client",
+      "projectFolder": "apps/pc-client",
+      "tags": ["app", "pc-client"]
+    },
+    {
+      "packageName": "@stellar-frontier/mobile-client",
+      "projectFolder": "apps/mobile-client",
+      "tags": ["app", "mobile-client"]
+    },
+    {
+      "packageName": "@stellar-frontier/relay-server",
+      "projectFolder": "apps/relay-server",
+      "tags": ["app", "server"]
+    },
+    {
+      "packageName": "@stellar-frontier/protocol",
+      "projectFolder": "packages/protocol",
+      "tags": ["library", "shared"]
+    }
+  ]
+}

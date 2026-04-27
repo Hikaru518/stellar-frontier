@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getLatencyTarget, paidMainlandHybridPlan, selectPreferredTransport } from "@stellar-frontier/protocol";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { getCrewActionTiming } from "../crewSystem";
@@ -49,6 +50,11 @@ export function CommunicationStation({
     .slice()
     .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
     .slice(0, 3);
+  const phoneTerminalLink = selectPreferredTransport([
+    { kind: "lan-websocket", health: "healthy", rttMs: 20 },
+    { kind: "mainland-relay", health: "healthy", rttMs: 60 },
+  ]);
+  const relayTarget = getLatencyTarget(paidMainlandHybridPlan, "同区域国内 relay RTT") ?? "20-80ms";
 
   return (
     <ConsoleShell
@@ -132,6 +138,21 @@ export function CommunicationStation({
 
         <Panel className="station-rule">
           <p>通话中也可打开通讯录，但不能直接开启第二个通话事件。</p>
+        </Panel>
+
+        <Panel title="手机私人终端" className="station-rule" tone="accent">
+          <div className="expertise-heading">
+            <strong>PC 权威 / 手机私讯</strong>
+            <StatusTag tone="accent">{phoneTerminalLink.selected}</StatusTag>
+          </div>
+          <p>手机端只接收 PC 授权的私密通讯，并回传已读、接听、选择等 typed events；游戏结算仍在本机完成。</p>
+          <FieldList
+            rows={[
+              ["同网优先", phoneTerminalLink.selected],
+              ["公网基线", `${phoneTerminalLink.fallback} / ${relayTarget}`],
+              ["Relay 职责", "国内 WSS room broker，仅中转消息，不持有 GameState"],
+            ]}
+          />
         </Panel>
 
         {openObjectives.length ? (

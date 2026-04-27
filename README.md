@@ -9,6 +9,7 @@ Stellar Frontier 是一个星球基地管理与叙事决策游戏原型。玩家
 - React 19
 - TypeScript
 - Vite
+- Rush + pnpm monorepo
 - Vitest（组件测试） + Playwright（端到端测试）
 - Ajv（内容 JSON 的 schema 校验）
 
@@ -25,13 +26,19 @@ nvm use || nvm install
 安装依赖：
 
 ```bash
-npm install
+node common/scripts/install-run-rush.js update
 ```
 
-启动开发服务器：
+启动 PC 开发服务器：
 
 ```bash
-npm run dev
+npm run dev:pc
+```
+
+启动手机 companion 端开发服务器：
+
+```bash
+npm run dev:mobile
 ```
 
 构建生产版本：
@@ -67,7 +74,8 @@ npm run validate:content
 首次运行端到端测试前安装浏览器：
 
 ```bash
-npx playwright install
+cd apps/pc-client
+node ../../common/scripts/install-run-rushx.js install:browsers
 ```
 
 运行端到端测试：
@@ -78,7 +86,7 @@ npm run test:e2e
 
 ## GitHub Pages 部署
 
-项目已配置 GitHub Actions workflow。推送到 `main` 分支后会依次执行类型检查、组件测试、端到端测试和生产构建，并将 `dist` 发布到 GitHub Pages。
+项目已配置 GitHub Actions workflow。推送到 `main` 分支后会通过 Rush/pnpm 依次执行类型检查、内容校验、组件测试、端到端测试和生产构建，并将 `apps/pc-client/dist` 发布到 GitHub Pages。
 
 GitHub Pages 使用项目页路径，预期访问地址为：
 
@@ -90,6 +98,7 @@ https://<用户名>.github.io/stellar-frontier/
 
 - **控制中心**：游戏主入口，展示资源状态、系统日志和可交互设施（窗户、中控台、咖啡机、唱片机、冰箱、研究台、星际贸易、星际之门等）。
 - **通讯台**：查看队员位置、状态、背包、通讯/失联状态和来电，并进入通话事件。
+- **手机私人终端**：手机端作为 companion terminal 接收 PC 授权的私密通讯，只回传 typed events；PC 仍是唯一权威游戏状态。
 - **通话**：承载角色事件、普通行动（移动 / 调查 / 采集 / 建设 / 待命）和紧急决策；选择结果会更新队员、地图与系统日志。
 - **地图**：以可配置网格（默认 `8 x 8`）展示地形、自然资源、建筑、仪器、危险与队员位置。地图只读，不直接下达指令。
 - **人物详情**：展示背景档案、5 维轻量属性、自由性格标签、专长以及关键节点日记，并按通讯/失联/找回状态控制日记可见性。
@@ -115,25 +124,17 @@ https://<用户名>.github.io/stellar-frontier/
 │   └── plans/               # 按时间分目录的增量设计提案
 ├── scripts/
 │   └── validate-content.mjs # 内容 schema + 引用完整性校验
-├── src/
-│   ├── components/          # 通用布局组件（Modal / Panel / FieldList 等）
-│   ├── content/             # 从 content/*.json 加载的运行时数据封装
-│   ├── data/                # 初始游戏状态、类型与行动配置
-│   ├── events/              # 结构化事件引擎、图运行、条件/效果与校验
-│   ├── pages/               # 控制中心 / 通讯台 / 通话 / 地图 / 人物详情 / Debug
-│   ├── crewSystem.ts        # 队员状态、移动、行动结算
-│   ├── diarySystem.ts       # 个人日记与可见性规则
-│   ├── eventSystem.ts       # 事件触发、概率、紧急事件结算
-│   ├── inventorySystem.ts   # 背包查询、物品可用性与物品效果 helper
-│   ├── mapSystem.ts         # 可配置地图初始化、查询与 legacy tile 投影
-│   ├── timeSystem.ts        # 全局时间、存档、格式化
-│   ├── App.tsx              # 页面流转、核心 reducer 与游戏循环
-│   ├── main.tsx             # React 入口
-│   └── styles.css           # 全局样式
-├── tests/e2e/               # Playwright 端到端测试
+├── apps/
+│   ├── pc-client/           # PC 权威游戏客户端（原 React/Vite app）
+│   │   ├── src/             # 页面、系统规则、内容加载、组件测试
+│   │   └── tests/e2e/       # Playwright 端到端测试
+│   ├── mobile-client/       # 手机 companion terminal 浏览器客户端
+│   └── relay-server/        # 国内 WSS room broker 骨架
+├── packages/
+│   └── protocol/            # 三端共享的配对、传输、消息 envelope 协议
+├── common/config/rush/      # Rush + pnpm 配置与 lockfile
 ├── package.json
-├── playwright.config.ts
-└── vite.config.ts
+└── rush.json
 ```
 
 ## 设计文档
@@ -148,8 +149,9 @@ https://<用户名>.github.io/stellar-frontier/
 
 ## 开发说明
 
-- 页面流转和事件结算集中在 `src/App.tsx`；具体规则按系统拆分到 `crewSystem.ts` / `eventSystem.ts` / `diarySystem.ts` / `timeSystem.ts`。
-- 队员、事件、物品、地图的内容数据位于 `content/*.json`，并在 `src/content/contentData.ts` 中加载；改动后请运行 `npm run validate:content`。
+- 页面流转和事件结算集中在 `apps/pc-client/src/App.tsx`；具体规则按系统拆分到 `crewSystem.ts` / `eventSystem.ts` / `diarySystem.ts` / `timeSystem.ts`。
+- 队员、事件、物品、地图的内容数据位于 `content/*.json`，并在 `apps/pc-client/src/content/contentData.ts` 中加载；改动后请运行 `npm run validate:content`。
+- Rush 由 `rush.json` 固定版本，pnpm 由 `pnpmVersion` 固定版本；不要新增 npm workspace 配置或提交 root `package-lock.json`。
 - 地图页面只负责展示信息；对队员的移动、建设、调查和停止工作等指令通过通讯台和通话页面完成。
 - 未实现的扩展模块（研究台、星际贸易、星际之门等）应给出明确反馈，避免玩家点击后没有响应。
 - 游戏存档以 `localStorage` 保存（key：`stellar-frontier-save-v1`）；Debug toolbox 提供"重置存档"按钮用于回到初始状态。

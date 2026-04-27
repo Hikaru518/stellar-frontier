@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
-package-lock.json
+common/temp/
+**/.rush/temp/
 
 # Build outputs
 dist/
@@ -30,6 +31,8 @@ Thumbs.db
 # Vite / TypeScript caches
 .vite/
 *.tsbuildinfo
+apps/*/vite.config.js
+apps/*/vite.config.d.ts
 
 # Local files
 docs/ui-designs/assets/

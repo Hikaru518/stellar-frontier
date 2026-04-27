@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "rootDir": "../..",
+    "paths": {
+      "@stellar-frontier/protocol": ["../../packages/protocol/src/index.ts"]
+    }
+  }
+}
