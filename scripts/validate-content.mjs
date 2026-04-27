@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
+const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const root = process.env.VALIDATE_CONTENT_ROOT
   ? path.resolve(process.env.VALIDATE_CONTENT_ROOT)
-  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  : sourceRoot;
+const { validateEventContentLibrary } = await loadEventValidation();
 
 const legacyPairs = [
   ["content/events/events.json", "content/schemas/events.schema.json"],
@@ -49,6 +51,7 @@ const validItemTags = new Set(["food", "light", "medical", "signal", "clue"]);
 const validAddItemTargets = new Set(["crewInventory", "baseInventory"]);
 
 let failed = false;
+let eventSchemaFailed = false;
 
 for (const [dataPath, schemaPath] of legacyPairs) {
   failed = validateJsonFile(dataPath, schemaPath, loaded[dataPath]) || failed;
@@ -56,12 +59,20 @@ for (const [dataPath, schemaPath] of legacyPairs) {
 
 for (const { directoryPath, schemaPath } of eventAssetGroups) {
   for (const dataPath of listJsonFiles(directoryPath)) {
-    failed = validateJsonFile(dataPath, schemaPath) || failed;
+    const fileFailed = validateJsonFile(dataPath, schemaPath);
+    eventSchemaFailed = fileFailed || eventSchemaFailed;
+    failed = fileFailed || failed;
   }
 }
 
 for (const [dataPath, schemaPath] of eventAssetFiles) {
-  failed = validateJsonFile(dataPath, schemaPath) || failed;
+  const fileFailed = validateJsonFile(dataPath, schemaPath);
+  eventSchemaFailed = fileFailed || eventSchemaFailed;
+  failed = fileFailed || failed;
+}
+
+if (!eventSchemaFailed) {
+  failed = validateEventProgramReferences() || failed;
 }
 
 failed = validateReferences(loaded) || failed;
@@ -106,6 +117,61 @@ function validateJsonFile(dataPath, schemaPath, data = readJson(dataPath)) {
     console.error(`  ${formatErrorPath(error)} ${error.message}`);
   }
   return true;
+}
+
+function validateEventProgramReferences() {
+  const issues = validateEventContentLibrary(loadEventContentLibrary());
+  if (issues.length === 0) {
+    return false;
+  }
+
+  console.error("Event cross-reference validation failed:");
+  for (const issue of issues) {
+    console.error(
+      `  [${issue.severity}] ${issue.asset_type}:${issue.asset_id} ${issue.path} ${issue.code}: ${issue.message}`,
+    );
+  }
+  return true;
+}
+
+function loadEventContentLibrary() {
+  return {
+    event_definitions: loadArrayFromFiles("content/events/definitions", "event_definitions"),
+    call_templates: loadArrayFromFiles("content/events/call_templates", "call_templates"),
+    handlers: readJson("content/events/handler_registry.json").handlers,
+    presets: loadArrayFromFiles("content/events/presets", "presets"),
+  };
+}
+
+function loadArrayFromFiles(relativeDirectory, propertyName) {
+  return listJsonFiles(relativeDirectory).flatMap((dataPath) => readJson(dataPath)[propertyName] ?? []);
+}
+
+async function loadEventValidation() {
+  const validationPath = path.join(sourceRoot, "src/events/validation.ts");
+
+  try {
+    return await import(pathToFileURL(validationPath).href);
+  } catch (error) {
+    if (!isUnknownTypeScriptExtensionError(error)) {
+      throw error;
+    }
+
+    const tsModule = await import("typescript");
+    const ts = tsModule.default ?? tsModule;
+    const source = fs.readFileSync(validationPath, "utf8");
+    const transpiled = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ES2020,
+        target: ts.ScriptTarget.ES2020,
+      },
+    });
+    return import(`data:text/javascript;base64,${Buffer.from(transpiled.outputText).toString("base64")}`);
+  }
+}
+
+function isUnknownTypeScriptExtensionError(error) {
+  return error instanceof TypeError && String(error.message).includes("Unknown file extension");
 }
 
 function formatErrorPath(error) {
