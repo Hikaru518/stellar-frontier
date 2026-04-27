@@ -318,6 +318,7 @@ function createObjectiveAction(objective: Objective, crew: CrewState, actionId: 
     path_tile_ids: readStringArray(params.path_tile_ids),
     progress_seconds: numberParam(params.progress_seconds, 0),
     duration_seconds: numberParam(params.duration_seconds, 0),
+    action_params: params,
     can_interrupt: booleanParam(params.can_interrupt, true),
     interrupt_duration_seconds: numberParam(params.interrupt_duration_seconds, 10),
     completion_trigger_context: objectiveTriggerContext(objective, crew.id, 0, "objective_completed"),

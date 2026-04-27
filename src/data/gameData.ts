@@ -54,6 +54,7 @@ export interface ActiveAction {
   totalDurationSeconds?: number;
   resource?: string;
   perRoundYield?: number;
+  params?: Record<string, unknown>;
 }
 
 export interface EmergencyEvent {

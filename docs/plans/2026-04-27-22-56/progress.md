@@ -18,7 +18,7 @@ source:
 | 2 | TASK-002 | 新增 call-actions 内容与 schema | completed | 1 |
 | 3 | TASK-003 | 实现 src/callActions.ts（buildCallView 纯函数） | completed | 1 |
 | 4 | TASK-004 | 实现 src/callActionSettlement.ts（handler 白名单 + settleAction） | completed | 1 |
-| 5 | TASK-005 | 事件 → 真实行动桥接层与 effect 输出对齐 | pending | 0 |
+| 5 | TASK-005 | 事件 → 真实行动桥接层与 effect 输出对齐 | completed | 1 |
 | 6 | TASK-006 | 重构 App.tsx 删除硬编码分支并接入 callActionSettlement | pending | 0 |
 | 7 | TASK-007 | 重构 CallPage 用 buildCallView 渲染按钮 | pending | 0 |
 | 8 | TASK-008 | 通讯台统一所有事件来电为接通按钮 | pending | 0 |
@@ -64,3 +64,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 `src/callActionSettlement.ts`，实现 `actionHandlers` 白名单与 `applyImmediateOrCreateAction` / `settleAction`；新增测试覆盖 standby、activeAction 创建、survey reveal、gather yield、未注册 handler 容错。
 - 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（19 files / 117 tests）；`npm run build` 通过；ReadLints 无新增错误。
+
+### TASK-005: 事件 → 真实行动桥接层与 effect 输出对齐
+- 状态: completed
+- 开始时间: 2026-04-28 00:28
+- 完成时间: 2026-04-28 00:35
+- 尝试次数: 1
+- Monkey summary: 成功。补齐 `create_crew_action` 输出字段，新增 `createActiveActionFromCrewAction`，并在 App runtime 合流中桥接事件 action；冲突时事件优先并写中断日志，`event_waiting` 投射为可接通的 event activeAction。
+- 质量检查: `npm run validate:content` 通过；`npm run lint` 通过；`npm run test` 通过（20 files / 124 tests）；`npm run build` 通过；ReadLints 无新增错误。

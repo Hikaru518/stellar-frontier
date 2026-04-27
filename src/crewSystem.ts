@@ -1,5 +1,6 @@
 import { defaultMapConfig } from "./content/contentData";
 import type { ActiveAction, CrewMember, MapTile, SystemLog, Tone } from "./data/gameData";
+import type { CrewActionState } from "./events/types";
 import { getTileLocationLabel } from "./mapSystem";
 import { formatDuration, formatGameTime, getRemainingSeconds } from "./timeSystem";
 
@@ -110,6 +111,46 @@ export function startCrewMove(member: CrewMember, preview: MovePreview, tiles: M
     activeAction: action,
     hasIncoming: false,
     lastContactTime: elapsedGameSeconds,
+  };
+}
+
+export function createActiveActionFromCrewAction(member: CrewMember, eventCrewAction: CrewActionState): ActiveAction {
+  const startTime = eventCrewAction.started_at ?? 0;
+  const durationSeconds = Math.max(0, eventCrewAction.duration_seconds);
+  const finishTime = eventCrewAction.ends_at ?? startTime + durationSeconds;
+  const targetTile = eventCrewAction.target_tile_id ?? eventCrewAction.to_tile_id ?? member.currentTile;
+  const fromTile = eventCrewAction.from_tile_id ?? member.currentTile;
+  const actionType = toActiveActionType(eventCrewAction.type);
+  const baseAction: ActiveAction = {
+    id: eventCrewAction.id,
+    actionType,
+    status: "inProgress",
+    startTime,
+    durationSeconds,
+    finishTime,
+    fromTile,
+    targetTile,
+    params: eventCrewAction.action_params,
+  };
+
+  if (actionType !== "move") {
+    return baseAction;
+  }
+
+  const route = eventCrewAction.path_tile_ids?.length
+    ? eventCrewAction.path_tile_ids
+    : targetTile && targetTile !== fromTile
+      ? [targetTile]
+      : [];
+  const stepDuration = route.length > 0 ? durationSeconds / route.length : durationSeconds;
+
+  return {
+    ...baseAction,
+    route,
+    routeStepIndex: 0,
+    stepStartedAt: startTime,
+    stepFinishTime: startTime + stepDuration,
+    totalDurationSeconds: durationSeconds,
   };
 }
 
@@ -351,6 +392,22 @@ function getTargetLabel(targetTileId: string | undefined, tiles: MapTile[]) {
 
   const tile = getTile(tiles, targetTileId);
   return tile?.coord ?? targetTileId;
+}
+
+function toActiveActionType(type: CrewActionState["type"]): ActiveAction["actionType"] {
+  switch (type) {
+    case "move":
+    case "survey":
+    case "gather":
+    case "build":
+      return type;
+    case "event_waiting":
+    case "guarding_event_site":
+    case "extract":
+    case "return_to_base":
+    default:
+      return "event";
+  }
 }
 
 function getTile(tiles: MapTile[], tileId: string) {
