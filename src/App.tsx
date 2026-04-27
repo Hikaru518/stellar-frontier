@@ -352,6 +352,8 @@ function App() {
     return (
       <CommunicationStation
         crew={crew}
+        activeCalls={gameState.active_calls}
+        objectives={gameState.objectives}
         elapsedGameSeconds={elapsedGameSeconds}
         gameTimeLabel={gameTimeLabel}
         onBack={() => setPage("control")}
@@ -366,6 +368,7 @@ function App() {
           call={currentCall}
           crew={crew}
           tiles={tiles}
+          activeCalls={gameState.active_calls}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
           onDecision={handleDecision}
@@ -746,7 +749,10 @@ function processObjectiveCompletions(state: GameState, contexts: TriggerContext[
 
 function findRuntimeCallForCrew(state: GameState, crewId: CrewId): RuntimeCall | undefined {
   return Object.values(state.active_calls).find(
-    (call) => call.crew_id === crewId && (call.status === "incoming" || call.status === "connected" || call.status === "awaiting_choice"),
+    (call) =>
+      call.crew_id === crewId &&
+      (call.status === "incoming" || call.status === "connected" || call.status === "awaiting_choice") &&
+      (typeof call.expires_at !== "number" || call.expires_at > state.elapsedGameSeconds),
   );
 }
 
