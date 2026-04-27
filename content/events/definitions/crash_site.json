@@ -1,0 +1,242 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "crash_site_wreckage_recon",
+      "version": 1,
+      "domain": "crash_site",
+      "title": "坠毁残骸内部信号",
+      "summary": "队员调查带有 crash_site 标签的地块后，报告残骸内部仍有微弱信号。",
+      "tags": ["crash_site", "normal_discovery"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "tags",
+            "value": "crash_site"
+          },
+          {
+            "type": "handler_condition",
+            "handler_type": "trigger_context_value_equals",
+            "params": {
+              "field": "payload.action_type",
+              "value": "survey"
+            }
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 55,
+        "weight": 1,
+        "mutex_group": null,
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": false
+      },
+      "repeat_policy": {
+        "scope": "crew_tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 0,
+        "history_key_template": "event:{event_definition_id}:{crew_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          {
+            "id": "report",
+            "type": "call",
+            "title": "报告残骸信号",
+            "call_template_id": "crash_site_wreckage_recon.call.report",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              {
+                "id": "mark",
+                "is_default": true
+              },
+              {
+                "id": "withdraw"
+              }
+            ],
+            "option_node_mapping": {
+              "mark": "mark_log",
+              "withdraw": "withdraw_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 180
+          },
+          {
+            "id": "mark_log",
+            "type": "log_only",
+            "title": "标记残骸内部信号",
+            "event_log_template_id": "wreckage_signal_marked_log",
+            "effect_refs": ["mark_wreckage_signal"],
+            "history_writes": [
+              {
+                "key_template": "crash_site_wreckage_recon:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "signal_marked"
+              }
+            ],
+            "next_node_id": "mark_end",
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            }
+          },
+          {
+            "id": "mark_end",
+            "type": "end",
+            "title": "残骸信号已标记",
+            "resolution": "resolved",
+            "result_key": "signal_marked",
+            "event_log_template_id": "wreckage_signal_marked_log",
+            "history_writes": [
+              {
+                "key_template": "crash_site_wreckage_recon:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "signal_marked"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "withdraw_end",
+            "type": "end",
+            "title": "队员撤出残骸",
+            "resolution": "resolved",
+            "result_key": "withdrawn",
+            "event_log_template_id": "wreckage_withdrawn_log",
+            "history_writes": [
+              {
+                "key_template": "crash_site_wreckage_recon:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "withdrawn"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["mark_end", "withdraw_end"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "mark_wreckage_signal",
+          "effects": [
+            {
+              "id": "reveal_wreckage_signal",
+              "type": "update_tile_state",
+              "target": {
+                "type": "event_tile"
+              },
+              "params": {
+                "object_id": "crash-site-wreckage",
+                "revealed": true
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "wreckage_signal_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "Mike 已标记坠毁残骸内部的微弱信号。",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "signal_marked"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "wreckage_signal_marked_log",
+          "summary": "残骸内部信号已标记",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "wreckage_withdrawn_log",
+          "summary": "队员已撤出残骸",
+          "importance": "minor",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["crash_site_wreckage_recon.call.report"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "action_complete",
+          "occurred_at": 180,
+          "source": "crew_action",
+          "crew_id": "mike",
+          "tile_id": "4-4",
+          "action_id": "survey:4-4:0",
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "action_type": "survey",
+            "tags": ["crash_site"]
+          }
+        }
+      ]
+    }
+  ]
+}

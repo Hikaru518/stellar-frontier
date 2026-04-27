@@ -31,6 +31,9 @@ export interface EffectGameState extends EventRuntimeState {
   crew: Record<Id, CrewState>;
   tiles: Record<Id, TileState>;
   resources?: Record<string, number>;
+  map?: {
+    tilesById?: Record<string, { revealedObjectIds?: string[] } | undefined>;
+  };
 }
 
 export interface EffectExecutionError {
@@ -178,6 +181,8 @@ function applyEffect(effect: Effect, context: EffectExecutionContext, path: stri
       return updateCrewAction(effect, context, target.target, path, readObject(effect, "patch", path, false).value ?? effect.params);
     case "update_tile_field":
       return updateTileField(effect, context, target.target, path);
+    case "update_tile_state":
+      return updateTileState(effect, context, target.target, path);
     case "add_tile_tag":
       return updateTileArrayField(effect, context, target.target, path, "tags", readString(effect, "tag", path), "add");
     case "add_danger_tag":
@@ -449,6 +454,75 @@ function updateTileField(
       },
     },
     errors: [],
+  };
+}
+
+function updateTileState(
+  effect: Effect,
+  context: EffectExecutionContext,
+  target: ResolvedEffectTarget | undefined,
+  path: string,
+): ApplyResult {
+  const tile = requireTarget<TileState>(effect, context, target, path);
+  const objectId = readString(effect, "object_id", path);
+  if (tile.errors.length > 0 || objectId.errors.length > 0 || !tile.target?.id) {
+    return { state: context.state, errors: [...tile.errors, ...objectId.errors] };
+  }
+
+  const reveal = booleanParam(effect.params.revealed, true);
+  const nextState = updateMapRevealedObject(context.state, tile.target.id, objectId.value, reveal);
+  return {
+    state: {
+      ...nextState,
+      tiles: {
+        ...nextState.tiles,
+        [tile.target.id]: updateTileSiteObject(tile.target.value, objectId.value, reveal),
+      },
+    },
+    errors: [],
+  };
+}
+
+function updateTileSiteObject(tile: TileState, objectId: string, reveal: boolean): TileState {
+  const existing = tile.site_objects.find((object) => object.id === objectId);
+  if (!existing && !reveal) {
+    return tile;
+  }
+
+  const nextObject = {
+    ...(existing ?? { id: objectId, object_type: objectId, tags: [] }),
+    tags: reveal ? addUnique(existing?.tags ?? [], "revealed") : (existing?.tags ?? []).filter((tag) => tag !== "revealed"),
+  };
+
+  return {
+    ...tile,
+    site_objects: existing
+      ? tile.site_objects.map((object) => (object.id === objectId ? nextObject : object))
+      : [...tile.site_objects, nextObject],
+  };
+}
+
+function updateMapRevealedObject(state: EffectGameState, tileId: string, objectId: string, reveal: boolean): EffectGameState {
+  if (!state.map?.tilesById) {
+    return state;
+  }
+
+  const previousTile = state.map.tilesById[tileId] ?? {};
+  const previousIds = previousTile.revealedObjectIds ?? [];
+  const revealedObjectIds = reveal ? addUnique(previousIds, objectId) : previousIds.filter((id) => id !== objectId);
+
+  return {
+    ...state,
+    map: {
+      ...state.map,
+      tilesById: {
+        ...state.map.tilesById,
+        [tileId]: {
+          ...previousTile,
+          revealedObjectIds,
+        },
+      },
+    },
   };
 }
 

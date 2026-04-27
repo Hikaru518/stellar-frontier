@@ -123,6 +123,10 @@ export function advanceRuntimeEvent(
     return advanceCallChoice(clonedState, definition, event, node, triggerContext, options);
   }
 
+  if (node.type === "call" && triggerContext.trigger_type === "time_wakeup" && node.on_missed?.next_node_id) {
+    return advanceMissedCall(clonedState, definition, event, node, triggerContext, options);
+  }
+
   if (node.type === "wait" && isWaitWakeup(triggerContext)) {
     const stateWithEvent = upsertEvent(clonedState, { ...event, next_wakeup_at: null, updated_at: now(triggerContext, clonedState) });
     return transitionFromNode(stateWithEvent, definition, event, node.next_node_id, triggerContext, options);
@@ -339,6 +343,48 @@ function advanceCallChoice(
   }
 
   return transitionFromNode(afterOptionEffects.state, definition, afterOptionEffects.event, nextNodeId, triggerContext, options);
+}
+
+function advanceMissedCall(
+  state: GraphRunnerGameState,
+  definition: EventDefinition,
+  event: RuntimeEvent,
+  node: CallNode,
+  triggerContext: TriggerContext,
+  options: GraphRunnerOptions,
+): GraphRunnerResult {
+  const onMissed = node.on_missed;
+  const nextNodeId = onMissed?.next_node_id;
+  if (!nextNodeId) {
+    return { state, event, errors: [missingTransition(event, node.id, "missed call")], transitions: [] };
+  }
+
+  const activeCallId = event.active_call_id;
+  const nextCalls =
+    activeCallId && state.active_calls[activeCallId]
+      ? {
+          ...state.active_calls,
+          [activeCallId]: {
+            ...state.active_calls[activeCallId],
+            status: "missed" as const,
+            ended_at: now(triggerContext, state),
+          },
+        }
+      : state.active_calls;
+  const missedEvent = {
+    ...event,
+    deadline_at: null,
+    updated_at: now(triggerContext, state),
+  };
+  const stateWithMissedCall = upsertEvent({ ...state, active_calls: nextCalls }, missedEvent);
+  const afterMissedEffects = runEffects(stateWithMissedCall, definition, missedEvent, node.id, onMissed.effect_refs ?? [], triggerContext, options);
+  if (afterMissedEffects.errors.length > 0) {
+    return failEvent(afterMissedEffects.state, definition, afterMissedEffects.event, afterMissedEffects.errors[0], triggerContext);
+  }
+
+  return enterNode(afterMissedEffects.state, definition, afterMissedEffects.event, nextNodeId, triggerContext, options, [
+    { from_node_id: node.id, to_node_id: nextNodeId },
+  ]);
 }
 
 function transitionFromNode(
@@ -614,16 +660,20 @@ function enterEndNode(
     return { ...afterFinalEffects, transitions: [], next_node_id: null };
   }
 
+  const stateAfterCleanup = node.cleanup_policy.release_blocking_claims
+    ? releaseEventCrewActions(afterFinalEffects.state, event.id, node.resolution, triggerContext)
+    : afterFinalEffects.state;
+  const eventAfterCleanup = stateAfterCleanup.active_events[event.id] ?? afterFinalEffects.event;
   const activeCallId = afterFinalEffects.event.active_call_id;
   const nextCalls =
     node.cleanup_policy.delete_active_calls && activeCallId
-      ? omitKey(afterFinalEffects.state.active_calls, activeCallId)
-      : afterFinalEffects.state.active_calls;
+      ? omitKey(stateAfterCleanup.active_calls, activeCallId)
+      : stateAfterCleanup.active_calls;
   const resultSummary = node.cleanup_policy.keep_player_summary
     ? `${findLogSummary(definition, node.event_log_template_id)}: ${node.result_key}`
     : null;
   const endedEvent = {
-    ...afterFinalEffects.event,
+    ...eventAfterCleanup,
     status: node.resolution,
     result_key: node.result_key,
     result_summary: resultSummary,
@@ -632,9 +682,55 @@ function enterEndNode(
     next_wakeup_at: null,
     updated_at: now(triggerContext, state),
   };
-  const nextState = upsertEvent({ ...afterFinalEffects.state, active_calls: nextCalls }, endedEvent);
+  const nextState = upsertEvent({ ...stateAfterCleanup, active_calls: nextCalls }, endedEvent);
 
   return { state: nextState, event: endedEvent, errors: [], transitions: [], next_node_id: null };
+}
+
+function releaseEventCrewActions(
+  state: GraphRunnerGameState,
+  eventId: Id,
+  resolution: EventTerminalStatus,
+  triggerContext: TriggerContext,
+): GraphRunnerGameState {
+  const releasedActionIds = new Set<Id>();
+  const crewActions = Object.fromEntries(
+    Object.entries(state.crew_actions).map(([actionId, action]) => {
+      if (action.parent_event_id !== eventId || action.status !== "active") {
+        return [actionId, action];
+      }
+
+      releasedActionIds.add(actionId);
+      return [
+        actionId,
+        {
+          ...action,
+          status: resolution === "resolved" ? ("completed" as const) : ("cancelled" as const),
+          ends_at: now(triggerContext, state),
+          progress_seconds: action.duration_seconds,
+        },
+      ];
+    }),
+  );
+
+  if (releasedActionIds.size === 0) {
+    return state;
+  }
+
+  const crew = Object.fromEntries(
+    Object.entries(state.crew).map(([crewId, crewState]) => [
+      crewId,
+      crewState.current_action_id && releasedActionIds.has(crewState.current_action_id)
+        ? { ...crewState, current_action_id: null, status: "idle" as const }
+        : crewState,
+    ]),
+  );
+
+  return {
+    ...state,
+    crew,
+    crew_actions: crewActions,
+  };
 }
 
 function runEffectsAndContinue(

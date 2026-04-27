@@ -27,7 +27,7 @@ import {
 
 export const SAMPLE_EVENT_IDS = [
   "forest_trace_small_camp",
-  "forest_beast_encounter",
+  "forest_beast_emergency",
   "mountain_signal_probe",
   "volcanic_ash_trace",
   "lost_relic_argument",
@@ -45,7 +45,7 @@ export type SampleReachability = "manual-reachable" | "seeded-regression" | "fut
 
 export const SAMPLE_EVENT_COVERAGE = {
   normal_discovery: ["forest_trace_small_camp"],
-  emergency_multi_call: ["forest_beast_encounter"],
+  emergency_multi_call: ["forest_beast_emergency"],
   wait_node: ["mountain_signal_probe"],
   cross_crew_objective: ["volcanic_ash_trace"],
   long_term_consequence: ["lost_relic_argument"],
@@ -53,7 +53,7 @@ export const SAMPLE_EVENT_COVERAGE = {
 
 export const SAMPLE_EVENT_REACHABILITY = {
   forest_trace_small_camp: "seeded-regression",
-  forest_beast_encounter: "future-integration",
+  forest_beast_emergency: "seeded-regression",
   mountain_signal_probe: "manual-reachable",
   volcanic_ash_trace: "seeded-regression",
   lost_relic_argument: "seeded-regression",

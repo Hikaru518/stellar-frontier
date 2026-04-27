@@ -58,18 +58,18 @@
     },
     {
       "schema_version": "event-program-model-v1",
-      "id": "forest_beast_encounter.call.first",
+      "id": "forest_beast_emergency.call.report",
       "version": 1,
       "domain": "forest",
-      "event_definition_id": "forest_beast_encounter",
-      "node_id": "beast_first_call",
-      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure", "crew_conditions"],
+      "event_definition_id": "forest_beast_emergency",
+      "node_id": "beast_emergency_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure", "severity", "crew_conditions"],
       "opening_lines": {
         "selection": "best_match",
         "variants": [
           {
-            "id": "beast_first_opening_default",
-            "text": "{{crew_display_name}} 压低声音：有个大型生物正在 {{tile_id}} 周围绕行。",
+            "id": "beast_emergency_opening_default",
+            "text": "{{crew_display_name}} 压低声音：大型野兽正在 {{tile_id}} 周围逼近，我需要立刻指令。",
             "priority": 0
           }
         ]
@@ -80,76 +80,30 @@
           "max_lines": 1,
           "variants": [
             {
-              "id": "beast_first_body_default",
-              "text": "通讯里传来喘息声，还有湿树枝断裂的声音。",
+              "id": "beast_emergency_body_default",
+              "text": "通讯里传来潮湿树枝断裂声，Amy 的呼吸被刻意压得很低。",
               "priority": 0
             }
           ]
         }
       ],
       "option_lines": {
-        "hold_position": {
+        "evacuate": {
           "selection": "best_match",
           "variants": [
             {
-              "id": "beast_hold_default",
-              "text": "保持位置，降低声响。",
+              "id": "beast_evacuate_default",
+              "text": "撤离到开阔地。",
               "priority": 0
             }
           ]
         },
-        "fall_back": {
+        "engage": {
           "selection": "best_match",
           "variants": [
             {
-              "id": "beast_fallback_default",
-              "text": "立刻后撤。",
-              "priority": 0
-            }
-          ]
-        }
-      },
-      "fallback_order": ["crew_conditions", "event_pressure", "default"],
-      "default_variant_required": true
-    },
-    {
-      "schema_version": "event-program-model-v1",
-      "id": "forest_beast_encounter.call.followup",
-      "version": 1,
-      "domain": "forest",
-      "event_definition_id": "forest_beast_encounter",
-      "node_id": "beast_followup_call",
-      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure", "crew_conditions"],
-      "opening_lines": {
-        "selection": "best_match",
-        "variants": [
-          {
-            "id": "beast_followup_opening_default",
-            "text": "{{crew_display_name}} 已经看清角度，但野兽还没有离开。",
-            "priority": 0
-          }
-        ]
-      },
-      "body_lines": [
-        {
-          "selection": "first_match",
-          "max_lines": 1,
-          "variants": [
-            {
-              "id": "beast_followup_body_default",
-              "text": "短促噪声也许能把它赶走。",
-              "priority": 0
-            }
-          ]
-        }
-      ],
-      "option_lines": {
-        "drive_off": {
-          "selection": "best_match",
-          "variants": [
-            {
-              "id": "beast_drive_default",
-              "text": "制造噪声驱离它。",
+              "id": "beast_engage_default",
+              "text": "用随身武器和噪声驱赶它。",
               "priority": 0
             }
           ]
@@ -159,7 +113,7 @@
           "variants": [
             {
               "id": "beast_hide_default",
-              "text": "继续躲藏，等它离开。",
+              "text": "继续隐藏，保持安静。",
               "priority": 0
             }
           ]

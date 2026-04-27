@@ -1,0 +1,60 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "crash_site_wreckage_recon.call.report",
+      "version": 1,
+      "domain": "crash_site",
+      "event_definition_id": "crash_site_wreckage_recon",
+      "node_id": "report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "wreckage_signal_opening_default",
+            "text": "{{crew_display_name}} 报告 {{tile_id}} 的残骸内部仍有微弱信号。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "max_lines": 1,
+          "variants": [
+            {
+              "id": "wreckage_signal_body_default",
+              "text": "信号像是从断裂舱段深处反射出来，无法确认是否还在移动。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "mark": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "wreckage_signal_mark_default",
+              "text": "标记残骸内部信号。",
+              "priority": 0
+            }
+          ]
+        },
+        "withdraw": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "wreckage_signal_withdraw_default",
+              "text": "暂时撤出，保持观测距离。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}
