@@ -6,7 +6,7 @@
 
 - `docs/` 是本项目的 knowledge base，所有设计内容都应**自包含**在其中。当某条设计需要引用外部资料（论文、文章、其他仓库等）时，请把相关内容**抄录或摘录到 `docs/` 内**再引用，不要只放外链。
 - `docs/core-ideas.md` 是特殊的全局核心想法与设计原则页，保持短小、指导性，不使用普通子系统 wiki 的 10 章模板；任何对它的更新都必须先获得人类确认，agent 不得在未确认的情况下自动改写核心原则。
-- `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品的具体配置写在 `content/`。
+- `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品/地图的具体配置写在 `content/`。
 - 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `src/` 后必须能通过 `npm run lint` 和 `npm run test`。
 
 ## docs/ 知识库结构
@@ -20,7 +20,8 @@
 | `docs/core-ideas.md` | 特殊全局原则页：简短说明核心想法与设计原则，不套用普通子系统 wiki 模板；任何更新都需要人类确认。 |
 | `docs/index.md` | 知识库索引，由 `audit-wiki` 根据现有 wiki 与文档入口重生成。 |
 | `docs/todo.md` | **设计 / 文档体系级**的有意搁置项；代码层面的 TODO 不写在这里。 |
-| `docs/gameplay/<system>/<system>.md` | 各子系统的 wiki，已生效的全量规则。当前包含 `crew`、`event-system`、`time-system` 三份。 |
+| `docs/gameplay/<system>/<system>.md` | 各子系统的 wiki，已生效的全量规则。当前包含 `crew`、`event-system`、`map-system`、`time-system` 四份。 |
+| `docs/game_model/<topic>.md` | 代码层数据契约：队员、事件、事件集成边界、地图等运行时模型与内容 schema 边界。 |
 | `docs/ui-designs/ui.md` | UI 总览：页面与职责、模块关系、跳转图。 |
 | `docs/ui-designs/ui-design-principles.md` | UI 风格与机制设计原则（低保真控制台美学）。 |
 | `docs/ui-designs/pages/*.md` | 控制中心 / 通讯台 / 通话 / 地图 的页面级 PRD。 |
@@ -49,7 +50,7 @@
 ### 玩法循环
 
 - **全局时间**：以 `1 现实秒 = 1 游戏秒` 推进；玩家关闭游戏后世界停止，再次进入从 `elapsedGameSeconds` 继续。Debug toolbox 可切换 `1x` / `2x` / `4x` / `8x` 倍率。
-- **队员行动**：5 名队员（Mike、Amy、Garry、Lin Xia、Kael）在 4x4 网格上移动；同一时间只能执行一个主行动；移动按格推进、抵达后自动待命；行动可被中断，停止动作本身需 `10 秒`。
+- **队员行动**：5 名队员（Mike、Amy、Garry、Lin Xia、Kael）在可配置网格地图（默认 `8 x 8`）上移动；同一时间只能执行一个主行动；移动按格推进、抵达后自动待命；行动可被中断，停止动作本身需 `10 秒`。
 - **通话决策**：玩家通过通讯台进入通话，给队员下达移动 / 调查 / 采集 / 建设 / 撤离 / 应急选项；选择结果更新队员状态、地块状态与系统日志。
 - **事件触发**：抵达地块、调查完成、采集完成、建设完成、长时间待命、通话选项均可触发事件；事件依据队员属性 / 携带物 / 标签 / 概率结算；紧急事件以来电进入通讯台并形成倒计时。
 - **人物表达**：每名队员具备背景档案、通话语气、5 维轻量属性（体能 / 敏捷 / 智力 / 感知 / 运气，取值 `1-6`）、自由性格标签、专长标签与关键节点日记。
@@ -58,7 +59,7 @@
 
 ### 内容数据
 
-- 队员、事件、物品定义全部从 `content/*.json` 加载，由 `content/schemas/*.schema.json` 约束格式；`scripts/validate-content.mjs` 同时校验 schema 与跨文件引用完整性。
+- 队员、事件、物品、地图定义全部从 `content/*.json` 加载，由 `content/schemas/*.schema.json` 与 `content/schemas/events/*.schema.json` 约束格式；`scripts/validate-content.mjs` 同时校验 schema 与跨文件引用完整性。
 
 ## 未来要做（Later）
 
@@ -87,11 +88,11 @@
 ## 约束与假设
 
 - **平台**：浏览器单页应用；状态全部在前端，依赖 `localStorage` 持久化，无后端。
-- **网格**：星球地图固定为 `4 x 4`，移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
+- **网格**：星球地图为可配置网格，默认 `8 x 8`，移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
 - **指令通道**：移动 / 调查 / 采集 / 建设等所有队员指令必须经"通讯台 → 通话"发出；地图与控制中心都不直接下达指令。
 - **行动并行性**：每名队员同一时间只能执行一个主行动；移动中改派必须先停止当前行动。
 - **数据来源唯一**：所有页面共享同一个 `GameState`；不存在页面独立的时间或状态。
-- **内容 vs 代码**：游戏文本、事件、队员、物品配置走 `content/*.json`，不允许新增到代码内的硬编码数组。
+- **内容 vs 代码**：游戏文本、事件、队员、物品、地图配置走 `content/*.json`，不允许新增到代码内的硬编码数组。
 - **设计文档自包含**：见上文"核心约定"。
 
 ## 代码仓库模块
@@ -100,9 +101,17 @@
 .
 ├── content/                              # 数据驱动的游戏内容（与代码解耦）
 │   ├── crew/crew.json                    # 队员档案、属性、标签、专长、日记节点定义
-│   ├── events/events.json                # 事件定义：触发条件、概率、效果、UI 文案
+│   ├── events/
+│   │   ├── events.json                   # 兼容层事件内容片段
+│   │   ├── definitions/<domain>.json     # 结构化事件定义
+│   │   ├── call_templates/<domain>.json  # 通话模板
+│   │   ├── presets/<domain>.json         # 可复用 condition / effect preset
+│   │   └── handler_registry.json         # 白名单 handler 与参数 schema 引用
 │   ├── items/items.json                  # 物品定义
-│   └── schemas/*.schema.json             # 上述三份内容的 JSON Schema
+│   ├── maps/default-map.json             # 默认可配置地图内容
+│   └── schemas/
+│       ├── *.schema.json                 # crew / items / legacy events / maps 等顶层 schema
+│       └── events/*.schema.json          # 结构化事件资产 schema
 ├── scripts/
 │   └── validate-content.mjs              # `npm run validate:content` 入口；校验 schema + 跨文件引用
 ├── src/
@@ -116,9 +125,10 @@
 │   │   ├── ControlCenter.tsx             # 控制中心：资源 / 日志 / 设施入口
 │   │   ├── CommunicationStation.tsx      # 通讯台：队员卡片、通讯录、来电、背包入口
 │   │   ├── CallPage.tsx                  # 通话：剧情对白、行动 / 紧急决策选项、地图与通讯录浮层入口
-│   │   ├── MapPage.tsx                   # 地图：4x4 网格、坐标详情面板（只读）
+│   │   ├── MapPage.tsx                   # 地图：可配置网格、坐标详情面板（只读）
 │   │   ├── CrewDetail.tsx                # 人物详情：档案 / 属性 / 标签 / 专长 / 日记
 │   │   └── DebugToolbox.tsx              # Debug toolbox：时间倍率切换、重置存档
+│   ├── events/                           # 结构化事件引擎：types / conditions / effects / graphRunner / callRenderer / validation 等
 │   ├── test/
 │   │   └── setup.ts                      # Vitest 测试环境初始化
 │   ├── App.tsx                           # 页面流转、全局 GameState、游戏循环、回调与事件结算汇总
@@ -126,6 +136,8 @@
 │   ├── crewSystem.ts                     # 队员状态规整、移动预览、逐格推进、行动结算与中断、地块队员同步
 │   ├── diarySystem.ts                    # 个人日记追加与按通讯状态切换可见性
 │   ├── eventSystem.ts                    # 事件触发候选、概率修正、效果结算、紧急事件升级、自动决策
+│   ├── inventorySystem.ts                # 背包查询、物品可用性与物品效果 helper
+│   ├── mapSystem.ts                      # 可配置地图初始化、查询、可见窗口与 legacy tile 投影
 │   ├── timeSystem.ts                     # 全局时间格式化、剩余时间计算、localStorage 存读档
 │   ├── main.tsx                          # React 入口，挂载 <App />
 │   └── styles.css                        # 全局样式，遵循 ui-design-principles.md 的低保真控制台美学
@@ -135,3 +147,5 @@
 ├── vite.config.ts                        # Vite 构建配置
 └── tsconfig.json                         # TypeScript 配置
 ```
+
+<!-- last-synced-by audit-wiki: 2026-04-27 -->

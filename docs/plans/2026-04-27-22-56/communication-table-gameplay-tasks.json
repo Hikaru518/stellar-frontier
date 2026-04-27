@@ -1,0 +1,326 @@
+{
+  "topic": "communication-table-gameplay",
+  "created": "2026-04-27",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "扩展 maps schema 与默认地图内容",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": "PS-002",
+      "description": "为后续所有事件触发与对象交互打数据基座。扩展 content/schemas/maps.schema.json 中 candidateActions enum 加入 'extract' 与 'scan'。在 content/maps/default-map.json 上为 MVP 涉及对象补 tags 字段：black-pine-stand 加 ['forest']、iron-ridge-deposit 加 ['mineral_deposit']、crash-site-wreckage 加 ['crash_site']；并修复 2-3 tile 的 beast-approach specialState，加 dangerTags ['beast_tracks']（与现有 forest 内容里的 trigger 对齐）。该任务不引入新代码模块，纯内容与 schema 调整，是后续 Wave 2/5 所有任务的前置依赖。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/schemas/maps.schema.json",
+          "content/maps/default-map.json"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: maps.schema.json 中 candidateActions enum 严格等于 ['move','survey','gather','build','standby','extract','scan']",
+        "AC2: black-pine-stand / iron-ridge-deposit / crash-site-wreckage 三个对象都至少含一个用于事件触发的 tag",
+        "AC3: 2-3 tile 的 beast-approach specialState 含 dangerTags ['beast_tracks']",
+        "AC4: 任何对象的 candidateActions 引用了未在 enum 中的值时 npm run validate:content 失败（手测）",
+        "AC5: npm run validate:content 通过"
+      ],
+      "tech_notes": "遵循 ADR-001 与 ADR-005。不要修改对象的 visibility（保持 onDiscovered/onInvestigated 既有值）；仅做加法。tags 字段使用小写 snake_case。"
+    },
+    {
+      "id": "TASK-002",
+      "title": "新增 call-actions 内容与 schema",
+      "priority": "P0",
+      "depends_on": ["TASK-001"],
+      "user_story": "PS-001",
+      "description": "落地 ADR-001 (B 内容驱动)：新增 content/schemas/call-actions.schema.json 描述 call-action 字段；新增 content/call-actions/basic-actions.json 提供 universal 动作（survey/move/standby/stop）；新增 content/call-actions/object-actions.json 提供对象动作（gather/build/extract/scan）。修改 scripts/validate-content.mjs 加交叉校验：每一个出现在 default-map.json 的 candidateActions 必须在 call-actions 内容中存在且 category=='object_action'；basic-actions 中的 id 必须在 maps schema 的 candidateActions enum 中。修改 src/content/contentData.ts import 这些新内容并 export typed 数组。",
+      "files": {
+        "create": [
+          "content/schemas/call-actions.schema.json",
+          "content/call-actions/basic-actions.json",
+          "content/call-actions/object-actions.json"
+        ],
+        "modify": [
+          "scripts/validate-content.mjs",
+          "src/content/contentData.ts"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: schema 至少覆盖 id/category/label/tone/availableWhenBusy/applicableObjectKinds/durationSeconds/handler/params 字段",
+        "AC2: basic-actions.json 至少包含 survey/move/standby/stop 四个 universal 动作；stop 标记 availableWhenBusy=true",
+        "AC3: object-actions.json 至少包含 gather/build/extract/scan，且每条都声明 applicableObjectKinds",
+        "AC4: 当 default-map.json 引用未定义的 candidateActions 时 npm run validate:content 失败",
+        "AC5: contentData.ts 暴露 callActionsContent 与 typed CallActionDef[]，且未引用即视为 dead content（可由 lint/test 检查）",
+        "AC6: npm run validate:content 通过"
+      ],
+      "tech_notes": "遵循 ADR-001。schema 使用 JSON Schema Draft 2020-12（与现有 schemas 对齐）。handler 字段是 string id，仅用于运行时映射到 src/callActionSettlement.ts 的注册表，schema 阶段不验证 handler 存在性（运行时会在 buildEventContentIndex 同级处校验）。"
+    },
+    {
+      "id": "TASK-003",
+      "title": "实现 src/callActions.ts（buildCallView 纯函数）",
+      "priority": "P0",
+      "depends_on": ["TASK-002"],
+      "user_story": "PS-001",
+      "description": "新增 src/callActions.ts，提供按钮视图构造能力。导出 CallActionDef / CallActionGroup / CallActionView 类型；loadCallActions() 从 contentData 读取并合并 basic + object actions；buildCallView({member, tile, gameState}) 按规则返回 {groups: CallActionGroup[], runtimeCall?: RuntimeCall}。规则：(1) 若 member.activeAction 存在（忙碌）→ 仅 availableWhenBusy=true 的 universal；(2) 若 member.activeAction 不存在（待命）→ 全部 universal + 当前 tile 已揭示对象 (revealed===true 或 visibility=='onDiscovered' 且 tile.discovered===true) 的 candidateActions 映射，每个对象自成一组；(3) 若 active runtime call 存在则 runtimeCall 字段返回，groups 不重复包含 runtime options。同步新增 src/callActions.test.ts 覆盖三态 + active runtime call。",
+      "files": {
+        "create": [
+          "src/callActions.ts",
+          "src/callActions.test.ts"
+        ],
+        "modify": [],
+        "test": [
+          "src/callActions.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 待命队员在含 1 个 revealed object 的 tile 上调用 buildCallView，groups 长度=2（基础组 + 对象组），且对象组 actions 数量等于该对象 candidateActions.length",
+        "AC2: 忙碌队员（activeAction 不为 undefined）调用时 groups 中只含 universal 且仅含 availableWhenBusy=true 的项",
+        "AC3: 对象 visibility=='onInvestigated' 但 tile 未被 investigate 时不出现该对象的按钮",
+        "AC4: gameState.active_calls 中存在该队员的 runtime call 时，runtimeCall 字段返回该 call",
+        "AC5: 当 candidateActions 引用一个 call-actions 中不存在的 id 时 buildCallView 跳过该按钮且不抛异常",
+        "AC6: npm run lint 与 npm run test 通过"
+      ],
+      "tech_notes": "纯函数实现，禁止依赖 React。CallActionView.id 形态：universal 用 def.id（如 'survey'），object_action 用 'def.id:objectId'（如 'gather:black-pine-stand'）以便后续 settlement 能从 actionViewId 反查 objectId。遵循 ADR-004。"
+    },
+    {
+      "id": "TASK-004",
+      "title": "实现 src/callActionSettlement.ts（handler 白名单 + settleAction）",
+      "priority": "P0",
+      "depends_on": ["TASK-002"],
+      "user_story": "PS-001",
+      "description": "新增 src/callActionSettlement.ts 替代 App.tsx 中按 crewId/tileId 分支的 settleCrewAction 与 resolveDecision 行动结算逻辑。导出 actionHandlers 注册表（包含 survey/gather/build/standby/extract/scan/stop），以及两个对外函数：applyImmediateOrCreateAction({state, crewId, actionViewId, occurredAt}) 用于玩家点击时立即写入 activeAction（或对 standby/stop 立即结算）；settleAction({member, action, occurredAt, resources, tiles, map, logs}) 用于 settleGameTime 在 finishTime 到达时调用，返回 ActionSettlementPatch。每个 handler 行为基于 tile.tags、object.candidateActions 与 action.params，禁止 if (member.id === ...) / if (tile.id === ...) 这类硬编码。同步新增 src/callActionSettlement.test.ts。",
+      "files": {
+        "create": [
+          "src/callActionSettlement.ts",
+          "src/callActionSettlement.test.ts"
+        ],
+        "modify": [],
+        "test": [
+          "src/callActionSettlement.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: applyImmediateOrCreateAction 对 standby 立即修改队员 status 与 statusTone 不写 activeAction；同时 patch.triggerContexts 含 idle_time",
+        "AC2: applyImmediateOrCreateAction 对 survey/gather/build/extract/scan 写入 activeAction（actionType, startTime, finishTime, params）",
+        "AC3: settleAction 对 survey 完成后揭示当前 tile 中 visibility=='onInvestigated' 的对象，并发出 trigger_type:'action_complete' 且 payload.tags 含合并后的 tile.tags + object.tags",
+        "AC4: settleAction 对 gather mineral_deposit 给 inventory 加 iron_ore，数量来自 action.params.perRoundYieldByResource['iron_ore']，禁止硬编码常量 5",
+        "AC5: 当 actionViewId 引用未注册 handler 时 applyImmediateOrCreateAction 返回 settled=false 且 patch.logs 含 danger 级日志，不抛异常",
+        "AC6: npm run lint 与 npm run test 通过"
+      ],
+      "tech_notes": "遵循 ADR-001 与 ADR-004。settleAction 不修改 crew_actions（事件路径），不调用桥接层。复用既有 src/inventorySystem.ts、src/mapSystem.ts 中的纯函数 helper（addInventoryItem、completeInvestigation 等）。triggerContexts 使用 src/events/types.ts 中 TriggerContext 类型。"
+    },
+    {
+      "id": "TASK-005",
+      "title": "事件 → 真实行动桥接层与 effect 输出对齐",
+      "priority": "P0",
+      "depends_on": ["TASK-003", "TASK-004"],
+      "user_story": "PS-003",
+      "description": "落地 ADR-003。修改 src/events/effects.ts 的 createCrewAction：确保产出的 CrewActionState 含 type/started_at/duration_seconds/target_tile_id/action_params 完整字段（让 bridge 能据此构建 ActiveAction）。修改 src/crewSystem.ts 暴露 createActiveActionFromCrewAction(member, eventCrewAction) 工具函数。在 src/App.tsx 内（或抽到 src/eventBridge.ts）新增 bridgeCrewActions(state, eventState)：扫描 eventState.crew_actions[*]，对 source==='event_action_request' 且 status==='active' 的项，按 type 映射到 crew[].activeAction；同 crew 已有 activeAction 时事件优先（替换并写'被中断'日志）；type==='event_waiting' 时同时设置 unavailable=true 与 canCommunicate=true（仍可接通处理事件）。在 syncEventRuntimeToViews 中调用并合并入 .crew 投射。新增对应测试。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/App.tsx",
+          "src/crewSystem.ts",
+          "src/events/effects.ts"
+        ],
+        "test": [
+          "src/App.test.tsx",
+          "src/crewSystem.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 事件 effect 创建 type:'move' 的 crew_action 后，crew[].activeAction 出现 actionType:'move'，含 finishTime",
+        "AC2: 事件 effect 创建 type:'event_waiting' 的 crew_action 后，crew[].activeAction.actionType=='event'，crew.unavailable===true，crew.canCommunicate===true",
+        "AC3: crew 已有 activeAction 时桥接替换它，并 appendLogEntry 写入 tone='accent' 的'被中断'日志",
+        "AC4: source!='event_action_request' 的 crew_action 不被投射（避免 App 层创建的 action 形成自循环）",
+        "AC5: npm run test 通过且未引入回归"
+      ],
+      "tech_notes": "遵循 ADR-003。bridge 在 mergeEventRuntimeState 内调用一次，纯函数返回新的 crew 数组。不要在 bridge 中调用 settleAction（settle 由 settleGameTime 推进时间触发）。冲突策略详见技术设计 §4.4。"
+    },
+    {
+      "id": "TASK-006",
+      "title": "重构 App.tsx 删除硬编码分支并接入 callActionSettlement",
+      "priority": "P0",
+      "depends_on": ["TASK-003", "TASK-004", "TASK-005"],
+      "user_story": "PS-001",
+      "description": "完成 App 层去硬编码改造。修改 src/App.tsx：handleDecision 在非 runtime call 路径上改调 callActionSettlement.applyImmediateOrCreateAction，并把返回的 patch 合并入 setGameState；删除 resolveDecision 中按 crewId+actionId 的 garry/mike 硬编码分支（包括 garry 采矿/调查、mike 湖泊调查等）。重构 settleCrewAction 改调 callActionSettlement.settleAction，删除按 member.id+action.actionType+tile.id 的 if 链。修改 src/App.test.tsx 中既有依赖具体 tile id (3-3、2-1) 与 resource 名 hardcode 的断言，改写为基于 mineral_deposit / forest / crash_site 等 tag 的等价断言。保留：移动选点流程（confirmMove）、idle_time 触发、processAppEventTrigger 调用链、processAppEventWakeups 不变。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/App.tsx",
+          "src/App.test.tsx"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: src/App.tsx 中 ripgrep 不能匹配到 'member.id === \"garry\"' / 'member.id === \"mike\"' / 'tileId === \"3-3\"' / 'tileId === \"2-1\"' 等硬编码分支",
+        "AC2: 既有'Garry 在 3-3 采矿获得 iron_ore'测试改为'Garry 在含 mineral_deposit tag 的 tile 采集后 inventory 含 iron_ore'，且通过",
+        "AC3: 移动选点流程（startCall→选 move→在地图选点→confirmMove）端到端不变，队员开始 move 行动",
+        "AC4: standby 后仍触发 idle_time（processAppEventTrigger 收到 trigger_type=='idle_time'）",
+        "AC5: npm run lint 与 npm run test 通过；既有测试条目数量不减少"
+      ],
+      "tech_notes": "本任务是风险最高的重构，遵循 R3 缓解策略。建议小步提交：先接入 applyImmediateOrCreateAction，跑测试；再接入 settleAction，跑测试；最后删除 dead code。"
+    },
+    {
+      "id": "TASK-007",
+      "title": "重构 CallPage 用 buildCallView 渲染按钮",
+      "priority": "P0",
+      "depends_on": ["TASK-003", "TASK-006"],
+      "user_story": "PS-001",
+      "description": "落地 ADR-004。修改 src/pages/CallPage.tsx：删除 garryActions 与 Mike 在湖泊地块的硬编码选项常量；改为对 normal call 调用 callActions.buildCallView 拿 groups 渲染按钮，分组标题在 UI 上呈现（基础行动 / objectName）。runtime call 路径仍渲染 runtimeCall.available_options，不变。MoveConfirmPanel 选点流程保持不变（move 仍是 universal action 的一项，handleDecision 仍在 actionId==='move' 时进入选点模式）。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/pages/CallPage.tsx"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: src/pages/CallPage.tsx 中 ripgrep 不能匹配到 'garryActions' / 'mikeActions' / Mike 湖泊相关常量",
+        "AC2: 待命队员的通话页 DOM 中含至少 3 个基础按钮 + 当前 tile 已揭示对象的动态按钮",
+        "AC3: 忙碌队员的通话页 DOM 中只含 availableWhenBusy=true 的按钮（如停止/原地休息）",
+        "AC4: 移动选点流程从 CallPage 触发后仍能正常返回 CallPage 并 confirmMove",
+        "AC5: npm run lint 与 npm run test 通过"
+      ],
+      "tech_notes": "遵循 ADR-004。组件保持 stateless 渲染优先，按钮分组由 buildCallView 决定，CallPage 不重新计算分组。"
+    },
+    {
+      "id": "TASK-008",
+      "title": "通讯台统一所有事件来电为接通按钮",
+      "priority": "P1",
+      "depends_on": ["TASK-006"],
+      "user_story": "PS-001",
+      "description": "落地 design doc §10.1 第 5 条与 interview 中 call_answer_all 决策。修改 src/pages/CommunicationStation.tsx：所有 active_calls 中的事件来电（普通/紧急）统一显示'接通'按钮；玩家主动通话入口（基于 hasIncoming 或选项）保持显示'通话'按钮。普通 vs 紧急通过 severity 标签 + 倒计时差异化（紧急显示倒计时，普通不显示）。同一队员同时存在事件来电与玩家可主动通话时，事件来电入口优先显示，避免重复。",
+      "files": {
+        "create": [],
+        "modify": [
+          "src/pages/CommunicationStation.tsx"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: severity 不为 'high'/'critical' 的事件来电显示'接通' + neutral 标签，无倒计时",
+        "AC2: severity 为 'high'/'critical' 的事件来电显示'接通' + danger 标签 + 倒计时（基于 expires_at - elapsedGameSeconds）",
+        "AC3: 不存在事件来电时玩家主动入口显示'通话'",
+        "AC4: 同一队员同时具备事件来电与可主动通话时，渲染中事件来电入口出现在 DOM 上方且只有一个'接通'按钮（不重复）",
+        "AC5: npm run lint 与 npm run test 通过"
+      ],
+      "tech_notes": "遵循 ADR-005。倒计时格式复用 src/timeSystem.ts 的 formatDuration。事件来电入口的 onClick 仍调 onStartCall（App 层 startCall 已能识别 runtimeCallId）。"
+    },
+    {
+      "id": "TASK-009",
+      "title": "实现 Mike crash_site_wreckage_recon 事件内容与集成",
+      "priority": "P0",
+      "depends_on": ["TASK-005", "TASK-007", "TASK-008"],
+      "user_story": "PS-003",
+      "description": "新增 content/events/definitions/crash_site.json 定义 crash_site_wreckage_recon 事件：trigger_type='action_complete'，match.tags=['crash_site']，match.action_type='survey'。事件 entry 节点为 'report' (CallNode)，引用 call_template 报告残骸内部信号，提供两个选项 'mark' 与 'withdraw'：mark → log_only 节点 + effect update_tile_state 把 crash-site-wreckage 对象 revealed=true → end ok；withdraw → end ok 不做修改。新增 content/events/call_templates/crash_site.json 提供 call template。修改 src/content/contentData.ts import 这两个新文件并加入 eventContentLibrary。新增集成测试覆盖完整链路。",
+      "files": {
+        "create": [
+          "content/events/definitions/crash_site.json",
+          "content/events/call_templates/crash_site.json"
+        ],
+        "modify": [
+          "src/content/contentData.ts"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Mike 移动到含 crash-site-wreckage 的 tile (1-2) 后下达 survey 行动并完成，通讯台 active_calls 中出现该事件的 RuntimeCall",
+        "AC2: 接通后通话页渲染该事件的 call template 文本与 'mark' / 'withdraw' 两个 available_options",
+        "AC3: 选择 'mark' 后该 tile 的 crash-site-wreckage 对象 revealed=true，且 event_logs 中追加新条目",
+        "AC4: 选择 'withdraw' 后事件正常 end，crash-site-wreckage 不被揭示",
+        "AC5: 当 contentData.ts 漏 import 该事件时 npm run validate:content 仍通过（独立离线 lint）但 npm run test 中事件触发用例失败（runtime 不生效），手测验证后再合并",
+        "AC6: npm run validate:content 与 npm run test 通过"
+      ],
+      "tech_notes": "遵循 ADR-005。call_template 格式参考 content/events/call_templates/forest.json。effect update_tile_state 需要 src/events/effects.ts 已有支持；若无则在本任务内补 effect handler（保持最小变更）。"
+    },
+    {
+      "id": "TASK-010",
+      "title": "实现 Amy forest_beast_emergency 紧急事件",
+      "priority": "P0",
+      "depends_on": ["TASK-005", "TASK-007", "TASK-008"],
+      "user_story": "PS-003",
+      "description": "修改 content/events/definitions/forest.json 与 content/events/call_templates/forest.json：把现有 forest_beast_encounter 改造为 forest_beast_emergency（或新建并废弃旧定义）：trigger_type='idle_time'，match.danger_tags=['beast_tracks']（与 TASK-001 中 beast-approach 的 dangerTags 修复对齐），severity='high'，expires_in_seconds=180。entry 节点 effect_refs 含 create_crew_action {type:'event_waiting', source:'event_action_request'} 阻塞 Amy。提供三个选项 'evacuate' / 'engage' / 'stay_hidden'，每个分支均通过 end node cleanup 解除阻塞。on_failed_node_id（超时未接通）走解除阻塞 + danger 日志 + condition_tag 'animal_aggro' 路径。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/events/definitions/forest.json",
+          "content/events/call_templates/forest.json"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Amy 在 2-3 tile 待命达到 idle_time 阈值后事件触发，通讯台出现紧急来电（severity=high + 倒计时）",
+        "AC2: 触发后 Amy 的 activeAction.actionType==='event'，crew.unavailable===true",
+        "AC3: 玩家接通后选择 'evacuate' / 'engage' / 'stay_hidden' 任一选项，事件 end node cleanup 解除阻塞，Amy 的 activeAction 被清除",
+        "AC4: 玩家未接通且 expires_in_seconds 到期后事件走 on_failed 路径，Amy 阻塞解除，event_logs 中含 danger 日志，condition_tags 含 'animal_aggro'",
+        "AC5: npm run validate:content 与 npm run test 通过"
+      ],
+      "tech_notes": "遵循 ADR-005 与风险 R4。倒计时由 CommunicationStation（TASK-008）渲染，本任务不改 UI。end node cleanup_policy.release_blocking_claims=true 是阻塞解除的关键；若现有 graphRunner 处理该字段已可用则不需改 runner。"
+    },
+    {
+      "id": "TASK-011",
+      "title": "实现 Garry mine_anomaly_report 事件",
+      "priority": "P0",
+      "depends_on": ["TASK-005", "TASK-007", "TASK-008"],
+      "user_story": "PS-003",
+      "description": "新增 content/events/definitions/mine.json 定义 mine_anomaly_report 事件：trigger_type='action_complete'，match.tags=['mineral_deposit']，match.action_type='gather'。entry 节点为 'report' (CallNode)，引用 call_template 报告矿脉空声，单选项 'log_anomaly'：触发 log_only effect 写入日志 + 设置 condition_tag 'noted_mine_anomaly' → end ok。新增 content/events/call_templates/mine.json。修改 src/content/contentData.ts import。集成测试覆盖：Garry 在含 mineral_deposit tag 的 tile（如 3-3 iron-ridge-deposit）完成一轮 gather 后事件触发；接通处理后 inventory 中 iron_ore 数量保持不变（不被事件覆盖）。",
+      "files": {
+        "create": [
+          "content/events/definitions/mine.json",
+          "content/events/call_templates/mine.json"
+        ],
+        "modify": [
+          "src/content/contentData.ts"
+        ],
+        "test": [
+          "src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Garry 在 3-3 iron-ridge-deposit 完成一轮 gather 后通讯台出现该事件 RuntimeCall（普通来电，severity!='high'）",
+        "AC2: 接通后通话页渲染该事件的 call template 与 'log_anomaly' 选项",
+        "AC3: 选择 'log_anomaly' 后 event_logs 中追加对应条目，Garry 的 condition_tags 含 'noted_mine_anomaly'",
+        "AC4: 整个流程结束后 Garry 的 inventory.iron_ore 数量保持采矿所得（不被事件改动）",
+        "AC5: 触发完全基于 mineral_deposit tag，把 Garry 移动到另一个不含 mineral_deposit 的 tile 后采集（若 candidateActions 允许）不触发该事件",
+        "AC6: npm run validate:content 与 npm run test 通过"
+      ],
+      "tech_notes": "遵循 ADR-005。call_template 格式参考 content/events/call_templates/forest.json。AC5 是 tag-driven 的关键反向验证。"
+    },
+    {
+      "id": "TASK-012",
+      "title": "新增 e2e 三事件验收用例",
+      "priority": "P1",
+      "depends_on": ["TASK-009", "TASK-010", "TASK-011"],
+      "user_story": "PS-001",
+      "description": "修改 tests/e2e/app.spec.ts 新增三条端到端用例覆盖 design doc §11.1 三个 Player Story：(1) PS-001 全员普通通话基础行动 — 玩家从通讯台对每个待命队员发起通话，断言三类基础按钮存在；(2) PS-002 调查揭示对象解锁交互 — Mike 通话调查 → 等候时间到 → 二次通话出现新动态按钮；(3) PS-003 三事件切片 — 分别复现 Mike crash / Amy beast / Garry mine 三个事件并断言来电出现、接通后选项处理、状态变化。Amy 紧急事件需断言倒计时元素存在。",
+      "files": {
+        "create": [],
+        "modify": [
+          "tests/e2e/app.spec.ts"
+        ],
+        "test": [
+          "tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: PS-001 e2e 用例通过：三名队员（Mike/Amy/Garry）的通话页都断言显示基础按钮组",
+        "AC2: PS-002 e2e 用例通过：调查前后通话页按钮集合发生变化",
+        "AC3: PS-003 三事件用例分别通过：通讯台来电出现 → 接通 → 选项处理 → 状态变化（揭示对象 / 解除阻塞 / 写入日志）",
+        "AC4: Amy 紧急用例断言倒计时 DOM 元素存在",
+        "AC5: npm run test:e2e 通过"
+      ],
+      "tech_notes": "复用 playwright.config.ts 既有配置。e2e 跑时间倍率可通过 Debug toolbox 调到 8x 加速；不要 mock 时间。"
+    }
+  ]
+}
