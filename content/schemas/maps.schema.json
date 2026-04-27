@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/maps.schema.json",
+  "title": "Stellar Frontier Maps",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "size", "originTileId", "initialDiscoveredTileIds", "tiles"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "name": {
+      "$ref": "#/$defs/localizedText"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rows", "cols"],
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "originTileId": {
+      "$ref": "#/$defs/tileId"
+    },
+    "initialDiscoveredTileIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/tileId"
+      },
+      "uniqueItems": true
+    },
+    "tiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/tile"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "tileId": {
+      "type": "string",
+      "pattern": "^[0-9]+-[0-9]+$"
+    },
+    "localizedText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["onDiscovered", "onInvestigated", "hidden"]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["temperatureCelsius", "humidityPercent", "magneticFieldMicroTesla", "radiationLevel"],
+      "properties": {
+        "temperatureCelsius": {
+          "type": "number"
+        },
+        "humidityPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "magneticFieldMicroTesla": {
+          "type": "number"
+        },
+        "radiationLevel": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high", "critical"]
+        },
+        "toxicityLevel": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high", "critical"]
+        },
+        "atmosphericPressureKpa": {
+          "type": "number"
+        },
+        "notes": {
+          "$ref": "#/$defs/localizedText"
+        }
+      }
+    },
+    "mapObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "name", "visibility"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["resourceNode", "structure", "signal", "hazard", "facility", "ruin", "landmark"]
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["onDiscovered", "onInvestigated"]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          }
+        },
+        "legacyResource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legacyBuilding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legacyInstrument": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidateActions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["move", "survey", "gather", "build", "standby"]
+          }
+        }
+      }
+    },
+    "specialState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "visibility", "severity", "startsActive"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          }
+        },
+        "startsActive": {
+          "type": "boolean"
+        },
+        "durationGameSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "legacyDanger": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "row", "col", "areaName", "terrain", "weather", "environment", "objects", "specialStates"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/tileId"
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "col": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "areaName": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "terrain": {
+          "type": "string",
+          "enum": ["平原", "水", "森林 / 山", "丘陵", "旧医疗前哨", "坠落广播塔", "沙漠", "裂谷", "高地", "荒原"]
+        },
+        "weather": {
+          "type": "string",
+          "enum": ["晴朗", "阴天", "薄雾", "强风", "沙尘", "酸雨", "静电风暴"]
+        },
+        "environment": {
+          "$ref": "#/$defs/environment"
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mapObject"
+          }
+        },
+        "specialStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/specialState"
+          }
+        }
+      }
+    }
+  }
+}
