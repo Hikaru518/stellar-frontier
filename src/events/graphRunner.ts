@@ -2,6 +2,7 @@ import { evaluateConditions, type ConditionEvaluationContext } from "./condition
 import type { EventContentIndex } from "./contentIndex";
 import { renderRuntimeCall } from "./callRenderer";
 import { executeEffects, type EffectGameState } from "./effects";
+import { createObjectiveFromNode } from "./objectives";
 import { pickWeightedBranch } from "./random";
 import type {
   ActionRequestNode,
@@ -14,7 +15,6 @@ import type {
   EventTerminalStatus,
   GameSeconds,
   Id,
-  Objective,
   ObjectiveNode,
   RandomNode,
   RuntimeCall,
@@ -544,45 +544,19 @@ function enterObjectiveNode(
   node: ObjectiveNode,
   triggerContext: TriggerContext,
 ): GraphRunnerResult & { next_node_id?: Id | null } {
-  const objectiveId = `${event.id}:${node.id}:objective`;
-  const objective: Objective = state.objectives[objectiveId] ?? {
-    id: objectiveId,
-    status: "available",
-    parent_event_id: event.id,
-    created_by_node_id: node.id,
-    title: node.objective_template.title,
-    summary: node.objective_template.summary,
-    target_tile_id: event.primary_tile_id ?? triggerContext.tile_id ?? null,
-    eligible_crew_conditions: node.objective_template.eligible_crew_conditions ?? [],
-    required_action_type: node.objective_template.required_action_type,
-    required_action_params: node.objective_template.required_action_params,
-    assigned_crew_id: null,
-    action_id: null,
-    created_at: now(triggerContext, state),
-    deadline_at: typeof node.expires_in_seconds === "number" ? now(triggerContext, state) + node.expires_in_seconds : null,
-    completion_trigger_type: "objective_completed",
-  };
-  const eventWithObjective = {
-    ...event,
-    objective_ids: event.objective_ids.includes(objectiveId) ? event.objective_ids : [...event.objective_ids, objectiveId],
-  };
-  const stateWithObjective = upsertEvent(
-    {
-      ...state,
-      objectives: {
-        ...state.objectives,
-        [objectiveId]: objective,
-      },
-    },
-    eventWithObjective,
-  );
+  const created = createObjectiveFromNode({
+    state,
+    event,
+    node,
+    trigger_context: triggerContext,
+  });
 
   if (node.mode === "create_and_continue" && node.on_created_node_id) {
-    return { state: stateWithObjective, event: eventWithObjective, errors: [], transitions: [], next_node_id: node.on_created_node_id };
+    return { state: created.state, event: created.event, errors: [], transitions: [], next_node_id: node.on_created_node_id };
   }
 
-  const waitingEvent = { ...eventWithObjective, status: "waiting_objective" as const, updated_at: now(triggerContext, state) };
-  return { state: upsertEvent(stateWithObjective, waitingEvent), event: waitingEvent, errors: [], transitions: [], next_node_id: null };
+  const waitingEvent = { ...created.event, status: "waiting_objective" as const, updated_at: now(triggerContext, state) };
+  return { state: upsertEvent(created.state, waitingEvent), event: waitingEvent, errors: [], transitions: [], next_node_id: null };
 }
 
 function enterSpawnEventNode(

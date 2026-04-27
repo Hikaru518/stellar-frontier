@@ -1,6 +1,7 @@
 import type { EventContentIndex } from "./contentIndex";
 import { evaluateConditions } from "./conditions";
 import { advanceRuntimeEvent, startRuntimeEvent, type GraphRunnerGameState, type GraphRunnerResult } from "./graphRunner";
+import { assignObjectiveToCrew, markObjectiveCompleted, type ObjectiveRuntimeError } from "./objectives";
 import { pickHighestPriorityWeightedBranch } from "./random";
 import type { EventDefinition, GameSeconds, Id, RuntimeCall, RuntimeEvent, TriggerContext, WorldHistoryEntry } from "./types";
 
@@ -9,6 +10,11 @@ export type EventEngineErrorCode =
   | "call_not_active"
   | "missing_event"
   | "missing_event_definition"
+  | "missing_objective"
+  | "missing_crew"
+  | "missing_parent_event"
+  | "objective_not_available"
+  | "crew_not_eligible"
   | "option_unavailable"
   | "graph_runner_error";
 
@@ -16,6 +22,8 @@ export interface EventEngineError {
   code: EventEngineErrorCode;
   call_id?: Id;
   option_id?: Id;
+  objective_id?: Id;
+  crew_id?: Id;
   event_id?: Id;
   path: string;
   message: string;
@@ -61,6 +69,22 @@ export interface ProcessEventWakeupsInput {
   state: GraphRunnerGameState;
   index: EventContentIndex;
   elapsed_game_seconds: GameSeconds;
+}
+
+export interface AssignObjectiveInput {
+  state: GraphRunnerGameState;
+  index: EventContentIndex;
+  objective_id: Id;
+  crew_id: Id;
+  occurred_at: GameSeconds;
+}
+
+export interface CompleteObjectiveInput {
+  state: GraphRunnerGameState;
+  index: EventContentIndex;
+  objective_id: Id;
+  occurred_at: GameSeconds;
+  result_key?: string | null;
 }
 
 const ACTIVE_CALL_STATUSES = new Set<RuntimeCall["status"]>(["incoming", "connected", "awaiting_choice"]);
@@ -179,6 +203,79 @@ export function processEventWakeups(input: ProcessEventWakeupsInput): EventEngin
   }
 
   return { state, events, event: events[events.length - 1], errors, graph_results: graphResults };
+}
+
+export function assignObjective(input: AssignObjectiveInput): EventEngineResult {
+  const result = assignObjectiveToCrew({
+    state: input.state,
+    objective_id: input.objective_id,
+    crew_id: input.crew_id,
+    occurred_at: input.occurred_at,
+    handler_registry: input.index.handlersByType,
+  });
+  const event = result.objective ? result.state.active_events[result.objective.parent_event_id] : undefined;
+
+  return {
+    state: result.state,
+    event,
+    errors: result.errors.map(objectiveError),
+  };
+}
+
+export function completeObjective(input: CompleteObjectiveInput): EventEngineResult {
+  const marked = markObjectiveCompleted({
+    state: input.state,
+    objective_id: input.objective_id,
+    occurred_at: input.occurred_at,
+    result_key: input.result_key ?? null,
+  });
+  if (marked.errors.length > 0 || !marked.objective || !marked.trigger_context) {
+    return {
+      state: marked.state,
+      errors: marked.errors.map(objectiveError),
+    };
+  }
+
+  const event = marked.state.active_events[marked.objective.parent_event_id];
+  const definition = event ? input.index.definitionsById.get(event.event_definition_id) : undefined;
+  if (!event || !definition) {
+    return failed(marked.state, {
+      code: event ? "missing_event_definition" : "missing_event",
+      objective_id: marked.objective.id,
+      event_id: marked.objective.parent_event_id,
+      path: event ? "event_definitions" : "active_events",
+      message: event
+        ? `Event definition ${event.event_definition_id} for runtime event ${event.id} does not exist.`
+        : `Runtime event ${marked.objective.parent_event_id} does not exist.`,
+    });
+  }
+
+  const context: TriggerContext = {
+    ...marked.trigger_context,
+    event_id: event.id,
+    event_definition_id: event.event_definition_id,
+    tile_id: marked.trigger_context.tile_id ?? event.primary_tile_id ?? null,
+    crew_id: marked.trigger_context.crew_id ?? event.primary_crew_id ?? null,
+  };
+  const graphResult = advanceRuntimeEvent(marked.state, definition, event.id, context, {
+    content_index: input.index,
+    handler_registry: input.index.handlersByType,
+  });
+
+  return {
+    state: graphResult.state,
+    event: graphResult.event,
+    events: [graphResult.event],
+    errors: graphResult.errors.map((error) => ({
+      code: "graph_runner_error",
+      objective_id: marked.objective?.id,
+      event_id: event.id,
+      path: error.path,
+      message: error.message,
+    })),
+    graph_result: graphResult,
+    graph_results: [graphResult],
+  };
 }
 
 export function selectCallOption(input: SelectCallOptionInput): EventEngineResult {
@@ -573,4 +670,15 @@ function callChoiceContext(call: RuntimeCall, event: RuntimeEvent, optionId: Id,
 
 function failed(state: GraphRunnerGameState, error: EventEngineError): EventEngineResult {
   return { state, errors: [error] };
+}
+
+function objectiveError(error: ObjectiveRuntimeError): EventEngineError {
+  return {
+    code: error.code,
+    objective_id: error.objective_id,
+    crew_id: error.crew_id,
+    event_id: error.event_id,
+    path: error.path,
+    message: error.message,
+  };
 }
