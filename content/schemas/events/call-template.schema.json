@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/call-template.schema.json",
+  "title": "Stellar Frontier Call Template File",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["call_templates"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "call_templates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/call_template"
+      }
+    }
+  },
+  "$defs": {
+    "call_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "version",
+        "domain",
+        "event_definition_id",
+        "node_id",
+        "render_context_fields",
+        "opening_lines",
+        "option_lines",
+        "fallback_order",
+        "default_variant_required"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "domain": {
+          "$ref": "#/$defs/id"
+        },
+        "event_definition_id": {
+          "$ref": "#/$defs/id"
+        },
+        "node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "render_context_fields": {
+          "$ref": "#/$defs/string_array"
+        },
+        "opening_lines": {
+          "$ref": "#/$defs/text_variant_group"
+        },
+        "body_lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/text_variant_group"
+          }
+        },
+        "option_lines": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/text_variant_group"
+          }
+        },
+        "fallback_order": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "crew_id",
+              "crew_voice_type",
+              "personality_tags",
+              "expertise_tags",
+              "crew_conditions",
+              "event_pressure",
+              "previous_choices",
+              "default"
+            ]
+          }
+        },
+        "default_variant_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "text_variant_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variants", "selection"],
+      "properties": {
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/text_variant"
+          }
+        },
+        "max_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "selection": {
+          "type": "string",
+          "enum": ["best_match", "first_match", "weighted_random"]
+        }
+      }
+    },
+    "text_variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "priority"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "text": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "$ref": "https://stellar-frontier.local/schemas/events/condition.schema.json#/$defs/condition"
+          }
+        },
+        "priority": {
+          "type": "number"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "string_array": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/non_empty_string"
+      }
+    }
+  }
+}

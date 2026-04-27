@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/handler-registry.schema.json",
+  "title": "Stellar Frontier Handler Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["handlers"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "handlers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/handler_definition"
+      }
+    }
+  },
+  "$defs": {
+    "handler_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handler_type",
+        "kind",
+        "description",
+        "params_schema_ref",
+        "allowed_target_types",
+        "deterministic",
+        "uses_random",
+        "failure_policy",
+        "sample_fixtures"
+      ],
+      "properties": {
+        "handler_type": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["condition", "effect", "candidate_weight", "action_params"]
+        },
+        "description": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "params_schema_ref": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "allowed_target_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/target_type"
+          }
+        },
+        "deterministic": {
+          "type": "boolean"
+        },
+        "uses_random": {
+          "type": "boolean"
+        },
+        "failure_policy": {
+          "$ref": "#/$defs/effect_failure_policy"
+        },
+        "sample_fixtures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/non_empty_string"
+          }
+        }
+      }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effect_failure_policy": {
+      "type": "string",
+      "enum": ["fail_event", "skip_effect", "skip_group", "retry_later"]
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "primary_crew",
+        "related_crew",
+        "crew_id",
+        "event_tile",
+        "tile_id",
+        "active_event",
+        "parent_event",
+        "child_event",
+        "objective_id",
+        "crew_inventory",
+        "base_inventory",
+        "base_resources",
+        "tile_resources",
+        "world_flags",
+        "world_history",
+        "event_log"
+      ]
+    }
+  }
+}

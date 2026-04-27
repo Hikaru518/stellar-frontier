@@ -1,0 +1,867 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/event-graph.schema.json",
+  "title": "Stellar Frontier Event Graph",
+  "$ref": "#/$defs/event_graph",
+  "$defs": {
+    "event_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_node_id", "nodes", "edges", "terminal_node_ids", "graph_rules"],
+      "properties": {
+        "entry_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event_node"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event_edge"
+          }
+        },
+        "terminal_node_ids": {
+          "$ref": "#/$defs/id_array"
+        },
+        "graph_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["acyclic", "max_active_nodes", "allow_parallel_nodes"],
+          "properties": {
+            "acyclic": {
+              "type": "boolean"
+            },
+            "max_active_nodes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "allow_parallel_nodes": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "event_node": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/event_node_common"
+        },
+        {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/call_node"
+            },
+            {
+              "$ref": "#/$defs/wait_node"
+            },
+            {
+              "$ref": "#/$defs/check_node"
+            },
+            {
+              "$ref": "#/$defs/random_node"
+            },
+            {
+              "$ref": "#/$defs/action_request_node"
+            },
+            {
+              "$ref": "#/$defs/objective_node"
+            },
+            {
+              "$ref": "#/$defs/spawn_event_node"
+            },
+            {
+              "$ref": "#/$defs/log_only_node"
+            },
+            {
+              "$ref": "#/$defs/end_node"
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "event_node_common": {
+      "type": "object",
+      "required": ["id", "type", "title", "blocking"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call",
+            "wait",
+            "check",
+            "random",
+            "action_request",
+            "objective",
+            "spawn_event",
+            "log_only",
+            "end"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "requirements": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "enter_effect_refs": {
+          "$ref": "#/$defs/id_array"
+        },
+        "exit_effect_refs": {
+          "$ref": "#/$defs/id_array"
+        },
+        "inline_effects": {
+          "$ref": "#/$defs/effect_array"
+        },
+        "event_log_template_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "history_writes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/history_write"
+          }
+        },
+        "blocking": {
+          "$ref": "#/$defs/blocking_requirement"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timeout_rule"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "auto_next_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        }
+      }
+    },
+    "call_node": {
+      "type": "object",
+      "required": ["type", "call_template_id", "speaker_crew_ref", "urgency", "delivery", "options", "option_node_mapping"],
+      "properties": {
+        "type": {
+          "const": "call"
+        },
+        "call_template_id": {
+          "$ref": "#/$defs/id"
+        },
+        "speaker_crew_ref": {
+          "$ref": "#/$defs/target_ref"
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["normal", "urgent", "emergency"]
+        },
+        "delivery": {
+          "type": "string",
+          "enum": ["incoming_call", "auto_report", "queued_message"]
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/call_option"
+          }
+        },
+        "option_node_mapping": {
+          "$ref": "#/$defs/id_record"
+        },
+        "on_missed": {
+          "$ref": "#/$defs/node_transition"
+        },
+        "expires_in_seconds": {
+          "$ref": "#/$defs/nullable_seconds"
+        }
+      }
+    },
+    "wait_node": {
+      "type": "object",
+      "required": ["type", "duration_seconds", "wake_trigger_type", "next_node_id", "set_next_wakeup_at", "interrupt_policy"],
+      "properties": {
+        "type": {
+          "const": "wait"
+        },
+        "duration_seconds": {
+          "$ref": "#/$defs/seconds"
+        },
+        "wake_trigger_type": {
+          "type": "string",
+          "enum": ["time_wakeup", "event_node_finished"]
+        },
+        "next_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "set_next_wakeup_at": {
+          "type": "boolean"
+        },
+        "crew_action_during_wait": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/crew_action_patch"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interrupt_policy": {
+          "type": "string",
+          "enum": ["not_interruptible", "player_can_cancel", "event_can_cancel"]
+        },
+        "on_interrupted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/node_transition_required"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "check_node": {
+      "type": "object",
+      "required": ["type", "branches", "default_next_node_id", "evaluation_order"],
+      "properties": {
+        "type": {
+          "const": "check"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/check_branch"
+          }
+        },
+        "default_next_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "evaluation_order": {
+          "const": "first_match"
+        }
+      }
+    },
+    "random_node": {
+      "type": "object",
+      "required": ["type", "seed_scope", "branches", "default_next_node_id", "store_result_as"],
+      "properties": {
+        "type": {
+          "const": "random"
+        },
+        "seed_scope": {
+          "type": "string",
+          "enum": ["event_instance", "node_entry", "trigger_context"]
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/random_branch"
+          }
+        },
+        "default_next_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "store_result_as": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "action_request_node": {
+      "type": "object",
+      "required": [
+        "type",
+        "request_id",
+        "action_type",
+        "target_crew_ref",
+        "action_params",
+        "completion_trigger",
+        "on_completed_node_id",
+        "on_failed_node_id",
+        "occupies_crew_action"
+      ],
+      "properties": {
+        "type": {
+          "const": "action_request"
+        },
+        "request_id": {
+          "$ref": "#/$defs/id"
+        },
+        "action_type": {
+          "$ref": "#/$defs/crew_action_type"
+        },
+        "target_crew_ref": {
+          "$ref": "#/$defs/target_ref"
+        },
+        "target_tile_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "action_params": {
+          "$ref": "#/$defs/json_object"
+        },
+        "acceptance_conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "completion_trigger": {
+          "$ref": "#/$defs/trigger_definition"
+        },
+        "on_accepted_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "on_completed_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "on_failed_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "expires_in_seconds": {
+          "$ref": "#/$defs/nullable_seconds"
+        },
+        "occupies_crew_action": {
+          "type": "boolean"
+        }
+      }
+    },
+    "objective_node": {
+      "type": "object",
+      "required": ["type", "objective_template", "mode", "on_completed_node_id", "parent_event_link"],
+      "properties": {
+        "type": {
+          "const": "objective"
+        },
+        "objective_template": {
+          "$ref": "#/$defs/objective_template"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["create_and_wait", "create_and_continue"]
+        },
+        "on_created_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "on_completed_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "on_failed_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "expires_in_seconds": {
+          "$ref": "#/$defs/nullable_seconds"
+        },
+        "parent_event_link": {
+          "type": "boolean"
+        }
+      }
+    },
+    "spawn_event_node": {
+      "type": "object",
+      "required": ["type", "event_definition_id", "spawn_policy", "context_mapping", "parent_event_link", "next_node_id"],
+      "properties": {
+        "type": {
+          "const": "spawn_event"
+        },
+        "event_definition_id": {
+          "$ref": "#/$defs/id"
+        },
+        "spawn_policy": {
+          "type": "string",
+          "enum": ["immediate", "deferred_until_trigger"]
+        },
+        "context_mapping": {
+          "$ref": "#/$defs/string_record"
+        },
+        "parent_event_link": {
+          "type": "boolean"
+        },
+        "dedupe_key_template": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "next_node_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "log_only_node": {
+      "type": "object",
+      "required": ["type", "event_log_template_id", "next_node_id"],
+      "properties": {
+        "type": {
+          "const": "log_only"
+        },
+        "event_log_template_id": {
+          "$ref": "#/$defs/id"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        },
+        "history_writes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/history_write"
+          }
+        },
+        "next_node_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "end_node": {
+      "type": "object",
+      "required": ["type", "resolution", "result_key", "event_log_template_id", "history_writes", "cleanup_policy"],
+      "properties": {
+        "type": {
+          "const": "end"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": ["resolved", "cancelled", "expired", "failed"]
+        },
+        "result_key": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "final_effect_refs": {
+          "$ref": "#/$defs/id_array"
+        },
+        "event_log_template_id": {
+          "$ref": "#/$defs/id"
+        },
+        "history_writes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/history_write"
+          }
+        },
+        "cleanup_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["release_blocking_claims", "delete_active_calls", "keep_player_summary"],
+          "properties": {
+            "release_blocking_claims": {
+              "type": "boolean"
+            },
+            "delete_active_calls": {
+              "type": "boolean"
+            },
+            "keep_player_summary": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "event_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_node_id", "to_node_id"],
+      "properties": {
+        "from_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "to_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "via": {
+          "$ref": "#/$defs/nullable_string"
+        }
+      }
+    },
+    "call_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "requirements": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        },
+        "is_default": {
+          "type": "boolean"
+        }
+      }
+    },
+    "check_branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "conditions", "next_node_id"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "next_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        }
+      }
+    },
+    "random_branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "weight", "next_node_id"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "next_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        }
+      }
+    },
+    "node_transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "next_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        }
+      }
+    },
+    "node_transition_required": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["next_node_id"],
+      "properties": {
+        "next_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        }
+      }
+    },
+    "objective_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "summary", "required_action_type", "required_action_params"],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "target_tile_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eligible_crew_conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "required_action_type": {
+          "$ref": "#/$defs/crew_action_type"
+        },
+        "required_action_params": {
+          "$ref": "#/$defs/json_object"
+        }
+      }
+    },
+    "trigger_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/trigger_type"
+        },
+        "conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "probability": {
+          "$ref": "#/$defs/probability"
+        },
+        "required_context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/non_empty_string"
+          }
+        },
+        "dedupe_key_template": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "probability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base"],
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/probability_value"
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/probability_modifier"
+          }
+        },
+        "min": {
+          "$ref": "#/$defs/probability_value"
+        },
+        "max": {
+          "$ref": "#/$defs/probability_value"
+        }
+      }
+    },
+    "probability_modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["conditions"],
+      "properties": {
+        "conditions": {
+          "$ref": "#/$defs/condition_array"
+        },
+        "add": {
+          "type": "number"
+        },
+        "multiply": {
+          "type": "number"
+        }
+      }
+    },
+    "history_write": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key_template", "scope"],
+      "properties": {
+        "key_template": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "scope": {
+          "$ref": "#/$defs/world_history_scope"
+        },
+        "value": true
+      }
+    },
+    "blocking_requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["occupies_crew_action", "occupies_communication"],
+      "properties": {
+        "occupies_crew_action": {
+          "type": "boolean"
+        },
+        "occupies_communication": {
+          "type": "boolean"
+        },
+        "blocking_key_template": {
+          "$ref": "#/$defs/nullable_string"
+        }
+      }
+    },
+    "timeout_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duration_seconds"],
+      "properties": {
+        "duration_seconds": {
+          "$ref": "#/$defs/seconds"
+        },
+        "next_node_id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "effect_refs": {
+          "$ref": "#/$defs/id_array"
+        }
+      }
+    },
+    "crew_action_patch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/crew_action_type"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "active", "paused", "completed", "failed", "interrupted", "cancelled"]
+        },
+        "action_params": {
+          "$ref": "#/$defs/json_object"
+        }
+      }
+    },
+    "target_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/target_type"
+        },
+        "id": {
+          "$ref": "#/$defs/nullable_id"
+        },
+        "ref": {
+          "$ref": "#/$defs/nullable_string"
+        }
+      }
+    },
+    "condition_array": {
+      "type": "array",
+      "items": {
+        "$ref": "https://stellar-frontier.local/schemas/events/condition.schema.json#/$defs/condition"
+      }
+    },
+    "effect_array": {
+      "type": "array",
+      "items": {
+        "$ref": "https://stellar-frontier.local/schemas/events/effect.schema.json#/$defs/effect"
+      }
+    },
+    "id_record": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "string_record": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/non_empty_string"
+      }
+    },
+    "json_object": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "id_array": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_id": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_string": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "nullable_seconds": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "probability_value": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "arrival",
+        "proximity",
+        "action_complete",
+        "idle_time",
+        "call_choice",
+        "event_node_finished",
+        "objective_created",
+        "objective_completed",
+        "world_flag_changed",
+        "time_wakeup"
+      ]
+    },
+    "crew_action_type": {
+      "type": "string",
+      "enum": [
+        "move",
+        "survey",
+        "gather",
+        "build",
+        "extract",
+        "return_to_base",
+        "event_waiting",
+        "guarding_event_site",
+        "custom_handler_action"
+      ]
+    },
+    "world_history_scope": {
+      "type": "string",
+      "enum": ["world", "crew", "tile", "crew_tile", "objective", "event"]
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "primary_crew",
+        "related_crew",
+        "crew_id",
+        "event_tile",
+        "tile_id",
+        "active_event",
+        "parent_event",
+        "child_event",
+        "objective_id",
+        "crew_inventory",
+        "base_inventory",
+        "base_resources",
+        "tile_resources",
+        "world_flags",
+        "world_history",
+        "event_log"
+      ]
+    }
+  }
+}
