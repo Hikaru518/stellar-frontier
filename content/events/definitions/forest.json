@@ -1,3 +1,644 @@
 {
-  "event_definitions": []
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "forest_trace_small_camp",
+      "version": 1,
+      "domain": "forest",
+      "title": "Forest Trace Small Camp",
+      "summary": "A crew member finds a small abandoned camp trace in the forest.",
+      "tags": ["sample", "normal_discovery", "forest"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "tags",
+            "value": "forest"
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 30,
+        "weight": 1,
+        "mutex_group": null,
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": false
+      },
+      "repeat_policy": {
+        "scope": "crew_tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 0,
+        "history_key_template": "event:{event_definition_id}:{crew_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "trace_report",
+        "nodes": [
+          {
+            "id": "trace_report",
+            "type": "call",
+            "title": "Report the camp trace",
+            "call_template_id": "forest_trace_small_camp.call.report",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              {
+                "id": "mark_camp",
+                "effect_refs": ["trace_mark_camp"],
+                "is_default": true
+              },
+              {
+                "id": "note_only"
+              }
+            ],
+            "option_node_mapping": {
+              "mark_camp": "trace_resolved",
+              "note_only": "trace_noted"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 180
+          },
+          {
+            "id": "trace_resolved",
+            "type": "end",
+            "title": "Camp trace marked",
+            "resolution": "resolved",
+            "result_key": "camp_marked",
+            "final_effect_refs": ["trace_log_discovery"],
+            "event_log_template_id": "trace_discovery_log",
+            "history_writes": [
+              {
+                "key_template": "forest_trace_small_camp:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "camp_marked"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "trace_noted",
+            "type": "end",
+            "title": "Camp trace noted",
+            "resolution": "resolved",
+            "result_key": "camp_noted",
+            "final_effect_refs": ["trace_log_note"],
+            "event_log_template_id": "trace_note_log",
+            "history_writes": [
+              {
+                "key_template": "forest_trace_small_camp:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "camp_noted"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["trace_resolved", "trace_noted"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "trace_mark_camp",
+          "effects": [
+            {
+              "id": "trace_mark_tile",
+              "type": "add_event_mark",
+              "target": {
+                "type": "event_tile"
+              },
+              "params": {
+                "id": "small_camp_trace",
+                "label": "Small camp trace"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "trace_log_discovery",
+          "effects": [
+            {
+              "id": "trace_discovery_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "A small forest camp trace was marked for later review.",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "camp_marked"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "trace_history_effect",
+              "type": "write_world_history",
+              "target": {
+                "type": "world_history"
+              },
+              "params": {
+                "key": "forest_trace_small_camp:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "camp_marked",
+                "last_result": "camp_marked"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "trace_log_note",
+          "effects": [
+            {
+              "id": "trace_note_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "The forest camp trace was noted without a tile marker.",
+                "importance": "minor",
+                "visibility": "player_visible",
+                "result_key": "camp_noted"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "trace_discovery_log",
+          "summary": "Forest trace marked",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "trace_note_log",
+          "summary": "Forest trace noted",
+          "importance": "minor",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["forest_trace_small_camp.call.report"],
+        "crew_ids": ["amy"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "action_complete",
+          "occurred_at": 120,
+          "source": "crew_action",
+          "crew_id": "amy",
+          "tile_id": "2-3",
+          "action_id": "amy-survey-2-3",
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "action_type": "survey"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "forest_beast_encounter",
+      "version": 1,
+      "domain": "forest",
+      "title": "Forest Beast Encounter",
+      "summary": "A forest idle event escalates through two urgent calls around a nearby beast.",
+      "tags": ["sample", "emergency_multi_call", "forest"],
+      "status": "approved",
+      "trigger": {
+        "type": "idle_time",
+        "required_context": ["crew_id", "tile_id"],
+        "conditions": [
+          {
+            "type": "has_tag",
+            "target": {
+              "type": "event_tile"
+            },
+            "field": "danger_tags",
+            "value": "beast_tracks"
+          }
+        ]
+      },
+      "candidate_selection": {
+        "priority": 90,
+        "weight": 1,
+        "mutex_group": "crew_emergency",
+        "max_instances_per_trigger": 1,
+        "requires_blocking_slot": true
+      },
+      "repeat_policy": {
+        "scope": "crew_tile",
+        "max_trigger_count": 1,
+        "cooldown_seconds": 300,
+        "history_key_template": "event:{event_definition_id}:{crew_id}:{tile_id}",
+        "allow_while_active": false
+      },
+      "event_graph": {
+        "entry_node_id": "beast_first_call",
+        "nodes": [
+          {
+            "id": "beast_first_call",
+            "type": "call",
+            "title": "First beast contact",
+            "call_template_id": "forest_beast_encounter.call.first",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "emergency",
+            "delivery": "incoming_call",
+            "options": [
+              {
+                "id": "hold_position",
+                "effect_refs": ["beast_hold_effect"],
+                "is_default": true
+              },
+              {
+                "id": "fall_back"
+              }
+            ],
+            "option_node_mapping": {
+              "hold_position": "beast_wait",
+              "fall_back": "beast_retreat_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 90
+          },
+          {
+            "id": "beast_wait",
+            "type": "wait",
+            "title": "Wait for the beast to pass",
+            "duration_seconds": 20,
+            "wake_trigger_type": "time_wakeup",
+            "next_node_id": "beast_followup_call",
+            "set_next_wakeup_at": true,
+            "crew_action_during_wait": {
+              "type": "guarding_event_site",
+              "status": "active",
+              "action_params": {
+                "stance": "silent"
+              }
+            },
+            "interrupt_policy": "not_interruptible",
+            "on_interrupted": null,
+            "blocking": {
+              "occupies_crew_action": true,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            }
+          },
+          {
+            "id": "beast_followup_call",
+            "type": "call",
+            "title": "Follow-up beast call",
+            "call_template_id": "forest_beast_encounter.call.followup",
+            "speaker_crew_ref": {
+              "type": "primary_crew"
+            },
+            "urgency": "urgent",
+            "delivery": "incoming_call",
+            "options": [
+              {
+                "id": "drive_off",
+                "is_default": true
+              },
+              {
+                "id": "stay_hidden"
+              }
+            ],
+            "option_node_mapping": {
+              "drive_off": "beast_safe_end",
+              "stay_hidden": "beast_shaken_end"
+            },
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": true,
+              "blocking_key_template": null
+            },
+            "expires_in_seconds": 120
+          },
+          {
+            "id": "beast_safe_end",
+            "type": "end",
+            "title": "Beast driven away",
+            "resolution": "resolved",
+            "result_key": "beast_driven_off",
+            "final_effect_refs": ["beast_safe_effects"],
+            "event_log_template_id": "beast_safe_log",
+            "history_writes": [
+              {
+                "key_template": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_driven_off"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "beast_shaken_end",
+            "type": "end",
+            "title": "Crew stays hidden",
+            "resolution": "resolved",
+            "result_key": "beast_avoided",
+            "final_effect_refs": ["beast_hidden_effects"],
+            "event_log_template_id": "beast_hidden_log",
+            "history_writes": [
+              {
+                "key_template": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_avoided"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          },
+          {
+            "id": "beast_retreat_end",
+            "type": "end",
+            "title": "Crew retreats",
+            "resolution": "resolved",
+            "result_key": "beast_retreat",
+            "final_effect_refs": ["beast_retreat_effects"],
+            "event_log_template_id": "beast_retreat_log",
+            "history_writes": [
+              {
+                "key_template": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_retreat"
+              }
+            ],
+            "blocking": {
+              "occupies_crew_action": false,
+              "occupies_communication": false,
+              "blocking_key_template": null
+            },
+            "cleanup_policy": {
+              "release_blocking_claims": true,
+              "delete_active_calls": true,
+              "keep_player_summary": true
+            }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["beast_safe_end", "beast_shaken_end", "beast_retreat_end"],
+        "graph_rules": {
+          "acyclic": true,
+          "max_active_nodes": 1,
+          "allow_parallel_nodes": false
+        }
+      },
+      "effect_groups": [
+        {
+          "id": "beast_hold_effect",
+          "effects": [
+            {
+              "id": "beast_add_braced",
+              "type": "add_crew_condition",
+              "target": {
+                "type": "primary_crew"
+              },
+              "params": {
+                "condition": "braced"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "beast_safe_effects",
+          "effects": [
+            {
+              "id": "beast_add_danger_tag",
+              "type": "add_danger_tag",
+              "target": {
+                "type": "event_tile"
+              },
+              "params": {
+                "tag": "beast_sighted"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "beast_safe_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "The forest beast withdrew after the crew held position.",
+                "importance": "major",
+                "visibility": "player_visible",
+                "result_key": "beast_driven_off"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            },
+            {
+              "id": "beast_history_effect",
+              "type": "write_world_history",
+              "target": {
+                "type": "world_history"
+              },
+              "params": {
+                "key": "forest_beast_encounter:{crew_id}:{tile_id}",
+                "scope": "crew_tile",
+                "value": "beast_driven_off",
+                "last_result": "beast_driven_off"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "beast_hidden_effects",
+          "effects": [
+            {
+              "id": "beast_hidden_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "The crew stayed hidden until the beast moved away.",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "beast_avoided"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "beast_retreat_effects",
+          "effects": [
+            {
+              "id": "beast_retreat_log_effect",
+              "type": "add_event_log",
+              "target": {
+                "type": "event_log"
+              },
+              "params": {
+                "summary": "The crew retreated from the forest beast sign.",
+                "importance": "normal",
+                "visibility": "player_visible",
+                "result_key": "beast_retreat"
+              },
+              "failure_policy": "fail_event",
+              "record_policy": {
+                "write_event_log": false,
+                "write_world_history": false
+              }
+            }
+          ]
+        }
+      ],
+      "log_templates": [
+        {
+          "id": "beast_safe_log",
+          "summary": "Beast encounter stabilized",
+          "importance": "major",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "beast_hidden_log",
+          "summary": "Beast encounter avoided",
+          "importance": "normal",
+          "visibility": "player_visible"
+        },
+        {
+          "id": "beast_retreat_log",
+          "summary": "Beast encounter retreated",
+          "importance": "normal",
+          "visibility": "player_visible"
+        }
+      ],
+      "content_refs": {
+        "call_template_ids": ["forest_beast_encounter.call.first", "forest_beast_encounter.call.followup"],
+        "crew_ids": ["amy"]
+      },
+      "sample_contexts": [
+        {
+          "trigger_type": "idle_time",
+          "occurred_at": 240,
+          "source": "time_system",
+          "crew_id": "amy",
+          "tile_id": "2-3",
+          "action_id": null,
+          "event_id": null,
+          "event_definition_id": null,
+          "node_id": null,
+          "call_id": null,
+          "objective_id": null,
+          "selected_option_id": null,
+          "world_flag_key": null,
+          "proximity": null,
+          "payload": {
+            "idle_seconds": 300
+          }
+        }
+      ]
+    }
+  ]
 }
