@@ -1,6 +1,7 @@
 import { FieldList, Panel, StatusTag } from "../components/Layout";
 import { getDiaryAvailabilityLabel, getVisibleDiaryEntries } from "../diarySystem";
 import type { CrewMember, Tone } from "../data/gameData";
+import type { EventLog } from "../events/types";
 import { getInventoryView } from "../inventorySystem";
 import { formatGameTime } from "../timeSystem";
 
@@ -12,9 +13,14 @@ const attributeLabels: Array<[keyof CrewMember["attributes"], string]> = [
   ["luck", "运气"],
 ];
 
-export function CrewDetail({ member }: { member: CrewMember }) {
+export function CrewDetail({ member, eventLogs = [] }: { member: CrewMember; eventLogs?: EventLog[] }) {
   const diaryEntries = getVisibleDiaryEntries(member).sort((a, b) => a.gameSecond - b.gameSecond);
   const inventorySummary = formatInventorySummary(member.inventory);
+  const memberEventLogs = eventLogs
+    .filter((log) => log.visibility === "player_visible" && log.crew_ids.includes(member.id))
+    .slice()
+    .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
+    .slice(0, 5);
 
   return (
     <div className="crew-detail">
@@ -50,13 +56,35 @@ export function CrewDetail({ member }: { member: CrewMember }) {
       </Panel>
 
       <Panel title="自由性格标签">
-        <div className="tag-list">
-          {member.personalityTags.map((tag) => (
-            <span key={tag} className="text-chip">
-              {tag}
-            </span>
-          ))}
-        </div>
+        {member.personalityTags.length ? (
+          <div className="tag-list">
+            {member.personalityTags.map((tag) => (
+              <span key={tag} className="text-chip">
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="muted-text">暂无性格标签。</p>
+        )}
+      </Panel>
+
+      <Panel title="事件影响">
+        {memberEventLogs.length ? (
+          <ol className="diary-list">
+            {memberEventLogs.map((log) => (
+              <li key={log.id}>
+                <div className="diary-meta">
+                  <span>{formatGameTime(log.occurred_at)}</span>
+                  <StatusTag tone={getEventLogTone(log.importance)}>{formatEventImportance(log.importance)}</StatusTag>
+                </div>
+                <p>{log.summary}</p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="muted-text">暂无事件摘要。</p>
+        )}
       </Panel>
 
       <Panel title="专长">
@@ -95,6 +123,29 @@ export function CrewDetail({ member }: { member: CrewMember }) {
       </Panel>
     </div>
   );
+}
+
+function getEventLogTone(importance: EventLog["importance"]): Tone {
+  if (importance === "critical") {
+    return "danger";
+  }
+  if (importance === "major") {
+    return "accent";
+  }
+  return "muted";
+}
+
+function formatEventImportance(importance: EventLog["importance"]) {
+  if (importance === "critical") {
+    return "紧急";
+  }
+  if (importance === "major") {
+    return "重要";
+  }
+  if (importance === "normal") {
+    return "记录";
+  }
+  return "简报";
 }
 
 function formatInventorySummary(inventory: CrewMember["inventory"]) {

@@ -2,11 +2,13 @@ import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
 import { createMovePreview, formatMoveRoute, getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember, MapReturnTarget, MapTile } from "../data/gameData";
+import type { EventLog } from "../events/types";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 interface MapPageProps {
   tiles: MapTile[];
   crew: CrewMember[];
+  eventLogs: EventLog[];
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   returnTarget: MapReturnTarget;
@@ -19,6 +21,7 @@ interface MapPageProps {
 export function MapPage({
   tiles,
   crew,
+  eventLogs,
   elapsedGameSeconds,
   gameTimeLabel,
   returnTarget,
@@ -31,6 +34,7 @@ export function MapPage({
   const selectedTile = tiles.find((tile) => tile.id === selectedId) ?? tiles[0];
   const moveSelectionMember = crew.find((member) => member.id === moveSelectionCrewId);
   const movePreview = moveSelectionMember && selectedTile ? createMovePreview(moveSelectionMember, selectedTile.id, tiles) : null;
+  const selectedTileLogs = selectedTile ? getTileEventLogs(eventLogs, selectedTile.id) : [];
 
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),
@@ -55,10 +59,12 @@ export function MapPage({
       <div className="map-layout">
         <section className="map-grid" aria-label="4x4 星球地块">
           {tiles.map((tile) => {
-            const hasDanger = tile.danger !== "未发现即时危险" && tile.danger !== "未知详情";
+            const dangerTags = tile.dangerTags ?? [];
+            const hasDanger = dangerTags.length > 0 || (tile.danger !== "未发现即时危险" && tile.danger !== "未知详情");
             const isRouteTile = movePreview?.route.includes(tile.id) ?? false;
             const isMoveTarget = selectedMoveTargetId === tile.id;
             const hasCurrentCrew = crew.some((member) => member.currentTile === tile.id);
+            const firstEventMark = tile.eventMarks?.[0];
             return (
               <button
                 type="button"
@@ -86,6 +92,12 @@ export function MapPage({
                     </small>
                   ) : null;
                 })}
+                {firstEventMark ? <small className="route-text">{firstEventMark.label}</small> : null}
+                {dangerTags.slice(0, 1).map((tag) => (
+                  <small key={tag} className="danger-text">
+                    {tag}
+                  </small>
+                ))}
                 {isRouteTile ? <small className="route-text">候选路线</small> : null}
                 {isMoveTarget ? <small className="route-text">已标记目标</small> : null}
               </button>
@@ -109,6 +121,9 @@ export function MapPage({
               ["手下状态", crewStatus(selectedTile, crewById)],
               ["计时状态", crewTiming(selectedTile, crewById, elapsedGameSeconds)],
               ["危险", selectedTile.danger],
+              ["危险标签", formatList(selectedTile.dangerTags)],
+              ["事件标记", formatEventMarks(selectedTile)],
+              ["事件摘要", formatEventSummaries(selectedTileLogs)],
               ["状态", selectedTile.status],
               ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
             ]}
@@ -150,6 +165,25 @@ export function MapPage({
       </div>
     </ConsoleShell>
   );
+}
+
+function getTileEventLogs(eventLogs: EventLog[], tileId: string) {
+  return eventLogs
+    .filter((log) => log.visibility === "player_visible" && log.tile_ids.includes(tileId))
+    .slice()
+    .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id));
+}
+
+function formatList(values: string[] | undefined) {
+  return values?.length ? values.join(" / ") : "无";
+}
+
+function formatEventMarks(tile: MapTile) {
+  return tile.eventMarks?.length ? tile.eventMarks.map((mark) => mark.label).join(" / ") : "无";
+}
+
+function formatEventSummaries(eventLogs: EventLog[]) {
+  return eventLogs.length ? eventLogs.map((log) => log.summary).join(" / ") : "暂无事件摘要";
 }
 
 function crewStatus(tile: MapTile, crewById: Map<string, CrewMember>) {
