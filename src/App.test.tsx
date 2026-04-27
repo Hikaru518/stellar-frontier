@@ -458,6 +458,119 @@ describe("App", () => {
     expect(event?.selected_options).toEqual({ trace_report: "mark_camp" });
   });
 
+  it("shows non-urgent event calls as neutral connect entries without countdown", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 30,
+        crew: [{ id: "garry", currentTile: "3-3", activeAction: null, hasIncoming: false }],
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+        active_calls: {
+          "normal-event-call": createRuntimeCall({
+            id: "normal-event-call",
+            crew_id: "garry",
+            severity: "medium",
+            expires_at: 300,
+            rendered_lines: [runtimeLine("Garry 报告矿脉里传出空声。", "garry")],
+          }),
+        },
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    const callCard = within(runtimeCallPanel as HTMLElement).getByText("Garry 报告矿脉里传出空声。").closest("article");
+    expect(callCard).not.toBeNull();
+
+    expect(within(callCard as HTMLElement).getByRole("button", { name: "接通" })).toBeInTheDocument();
+    expect(within(callCard as HTMLElement).getByText("普通")).toHaveClass("status-neutral");
+    expect(within(callCard as HTMLElement).queryByText(/剩余/)).not.toBeInTheDocument();
+    expect(within(callCard as HTMLElement).queryByText("无强制倒计时")).not.toBeInTheDocument();
+  });
+
+  it("shows urgent event calls as danger connect entries with countdown", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 95,
+        crew: [{ id: "amy", currentTile: "2-3", activeAction: null, hasIncoming: false }],
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+        active_calls: {
+          "urgent-event-call": createRuntimeCall({
+            id: "urgent-event-call",
+            crew_id: "amy",
+            severity: "high",
+            expires_at: 215,
+            rendered_lines: [runtimeLine("Amy 压低声音：有个大型生物正在绕行。", "amy")],
+          }),
+        },
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    const callCard = within(runtimeCallPanel as HTMLElement).getByText("Amy 压低声音：有个大型生物正在绕行。").closest("article");
+    expect(callCard).not.toBeNull();
+
+    expect(within(callCard as HTMLElement).getByRole("button", { name: "接通" })).toBeInTheDocument();
+    expect(within(callCard as HTMLElement).getByText("紧急")).toHaveClass("status-danger");
+    expect(within(callCard as HTMLElement).getByText("剩余 02:00")).toBeInTheDocument();
+  });
+
+  it("prioritizes an event call over the same crew's player call entry", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 10,
+        crew: [
+          { id: "amy", hasIncoming: false },
+          { id: "garry", currentTile: "3-3", activeAction: null, hasIncoming: true },
+        ],
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+        active_calls: {
+          "priority-event-call": createRuntimeCall({
+            id: "priority-event-call",
+            crew_id: "garry",
+            severity: "medium",
+            rendered_lines: [runtimeLine("Garry 的事件频道等待接入。", "garry")],
+          }),
+        },
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    const contactsPanel = screen.getByText("通讯录 · 1 条来电").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    expect(contactsPanel).not.toBeNull();
+    const eventCallCard = within(runtimeCallPanel as HTMLElement).getByText("Garry 的事件频道等待接入。").closest("article");
+    const contactCard = within(contactsPanel as HTMLElement).getByText("Garry，退休老大爷").closest("article");
+    expect(eventCallCard).not.toBeNull();
+    expect(contactCard).not.toBeNull();
+
+    expect(screen.getAllByRole("button", { name: "接通" })).toHaveLength(1);
+    expect(within(contactCard as HTMLElement).queryByRole("button", { name: "接通" })).not.toBeInTheDocument();
+    expect(within(contactCard as HTMLElement).getByRole("button", { name: "通话" })).toBeInTheDocument();
+    expect((eventCallCard as HTMLElement).compareDocumentPosition(contactCard as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("shows the resolved seeded forest camp trace on the map tile", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
@@ -804,7 +917,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: /通讯台/ }));
     const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
     expect(linCard).not.toBeNull();
-    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "接通" }));
+    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "通话" }));
 
     expect(screen.getByRole("heading", { name: "通话页面：林夏 状态确认" })).toBeInTheDocument();
     expect(screen.queryByText(/使用照明道具继续确认洞内路径/)).not.toBeInTheDocument();
@@ -872,7 +985,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: /通讯台/ }));
     const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
     expect(amyCard).not.toBeNull();
-    await user.click(within(amyCard as HTMLElement).getByRole("button", { name: "接通" }));
+    await user.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
 
     expect(screen.queryByRole("button", { name: "立刻撤离" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "立刻后撤。" })).not.toBeInTheDocument();
@@ -887,7 +1000,9 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: /通讯台/ }));
     expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "接通" }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    await user.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
     expect(screen.getByRole("heading", { name: "通话页面：Amy 状态确认" })).toBeInTheDocument();
     expect(screen.queryByText("队员压低声音报告：附近有大型野兽正在靠近。")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "返回通讯台" }).length).toBeGreaterThan(0);
@@ -1167,14 +1282,14 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "交易" })).not.toBeInTheDocument();
   });
 
-  it("keeps incoming call connect as the primary action while inventory remains available", () => {
+  it("keeps player call entry as the primary action while inventory remains available", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
     expect(amyCard).not.toBeNull();
 
-    expect(within(amyCard as HTMLElement).getByRole("button", { name: "接通" })).toHaveClass("primary-button");
+    expect(within(amyCard as HTMLElement).getByRole("button", { name: "通话" })).toHaveClass("primary-button");
     expect(within(amyCard as HTMLElement).getByRole("button", { name: "查看背包" })).toBeInTheDocument();
   });
 
@@ -1353,6 +1468,42 @@ function eventCrewAction(overrides: Partial<CrewActionState>): CrewActionState {
     interrupt_duration_seconds: 10,
     action_params: {},
     ...overrides,
+  };
+}
+
+function createRuntimeCall(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "runtime-call",
+    event_id: "event-call-test",
+    event_node_id: "call-node",
+    call_template_id: "test.call",
+    crew_id: "garry",
+    status: "incoming",
+    created_at: 0,
+    connected_at: null,
+    ended_at: null,
+    expires_at: null,
+    render_context_snapshot: {},
+    rendered_lines: [runtimeLine("事件通话等待接入。", "garry")],
+    available_options: [
+      {
+        option_id: "acknowledge",
+        template_variant_id: "acknowledge-default",
+        text: "收到。",
+        is_default: true,
+      },
+    ],
+    selected_option_id: null,
+    blocking_claim_id: null,
+    ...overrides,
+  };
+}
+
+function runtimeLine(text: string, speakerCrewId: string) {
+  return {
+    template_variant_id: `${speakerCrewId}-line`,
+    text,
+    speaker_crew_id: speakerCrewId,
   };
 }
 
