@@ -82,16 +82,17 @@ export function CommunicationStation({
               {activeRuntimeCalls.map((call) => {
                 const member = crew.find((item) => item.id === call.crew_id);
                 const crewId = isCrewId(call.crew_id) ? call.crew_id : null;
+                const isUrgent = isUrgentRuntimeCall(call);
                 return (
                   <article key={call.id} className="crew-card crew-card-alert">
                     <div className="avatar-box">信号</div>
                     <div className="crew-card-body">
                       <div className="crew-card-heading">
                         <h3>{member ? `${member.name}，${member.role}` : call.crew_id}</h3>
-                        <StatusTag tone={call.status === "awaiting_choice" ? "accent" : "danger"}>{formatRuntimeCallStatus(call)}</StatusTag>
+                        <StatusTag tone={isUrgent ? "danger" : "neutral"}>{formatRuntimeCallSeverity(call)}</StatusTag>
                       </div>
                       <p className="crew-status status-accent">{call.rendered_lines[0]?.text ?? "事件通话等待接入。"}</p>
-                      <p className="muted-text">{formatRuntimeCallTiming(call, elapsedGameSeconds)}</p>
+                      {isUrgent ? <p className="muted-text">{formatRuntimeCallTiming(call, elapsedGameSeconds)}</p> : null}
                     </div>
                     <div className="crew-actions">
                       {crewId ? (
@@ -232,7 +233,7 @@ function CrewCard({
         {member.hasIncoming ? (
           <>
             <button type="button" className="primary-button" disabled={member.unavailable} onClick={onStartCall}>
-              {member.unavailable ? "信号中断" : "接通"}
+              {member.unavailable ? "信号中断" : "通话"}
             </button>
             <button type="button" className="secondary-button" onClick={onOpenInventory}>
               查看背包
@@ -314,25 +315,34 @@ function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {
   );
 }
 
-function formatRuntimeCallStatus(call: RuntimeCall) {
-  if (call.status === "awaiting_choice") {
-    return "排队消息";
-  }
-  if (call.status === "incoming") {
-    return "来电";
-  }
-  if (call.status === "connected") {
-    return "已接通";
-  }
-  return "已关闭";
-}
-
 function formatRuntimeCallTiming(call: RuntimeCall, elapsedGameSeconds: number) {
   if (typeof call.expires_at === "number") {
     return `剩余 ${formatDuration(getRemainingSeconds(call.expires_at, elapsedGameSeconds))}`;
   }
 
   return "无强制倒计时";
+}
+
+function formatRuntimeCallSeverity(call: RuntimeCall) {
+  const severity = getRuntimeCallSeverity(call);
+  if (severity === "critical") {
+    return "危急";
+  }
+  if (severity === "high") {
+    return "紧急";
+  }
+  return "普通";
+}
+
+function isUrgentRuntimeCall(call: RuntimeCall) {
+  const severity = getRuntimeCallSeverity(call);
+  return severity === "high" || severity === "critical";
+}
+
+function getRuntimeCallSeverity(call: RuntimeCall) {
+  const callWithSeverity = call as RuntimeCall & { severity?: unknown };
+  const severity = typeof callWithSeverity.severity === "string" ? callWithSeverity.severity : call.render_context_snapshot.severity;
+  return typeof severity === "string" ? severity : null;
 }
 
 function formatObjectiveStatus(objective: Objective) {
