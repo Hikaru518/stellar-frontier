@@ -85,6 +85,15 @@ const builtInConditionHandlers: Record<string, ConditionHandler> = {
     const entry = context.state.world_history?.[key.value];
     return pass(Boolean(entry && Object.is(readFieldValue(entry, "value"), params.value)));
   },
+  trigger_context_value_equals({ context, condition, path, params }) {
+    const field = readStringParam(params, "field", `${path}.params.field`, condition.handler_type ?? "handler");
+    if (field.errors.length > 0) {
+      return field;
+    }
+
+    const read = readField(context.trigger_context, field.value);
+    return pass(read.ok && Object.is(read.value, params.value));
+  },
 };
 
 export function evaluateConditions(

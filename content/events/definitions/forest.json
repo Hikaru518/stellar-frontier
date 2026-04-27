@@ -5,8 +5,8 @@
       "id": "forest_trace_small_camp",
       "version": 1,
       "domain": "forest",
-      "title": "Forest Trace Small Camp",
-      "summary": "A crew member finds a small abandoned camp trace in the forest.",
+      "title": "森林小型营地痕迹",
+      "summary": "队员在森林中发现一处废弃小营地痕迹。",
       "tags": ["sample", "normal_discovery", "forest"],
       "status": "approved",
       "trigger": {
@@ -43,7 +43,7 @@
           {
             "id": "trace_report",
             "type": "call",
-            "title": "Report the camp trace",
+            "title": "报告营地痕迹",
             "call_template_id": "forest_trace_small_camp.call.report",
             "speaker_crew_ref": {
               "type": "primary_crew"
@@ -74,7 +74,7 @@
           {
             "id": "trace_resolved",
             "type": "end",
-            "title": "Camp trace marked",
+            "title": "营地痕迹已标记",
             "resolution": "resolved",
             "result_key": "camp_marked",
             "final_effect_refs": ["trace_log_discovery"],
@@ -100,7 +100,7 @@
           {
             "id": "trace_noted",
             "type": "end",
-            "title": "Camp trace noted",
+            "title": "营地痕迹已记录",
             "resolution": "resolved",
             "result_key": "camp_noted",
             "final_effect_refs": ["trace_log_note"],
@@ -144,7 +144,7 @@
               },
               "params": {
                 "id": "small_camp_trace",
-                "label": "Small camp trace"
+                "label": "小型营地痕迹"
               },
               "failure_policy": "fail_event",
               "record_policy": {
@@ -164,7 +164,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "A small forest camp trace was marked for later review.",
+                "summary": "一处森林小型营地痕迹已标记，等待后续复核。",
                 "importance": "normal",
                 "visibility": "player_visible",
                 "result_key": "camp_marked"
@@ -205,7 +205,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The forest camp trace was noted without a tile marker.",
+                "summary": "森林营地痕迹已记录，但未标记地块。",
                 "importance": "minor",
                 "visibility": "player_visible",
                 "result_key": "camp_noted"
@@ -222,13 +222,13 @@
       "log_templates": [
         {
           "id": "trace_discovery_log",
-          "summary": "Forest trace marked",
+          "summary": "森林痕迹已标记",
           "importance": "normal",
           "visibility": "player_visible"
         },
         {
           "id": "trace_note_log",
-          "summary": "Forest trace noted",
+          "summary": "森林痕迹已记录",
           "importance": "minor",
           "visibility": "player_visible"
         }
@@ -264,8 +264,8 @@
       "id": "forest_beast_encounter",
       "version": 1,
       "domain": "forest",
-      "title": "Forest Beast Encounter",
-      "summary": "A forest idle event escalates through two urgent calls around a nearby beast.",
+      "title": "森林野兽遭遇",
+      "summary": "队员在森林待命时遭遇附近野兽，事件会通过两次紧急通话升级。",
       "tags": ["sample", "emergency_multi_call", "forest"],
       "status": "approved",
       "trigger": {
@@ -302,7 +302,7 @@
           {
             "id": "beast_first_call",
             "type": "call",
-            "title": "First beast contact",
+            "title": "首次野兽接触",
             "call_template_id": "forest_beast_encounter.call.first",
             "speaker_crew_ref": {
               "type": "primary_crew"
@@ -333,7 +333,7 @@
           {
             "id": "beast_wait",
             "type": "wait",
-            "title": "Wait for the beast to pass",
+            "title": "等待野兽离开",
             "duration_seconds": 20,
             "wake_trigger_type": "time_wakeup",
             "next_node_id": "beast_followup_call",
@@ -356,7 +356,7 @@
           {
             "id": "beast_followup_call",
             "type": "call",
-            "title": "Follow-up beast call",
+            "title": "野兽后续通话",
             "call_template_id": "forest_beast_encounter.call.followup",
             "speaker_crew_ref": {
               "type": "primary_crew"
@@ -386,7 +386,7 @@
           {
             "id": "beast_safe_end",
             "type": "end",
-            "title": "Beast driven away",
+            "title": "野兽已驱离",
             "resolution": "resolved",
             "result_key": "beast_driven_off",
             "final_effect_refs": ["beast_safe_effects"],
@@ -412,7 +412,7 @@
           {
             "id": "beast_shaken_end",
             "type": "end",
-            "title": "Crew stays hidden",
+            "title": "队员继续躲藏",
             "resolution": "resolved",
             "result_key": "beast_avoided",
             "final_effect_refs": ["beast_hidden_effects"],
@@ -438,7 +438,7 @@
           {
             "id": "beast_retreat_end",
             "type": "end",
-            "title": "Crew retreats",
+            "title": "队员后撤",
             "resolution": "resolved",
             "result_key": "beast_retreat",
             "final_effect_refs": ["beast_retreat_effects"],
@@ -516,7 +516,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The forest beast withdrew after the crew held position.",
+                "summary": "队员保持位置后，森林野兽已经退走。",
                 "importance": "major",
                 "visibility": "player_visible",
                 "result_key": "beast_driven_off"
@@ -557,7 +557,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The crew stayed hidden until the beast moved away.",
+                "summary": "队员继续躲藏，直到野兽离开。",
                 "importance": "normal",
                 "visibility": "player_visible",
                 "result_key": "beast_avoided"
@@ -580,7 +580,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "The crew retreated from the forest beast sign.",
+                "summary": "队员从森林野兽踪迹附近后撤。",
                 "importance": "normal",
                 "visibility": "player_visible",
                 "result_key": "beast_retreat"
@@ -597,19 +597,19 @@
       "log_templates": [
         {
           "id": "beast_safe_log",
-          "summary": "Beast encounter stabilized",
+          "summary": "野兽遭遇已稳定",
           "importance": "major",
           "visibility": "player_visible"
         },
         {
           "id": "beast_hidden_log",
-          "summary": "Beast encounter avoided",
+          "summary": "野兽遭遇已避开",
           "importance": "normal",
           "visibility": "player_visible"
         },
         {
           "id": "beast_retreat_log",
-          "summary": "Beast encounter retreated",
+          "summary": "野兽遭遇已后撤",
           "importance": "normal",
           "visibility": "player_visible"
         }

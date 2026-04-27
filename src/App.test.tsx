@@ -100,6 +100,36 @@ describe("App", () => {
     );
   });
 
+  it("creates a manual runtime call when default Garry mine survey finishes", () => {
+    vi.useFakeTimers();
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(Object.values(saved.active_events).map((event) => (event as { event_definition_id: string }).event_definition_id)).toContain(
+      "garry_mine_anomaly_report",
+    );
+    expect(saved.active_calls["garry_mine_anomaly_report:180:mine_anomaly_call:call"].status).toBe("awaiting_choice");
+
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByText("Garry 报告 3-3 的矿床下方传来空洞回声。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "标记异常，交给工程复核。" })).toBeInTheDocument();
+  });
+
   it("keeps items and all five approved event program samples wired through content data", () => {
     const lightItem = itemDefinitions.find((item) => item.tags.includes("light") && item.usableInResponse);
     expect(lightItem).toBeDefined();
@@ -125,7 +155,7 @@ describe("App", () => {
     ).toBe(true);
   });
 
-  it("creates a runtime event when a crew member completes a sample trigger action", () => {
+  it("creates the seeded forest trace sample when Garry is placed on a forest tile", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -168,7 +198,7 @@ describe("App", () => {
     expect(Object.keys(saved.active_calls)).toContain("forest_trace_small_camp:180:trace_report:call");
   });
 
-  it("opens an active runtime call from the station and submits its stable option_id", () => {
+  it("opens the seeded forest trace runtime call from the station and submits its stable option_id", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -210,10 +240,10 @@ describe("App", () => {
     expect(runtimeCallPanel).not.toBeNull();
     fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
 
-    expect(screen.getByText("Garry reports a small camp trace near 2-3.")).toBeInTheDocument();
-    expect(screen.getByText("No movement, just old ash and a tied branch.")).toBeInTheDocument();
+    expect(screen.getByText("Garry 报告 2-3 附近有一处小型营地痕迹。")).toBeInTheDocument();
+    expect(screen.getByText("没有活动迹象，只有冷灰和一根被绑过的树枝。")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark the camp trace." }));
+    fireEvent.click(screen.getByRole("button", { name: "标记这处营地痕迹。" }));
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const call = saved.active_calls["forest_trace_small_camp:180:trace_report:call"];
@@ -226,7 +256,7 @@ describe("App", () => {
     expect(event.selected_options).toEqual({ trace_report: "mark_camp" });
   });
 
-  it("shows the resolved forest camp trace on the map tile", () => {
+  it("shows the resolved seeded forest camp trace on the map tile", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -266,17 +296,17 @@ describe("App", () => {
     const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
     expect(runtimeCallPanel).not.toBeNull();
     fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
-    fireEvent.click(screen.getByRole("button", { name: "Mark the camp trace." }));
+    fireEvent.click(screen.getByRole("button", { name: "标记这处营地痕迹。" }));
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
     fireEvent.click(screen.getByRole("button", { name: "返回控制中心" }));
     fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
     fireEvent.click(screen.getByRole("button", { name: /\(2,3\)/ }));
 
-    expect(screen.getAllByText("Small camp trace").length).toBeGreaterThan(0);
-    expect(screen.getByText("A small forest camp trace was marked for later review.")).toBeInTheDocument();
+    expect(screen.getAllByText("小型营地痕迹").length).toBeGreaterThan(0);
+    expect(screen.getByText("一处森林小型营地痕迹已标记，等待后续复核。")).toBeInTheDocument();
   });
 
-  it("shows lost relic argument effects in Kael's crew detail", () => {
+  it("shows seeded lost relic argument effects in Kael's crew detail", () => {
     const { eventState } = createLostRelicArgumentState();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -303,7 +333,7 @@ describe("App", () => {
     const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
     expect(runtimeCallPanel).not.toBeNull();
     fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
-    fireEvent.click(screen.getByRole("button", { name: "Trust Kael to carry the lead." }));
+    fireEvent.click(screen.getByRole("button", { name: "信任 Kael，让他继续追查线索。" }));
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
 
     const kaelCard = screen
@@ -314,10 +344,10 @@ describe("App", () => {
     fireEvent.click(within(kaelCard as HTMLElement).getByRole("button", { name: "查看档案" }));
 
     expect(screen.getByText("relic_burdened")).toBeInTheDocument();
-    expect(screen.getAllByText("Kael kept the relic lead, changing his long-term outlook.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Kael 保留了遗物线索，他的长期态度发生变化。").length).toBeGreaterThan(0);
   });
 
-  it("completes an assigned runtime objective when its crew action finishes", () => {
+  it("completes a seeded volcanic runtime objective when its crew action finishes", () => {
     vi.useFakeTimers();
     const { eventId, objectiveId, actionId, eventState } = createVolcanicObjectiveState();
     window.localStorage.setItem(
@@ -374,7 +404,7 @@ describe("App", () => {
     expect(saved.active_events[eventId].current_node_id).toBe("ash_mapped_end");
     expect(saved.event_logs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ summary: "A second crew member mapped the volcanic ash trace." }),
+        expect.objectContaining({ summary: "第二名队员完成了火山灰痕迹测绘。" }),
       ]),
     );
   });
@@ -446,7 +476,7 @@ describe("App", () => {
             rendered_lines: [
               {
                 template_variant_id: "beast_first_opening_default",
-                text: "Amy whispers: something large is circling 2-3.",
+              text: "Amy 压低声音：有个大型生物正在 2-3 周围绕行。",
                 speaker_crew_id: "amy",
               },
             ],
@@ -454,7 +484,7 @@ describe("App", () => {
               {
                 option_id: "fall_back",
                 template_variant_id: "beast_fallback_default",
-                text: "Fall back now.",
+              text: "立刻后撤。",
                 is_default: false,
               },
             ],
@@ -476,7 +506,7 @@ describe("App", () => {
     await user.click(within(amyCard as HTMLElement).getByRole("button", { name: "接通" }));
 
     expect(screen.queryByRole("button", { name: "立刻撤离" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fall back now." })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "立刻后撤。" })).not.toBeInTheDocument();
     expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
   });
 
@@ -773,12 +803,12 @@ function createLostRelicArgumentState() {
           rendered_lines: [
             {
               template_variant_id: "relic_opening_default",
-              text: "Kael refuses to bag the relic without a promise.",
+              text: "Kael 拒绝把遗物装袋，除非基地先给出承诺。",
               speaker_crew_id: "kael",
             },
             {
               template_variant_id: "relic_body_default",
-              text: "He says it belongs to someone who never made it home.",
+              text: "他说那东西属于一个再也没能回家的人。",
               speaker_crew_id: "kael",
             },
           ],
@@ -786,13 +816,13 @@ function createLostRelicArgumentState() {
             {
               option_id: "trust_kael",
               template_variant_id: "relic_trust_default",
-              text: "Trust Kael to carry the lead.",
+              text: "信任 Kael，让他继续追查线索。",
               is_default: true,
             },
             {
               option_id: "secure_relic",
               template_variant_id: "relic_secure_default",
-              text: "Secure the relic under base protocol.",
+              text: "按基地规程封存遗物。",
               is_default: false,
             },
           ],

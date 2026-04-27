@@ -41,6 +41,7 @@ export type SampleCoverageCategory =
   | "wait_node"
   | "cross_crew_objective"
   | "long_term_consequence";
+export type SampleReachability = "manual-reachable" | "seeded-regression" | "future-integration";
 
 export const SAMPLE_EVENT_COVERAGE = {
   normal_discovery: ["forest_trace_small_camp"],
@@ -49,6 +50,14 @@ export const SAMPLE_EVENT_COVERAGE = {
   cross_crew_objective: ["volcanic_ash_trace"],
   long_term_consequence: ["lost_relic_argument"],
 } satisfies Record<SampleCoverageCategory, readonly SampleEventId[]>;
+
+export const SAMPLE_EVENT_REACHABILITY = {
+  forest_trace_small_camp: "seeded-regression",
+  forest_beast_encounter: "future-integration",
+  mountain_signal_probe: "manual-reachable",
+  volcanic_ash_trace: "seeded-regression",
+  lost_relic_argument: "seeded-regression",
+} satisfies Record<SampleEventId, SampleReachability>;
 
 export interface SampleDryRunReport {
   event_definition_id: SampleEventId;
