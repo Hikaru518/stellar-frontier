@@ -67,13 +67,18 @@ export function StatusTag({ children, tone = "neutral" }: { children: ReactNode;
   return <span className={`status-tag status-${tone}`}>{children}</span>;
 }
 
-export function SystemLogPanel({ logs }: { logs: SystemLog[] }) {
+export function SystemLogPanel({ logs, onOpenReport }: { logs: SystemLog[]; onOpenReport?: (reportId: string) => void }) {
   return (
     <Panel title="系统日志" className="system-log">
       <ol>
         {logs.slice(-6).map((log) => (
           <li key={log.id} className={`log-${log.tone}`}>
             <span>[{log.time}]</span> {log.text}
+            {log.reportId && onOpenReport ? (
+              <button type="button" className="small-button log-report-button" onClick={() => onOpenReport(log.reportId!)}>
+                查看报告
+              </button>
+            ) : null}
           </li>
         ))}
       </ol>

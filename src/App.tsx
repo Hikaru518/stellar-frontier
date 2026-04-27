@@ -22,6 +22,7 @@ import {
   type CrewId,
   type CrewMember,
   type GameMapState,
+  type InvestigationReport,
   type MapReturnTarget,
   type MapTile,
   type PageId,
@@ -394,6 +395,7 @@ function App() {
         onOpenMap={() => openMap("control")}
         onOpenDebug={() => setDebugOpen(true)}
         onAppendLog={appendLog}
+        map={map}
       />
       {debugOpen ? (
         <DebugToolbox
@@ -505,11 +507,12 @@ function settleGameTime(state: GameState): GameState {
       }
     } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
       const completedActionType = member.activeAction.actionType;
-      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs);
+      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, tiles, logs, map);
       nextMember = settled.member;
       resources = settled.resources;
       tiles = settled.tiles;
       logs = settled.logs;
+      map = settled.map;
       changed = true;
 
       const source = getEventTriggerSource(completedActionType);
@@ -561,10 +564,11 @@ function settleCrewAction(
   resources: ResourceSummary,
   tiles: MapTile[],
   logs: SystemLog[],
+  map: GameMapState,
 ) {
   const action = member.activeAction;
   if (!action) {
-    return { member, resources, tiles, logs };
+    return { member, resources, tiles, logs, map };
   }
 
   if (member.id === "garry" && action.actionType === "gather" && (action.resource === "iron" || action.resource === "iron_ore")) {
@@ -604,6 +608,7 @@ function settleCrewAction(
       resources,
       tiles,
       logs: appendLogEntry(logs, `Garry 完成了 ${completedRounds} 轮铁矿采集，获得 ${ironYield} 铁矿石。`, "success", elapsedGameSeconds),
+      map,
     };
   }
 
@@ -622,6 +627,7 @@ function settleCrewAction(
       resources,
       tiles: patchTile(tiles, "2-1", { status: "观察中" }),
       logs: appendLogEntry(logs, "Mike 抵达湖泊边缘，开始观察异常水位。", "neutral", elapsedGameSeconds),
+      map,
     };
   }
 
@@ -637,6 +643,7 @@ function settleCrewAction(
       resources,
       tiles: patchTile(tiles, "3-3", { buildings: ["采矿厂：铁 #2", "临时支架"], status: "设施已加固" }),
       logs: appendLogEntry(logs, "丘陵地块的临时支架已安装完成。", "success", elapsedGameSeconds),
+      map,
     };
   }
 
@@ -657,12 +664,14 @@ function settleCrewAction(
       },
     );
     const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
+    const investigation = completeInvestigation(map, member.currentTile, member.id, elapsedGameSeconds);
 
     return {
       member: withExpertise.member,
       resources: withExpertise.resources,
-      tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
+      tiles: patchTile(deriveLegacyTiles(defaultMapConfig, investigation.map), member.currentTile, { investigated: true, status: "已调查" }),
+      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds, investigation.report.id),
+      map: investigation.map,
     };
   }
 
@@ -683,12 +692,14 @@ function settleCrewAction(
       },
     );
     const withExpertise = applySurveyExpertiseBonus(surveyedMember, resources, logs, elapsedGameSeconds);
+    const investigation = completeInvestigation(map, member.currentTile, member.id, elapsedGameSeconds);
 
     return {
       member: withExpertise.member,
       resources: withExpertise.resources,
-      tiles: patchTile(tiles, member.currentTile, { investigated: true, status: "已调查" }),
-      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds),
+      tiles: patchTile(deriveLegacyTiles(defaultMapConfig, investigation.map), member.currentTile, { investigated: true, status: "已调查" }),
+      logs: appendLogEntry(withExpertise.logs, `${member.name} 完成一轮调查。`, "neutral", elapsedGameSeconds, investigation.report.id),
+      map: investigation.map,
     };
   }
 
@@ -697,6 +708,7 @@ function settleCrewAction(
     resources,
     tiles,
     logs: appendLogEntry(logs, `${member.name} 的行动已完成。`, "neutral", elapsedGameSeconds),
+    map,
   };
 }
 
@@ -810,9 +822,78 @@ function getEventTriggerSource(actionType: ActiveAction["actionType"]) {
   return null;
 }
 
-function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number) {
+function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {
   const id = logs.reduce((highest, log) => Math.max(highest, log.id), 0) + 1;
-  return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone }];
+  return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone, ...(reportId ? { reportId } : {}) }];
+}
+
+function completeInvestigation(map: GameMapState, tileId: string, crewId: CrewId, elapsedGameSeconds: number) {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  const previous = map.tilesById[tileId] ?? {};
+  const reportId = `investigation-${tileId.replace("-", "_")}-${crewId}-${elapsedGameSeconds}`;
+
+  if (!configTile) {
+    const report: InvestigationReport = {
+      id: reportId,
+      tileId,
+      crewId,
+      createdAtGameSeconds: elapsedGameSeconds,
+      areaName: tileId,
+      playerCoord: tileId,
+      terrain: "未知",
+      weather: "未知",
+      environment: { temperatureCelsius: 0, humidityPercent: 0, magneticFieldMicroTesla: 0, radiationLevel: "unknown" },
+      revealedObjects: [],
+      revealedSpecialStates: [],
+    };
+    return { report, map: { ...map, investigationReportsById: { ...map.investigationReportsById, [reportId]: report } } };
+  }
+
+  const revealedObjectIds = configTile.objects.filter((object) => object.visibility === "onInvestigated").map((object) => object.id);
+  const activeStateIds = previous.activeSpecialStateIds ?? configTile.specialStates.filter((state) => state.startsActive).map((state) => state.id);
+  const revealedSpecialStateIds = configTile.specialStates
+    .filter((state) => state.visibility === "onInvestigated" && activeStateIds.includes(state.id))
+    .map((state) => state.id);
+  const origin = defaultMapConfig.tiles.find((tile) => tile.id === defaultMapConfig.originTileId);
+  const playerCoord = origin ? `(${configTile.col - origin.col},${origin.row - configTile.row})` : `(${configTile.row},${configTile.col})`;
+  const report: InvestigationReport = {
+    id: reportId,
+    tileId,
+    crewId,
+    createdAtGameSeconds: elapsedGameSeconds,
+    areaName: configTile.areaName,
+    playerCoord,
+    terrain: configTile.terrain,
+    weather: configTile.weather,
+    environment: configTile.environment,
+    revealedObjects: configTile.objects
+      .filter((object) => revealedObjectIds.includes(object.id) && !(previous.revealedObjectIds ?? []).includes(object.id))
+      .map((object) => ({ id: object.id, name: object.name, kind: object.kind })),
+    revealedSpecialStates: configTile.specialStates
+      .filter((state) => revealedSpecialStateIds.includes(state.id) && !(previous.revealedSpecialStateIds ?? []).includes(state.id))
+      .map((state) => ({ id: state.id, name: state.name, severity: state.severity })),
+  };
+
+  return {
+    report,
+    map: {
+      ...map,
+      discoveredTileIds: map.discoveredTileIds.includes(tileId) ? map.discoveredTileIds : [...map.discoveredTileIds, tileId],
+      investigationReportsById: { ...map.investigationReportsById, [reportId]: report },
+      tilesById: {
+        ...map.tilesById,
+        [tileId]: {
+          ...previous,
+          discovered: true,
+          investigated: true,
+          status: "已调查",
+          revealedObjectIds: addUnique(previous.revealedObjectIds ?? [], ...revealedObjectIds),
+          revealedSpecialStateIds: addUnique(previous.revealedSpecialStateIds ?? [], ...revealedSpecialStateIds),
+          lastInvestigationReportId: reportId,
+        },
+      },
+    },
+  };
 }
 
 function patchTile(tiles: MapTile[], id: string, patch: Partial<MapTile>) {

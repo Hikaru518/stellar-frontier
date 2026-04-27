@@ -1,5 +1,5 @@
 import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
-import type { CrewId, MapTile } from "./data/gameData";
+import type { CrewId, InvestigationReport, MapTile } from "./data/gameData";
 
 export type VisibleTileStatus = "discovered" | "frontier" | "unknownHole";
 
@@ -21,6 +21,7 @@ export interface RuntimeMapTileState {
   activeSpecialStateIds?: string[];
   crew?: CrewId[];
   status?: string;
+  lastInvestigationReportId?: string;
 }
 
 export interface RuntimeMapState {
@@ -30,7 +31,7 @@ export interface RuntimeMapState {
   cols: number;
   originTileId: string;
   discoveredTileIds: string[];
-  investigationReportsById: Record<string, unknown>;
+  investigationReportsById: Record<string, InvestigationReport>;
   tilesById: Record<string, RuntimeMapTileState | undefined>;
 }
 

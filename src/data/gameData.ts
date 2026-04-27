@@ -112,6 +112,28 @@ export interface SystemLog {
   time: string;
   text: string;
   tone: Tone;
+  reportId?: string;
+}
+
+export interface InvestigationReport {
+  id: string;
+  tileId: string;
+  crewId: CrewId;
+  createdAtGameSeconds: number;
+  areaName: string;
+  playerCoord: string;
+  terrain: string;
+  weather: string;
+  environment: {
+    temperatureCelsius: number;
+    humidityPercent: number;
+    magneticFieldMicroTesla: number;
+    radiationLevel: string;
+    toxicityLevel?: string;
+    atmosphericPressureKpa?: number;
+  };
+  revealedObjects: Array<{ id: string; name: string; kind: string }>;
+  revealedSpecialStates: Array<{ id: string; name: string; severity: string }>;
 }
 
 export type GameMapState = RuntimeMapState;

@@ -131,6 +131,79 @@ describe("App", () => {
         expect.objectContaining({ text: "Garry 敲了三下岩壁，找出一条地图没有标注的铁矿细脉。" }),
       ]),
     );
+
+    const endButtons = screen.getAllByRole("button", { name: "结束通话" });
+    fireEvent.click(endButtons[endButtons.length - 1]);
+    fireEvent.click(screen.getByRole("button", { name: /返回/ }));
+    fireEvent.click(screen.getByRole("button", { name: "查看报告" }));
+    expect(screen.getByText("未确认新的地块对象")).toBeInTheDocument();
+  });
+
+  it("creates an investigation report, reveals investigated map facts, and opens it from the log", () => {
+    vi.useFakeTimers();
+    const map = createInitialMapState();
+    map.discoveredTileIds = ["4-4", "6-1"];
+    map.tilesById["6-1"] = { ...map.tilesById["6-1"], discovered: true, investigated: false, revealedObjectIds: [], revealedSpecialStateIds: [] };
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify({
+        elapsedGameSeconds: 0,
+        saveVersion: GAME_SAVE_VERSION,
+        crew: [{ id: "garry", currentTile: "6-1", activeAction: null }],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+      }),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: /开展调查/ }));
+
+    act(() => {
+      vi.advanceTimersByTime(180_000);
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const runtimeTile = saved.map.tilesById["6-1"];
+    expect(runtimeTile.investigated).toBe(true);
+    expect(runtimeTile.revealedObjectIds).toContain("acidic-marsh");
+    expect(runtimeTile.revealedSpecialStateIds).toContain("acid-rain-pool");
+    expect(runtimeTile.lastInvestigationReportId).toBeTruthy();
+    const report = saved.map.investigationReportsById[runtimeTile.lastInvestigationReportId];
+    expect(report).toMatchObject({
+      tileId: "6-1",
+      crewId: "garry",
+      areaName: "南湖湿地",
+      playerCoord: "(-3,-2)",
+      terrain: "水",
+      weather: "酸雨",
+      environment: expect.objectContaining({ temperatureCelsius: 17, humidityPercent: 84 }),
+      revealedObjects: [expect.objectContaining({ id: "acidic-marsh", name: "酸性湿地" })],
+      revealedSpecialStates: [expect.objectContaining({ id: "acid-rain-pool", name: "酸雨积水" })],
+    });
+    expect(saved.logs).toEqual(expect.arrayContaining([expect.objectContaining({ text: "Garry 完成一轮调查。", reportId: report.id })]));
+
+    const endButtons = screen.getAllByRole("button", { name: "结束通话" });
+    fireEvent.click(endButtons[endButtons.length - 1]);
+    fireEvent.click(screen.getByRole("button", { name: /返回/ }));
+    fireEvent.click(screen.getByRole("button", { name: "查看报告" }));
+
+    expect(screen.getByRole("heading", { name: "调查报告" })).toBeInTheDocument();
+    expect(screen.getByText("Garry")).toBeInTheDocument();
+    expect(screen.getByText("南湖湿地")).toBeInTheDocument();
+    expect(screen.getByText("(-3,-2)")).toBeInTheDocument();
+    expect(screen.getByText("酸雨")).toBeInTheDocument();
+    expect(screen.getByText("17 °C")).toBeInTheDocument();
+    expect(screen.getByText("84%")).toBeInTheDocument();
+    expect(screen.getByText("56 μT")).toBeInTheDocument();
+    expect(screen.getByText("酸性湿地")).toBeInTheDocument();
+    expect(screen.getByText("酸雨积水")).toBeInTheDocument();
   });
 
   it("keeps the MVP item and event content slice wired through content data", () => {
