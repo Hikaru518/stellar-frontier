@@ -18,7 +18,7 @@ branch: "feature/event-program-model-player-journey"
 | 2 | TASK-002 | 搭建全局事件资产库加载与索引 | completed | 1 |
 | 3 | TASK-003 | 新增事件 JSON Schema 与基础内容校验入口 | completed | 1 |
 | 4 | TASK-004 | 实现事件图、引用和模板一致性校验 | completed | 1 |
-| 5 | TASK-005 | 实现结构化 condition evaluator | pending | 0 |
+| 5 | TASK-005 | 实现结构化 condition evaluator | completed | 1 |
 | 6 | TASK-006 | 实现结构化 effect executor | pending | 0 |
 | 7 | TASK-007 | 实现事件图 runner 与 runtime event 生命周期 | pending | 0 |
 | 8 | TASK-008 | 实现 runtime call renderer 与选项回写 | pending | 0 |
@@ -45,6 +45,18 @@ branch: "feature/event-program-model-player-journey"
   - 尝试 1: Monkey 运行约 5 分钟后被用户中断；仅留下未完成的 `src/events/types.test.ts`，未返回 summary，未完成实现。
   - 尝试 2: 已重新派发 Monkey，要求复用或修正上次残留测试并完成契约、初始状态和 save schema 边界。
 - Monkey summary: 成功。建立 `src/events/types.ts` 事件程序模型契约与初始空运行时状态；扩展 `GameState` 事件 runtime 集合；为 save/load 增加新 schema metadata 与兼容性 gate；更新相关测试 fixture，使旧 legacy save 断言符合 ADR-001 cutover。
+- 质量检查:
+  - `npm run validate:content`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS
+  - `npm run build`: PASS
+
+### TASK-005: 实现结构化 condition evaluator
+- 状态: completed
+- 开始时间: 2026-04-27 17:26
+- 完成时间: 2026-04-27 17:31
+- 尝试次数: 1
+- Monkey summary: 成功。实现结构化 condition evaluator；覆盖 crew、tile、inventory、resource、world flags/history、objective、event、crew action、time 和 handler_condition；为 handler registry 增加首个 condition handler。
 - 质量检查:
   - `npm run validate:content`: PASS
   - `npm run lint`: PASS

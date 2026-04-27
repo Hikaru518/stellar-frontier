@@ -1,3 +1,15 @@
 {
-  "handlers": []
+  "handlers": [
+    {
+      "handler_type": "world_history_value_equals",
+      "kind": "condition",
+      "description": "Checks whether a world_history entry stores the expected value.",
+      "params_schema_ref": "#/$defs/world_history_value_equals_params",
+      "allowed_target_types": ["world_history"],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": ["world_history_value_equals.safe_camp"]
+    }
+  ]
 }
