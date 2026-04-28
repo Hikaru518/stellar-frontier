@@ -1,18 +1,5 @@
 import eventsContent from "../../../../content/events/events.json";
-import crashSiteCallTemplatesContent from "../../../../content/events/call_templates/crash_site.json";
-import crewKaelCallTemplatesContent from "../../../../content/events/call_templates/crew_kael.json";
-import desertCallTemplatesContent from "../../../../content/events/call_templates/desert.json";
-import forestCallTemplatesContent from "../../../../content/events/call_templates/forest.json";
-import mineCallTemplatesContent from "../../../../content/events/call_templates/mine.json";
-import mountainCallTemplatesContent from "../../../../content/events/call_templates/mountain.json";
-import crashSiteEventDefinitionsContent from "../../../../content/events/definitions/crash_site.json";
-import crewKaelEventDefinitionsContent from "../../../../content/events/definitions/crew_kael.json";
-import desertEventDefinitionsContent from "../../../../content/events/definitions/desert.json";
-import forestEventDefinitionsContent from "../../../../content/events/definitions/forest.json";
-import mineEventDefinitionsContent from "../../../../content/events/definitions/mine.json";
-import mountainEventDefinitionsContent from "../../../../content/events/definitions/mountain.json";
 import handlerRegistryContent from "../../../../content/events/handler_registry.json";
-import forestPresetsContent from "../../../../content/events/presets/forest.json";
 import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
@@ -25,6 +12,21 @@ import type {
   HandlerDefinition,
   PresetDefinition,
 } from "../events/types";
+
+type JsonModule<T> = T | { default: T };
+
+const eventDefinitionModules = import.meta.glob("../../../../content/events/definitions/*.json", { eager: true }) as Record<
+  string,
+  JsonModule<{ event_definitions: unknown[] }>
+>;
+const callTemplateModules = import.meta.glob("../../../../content/events/call_templates/*.json", { eager: true }) as Record<
+  string,
+  JsonModule<{ call_templates: unknown[] }>
+>;
+const presetModules = import.meta.glob("../../../../content/events/presets/*.json", { eager: true }) as Record<
+  string,
+  JsonModule<{ presets: unknown[] }>
+>;
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
 export type CrewStatus = "idle" | "moving" | "working" | "inEvent" | "lost" | "dead";
@@ -273,24 +275,10 @@ export interface CallActionDef {
   params?: Record<string, unknown>;
 }
 
-export const eventProgramDefinitions = [
-  ...crashSiteEventDefinitionsContent.event_definitions,
-  ...forestEventDefinitionsContent.event_definitions,
-  ...mineEventDefinitionsContent.event_definitions,
-  ...mountainEventDefinitionsContent.event_definitions,
-  ...desertEventDefinitionsContent.event_definitions,
-  ...crewKaelEventDefinitionsContent.event_definitions,
-] as unknown as ProgramEventDefinition[];
-export const callTemplates = [
-  ...crashSiteCallTemplatesContent.call_templates,
-  ...forestCallTemplatesContent.call_templates,
-  ...mineCallTemplatesContent.call_templates,
-  ...mountainCallTemplatesContent.call_templates,
-  ...desertCallTemplatesContent.call_templates,
-  ...crewKaelCallTemplatesContent.call_templates,
-] as unknown as CallTemplate[];
+export const eventProgramDefinitions = collectContentArray(eventDefinitionModules, "event_definitions") as unknown as ProgramEventDefinition[];
+export const callTemplates = collectContentArray(callTemplateModules, "call_templates") as unknown as CallTemplate[];
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
-export const presetDefinitions = forestPresetsContent.presets as unknown as PresetDefinition[];
+export const presetDefinitions = collectContentArray(presetModules, "presets") as unknown as PresetDefinition[];
 export const eventContentLibrary: EventContentLibrary = {
   event_definitions: eventProgramDefinitions,
   call_templates: callTemplates,
@@ -316,4 +304,14 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
     const name = item?.name ?? entry.itemId;
     return entry.quantity > 1 ? `${name} x${entry.quantity}` : name;
   });
+}
+
+function collectContentArray<T extends string>(modules: Record<string, JsonModule<Record<T, unknown[]>>>, key: T) {
+  return Object.keys(modules)
+    .sort()
+    .flatMap((path) => unwrapJsonModule(modules[path])[key]);
+}
+
+function unwrapJsonModule<T extends object>(module: JsonModule<T>): T {
+  return "default" in module ? module.default : module;
 }

@@ -680,7 +680,7 @@ function findRuntimeCallForCrew(state: GameState, crewId: CrewId): RuntimeCall |
   );
 }
 
-function toEventEngineState(state: GameState): GraphRunnerGameState {
+export function toEventEngineState(state: GameState): GraphRunnerGameState {
   return {
     ...state,
     elapsed_game_seconds: state.elapsedGameSeconds,
@@ -688,13 +688,13 @@ function toEventEngineState(state: GameState): GraphRunnerGameState {
     tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile)])),
     resources: numericResources(state.resources),
     inventories: {
-      ...toInventoryStates(state),
       ...state.inventories,
+      ...toInventoryStates(state),
     },
   };
 }
 
-function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
+export function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
   const views = syncEventRuntimeToViews(state, eventState);
   const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventState);
   const eventMap = (eventState as GraphRunnerGameState & { map?: GameMapState }).map;
@@ -702,6 +702,8 @@ function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameSta
   return {
     ...state,
     crew: bridged.crew,
+    baseInventory: views.baseInventory,
+    resources: views.resources,
     map: eventMap ?? state.map,
     tiles: views.tiles,
     logs: bridged.logs,
@@ -787,17 +789,22 @@ function compareCrewActionRecency(left: CrewActionState, right: CrewActionState)
 }
 
 function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameState) {
+  const baseInventory = eventState.inventories.base;
+
   return {
     crew: state.crew.map((member) => {
       const runtimeCrew = eventState.crew[member.id];
-      if (!runtimeCrew) {
-        return member;
-      }
+      const crewInventory = eventState.inventories[crewInventoryId(member.id)];
 
       return {
         ...member,
-        personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
-        conditions: mergeStringLists(member.conditions, runtimeCrew.condition_tags),
+        ...(runtimeCrew
+          ? {
+              personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
+              conditions: mergeStringLists(member.conditions, runtimeCrew.condition_tags),
+            }
+          : {}),
+        ...(crewInventory ? { inventory: toGameInventoryEntries(crewInventory.items) } : {}),
       };
     }),
     tiles: state.tiles.map((tile) => {
@@ -812,6 +819,26 @@ function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameSt
         eventMarks: mergeEventMarks(tile.eventMarks ?? [], runtimeTile.event_marks),
       };
     }),
+    baseInventory: baseInventory ? toGameInventoryEntries(baseInventory.items) : state.baseInventory,
+    resources: baseInventory ? toResourceSummary(state.resources, baseInventory.resources) : state.resources,
+  };
+}
+
+function toGameInventoryEntries(items: InventoryState["items"]): GameState["baseInventory"] {
+  return items.filter((item) => item.quantity > 0).map((item) => ({ itemId: item.item_id, quantity: item.quantity }));
+}
+
+function toResourceSummary(existing: ResourceSummary, resources: Record<string, number>): ResourceSummary {
+  return {
+    ...existing,
+    energy: resources.energy ?? existing.energy,
+    iron: resources.iron ?? existing.iron,
+    wood: resources.wood ?? existing.wood,
+    food: resources.food ?? existing.food,
+    water: resources.water ?? existing.water,
+    baseIntegrity: resources.baseIntegrity ?? existing.baseIntegrity,
+    sol: resources.sol ?? existing.sol,
+    power: resources.power ?? existing.power,
   };
 }
 

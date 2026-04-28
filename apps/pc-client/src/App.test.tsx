@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import App from "./App";
+import App, { mergeEventRuntimeState, toEventEngineState } from "./App";
 import { crewDefinitions, defaultMapConfig, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
-import { createInitialMapState, initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
-import { createEmptyEventRuntimeState, type CrewActionState } from "./events/types";
+import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
+import { evaluateCondition } from "./events/conditions";
+import { executeEffects } from "./events/effects";
+import { createEmptyEventRuntimeState, type CrewActionState, type Effect } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 
 describe("App", () => {
@@ -527,6 +529,91 @@ describe("App", () => {
         .find((definition) => definition.id === "volcanic_ash_trace")
         ?.event_graph.nodes.some((node) => node.type === "objective"),
     ).toBe(true);
+  });
+
+  it("syncs event inventory item changes back to crew inventory for later conditions", () => {
+    const mike = initialCrew.find((member) => member.id === "mike");
+    expect(mike).toBeDefined();
+    const state = createCompatibleSavedGameState({
+      elapsedGameSeconds: 0,
+      crew: [
+        {
+          ...mike,
+          inventory: [{ itemId: "ration", quantity: 1 }],
+          conditions: ["steady"],
+          personalityTags: ["baseline"],
+        },
+      ],
+      tiles: initialTiles,
+      map: createInitialMapState(),
+      logs: initialLogs,
+      resources: initialResources,
+      baseInventory: [{ itemId: "iron_ore", quantity: 1240 }],
+      inventories: {
+        base: {
+          id: "base",
+          owner_type: "base",
+          owner_id: "base",
+          items: [{ item_id: "iron_ore", quantity: 1 }],
+          resources: { ...initialResources, iron: 1 },
+        },
+        "crew:mike": {
+          id: "crew:mike",
+          owner_type: "crew",
+          owner_id: "mike",
+          items: [{ item_id: "old_compass", quantity: 99 }],
+          resources: {},
+        },
+      },
+    }) as unknown as GameState;
+
+    const runtimeState = toEventEngineState(state);
+    expect(runtimeState.inventories["crew:mike"].items).toEqual([{ item_id: "ration", quantity: 1 }]);
+    expect(
+      evaluateCondition(hasCrewItemCondition("ration"), {
+        state: runtimeState,
+        trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 0, crew_id: "mike" },
+      }).passed,
+    ).toBe(true);
+
+    const executed = executeEffects([removeCrewItemEffect("ration", 1), addCrewItemEffect("iron_ore", 2)], {
+      state: {
+        ...runtimeState,
+        crew: {
+          ...runtimeState.crew,
+          mike: {
+            ...runtimeState.crew.mike,
+            condition_tags: [...runtimeState.crew.mike.condition_tags, "runtime_condition"],
+            personality_tags: [...runtimeState.crew.mike.personality_tags, "runtime_tag"],
+          },
+        },
+      },
+      trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 0, crew_id: "mike" },
+    });
+    expect(executed.status).toBe("success");
+
+    const merged = mergeEventRuntimeState(state, executed.state);
+    const mergedMike = merged.crew.find((member) => member.id === "mike");
+    expect(mergedMike).toBeDefined();
+    expect(mergedMike!.inventory).toEqual([{ itemId: "iron_ore", quantity: 2 }]);
+    expect(mergedMike!.conditions).toContain("runtime_condition");
+    expect(mergedMike!.personalityTags).toContain("runtime_tag");
+    expect(merged.baseInventory).toEqual([{ itemId: "iron_ore", quantity: 1240 }]);
+    expect(merged.resources.iron).toBe(1240);
+
+    const nextRuntimeState = toEventEngineState(merged);
+    expect(
+      evaluateCondition(hasCrewItemCondition("iron_ore", 2), {
+        state: nextRuntimeState,
+        trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 1, crew_id: "mike" },
+      }).passed,
+    ).toBe(true);
+    expect(
+      evaluateCondition(hasCrewItemCondition("ration"), {
+        state: nextRuntimeState,
+        trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 1, crew_id: "mike" },
+      }).passed,
+    ).toBe(false);
   });
 
   it("creates the seeded forest trace sample when Garry is placed on a forest tile", () => {
@@ -1853,6 +1940,34 @@ function savedCrew(saved: { crew?: SavedCrewForTest[] }, crewId: string) {
   const member = saved.crew?.find((item) => item.id === crewId);
   expect(member).toBeDefined();
   return member!;
+}
+
+function hasCrewItemCondition(itemId: string, minQuantity = 1) {
+  return {
+    type: "inventory_has_item" as const,
+    target: { type: "crew_inventory" as const },
+    value: itemId,
+    params: { min_quantity: minQuantity },
+  };
+}
+
+function addCrewItemEffect(itemId: string, quantity: number): Effect {
+  return inventoryEffect("add_item", itemId, quantity);
+}
+
+function removeCrewItemEffect(itemId: string, quantity: number): Effect {
+  return inventoryEffect("remove_item", itemId, quantity);
+}
+
+function inventoryEffect(type: "add_item" | "remove_item", itemId: string, quantity: number): Effect {
+  return {
+    id: `${type}:${itemId}`,
+    type,
+    target: { type: "crew_inventory" },
+    params: { item_id: itemId, quantity },
+    failure_policy: "fail_event",
+    record_policy: { write_event_log: false, write_world_history: false },
+  };
 }
 
 function findRuntimeEvent(saved: { active_events?: Record<string, unknown> }, eventDefinitionId: string) {
