@@ -24,6 +24,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -202,6 +203,130 @@ p {
   padding-left: 18px;
 }
 
+.event-editor-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 36%) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.event-browser,
+.selection-summary {
+  border: 1px dashed #b45b13;
+  background: rgba(255, 255, 255, 0.28);
+  padding: 14px;
+}
+
+.event-browser-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #d0b69b;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.event-browser-heading h3,
+.selection-summary h3 {
+  margin-bottom: 6px;
+}
+
+.event-browser-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.event-browser-filters label {
+  display: grid;
+  gap: 4px;
+  color: #46505a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.event-browser-filters input,
+.event-browser-filters select {
+  width: 100%;
+  border: 1px solid #77736b;
+  background: #f7f4ec;
+  padding: 7px;
+  color: #171a1c;
+}
+
+.event-browser-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-browser-row {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+  padding: 10px;
+  text-align: left;
+}
+
+.event-browser-row-selected {
+  border-color: #24384f;
+  background: #dbe3e9;
+}
+
+.event-browser-row-topline,
+.event-browser-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-browser-row-topline {
+  justify-content: space-between;
+}
+
+.event-browser-meta {
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.event-browser-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.event-editor-detail {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.selection-summary dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.selection-summary dl div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.selection-summary dt {
+  color: #46505a;
+  font-weight: 700;
+}
+
+.selection-summary dd {
+  margin: 0;
+}
+
 .draft-scratchpad-label {
   display: block;
   margin-bottom: 8px;
@@ -222,8 +347,21 @@ p {
   font-weight: 700;
 }
 
+.status-error-tag {
+  color: #a13822;
+}
+
+.status-warning {
+  color: #8a5a11;
+}
+
 @media (max-width: 760px) {
   .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .event-editor-workspace,
+  .event-browser-filters {
     grid-template-columns: 1fr;
   }
 }

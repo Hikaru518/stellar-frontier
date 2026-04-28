@@ -30,7 +30,7 @@ export interface ValidationIssue {
   code: string;
   message: string;
   file_path?: string;
-  asset_type?: "event_definition" | "call_template" | "handler" | "preset" | "manifest";
+  asset_type?: "event_definition" | "call_template" | "handler" | "preset" | "legacy_event" | "manifest";
   asset_id?: string;
   json_path?: string;
 }

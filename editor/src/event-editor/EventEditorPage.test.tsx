@@ -85,6 +85,36 @@ describe("EventEditorPage", () => {
       expect(window.localStorage.getItem(buildDraftStorageKey(asset))).toContain("local change");
     });
   });
+
+  it("updates the selection summary from the event browser and keeps legacy assets read-only", async () => {
+    const definition = createDefinitionAsset("forest.signal", {
+      data: {
+        id: "forest.signal",
+        title: "Signal flare",
+        summary: "Crew finds a rescue marker.",
+        trigger: { type: "arrival" },
+        effect_groups: [],
+      },
+    });
+    const legacy = createLegacyAsset("legacy.distress");
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        definitions: [definition],
+        legacy_events: [legacy],
+      }),
+    );
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Event Browser" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /select legacy.distress/i }));
+
+    expect(screen.getByRole("heading", { name: "Selection summary" })).toBeInTheDocument();
+    const summary = screen.getByLabelText("Selection summary");
+    expect(summary).toHaveTextContent("legacy.distress");
+    expect(summary).toHaveTextContent("Read-only legacy format");
+    expect(screen.queryByLabelText("Draft JSON scratchpad")).not.toBeInTheDocument();
+  });
 });
 
 function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = {}): EventEditorLibraryResponse {
@@ -132,6 +162,16 @@ function createCallTemplateAsset(
     file_path: "content/events/call_templates/forest.json",
     ...overrides,
   }) as EventEditorLibraryResponse["call_templates"][number];
+}
+
+function createLegacyAsset(id: string, overrides: Partial<EditorEventAsset<unknown>> = {}): EditorEventAsset<unknown> {
+  return createAsset(id, {
+    asset_type: "legacy_event",
+    file_path: "content/events/events.json",
+    editable: false,
+    data: { id, title: "Legacy distress beacon" },
+    ...overrides,
+  });
 }
 
 function createHandler() {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { EventEditorApiError, HELPER_START_COMMAND, loadEventEditorLibrary } from "./apiClient";
 import { loadDraft, saveDraft } from "./draftStorage";
+import EventBrowser from "./EventBrowser";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 type LoadLibrary = () => Promise<EventEditorLibraryResponse>;
@@ -35,11 +36,12 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
         }
 
         const editableAssets = getEditableAssets(nextLibrary);
+        const browserAssets = getBrowserAssets(nextLibrary);
         const restoredDrafts = editableAssets
           .map((asset) => ({ asset, draft: loadDraft<unknown>(asset) }))
           .filter((entry): entry is { asset: EditorEventAsset<unknown>; draft: unknown } => entry.draft !== null);
-        const activeAsset = restoredDrafts[0]?.asset ?? editableAssets[0] ?? null;
-        const activeDraft = activeAsset ? (loadDraft(activeAsset) ?? activeAsset.data) : null;
+        const activeAsset = restoredDrafts[0]?.asset ?? editableAssets[0] ?? browserAssets[0] ?? null;
+        const activeDraft = activeAsset && canEditAsset(activeAsset) ? (loadDraft(activeAsset) ?? activeAsset.data) : null;
 
         setLibrary(nextLibrary);
         setDraftState({
@@ -64,7 +66,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     };
   }, [loadLibrary]);
 
-  const editableAssets = useMemo(() => (library ? getEditableAssets(library) : []), [library]);
+  const browserAssets = useMemo(() => (library ? getBrowserAssets(library) : []), [library]);
 
   if (status === "loading") {
     return (
@@ -90,7 +92,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     );
   }
 
-  if (editableAssets.length === 0) {
+  if (browserAssets.length === 0) {
     return (
       <section className="panel panel-accent editor-main">
         <Header statusLabel="EMPTY" />
@@ -118,30 +120,48 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
         <p>{formatCount(draftState.restoredCount, "local draft")} restored</p>
       </div>
 
-      {draftState.activeAsset ? (
-        <div className="rjsf-preview" aria-label="Draft storage preview">
-          <h3>Local draft scratchpad</h3>
-          <p className="muted-text">
-            Previewing local-only draft storage for <code>{draftState.activeAsset.id}</code>. Save UX arrives in a later task.
-          </p>
-          <label className="draft-scratchpad-label" htmlFor="draft-json-scratchpad">
-            Draft JSON scratchpad
-          </label>
-          <textarea
-            id="draft-json-scratchpad"
-            aria-label="Draft JSON scratchpad"
-            value={draftState.text}
-            onChange={(event) => updateDraftText(event.target.value)}
-            rows={10}
-          />
-          {draftState.error ? <p className="status-error">{draftState.error}</p> : null}
+      <div className="event-editor-workspace">
+        {library ? <EventBrowser library={library} selectedAsset={draftState.activeAsset} onSelectAsset={selectAsset} /> : null}
+
+        <div className="event-editor-detail">
+          {draftState.activeAsset ? <SelectionSummary asset={draftState.activeAsset} /> : null}
+
+          {draftState.activeAsset && canEditAsset(draftState.activeAsset) ? (
+            <div className="rjsf-preview" aria-label="Draft storage preview">
+              <h3>Local draft scratchpad</h3>
+              <p className="muted-text">
+                Previewing local-only draft storage for <code>{draftState.activeAsset.id}</code>. Save UX arrives in a later task.
+              </p>
+              <label className="draft-scratchpad-label" htmlFor="draft-json-scratchpad">
+                Draft JSON scratchpad
+              </label>
+              <textarea
+                id="draft-json-scratchpad"
+                aria-label="Draft JSON scratchpad"
+                value={draftState.text}
+                onChange={(event) => updateDraftText(event.target.value)}
+                rows={10}
+              />
+              {draftState.error ? <p className="status-error">{draftState.error}</p> : null}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </section>
   );
 
+  function selectAsset(asset: EditorEventAsset<unknown>): void {
+    const draft = canEditAsset(asset) ? (loadDraft(asset) ?? asset.data) : null;
+    setDraftState((current) => ({
+      ...current,
+      activeAsset: asset,
+      text: draft ? JSON.stringify(draft, null, 2) : "",
+      error: null,
+    }));
+  }
+
   function updateDraftText(text: string): void {
-    if (!draftState.activeAsset) {
+    if (!draftState.activeAsset || !canEditAsset(draftState.activeAsset)) {
       return;
     }
 
@@ -153,6 +173,31 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
       setDraftState((current) => ({ ...current, text, error: "Draft JSON is invalid and was not saved." }));
     }
   }
+}
+
+function SelectionSummary({ asset }: { asset: EditorEventAsset<unknown> }) {
+  return (
+    <div className="selection-summary" aria-label="Selection summary">
+      <h3>Selection summary</h3>
+      <p>
+        Selected asset <code>{asset.id}</code>
+      </p>
+      <dl>
+        <div>
+          <dt>Type</dt>
+          <dd>{asset.asset_type}</dd>
+        </div>
+        <div>
+          <dt>Domain</dt>
+          <dd>{asset.domain}</dd>
+        </div>
+        <div>
+          <dt>Edit mode</dt>
+          <dd>{canEditAsset(asset) ? "Local draft scratchpad" : "Read-only legacy format"}</dd>
+        </div>
+      </dl>
+    </div>
+  );
 }
 
 function Header({ statusLabel }: { statusLabel: string }) {
@@ -169,8 +214,16 @@ function Header({ statusLabel }: { statusLabel: string }) {
 
 function getEditableAssets(library: EventEditorLibraryResponse): EditorEventAsset<unknown>[] {
   return [...library.definitions, ...library.call_templates, ...library.presets, ...library.legacy_events].filter(
-    (asset) => asset.editable,
+    (asset) => canEditAsset(asset),
   );
+}
+
+function getBrowserAssets(library: EventEditorLibraryResponse): EditorEventAsset<unknown>[] {
+  return [...library.definitions, ...library.call_templates, ...library.legacy_events];
+}
+
+function canEditAsset(asset: EditorEventAsset<unknown>): boolean {
+  return asset.editable && asset.asset_type !== "legacy_event";
 }
 
 function formatCount(count: number, singular: string): string {
