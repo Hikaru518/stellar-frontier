@@ -179,6 +179,100 @@
       "effects": []
     },
     {
+      "itemId": "medicine",
+      "name": "药品",
+      "category": "consumable",
+      "stackable": true,
+      "maxStack": 10,
+      "usableInResponse": true,
+      "consumedOnUse": true,
+      "description": "医疗舱中可回收的基础药品，可治疗受伤或救助外星村民。",
+      "tags": ["medical", "mainline"],
+      "effects": [
+        { "type": "restoreCondition", "condition": "wounded", "value": 1 }
+      ]
+    },
+    {
+      "itemId": "rare_ore_sample",
+      "name": "稀有矿石样本",
+      "category": "quest",
+      "stackable": true,
+      "maxStack": 10,
+      "usableInResponse": false,
+      "consumedOnUse": true,
+      "description": "丘陵矿带中分离出的异常样本，可用于与外星商人交换高温开采设备。",
+      "tags": ["mainline", "trade", "mining"],
+      "effects": []
+    },
+    {
+      "itemId": "thermal_mining_gear",
+      "name": "高温开采设备",
+      "category": "tool",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
+      "description": "外星村落商人提供的隔热开采工具，可支撑火山黑曜石采集。",
+      "tags": ["mainline", "tool", "mining", "heat_resistant"],
+      "effects": []
+    },
+    {
+      "itemId": "obsidian",
+      "name": "黑曜石",
+      "category": "resource",
+      "stackable": true,
+      "maxStack": 20,
+      "usableInResponse": false,
+      "consumedOnUse": true,
+      "description": "火山高温带采集的致密材料，是制造折跃仓修复套件的关键资源。",
+      "tags": ["mainline", "resource", "volcanic"],
+      "effects": []
+    },
+    {
+      "itemId": "warp_pod_repair_kit",
+      "name": "折跃仓修复套件",
+      "category": "quest",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": true,
+      "description": "在修复后的熔炉中制成的关键套件，用于修复折跃仓仓体。",
+      "tags": ["mainline", "repair", "warp_pod"],
+      "effects": []
+    },
+    {
+      "itemId": "warp_coordinates",
+      "name": "折跃坐标",
+      "category": "quest",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
+      "description": "旧飞船遗迹中恢复出的返航坐标，可用于折跃仓终局启动。",
+      "tags": ["mainline", "navigation", "warp_pod"],
+      "effects": []
+    },
+    {
+      "itemId": "decoy",
+      "name": "诱饵",
+      "category": "consumable",
+      "stackable": true,
+      "maxStack": 5,
+      "usableInResponse": true,
+      "consumedOnUse": true,
+      "description": "能短暂引开外星生物守卫的气味诱饵，巢穴入口和孵化室各需要消耗一个。",
+      "tags": ["mainline", "bait", "hive"],
+      "effects": []
+    },
+    {
+      "itemId": "alien_slime_fuel",
+      "name": "外星粘液燃料",
+      "category": "quest",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": true,
+      "description": "外星生物巢穴孵化室中取得的高能粘液，可作为折跃仓终局燃料。",
+      "tags": ["mainline", "fuel", "hive", "warp_pod"],
+      "effects": []
+    },
+    {
       "itemId": "wood",
       "name": "木材",
       "category": "resource",
