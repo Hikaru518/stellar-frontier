@@ -5,6 +5,7 @@ import itemsContent from "../../../../content/items/items.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
 import basicCallActionsContent from "../../../../content/call-actions/basic-actions.json";
 import objectCallActionsContent from "../../../../content/call-actions/object-actions.json";
+import { mapObjectDefinitionById as newMapObjectDefinitionById } from "./mapObjects";
 import type { EventContentLibrary } from "../events/contentIndex";
 import type {
   CallTemplate,
@@ -245,6 +246,14 @@ export interface MapTileDefinition {
   terrain: string;
   weather: string;
   environment: MapEnvironmentDefinition;
+  /** New schema: identifiers into `mapObjectDefinitionById`. Authoritative going forward. */
+  objectIds: string[];
+  /**
+   * Backwards-compatible legacy projection synthesised from `objectIds` plus the
+   * new `mapObjectDefinitionById` index. Task 3 will remove this in favour of
+   * direct `objectIds` lookups everywhere.
+   * @deprecated use `objectIds` and `mapObjectDefinitionById` instead.
+   */
   objects: MapObjectDefinition[];
   specialStates: MapSpecialStateDefinition[];
 }
@@ -289,7 +298,18 @@ export const eventContentLibrary: EventContentLibrary = {
 export const eventDefinitions = eventsContent.events as unknown as EventDefinition[];
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
-export const defaultMapConfig = defaultMapJson as unknown as MapConfigDefinition;
+
+const KNOWN_CANDIDATE_ACTION_VERBS: ReadonlySet<MapCandidateAction> = new Set([
+  "move",
+  "survey",
+  "gather",
+  "build",
+  "standby",
+  "extract",
+  "scan",
+]);
+
+export const defaultMapConfig: MapConfigDefinition = projectDefaultMapConfig(defaultMapJson as unknown as MapConfigDefinition);
 export const callActionsContent = [
   ...basicCallActionsContent.call_actions,
   ...objectCallActionsContent.call_actions,
@@ -314,4 +334,72 @@ function collectContentArray<T extends string>(modules: Record<string, JsonModul
 
 function unwrapJsonModule<T extends object>(module: JsonModule<T>): T {
   return "default" in module ? module.default : module;
+}
+
+/**
+ * Bridge the migrated map JSON (which now stores `tile.objectIds: string[]`)
+ * to the legacy `tile.objects` runtime shape consumed by callActions, mapSystem,
+ * App.tsx, etc. Task 3 will remove this projection along with the legacy field.
+ */
+function projectDefaultMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
+  return {
+    ...rawConfig,
+    tiles: rawConfig.tiles.map((tile) => projectTile(tile)),
+  };
+}
+
+function projectTile(tile: MapTileDefinition): MapTileDefinition {
+  const objectIds = Array.isArray(tile.objectIds) ? tile.objectIds : [];
+  const objects = objectIds
+    .map((id) => projectMapObject(id))
+    .filter((object): object is MapObjectDefinition => Boolean(object));
+  return {
+    ...tile,
+    objectIds,
+    objects,
+  };
+}
+
+function projectMapObject(id: string): MapObjectDefinition | undefined {
+  const definition = newMapObjectDefinitionById.get(id);
+  if (!definition) {
+    return undefined;
+  }
+
+  const candidateActions = extractCandidateActions(definition);
+  const projected: MapObjectDefinition = {
+    id: definition.id,
+    kind: definition.kind,
+    name: definition.name,
+    description: definition.description,
+    visibility: (definition.visibility === "hidden" ? "onInvestigated" : definition.visibility) as Exclude<MapVisibility, "hidden">,
+    tags: definition.tags,
+    legacyResource: definition.legacyResource,
+    legacyBuilding: definition.legacyBuilding,
+    legacyInstrument: definition.legacyInstrument,
+  };
+  if (candidateActions.length > 0) {
+    projected.candidateActions = candidateActions;
+  }
+  return projected;
+}
+
+function extractCandidateActions(definition: { actions?: Array<{ id: string }> }): MapCandidateAction[] {
+  if (!Array.isArray(definition.actions)) {
+    return [];
+  }
+
+  const verbs: MapCandidateAction[] = [];
+  for (const action of definition.actions) {
+    const colonIndex = action.id.lastIndexOf(":");
+    if (colonIndex < 0) {
+      continue;
+    }
+    const verb = action.id.slice(colonIndex + 1) as MapCandidateAction;
+    if (!KNOWN_CANDIDATE_ACTION_VERBS.has(verb) || verbs.includes(verb)) {
+      continue;
+    }
+    verbs.push(verb);
+  }
+  return verbs;
 }

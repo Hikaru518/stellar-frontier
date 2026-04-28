@@ -1,5 +1,5 @@
 import { appendDiaryEntryId } from "../diarySystem";
-import type { MapObjectDefinition, RuntimeMapObjectsState } from "../content/mapObjects";
+import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "../content/mapObjects";
 import type {
   CrewActionState,
   CrewActionType,
@@ -238,16 +238,15 @@ function applyEffect(effect: Effect, context: EffectExecutionContext, path: stri
   }
 }
 
-// TODO(Task 2): replace this placeholder with a real import of
-// `mapObjectDefinitionById` from "../content/mapObjects" once the glob loader
-// lands. For now we read from a hook on globalThis so tests can inject a
-// fixture without forcing Task 1 to bring up the loader.
+// Test override hook: vitest specs can inject a fixture map by setting
+// `globalThis.__mapObjectDefinitionById`; production resolves through the real
+// `mapObjectDefinitionById` loaded from `content/map-objects/*.json`.
 function getMapObjectDefinition(objectId: string): MapObjectDefinition | undefined {
-  const lookup = (globalThis as { __mapObjectDefinitionById?: Map<string, MapObjectDefinition> }).__mapObjectDefinitionById;
-  if (!lookup) {
-    return undefined;
+  const override = (globalThis as { __mapObjectDefinitionById?: Map<string, MapObjectDefinition> }).__mapObjectDefinitionById;
+  if (override) {
+    return override.get(objectId);
   }
-  return lookup.get(objectId);
+  return mapObjectDefinitionById.get(objectId);
 }
 
 function setObjectStatus(effect: Effect, context: EffectExecutionContext, path: string): ApplyResult {
@@ -257,13 +256,10 @@ function setObjectStatus(effect: Effect, context: EffectExecutionContext, path: 
     return { state: context.state, errors: [...objectId.errors, ...status.errors] };
   }
 
-  // TODO(Task 2): replace these soft warnings with hard `missing_target`
-  // failures once `mapObjectDefinitionById` is wired up via the glob loader.
-  // For Task 1 the lookup is best-effort so tests can run without the loader.
   const def = getMapObjectDefinition(objectId.value);
   if (!def) {
     console.warn(
-      `[set_object_status] Object definition for ${objectId.value} not found; writing status anyway (Task 1 placeholder).`,
+      `[set_object_status] Object definition for ${objectId.value} not found; writing status anyway.`,
     );
   } else if (!def.status_options.includes(status.value)) {
     console.warn(

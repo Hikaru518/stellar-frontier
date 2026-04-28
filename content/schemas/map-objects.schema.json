@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://stellar-frontier.local/schemas/map-objects.schema.json",
+  "title": "Stellar Frontier Map Objects",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["map_objects"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "map_objects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/mapObject"
+      }
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
+    },
+    "tag": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "localizedText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "muted", "accent", "danger", "success"]
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["onDiscovered", "onInvestigated", "hidden"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["resourceNode", "structure", "signal", "hazard", "facility", "ruin", "landmark"]
+    },
+    "actionDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "label", "conditions", "event_id"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["universal", "object"]
+        },
+        "label": {
+          "$ref": "#/definitions/localizedText"
+        },
+        "tone": {
+          "$ref": "#/definitions/tone"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_when_unavailable": {
+          "type": "string",
+          "enum": ["disabled"]
+        },
+        "unavailable_hint": {
+          "$ref": "#/definitions/localizedText"
+        },
+        "action_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mapObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "name", "visibility", "status_options", "initial_status", "actions"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "kind": {
+          "$ref": "#/definitions/kind"
+        },
+        "name": {
+          "$ref": "#/definitions/localizedText"
+        },
+        "description": {
+          "$ref": "#/definitions/localizedText"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/tag"
+          }
+        },
+        "status_options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "initial_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/actionDef"
+          }
+        },
+        "visibility": {
+          "$ref": "#/definitions/visibility"
+        },
+        "legacyResource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legacyBuilding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legacyInstrument": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

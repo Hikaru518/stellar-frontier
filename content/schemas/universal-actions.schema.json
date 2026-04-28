@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://stellar-frontier.local/schemas/universal-actions.schema.json",
+  "title": "Stellar Frontier Universal Actions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["universal_actions"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "universal_actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/actionDef"
+      }
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
+    },
+    "localizedText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "muted", "accent", "danger", "success"]
+    },
+    "actionDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "label", "conditions", "event_id"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["universal", "object"]
+        },
+        "label": {
+          "$ref": "#/definitions/localizedText"
+        },
+        "tone": {
+          "$ref": "#/definitions/tone"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_when_unavailable": {
+          "type": "string",
+          "enum": ["disabled"]
+        },
+        "unavailable_hint": {
+          "$ref": "#/definitions/localizedText"
+        },
+        "action_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

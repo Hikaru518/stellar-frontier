@@ -1087,6 +1087,7 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
     tilesById: { ...fresh.tilesById, ...(map.tilesById ?? {}) },
     discoveredTileIds,
     investigationReportsById: map.investigationReportsById ?? {},
+    mapObjects: { ...(fresh.mapObjects ?? {}), ...(map.mapObjects ?? {}) },
   };
 }
 

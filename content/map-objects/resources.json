@@ -1,0 +1,108 @@
+{
+  "$schema": "../schemas/map-objects.schema.json",
+  "map_objects": [
+    {
+      "id": "black-pine-stand",
+      "kind": "resourceNode",
+      "name": "黑松木材带",
+      "visibility": "onDiscovered",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": [
+        {
+          "id": "black-pine-stand:survey",
+          "category": "object",
+          "label": "调查 {objectName}",
+          "tone": "neutral",
+          "conditions": [],
+          "event_id": "legacy.survey"
+        },
+        {
+          "id": "black-pine-stand:gather",
+          "category": "object",
+          "label": "采集 {objectName}",
+          "tone": "accent",
+          "conditions": [],
+          "event_id": "legacy.gather"
+        }
+      ],
+      "tags": [
+        "forest"
+      ],
+      "legacyResource": "wood"
+    },
+    {
+      "id": "fallen-timber",
+      "kind": "resourceNode",
+      "name": "倒伏木材",
+      "visibility": "onDiscovered",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": [
+        {
+          "id": "fallen-timber:gather",
+          "category": "object",
+          "label": "采集 {objectName}",
+          "tone": "accent",
+          "conditions": [],
+          "event_id": "legacy.gather"
+        }
+      ],
+      "legacyResource": "wood"
+    },
+    {
+      "id": "needlewood-stand",
+      "kind": "resourceNode",
+      "name": "针叶木材",
+      "visibility": "onInvestigated",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": [
+        {
+          "id": "needlewood-stand:gather",
+          "category": "object",
+          "label": "采集 {objectName}",
+          "tone": "accent",
+          "conditions": [],
+          "event_id": "legacy.gather"
+        }
+      ],
+      "legacyResource": "wood"
+    },
+    {
+      "id": "southwest-timber",
+      "kind": "resourceNode",
+      "name": "潮湿木材",
+      "visibility": "onInvestigated",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": [
+        {
+          "id": "southwest-timber:survey",
+          "category": "object",
+          "label": "调查 {objectName}",
+          "tone": "neutral",
+          "conditions": [],
+          "event_id": "legacy.survey"
+        },
+        {
+          "id": "southwest-timber:gather",
+          "category": "object",
+          "label": "采集 {objectName}",
+          "tone": "accent",
+          "conditions": [],
+          "event_id": "legacy.gather"
+        }
+      ],
+      "legacyResource": "wood"
+    }
+  ]
+}

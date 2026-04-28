@@ -5,7 +5,7 @@ import hiveContent from "../../../../content/events/definitions/mainline_hive.js
 import medicalContent from "../../../../content/events/definitions/mainline_medical.json";
 import resourcesContent from "../../../../content/events/definitions/mainline_resources.json";
 import villageContent from "../../../../content/events/definitions/mainline_village.json";
-import defaultMap from "../../../../content/maps/default-map.json";
+import { defaultMapConfig } from "../content/contentData";
 
 type JsonRecord = Record<string, unknown>;
 type JsonDefinition = JsonRecord & {
@@ -363,8 +363,7 @@ function findCallOption(definition: ReturnType<typeof findDefinition>, id: strin
 }
 
 function findMapObject(id: string) {
-  const map = defaultMap as { tiles: Array<{ objects: Array<JsonRecord & { id?: string; candidateActions?: string[] }> }> };
-  const object = map.tiles.flatMap((tile) => tile.objects).find((item) => item.id === id);
+  const object = defaultMapConfig.tiles.flatMap((tile) => tile.objects).find((item) => item.id === id);
   expect(object).toBeTruthy();
   return object!;
 }

@@ -1,13 +1,14 @@
 import type { Condition } from "../events/types";
 
 /**
- * Map object types — Task 1 of map-object-action-refactor.
+ * Map object types and content loaders for the map-object-action-refactor.
  *
- * This module currently only exports type definitions; the glob loader,
- * `mapObjectDefinitionById` index, and `universalActions` array are added
- * in Task 2.
+ * Task 1 introduced the type definitions; Task 2 wires up the glob loaders for
+ * `content/map-objects/*.json` and `content/universal-actions/*.json` and
+ * exports the `mapObjectDefinitionById` index plus the `universalActions`
+ * array.
  *
- * See docs/plans/2026-04-29-01-40/technical-design.md §2 for the spec.
+ * See docs/plans/2026-04-29-01-40/technical-design.md §2 / §3.
  */
 
 // Visibility enum reused from existing map content; `hidden` means the object
@@ -88,4 +89,42 @@ export interface MapObjectRuntime {
 /** Flat by-id index; mirrors `RuntimeMapState.tilesById` for save/load symmetry. */
 export type RuntimeMapObjectsState = Record<string, MapObjectRuntime>;
 
-// TODO(Task 2): glob loader, mapObjectDefinitionById, universalActions
+type JsonModule<T> = T | { default: T };
+
+const mapObjectModules = import.meta.glob("../../../../content/map-objects/*.json", { eager: true }) as Record<
+  string,
+  JsonModule<{ map_objects: MapObjectDefinition[] }>
+>;
+
+const universalActionModules = import.meta.glob("../../../../content/universal-actions/*.json", { eager: true }) as Record<
+  string,
+  JsonModule<{ universal_actions: ActionDef[] }>
+>;
+
+function unwrapJsonModule<T extends object>(module: JsonModule<T>): T {
+  return "default" in module ? module.default : module;
+}
+
+function collectGlob<TKey extends string, TValue>(
+  modules: Record<string, JsonModule<Record<TKey, TValue[]>>>,
+  key: TKey,
+): TValue[] {
+  return Object.keys(modules)
+    .sort()
+    .flatMap((path) => unwrapJsonModule(modules[path])[key] ?? []);
+}
+
+/** Flat list of every map object definition discovered under `content/map-objects/*.json`. */
+export const mapObjectDefinitions: MapObjectDefinition[] = collectGlob(mapObjectModules, "map_objects");
+
+/** By-id index; the canonical lookup point for `set_object_status`, callActions, and mapSystem. */
+export const mapObjectDefinitionById: Map<string, MapObjectDefinition> = new Map(
+  mapObjectDefinitions.map((definition) => [definition.id, definition]),
+);
+
+export function getMapObjectDefinition(id: string): MapObjectDefinition | undefined {
+  return mapObjectDefinitionById.get(id);
+}
+
+/** Flat list of universal `ActionDef` entries discovered under `content/universal-actions/*.json`. */
+export const universalActions: ActionDef[] = collectGlob(universalActionModules, "universal_actions");

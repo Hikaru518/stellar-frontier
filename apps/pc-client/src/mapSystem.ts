@@ -1,4 +1,5 @@
 import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
+import type { RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport, MapTile } from "./data/gameData";
 
 export type VisibleTileStatus = "discovered" | "frontier" | "unknownHole";
@@ -33,6 +34,12 @@ export interface RuntimeMapState {
   discoveredTileIds: string[];
   investigationReportsById: Record<string, InvestigationReport>;
   tilesById: Record<string, RuntimeMapTileState | undefined>;
+  /**
+   * Flat by-id state for every map object, populated at game-start from
+   * `mapObjectDefinitionById`. Optional on the type so legacy test fixtures
+   * still compile; runtime always treats `undefined` as `{}`.
+   */
+  mapObjects?: RuntimeMapObjectsState;
 }
 
 export interface VisibleTileCell {
