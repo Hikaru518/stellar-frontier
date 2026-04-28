@@ -17,7 +17,7 @@ source:
 | 1 | T001 | 建立事件 manifest 与生成式运行时聚合模块 | completed | 2 |
 | 2 | T002 | 搭建独立 editor Vite/TS/RJSF 工程入口 | completed | 1 |
 | 3 | T003 | 实现 Local Helper 基础服务与只读 library API | completed | 1 |
-| 4 | T004 | 实现 validation gate 与已有 asset 保存 API | pending | 0 |
+| 4 | T004 | 实现 validation gate 与已有 asset 保存 API | completed | 1 |
 | 5 | T005 | 实现新建 domain API 与 manifest 同步 | pending | 0 |
 | 6 | T006 | 实现 editor API client、library state 与 draft storage | pending | 0 |
 | 7 | T007 | 实现 Event Browser 与搜索筛选 | pending | 0 |
@@ -56,4 +56,12 @@ source:
 - 完成时间: 2026-04-28 16:10
 - 尝试次数: 1
 - Monkey summary: 新增只读 Local Helper service，包含 health、library 读取、路径白名单、validation report 和 editor 共享类型；补齐 health、library、legacy readonly、path guard 与 validation mapping 测试。
+- 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 均通过。
+
+### T004: 实现 validation gate 与已有 asset 保存 API
+- 状态: completed
+- 开始时间: 2026-04-28 16:10
+- 完成时间: 2026-04-28 16:10
+- 尝试次数: 1
+- Monkey summary: 实现 `validate-draft` 与 `save` API，使用临时 content root 做格式化与校验，支持 hash conflict 检测、成功后格式化写入，以及结构化 validation report；补齐保存成功、无效 draft 不写入、conflict 不覆盖与 issue mapping 测试。
 - 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 均通过。
