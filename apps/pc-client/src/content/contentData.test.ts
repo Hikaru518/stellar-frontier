@@ -33,10 +33,18 @@ describe("generated event content exports", () => {
   it("exposes authored definitions, call templates, handlers, and presets through eventContentLibrary", async () => {
     const contentData = await import("./contentData");
     const generatedContent = await import("./generated/eventContentManifest");
+    const eventContentLibrary = contentData.eventContentLibrary as typeof contentData.eventContentLibrary & {
+      domains?: string[];
+    };
+    const generatedDomains = generatedContent as typeof generatedContent & {
+      generatedEventDomains?: readonly string[];
+    };
 
     expect(contentData.eventProgramDefinitions).toBe(generatedContent.generatedEventProgramDefinitions);
     expect(contentData.callTemplates).toBe(generatedContent.generatedCallTemplates);
     expect(contentData.presetDefinitions).toBe(generatedContent.generatedPresetDefinitions);
+    expect(generatedDomains.generatedEventDomains).toEqual(structuredDomains);
+    expect(eventContentLibrary.domains).toEqual(structuredDomains);
 
     expect(new Set(contentData.eventProgramDefinitions.map((definition) => definition.domain))).toEqual(
       new Set(structuredDomains),

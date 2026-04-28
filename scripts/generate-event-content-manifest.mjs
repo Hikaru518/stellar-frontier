@@ -245,12 +245,14 @@ function renderGeneratedModule(manifest, root, outputPath) {
   const definitionSpreads = [];
   const callTemplateSpreads = [];
   const presetSpreads = [];
+  const domainEntries = [];
 
   for (const domain of domains) {
     const importBase = toImportIdentifier(domain.id);
     const definitionsIdentifier = `${importBase}EventDefinitionsContent`;
     const callTemplatesIdentifier = `${importBase}CallTemplatesContent`;
 
+    domainEntries.push(`  "${domain.id}",`);
     importLines.push(renderJsonImport(definitionsIdentifier, root, outputPath, domain.definitions));
     importLines.push(renderJsonImport(callTemplatesIdentifier, root, outputPath, domain.call_templates));
     definitionSpreads.push(`  ...${definitionsIdentifier}.event_definitions,`);
@@ -270,6 +272,10 @@ function renderGeneratedModule(manifest, root, outputPath) {
     " */",
     'import type { CallTemplate, EventDefinition, PresetDefinition } from "../../events/types";',
     ...importLines,
+    "",
+    "export const generatedEventDomains = [",
+    ...domainEntries,
+    "] as const;",
     "",
     "export const generatedEventProgramDefinitions = [",
     ...definitionSpreads,

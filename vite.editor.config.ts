@@ -14,6 +14,6 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}", "helper/**/*.test.mjs"],
+    include: ["src/**/*.test.{ts,tsx}", "helper/**/*.test.mjs", "../scripts/generate-event-content-manifest.test.mjs"],
   },
 });

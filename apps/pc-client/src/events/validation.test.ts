@@ -259,6 +259,7 @@ function minimalLibrary({
   handlers?: HandlerDefinition[];
 }): EventContentLibrary {
   return {
+    domains: Array.from(new Set(definitions.map((definition) => definition.domain))).sort(),
     event_definitions: definitions,
     call_templates: templates,
     handlers,

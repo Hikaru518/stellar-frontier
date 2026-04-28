@@ -9,6 +9,7 @@ import type { EventContentLibrary } from "../events/contentIndex";
 import type { HandlerDefinition } from "../events/types";
 import {
   generatedCallTemplates,
+  generatedEventDomains,
   generatedEventProgramDefinitions,
   generatedPresetDefinitions,
 } from "./generated/eventContentManifest";
@@ -265,6 +266,7 @@ export const callTemplates = generatedCallTemplates;
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
 export const presetDefinitions = generatedPresetDefinitions;
 export const eventContentLibrary: EventContentLibrary = {
+  domains: generatedEventDomains,
   event_definitions: eventProgramDefinitions,
   call_templates: callTemplates,
   handlers: handlerDefinitions,

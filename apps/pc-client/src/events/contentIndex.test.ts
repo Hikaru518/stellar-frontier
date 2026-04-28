@@ -17,6 +17,7 @@ describe("EventContentIndex", () => {
     const duplicate = minimalEventDefinition({ id: "forest_trace", triggerType: "arrival" });
 
     const result = buildEventContentIndex({
+      domains: [],
       event_definitions: [duplicate, minimalEventDefinition({ id: "forest_trace", triggerType: "idle_time" })],
       call_templates: [],
       handlers: [],
@@ -32,6 +33,7 @@ describe("EventContentIndex", () => {
 
   it("reports duplicate call template ids and handler types with paths", () => {
     const result = buildEventContentIndex({
+      domains: [],
       event_definitions: [],
       call_templates: [
         minimalCallTemplate({ id: "forest_trace_call" }),
@@ -60,6 +62,7 @@ describe("EventContentIndex", () => {
     const idle = minimalEventDefinition({ id: "idle_event", triggerType: "idle_time" });
 
     const result = buildEventContentIndex({
+      domains: [],
       event_definitions: [arrival, idle],
       call_templates: [],
       handlers: [],
@@ -84,6 +87,7 @@ describe("EventContentIndex", () => {
     });
 
     const result = buildEventContentIndex({
+      domains: ["forest"],
       event_definitions: [definition],
       call_templates: [],
       handlers: [],

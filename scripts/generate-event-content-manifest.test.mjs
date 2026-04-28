@@ -53,6 +53,9 @@ describe("generate-event-content-manifest", () => {
     expect(generated).toContain(
       'import forestPresetsContent from "../../../../../content/events/presets/forest.json";',
     );
+    expect(generated).toContain("export const generatedEventDomains = [");
+    expect(generated).toContain('  "crash_site",');
+    expect(generated).toContain('  "mountain",');
     expect(generated).toContain("export const generatedEventProgramDefinitions");
     expect(generated).toContain("...mountainCallTemplatesContent.call_templates");
   });

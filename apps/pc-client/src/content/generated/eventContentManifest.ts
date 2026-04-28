@@ -17,6 +17,15 @@ import mineCallTemplatesContent from "../../../../../content/events/call_templat
 import mountainEventDefinitionsContent from "../../../../../content/events/definitions/mountain.json";
 import mountainCallTemplatesContent from "../../../../../content/events/call_templates/mountain.json";
 
+export const generatedEventDomains = [
+  "crash_site",
+  "crew_kael",
+  "desert",
+  "forest",
+  "mine",
+  "mountain",
+] as const;
+
 export const generatedEventProgramDefinitions = [
   ...crashSiteEventDefinitionsContent.event_definitions,
   ...crewKaelEventDefinitionsContent.event_definitions,
