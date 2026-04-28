@@ -1,0 +1,178 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_medical_pod_survey",
+      "version": 1,
+      "domain": "mainline_medical",
+      "title": "医疗舱调查与野外急救",
+      "summary": "调查医疗舱后，当前队员获得药品与野外急救知识，并设置可重复学习 flag。",
+      "tags": ["mainline", "medical", "field_first_aid"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "abandoned-medical-pod" } }
+      ] },
+      "candidate_selection": { "priority": 80, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_medical_pod_survey:{crew_id}", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "medical_report", "nodes": [
+        { "id": "medical_report", "type": "call", "title": "医疗舱报告", "call_template_id": "mainline_medical_pod_survey.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "collect", "effect_refs": ["medical_pod_rewards"], "is_default": true }], "option_node_mapping": { "collect": "medical_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+        { "id": "medical_end", "type": "end", "title": "医疗资料已取得", "resolution": "resolved", "result_key": "medical_docs_available", "event_log_template_id": "medical_docs_available_log", "history_writes": [{ "key_template": "mainline_medical_pod_survey:{crew_id}", "scope": "crew", "value": "medical_docs_available" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["medical_end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [{ "id": "medical_pod_rewards", "effects": [
+        { "id": "medical_docs_available_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "medical_docs_available", "value": true, "tags": ["mainline", "medical", "knowledge"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+        { "id": "add_medicine", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "medicine", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+        { "id": "learn_field_first_aid", "type": "add_crew_condition", "target": { "type": "primary_crew" }, "params": { "condition": "knows_field_first_aid" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+        { "id": "medical_pod_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "当前队员从废弃医疗舱取得药品，并学习 knows_field_first_aid；医疗文档已保存，可供其他队员重复学习。", "importance": "major", "visibility": "player_visible", "result_key": "medical_docs_available" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+      ] }],
+      "log_templates": [{ "id": "medical_docs_available_log", "summary": "医疗舱资料已保存", "importance": "major", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["mainline_medical_pod_survey.call.report"], "item_ids": ["medicine"] },
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1320, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "4-1", "action_id": "survey:abandoned-medical-pod:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "abandoned-medical-pod", "tags": ["mainline", "mainline_medical", "medical_pod"] } }]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_medical_docs_repeat_learning",
+      "version": 1,
+      "domain": "mainline_medical",
+      "title": "重复学习野外急救",
+      "summary": "医疗文档可让缺少野外急救知识的队员重复学习。",
+      "tags": ["mainline", "medical", "repeatable_knowledge"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "world_flag_equals", "field": "medical_docs_available", "value": true },
+        { "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "knows_field_first_aid" }] },
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-medical-docs" } },
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "scan" } }
+        ] }
+      ] },
+      "candidate_selection": { "priority": 83, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_medical_docs_repeat_learning:{crew_id}", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "repeat_aid_report", "nodes": [
+        { "id": "repeat_aid_report", "type": "call", "title": "补学野外急救", "call_template_id": "mainline_medical_docs_repeat_learning.call.learn", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "learn", "effect_refs": ["repeat_first_aid_reward"], "is_default": true }], "option_node_mapping": { "learn": "repeat_aid_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+        { "id": "repeat_aid_end", "type": "end", "title": "野外急救已补学", "resolution": "resolved", "result_key": "field_first_aid_learned", "event_log_template_id": "field_first_aid_learned_log", "history_writes": [{ "key_template": "mainline_medical_docs_repeat_learning:{crew_id}", "scope": "crew", "value": "field_first_aid_learned" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["repeat_aid_end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [{ "id": "repeat_first_aid_reward", "effects": [
+        { "id": "repeat_learn_field_first_aid", "type": "add_crew_condition", "target": { "type": "primary_crew" }, "params": { "condition": "knows_field_first_aid" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+        { "id": "repeat_first_aid_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "队员通过医疗文档补学了野外急救。", "importance": "normal", "visibility": "player_visible", "result_key": "field_first_aid_learned" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+      ] }],
+      "log_templates": [{ "id": "field_first_aid_learned_log", "summary": "野外急救已补学", "importance": "normal", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["mainline_medical_docs_repeat_learning.call.learn"] },
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1380, "source": "crew_action", "crew_id": "kael", "tile_id": "4-1", "action_id": "scan:mainline-medical-docs:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "scan", "object_id": "mainline-medical-docs", "tags": ["mainline", "mainline_medical", "field_first_aid"] } }]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_wounded_recovery_options",
+      "version": 1,
+      "domain": "mainline_medical",
+      "title": "受伤恢复选项",
+      "summary": "受伤队员可通过消耗药品或使用野外急救移除 wounded。",
+      "tags": ["mainline", "medical", "wounded_recovery"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "has_condition", "target": { "type": "primary_crew" }, "value": "wounded" },
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "abandoned-medical-pod" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-medical-docs" } }
+        ] }
+      ] },
+      "candidate_selection": { "priority": 84, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_wounded_recovery_options:{crew_id}", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "recovery_call", "nodes": [
+        { "id": "recovery_call", "type": "call", "title": "处理受伤", "call_template_id": "mainline_wounded_recovery_options.call.recover", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [
+          { "id": "use_medicine", "requirements": [{ "type": "inventory_has_item", "target": { "type": "crew_inventory" }, "value": "medicine", "params": { "min_quantity": 1 } }], "effect_refs": ["recover_with_medicine"] },
+          { "id": "field_first_aid", "requirements": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "knows_field_first_aid" }], "effect_refs": ["recover_with_first_aid"] },
+          { "id": "wait", "is_default": true }
+        ], "option_node_mapping": { "use_medicine": "recovered_end", "field_first_aid": "recovered_end", "wait": "wait_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+        { "id": "recovered_end", "type": "end", "title": "受伤已恢复", "resolution": "resolved", "result_key": "wounded_recovered", "event_log_template_id": "wounded_recovered_log", "history_writes": [{ "key_template": "mainline_wounded_recovery_options:{crew_id}", "scope": "crew", "value": "wounded_recovered" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } },
+        { "id": "wait_end", "type": "end", "title": "暂不治疗", "resolution": "resolved", "result_key": "wounded_recovery_skipped", "event_log_template_id": "wounded_recovery_skipped_log", "history_writes": [{ "key_template": "mainline_wounded_recovery_options:skipped:{crew_id}", "scope": "crew", "value": "wounded_recovery_skipped" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["recovered_end", "wait_end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "recover_with_medicine", "effects": [
+          { "id": "consume_medicine_for_wound", "type": "remove_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "medicine", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "remove_wounded_with_medicine", "type": "remove_crew_condition", "target": { "type": "primary_crew" }, "params": { "condition": "wounded" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "recover_with_first_aid", "effects": [
+          { "id": "remove_wounded_with_first_aid", "type": "remove_crew_condition", "target": { "type": "primary_crew" }, "params": { "condition": "wounded" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "wounded_recovered_log", "summary": "队员受伤状态已恢复", "importance": "major", "visibility": "player_visible" }, { "id": "wounded_recovery_skipped_log", "summary": "暂未处理受伤状态", "importance": "normal", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["mainline_wounded_recovery_options.call.recover"], "item_ids": ["medicine"] },
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1440, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "4-1", "action_id": "survey:abandoned-medical-pod:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "abandoned-medical-pod", "tags": ["mainline", "mainline_medical"] } }]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_injured_villager_rescue_decoy",
+      "version": 1,
+      "domain": "mainline_medical",
+      "title": "营地救援获得诱饵",
+      "summary": "受伤村民营地可通过药品或野外急救完成救援，获得第一个诱饵。",
+      "tags": ["mainline", "medical", "injured_villager", "decoy_source", "high_risk"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-injured-villager-camp" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-injured-villager" } }
+        ] }
+      ] },
+      "candidate_selection": { "priority": 78, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_injured_villager_rescue_decoy:{crew_id}", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "rescue_call", "nodes": [
+        { "id": "rescue_call", "type": "call", "title": "救援受伤村民", "call_template_id": "mainline_injured_villager_rescue_decoy.call.rescue", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [
+          { "id": "use_medicine", "requirements": [{ "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "wounded" }] }, { "type": "inventory_has_item", "target": { "type": "crew_inventory" }, "value": "medicine", "params": { "min_quantity": 1 } }], "effect_refs": ["rescue_with_medicine_rewards"] },
+          { "id": "field_first_aid", "requirements": [{ "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "wounded" }] }, { "type": "has_condition", "target": { "type": "primary_crew" }, "value": "knows_field_first_aid" }], "effect_refs": ["rescue_with_first_aid_rewards"] },
+          { "id": "observe", "is_default": true }
+        ], "option_node_mapping": { "use_medicine": "rescue_end", "field_first_aid": "rescue_end", "observe": "observe_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+        { "id": "rescue_end", "type": "end", "title": "诱饵已取得", "resolution": "resolved", "result_key": "camp_decoy_obtained", "event_log_template_id": "camp_decoy_obtained_log", "history_writes": [{ "key_template": "mainline_injured_villager_rescue_decoy:{crew_id}", "scope": "crew", "value": "camp_decoy_obtained" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } },
+        { "id": "observe_end", "type": "end", "title": "等待救援条件", "resolution": "resolved", "result_key": "camp_rescue_waiting", "event_log_template_id": "camp_rescue_waiting_log", "history_writes": [{ "key_template": "mainline_injured_villager_rescue_decoy:waiting:{crew_id}", "scope": "crew", "value": "camp_rescue_waiting" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["rescue_end", "observe_end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "rescue_with_medicine_rewards", "effects": [
+          { "id": "consume_medicine_for_villager", "type": "remove_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "medicine", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "camp_decoy_from_medicine", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "decoy", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "injured_villager_rescued_flag_medicine", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "injured_villager_rescued", "value": true, "tags": ["mainline", "decoy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "rescue_with_first_aid_rewards", "effects": [
+          { "id": "camp_decoy_from_first_aid", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "decoy", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "injured_villager_rescued_flag_first_aid", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "injured_villager_rescued", "value": true, "tags": ["mainline", "decoy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "camp_decoy_obtained_log", "summary": "营地救援完成并取得诱饵", "importance": "major", "visibility": "player_visible" }, { "id": "camp_rescue_waiting_log", "summary": "营地救援等待药品或野外急救条件", "importance": "normal", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["mainline_injured_villager_rescue_decoy.call.rescue"], "item_ids": ["medicine", "decoy"] },
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1500, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "5-2", "action_id": "survey:mainline-injured-villager:5-2:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-injured-villager", "tags": ["mainline", "mainline_medical", "injured_villager", "decoy_source"] } }]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_marsh_decoy_source",
+      "version": 1,
+      "domain": "mainline_medical",
+      "title": "浅滩湿地第二诱饵",
+      "summary": "浅滩湿地 survey 或 gather 稳定给当前队员第二个诱饵。",
+      "tags": ["mainline", "medical", "marsh", "decoy_source"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-marsh-decoy-source" } },
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "gather" } }
+        ] }
+      ] },
+      "candidate_selection": { "priority": 77, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_marsh_decoy_source:{crew_id}", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "marsh_report", "nodes": [
+        { "id": "marsh_report", "type": "call", "title": "湿地诱饵", "call_template_id": "mainline_marsh_decoy_source.call.obtain", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "collect", "effect_refs": ["marsh_decoy_rewards"], "is_default": true }], "option_node_mapping": { "collect": "marsh_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+        { "id": "marsh_end", "type": "end", "title": "湿地诱饵已取得", "resolution": "resolved", "result_key": "marsh_decoy_obtained", "event_log_template_id": "marsh_decoy_obtained_log", "history_writes": [{ "key_template": "mainline_marsh_decoy_source:{crew_id}", "scope": "crew", "value": "marsh_decoy_obtained" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["marsh_end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [{ "id": "marsh_decoy_rewards", "effects": [
+        { "id": "add_marsh_decoy", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "decoy", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+        { "id": "marsh_decoy_obtained_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "marsh_decoy_obtained", "value": true, "tags": ["mainline", "decoy", "marsh"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+        { "id": "marsh_decoy_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "浅滩湿地稳定取得额外诱饵，可作为巢穴路线需要的第二个诱饵来源。", "importance": "major", "visibility": "player_visible", "result_key": "marsh_decoy_obtained" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+      ] }],
+      "log_templates": [{ "id": "marsh_decoy_obtained_log", "summary": "浅滩湿地诱饵已取得", "importance": "major", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["mainline_marsh_decoy_source.call.obtain"], "item_ids": ["decoy"] },
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1560, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "6-1", "action_id": "gather:mainline-marsh-decoy-source:6-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "gather", "object_id": "mainline-marsh-decoy-source", "tags": ["mainline", "mainline_medical", "marsh", "decoy_source"] } }]
+    }
+  ]
+}
