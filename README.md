@@ -41,6 +41,8 @@ npm run dev:pc
 npm run dev:mobile
 ```
 
+默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Yuan Host 为 `ws://localhost:8888/`。
+
 构建生产版本：
 
 ```bash

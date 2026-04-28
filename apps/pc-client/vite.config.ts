@@ -5,6 +5,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   base: process.env.NODE_ENV === "production" ? "/stellar-frontier/" : "/",
   plugins: [react()],
+  server: {
+    port: 5173,
+  },
   resolve: {
     alias: {
       "@stellar-frontier/dual-device": fileURLToPath(new URL("../../packages/dual-device/src/index.ts", import.meta.url)),
