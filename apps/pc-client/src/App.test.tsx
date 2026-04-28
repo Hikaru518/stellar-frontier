@@ -63,6 +63,41 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
   });
 
+  it("fills return home completion time when event content leaves a placeholder", () => {
+    const state = createCompatibleSavedGameState({
+      elapsedGameSeconds: 3723,
+      crew: initialCrew,
+      tiles: initialTiles,
+      map: createInitialMapState(),
+      logs: initialLogs,
+      resources: initialResources,
+      baseInventory: [{ itemId: "iron_ore", quantity: 1240 }],
+    }) as unknown as GameState;
+    const runtimeState = {
+      ...toEventEngineState(state),
+      world_flags: {
+        return_home_completed: {
+          key: "return_home_completed",
+          value: true,
+          value_type: "boolean" as const,
+          created_at: 3700,
+          updated_at: 3700,
+        },
+        return_home_completed_at: {
+          key: "return_home_completed_at",
+          value: 0,
+          value_type: "number" as const,
+          created_at: 3700,
+          updated_at: 3700,
+        },
+      },
+    };
+
+    const merged = mergeEventRuntimeState(state, runtimeState);
+
+    expect(merged.world_flags.return_home_completed_at?.value).toBe(3723);
+  });
+
   it("creates the initial runtime map state from the default map config", () => {
     render(<App />);
 

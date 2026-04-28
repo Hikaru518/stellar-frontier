@@ -22,6 +22,7 @@ import {
   type RuntimeCall,
   type TileState,
   type TriggerContext,
+  type WorldFlag,
 } from "./events/types";
 import { defaultMapConfig } from "./content/contentData";
 import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
@@ -719,6 +720,7 @@ export function mergeEventRuntimeState(state: GameState, eventState: GraphRunner
   const views = syncEventRuntimeToViews(state, eventState);
   const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventState);
   const eventMap = (eventState as GraphRunnerGameState & { map?: GameMapState }).map;
+  const worldFlags = withReturnHomeCompletionTime(state, eventState.world_flags);
 
   return {
     ...state,
@@ -733,10 +735,37 @@ export function mergeEventRuntimeState(state: GameState, eventState: GraphRunner
     objectives: eventState.objectives,
     event_logs: eventState.event_logs,
     world_history: eventState.world_history,
-    world_flags: eventState.world_flags,
+    world_flags: worldFlags,
     crew_actions: eventState.crew_actions,
     inventories: eventState.inventories,
     rng_state: eventState.rng_state,
+  };
+}
+
+function withReturnHomeCompletionTime(state: GameState, worldFlags: GameState["world_flags"]): GameState["world_flags"] {
+  if (worldFlags.return_home_completed?.value !== true) {
+    return worldFlags;
+  }
+
+  const existing = worldFlags.return_home_completed_at;
+  if (typeof existing?.value === "number" && existing.value > 0) {
+    return worldFlags;
+  }
+
+  const completedAt = Math.max(0, state.elapsedGameSeconds);
+  const flag: WorldFlag = {
+    key: "return_home_completed_at",
+    value: completedAt,
+    value_type: "number",
+    created_at: existing?.created_at ?? completedAt,
+    updated_at: completedAt,
+    source_event_id: existing?.source_event_id ?? worldFlags.return_home_completed.source_event_id ?? null,
+    tags: existing?.tags ?? ["mainline", "ending", "completion_time"],
+  };
+
+  return {
+    ...worldFlags,
+    return_home_completed_at: flag,
   };
 }
 

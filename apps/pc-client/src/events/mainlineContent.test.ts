@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import crashSiteContent from "../../../../content/events/definitions/mainline_crash_site.json";
+import endingContent from "../../../../content/events/definitions/mainline_ending.json";
+import hiveContent from "../../../../content/events/definitions/mainline_hive.json";
 import medicalContent from "../../../../content/events/definitions/mainline_medical.json";
 import resourcesContent from "../../../../content/events/definitions/mainline_resources.json";
 import villageContent from "../../../../content/events/definitions/mainline_village.json";
@@ -196,6 +198,125 @@ describe("mainline event content", () => {
       type: "set_world_flag",
       params: { key: "marsh_decoy_obtained", value: true },
     });
+  });
+
+  it("covers volcano, forge, repair-kit crafting, and warp coordinates", () => {
+    const volcano = findDefinition(resourcesContent, "mainline_volcano_obsidian_chain");
+    const forge = findDefinition(resourcesContent, "mainline_forge_repair_and_kit");
+    const oldShip = findDefinition(resourcesContent, "mainline_old_ship_warp_coordinates");
+
+    expect(findCallOption(volcano, "collect_obsidian").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "thermal_mining_gear" }),
+        expect.objectContaining({ type: "not" }),
+      ]),
+    );
+    expect(findEffect(volcano, "thermal_mining_gear_required_flag")).toMatchObject({
+      type: "set_world_flag",
+      params: { key: "thermal_mining_gear_required_for_obsidian", value: true },
+    });
+    expect(findEffect(volcano, "add_obsidian")).toMatchObject({
+      type: "add_item",
+      target: { type: "crew_inventory" },
+      params: { item_id: "obsidian", quantity: 1 },
+    });
+
+    expect(findCallOption(forge, "repair_forge").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "has_condition", value: "knows_repair_tech" }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "iron_ore" }),
+      ]),
+    );
+    expect(findEffect(forge, "forge_repaired_flag")).toMatchObject({
+      type: "set_world_flag",
+      params: { key: "forge_repaired", value: true },
+    });
+    expect(findCallOption(forge, "craft_repair_kit").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "world_flag_equals", field: "forge_repaired", value: true }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "obsidian" }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "iron_ore" }),
+      ]),
+    );
+    expect(findEffect(forge, "consume_obsidian_for_repair_kit")).toMatchObject({ type: "remove_item", params: { item_id: "obsidian" } });
+    expect(findEffect(forge, "consume_iron_ore_for_repair_kit")).toMatchObject({ type: "remove_item", params: { item_id: "iron_ore" } });
+    expect(findEffect(forge, "add_warp_pod_repair_kit")).toMatchObject({
+      type: "add_item",
+      target: { type: "crew_inventory" },
+      params: { item_id: "warp_pod_repair_kit", quantity: 1 },
+    });
+
+    expect(findEffect(oldShip, "add_warp_coordinates")).toMatchObject({
+      type: "add_item",
+      target: { type: "crew_inventory" },
+      params: { item_id: "warp_coordinates", quantity: 1 },
+    });
+    expect(findEffect(oldShip, "warp_coordinates_found_flag")).toMatchObject({
+      type: "set_world_flag",
+      params: { key: "warp_coordinates_found", value: true },
+    });
+  });
+
+  it("covers hive two-decoy route and high-risk wound gates", () => {
+    const hive = findDefinition(hiveContent, "mainline_hive_entrance_and_hatchery");
+
+    expect(findCallOption(hive, "lure_guard").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "decoy" }),
+        expect.objectContaining({ type: "not" }),
+      ]),
+    );
+    expect(findEffect(hive, "consume_decoy_for_hive_entrance")).toMatchObject({ type: "remove_item", params: { item_id: "decoy", quantity: 1 } });
+    expect(findEffect(hive, "hive_entrance_guard_lured_flag")).toMatchObject({
+      type: "set_world_flag",
+      params: { key: "hive_entrance_guard_lured", value: true },
+    });
+
+    expect(findCallOption(hive, "collect_slime_fuel").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "world_flag_equals", field: "hive_entrance_guard_lured", value: true }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "decoy" }),
+        expect.objectContaining({ type: "not" }),
+      ]),
+    );
+    expect(findEffect(hive, "consume_decoy_for_hatchery")).toMatchObject({ type: "remove_item", params: { item_id: "decoy", quantity: 1 } });
+    expect(findEffect(hive, "add_alien_slime_fuel")).toMatchObject({
+      type: "add_item",
+      target: { type: "crew_inventory" },
+      params: { item_id: "alien_slime_fuel", quantity: 1 },
+    });
+  });
+
+  it("covers warp-pod ending sequence and crew assembly requirement", () => {
+    const ending = findDefinition(endingContent, "mainline_warp_pod_final_sequence");
+
+    expect(findCallOption(ending, "repair_hull").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "has_condition", value: "knows_repair_tech" }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "warp_pod_repair_kit" }),
+      ]),
+    );
+    expect(findEffect(ending, "consume_warp_pod_repair_kit")).toMatchObject({ type: "remove_item", params: { item_id: "warp_pod_repair_kit" } });
+    expect(findEffect(ending, "warp_pod_hull_repaired_flag")).toMatchObject({ type: "set_world_flag", params: { key: "warp_pod_hull_repaired", value: true } });
+
+    expect(findCallOption(ending, "inject_fuel").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "world_flag_equals", field: "warp_pod_hull_repaired", value: true }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "alien_slime_fuel" }),
+      ]),
+    );
+    expect(findEffect(ending, "consume_alien_slime_fuel")).toMatchObject({ type: "remove_item", params: { item_id: "alien_slime_fuel" } });
+    expect(findEffect(ending, "warp_pod_fueled_flag")).toMatchObject({ type: "set_world_flag", params: { key: "warp_pod_fueled", value: true } });
+
+    expect(findCallOption(ending, "launch_home").requirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "world_flag_equals", field: "warp_pod_fueled", value: true }),
+        expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "warp_coordinates" }),
+        expect.objectContaining({ type: "handler_condition", handler_type: "all_available_crew_at_tile", params: { tile_id: "4-4" } }),
+      ]),
+    );
+    expect(findEffect(ending, "return_home_completed_flag")).toMatchObject({ type: "set_world_flag", params: { key: "return_home_completed", value: true } });
+    expect(findEffect(ending, "return_home_completed_at_flag")).toMatchObject({ type: "set_world_flag", params: { key: "return_home_completed_at", value: 0 } });
   });
 });
 
