@@ -1,0 +1,35 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/rush/v5/command-line.schema.json",
+  "commands": [
+    {
+      "commandKind": "bulk",
+      "name": "lint",
+      "summary": "Type-checks projects.",
+      "description": "Runs the lint script for projects that define one, respecting Rush project dependencies.",
+      "enableParallelism": true
+    },
+    {
+      "commandKind": "bulk",
+      "name": "test",
+      "summary": "Runs unit tests.",
+      "description": "Runs the test script for projects that define one, respecting Rush project dependencies.",
+      "enableParallelism": true
+    },
+    {
+      "commandKind": "bulk",
+      "name": "test:e2e",
+      "summary": "Runs end-to-end tests.",
+      "description": "Runs the test:e2e script for projects that define one.",
+      "enableParallelism": false,
+      "ignoreMissingScript": true
+    },
+    {
+      "commandKind": "global",
+      "name": "validate-content",
+      "summary": "Validates content data.",
+      "description": "Validates repository content JSON schemas and cross-file references.",
+      "shellCommand": "node scripts/validate-content.mjs"
+    }
+  ],
+  "parameters": []
+}

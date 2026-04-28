@@ -1,0 +1,39 @@
+{
+  "name": "@stellar-frontier/pc-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=../../common/temp/playwright-browsers playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "install:browsers": "PLAYWRIGHT_BROWSERS_PATH=../../common/temp/playwright-browsers playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@stellar-frontier/dual-device": "workspace:*",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "ajv": "^8.20.0",
+    "jsdom": "^29.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
+  }
+}

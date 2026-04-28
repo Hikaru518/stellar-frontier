@@ -1,41 +1,23 @@
 {
-  "name": "stellar-frontier",
+  "name": "stellar-frontier-monorepo",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
+  "packageManager": "pnpm@10.33.1",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "lint": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "validate:content": "node scripts/validate-content.mjs",
-    "test:e2e:ui": "playwright test --ui"
-  },
-  "dependencies": {
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
-  },
-  "devDependencies": {
-    "@emnapi/core": "^1.10.0",
-    "@emnapi/runtime": "^1.10.0",
-    "@playwright/test": "^1.59.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
-    "ajv": "^8.20.0",
-    "jsdom": "^29.0.2",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.10",
-    "vitest": "^4.1.5"
+    "dev": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client dev",
+    "dev:pc": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client dev",
+    "dev:mobile": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/mobile-client dev",
+    "dev:mobile:lan": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/mobile-client dev:lan",
+    "preview": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client preview",
+    "rush:update": "node common/scripts/install-run-rush.js update",
+    "build": "node common/scripts/install-run-rush.js build",
+    "lint": "node common/scripts/install-run-rush.js lint",
+    "test": "node common/scripts/install-run-rush.js test",
+    "test:e2e": "node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client",
+    "validate:content": "node common/scripts/install-run-rush.js validate-content",
+    "rush:list": "node common/scripts/install-run-rush.js list"
   }
 }
