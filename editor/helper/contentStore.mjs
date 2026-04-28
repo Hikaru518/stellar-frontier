@@ -80,6 +80,7 @@ export async function loadEventEditorLibrary({
 
   return {
     manifest,
+    manifest_base_hash: hashJson(manifest),
     domains: (manifest.domains ?? []).map((domain) => domain.id),
     definitions,
     call_templates: callTemplates,

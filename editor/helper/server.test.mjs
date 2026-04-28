@@ -79,6 +79,193 @@ describe("helper server", () => {
     });
   });
 
+  it("creates a new event domain package and refreshes the generated manifest", async () => {
+    const repoRoot = await createTempContentRoot();
+    const server = createHelperServer({ repoRoot, sourceRoot });
+    servers.push(server);
+    await new Promise((resolve) => server.listen(0, DEFAULT_HOST, resolve));
+    const address = server.address();
+    const baseUrl = `http://${DEFAULT_HOST}:${address.port}`;
+    const library = await getJson(`${baseUrl}/api/event-editor/library`);
+
+    const response = await postJson(`${baseUrl}/api/event-editor/create-domain`, {
+      domain_id: "test_lab",
+      manifest_base_hash: library.manifest_base_hash,
+    });
+    const body = await response.json();
+    const manifest = JSON.parse(await fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8"));
+    const definitions = JSON.parse(await fs.readFile(path.join(repoRoot, "content/events/definitions/test_lab.json"), "utf8"));
+    const callTemplates = JSON.parse(
+      await fs.readFile(path.join(repoRoot, "content/events/call_templates/test_lab.json"), "utf8"),
+    );
+    const generated = await fs.readFile(
+      path.join(repoRoot, "apps/pc-client/src/content/generated/eventContentManifest.ts"),
+      "utf8",
+    );
+    const refreshedLibrary = await getJson(`${baseUrl}/api/event-editor/library`);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      status: "created",
+      domain_id: "test_lab",
+      files: {
+        definitions: "content/events/definitions/test_lab.json",
+        call_templates: "content/events/call_templates/test_lab.json",
+        manifest: "content/events/manifest.json",
+        generated: "apps/pc-client/src/content/generated/eventContentManifest.ts",
+      },
+      validation: { passed: true, issues: [], command: "npm run validate:content" },
+    });
+    expect(body.manifest_base_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.manifest_base_hash).not.toBe(library.manifest_base_hash);
+    expect(manifest.domains.at(-1)).toEqual({
+      id: "test_lab",
+      definitions: "definitions/test_lab.json",
+      call_templates: "call_templates/test_lab.json",
+      presets: null,
+    });
+    expect(definitions.event_definitions[0]).toMatchObject({
+      id: "test_lab.draft_event",
+      domain: "test_lab",
+      status: "draft",
+      event_graph: {
+        entry_node_id: "draft_call",
+        terminal_node_ids: ["draft_resolved"],
+      },
+    });
+    expect(callTemplates.call_templates[0]).toMatchObject({
+      id: "test_lab.draft_event.call.draft_call",
+      domain: "test_lab",
+      event_definition_id: "test_lab.draft_event",
+      node_id: "draft_call",
+    });
+    expect(generated).toContain(
+      'import testLabEventDefinitionsContent from "../../../../../content/events/definitions/test_lab.json";',
+    );
+    expect(generated).toContain("...testLabCallTemplatesContent.call_templates");
+    expect(refreshedLibrary.domains).toContain("test_lab");
+    expect(refreshedLibrary.definitions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "test_lab.draft_event", domain: "test_lab" })]),
+    );
+    expect(refreshedLibrary.call_templates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "test_lab.draft_event.call.draft_call", domain: "test_lab" }),
+      ]),
+    );
+  });
+
+  it("rejects duplicate event domains without changing the manifest", async () => {
+    const repoRoot = await createTempContentRoot();
+    const server = createHelperServer({ repoRoot, sourceRoot });
+    servers.push(server);
+    await new Promise((resolve) => server.listen(0, DEFAULT_HOST, resolve));
+    const address = server.address();
+    const baseUrl = `http://${DEFAULT_HOST}:${address.port}`;
+    const library = await getJson(`${baseUrl}/api/event-editor/library`);
+    const originalManifest = await fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8");
+
+    const response = await postJson(`${baseUrl}/api/event-editor/create-domain`, {
+      domain_id: "forest",
+      manifest_base_hash: library.manifest_base_hash,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("domain_exists");
+    await expect(fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8")).resolves.toBe(
+      originalManifest,
+    );
+  });
+
+  it("rejects unsafe event domain ids before writing files", async () => {
+    const repoRoot = await createTempContentRoot();
+    const server = createHelperServer({ repoRoot, sourceRoot });
+    servers.push(server);
+    await new Promise((resolve) => server.listen(0, DEFAULT_HOST, resolve));
+    const address = server.address();
+    const baseUrl = `http://${DEFAULT_HOST}:${address.port}`;
+    const library = await getJson(`${baseUrl}/api/event-editor/library`);
+    const originalManifest = await fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8");
+
+    const response = await postJson(`${baseUrl}/api/event-editor/create-domain`, {
+      domain_id: "../evil",
+      manifest_base_hash: library.manifest_base_hash,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("invalid_domain_id");
+    await expect(fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8")).resolves.toBe(
+      originalManifest,
+    );
+    await expect(fs.access(path.join(repoRoot, "content/events/definitions/evil.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
+  it("rejects invalid scaffold content without leaving partial files", async () => {
+    const repoRoot = await createTempContentRoot();
+    const server = createHelperServer({ repoRoot, sourceRoot });
+    servers.push(server);
+    await new Promise((resolve) => server.listen(0, DEFAULT_HOST, resolve));
+    const address = server.address();
+    const baseUrl = `http://${DEFAULT_HOST}:${address.port}`;
+    const library = await getJson(`${baseUrl}/api/event-editor/library`);
+    const originalManifest = await fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8");
+
+    const response = await postJson(`${baseUrl}/api/event-editor/create-domain`, {
+      domain_id: "bad_lab",
+      manifest_base_hash: library.manifest_base_hash,
+      scaffold: {
+        event_definition: {
+          domain: "bad_lab",
+        },
+      },
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.code).toBe("validation_failed");
+    expect(body.validation.passed).toBe(false);
+    await expect(fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8")).resolves.toBe(
+      originalManifest,
+    );
+    await expect(fs.access(path.join(repoRoot, "content/events/definitions/bad_lab.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    await expect(fs.access(path.join(repoRoot, "content/events/call_templates/bad_lab.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    await expect(
+      fs.access(path.join(repoRoot, "apps/pc-client/src/content/generated/eventContentManifest.ts")),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("returns conflict when the manifest base hash is stale", async () => {
+    const repoRoot = await createTempContentRoot();
+    const server = createHelperServer({ repoRoot, sourceRoot });
+    servers.push(server);
+    await new Promise((resolve) => server.listen(0, DEFAULT_HOST, resolve));
+    const address = server.address();
+    const originalManifest = await fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8");
+
+    const response = await postJson(`http://${DEFAULT_HOST}:${address.port}/api/event-editor/create-domain`, {
+      domain_id: "stale_lab",
+      manifest_base_hash: "0".repeat(64),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("conflict");
+    expect(body.current_manifest_base_hash).toMatch(/^[a-f0-9]{64}$/);
+    await expect(fs.readFile(path.join(repoRoot, "content/events/manifest.json"), "utf8")).resolves.toBe(
+      originalManifest,
+    );
+    await expect(fs.access(path.join(repoRoot, "content/events/definitions/stale_lab.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("saves a valid draft after validation and returns the new base hash", async () => {
     const repoRoot = await createTempContentRoot();
     const server = createHelperServer({ repoRoot, sourceRoot });

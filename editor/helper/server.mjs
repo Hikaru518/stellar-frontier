@@ -2,6 +2,7 @@ import http from "node:http";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadEventEditorLibrary, saveDraftAsset, validateDraftAsset } from "./contentStore.mjs";
+import { createEventDomain } from "./manifestStore.mjs";
 
 export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 4317;
@@ -76,6 +77,12 @@ async function routeRequest(request, response, { repoRoot, sourceRoot }) {
 
   if (request.method === "POST" && url.pathname === "/api/event-editor/save") {
     const result = await saveDraftAsset({ repoRoot, sourceRoot, body: await readJsonRequest(request) });
+    sendJson(response, result.statusCode, result.body);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/event-editor/create-domain") {
+    const result = await createEventDomain({ repoRoot, sourceRoot, body: await readJsonRequest(request) });
     sendJson(response, result.statusCode, result.body);
     return;
   }

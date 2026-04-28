@@ -18,7 +18,7 @@ source:
 | 2 | T002 | 搭建独立 editor Vite/TS/RJSF 工程入口 | completed | 1 |
 | 3 | T003 | 实现 Local Helper 基础服务与只读 library API | completed | 1 |
 | 4 | T004 | 实现 validation gate 与已有 asset 保存 API | completed | 1 |
-| 5 | T005 | 实现新建 domain API 与 manifest 同步 | pending | 0 |
+| 5 | T005 | 实现新建 domain API 与 manifest 同步 | completed | 1 |
 | 6 | T006 | 实现 editor API client、library state 与 draft storage | pending | 0 |
 | 7 | T007 | 实现 Event Browser 与搜索筛选 | pending | 0 |
 | 8 | T008 | 实现表单与 JSON 并排编辑工作区 | pending | 0 |
@@ -64,4 +64,12 @@ source:
 - 完成时间: 2026-04-28 16:10
 - 尝试次数: 1
 - Monkey summary: 实现 `validate-draft` 与 `save` API，使用临时 content root 做格式化与校验，支持 hash conflict 检测、成功后格式化写入，以及结构化 validation report；补齐保存成功、无效 draft 不写入、conflict 不覆盖与 issue mapping 测试。
+- 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 均通过。
+
+### T005: 实现新建 domain API 与 manifest 同步
+- 状态: completed
+- 开始时间: 2026-04-28 16:10
+- 完成时间: 2026-04-28 16:10
+- 尝试次数: 1
+- Monkey summary: 实现 `create-domain` API 与 `manifestStore`，支持生成 definitions/call_templates scaffold、更新 manifest、刷新 generated module、manifest hash conflict 检测，以及失败回滚；测试 domain 仅在临时目录中创建。
 - 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 均通过。
