@@ -424,6 +424,88 @@ p {
   gap: 14px;
 }
 
+.realtime-link-demo {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(86px, 0.7fr) minmax(130px, 1fr) minmax(86px, 0.7fr) minmax(110px, 0.8fr);
+  gap: 8px;
+  align-items: stretch;
+  border: 1px solid #24384f;
+  background:
+    linear-gradient(90deg, rgba(36, 56, 79, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(180, 91, 19, 0.08) 1px, transparent 1px),
+    #ebe7dc;
+  background-size: 18px 18px;
+  padding: 10px;
+}
+
+.link-node,
+.link-lane {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #5d6368;
+  background: #f7f4ec;
+  padding: 10px;
+}
+
+.link-node {
+  display: grid;
+  gap: 4px;
+  min-height: 84px;
+}
+
+.link-node span,
+.link-node small,
+.link-lane em {
+  color: #5d6368;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.link-node strong {
+  align-self: center;
+  color: #24384f;
+  font-size: 15px;
+}
+
+.link-node-yuan {
+  border-color: #b45b13;
+  background: #f4eadf;
+}
+
+.link-lane {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.link-lane span {
+  position: relative;
+  display: block;
+  height: 8px;
+  border: 1px solid #24384f;
+  background: linear-gradient(90deg, #24384f 0 18%, transparent 18% 100%);
+  background-size: 34px 100%;
+  animation: signalSweep 1.1s linear infinite;
+}
+
+.link-lane-webrtc span {
+  border-color: #2f6f44;
+  background-image: linear-gradient(90deg, #2f6f44 0 18%, transparent 18% 100%);
+  animation-duration: 0.72s;
+}
+
+@keyframes signalSweep {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: 34px;
+  }
+}
+
 .phone-pairing-grid {
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr);
@@ -870,5 +952,9 @@ blockquote {
 
   .contacts-overlay {
     position: static;
+  }
+
+  .realtime-link-demo {
+    grid-template-columns: 1fr;
   }
 }

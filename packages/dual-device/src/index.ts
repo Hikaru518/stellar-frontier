@@ -17,6 +17,21 @@ export interface DualDeviceTransportSelection {
   reason: string;
 }
 
+export interface YuanRealtimeLinkPresentation {
+  current: DualDeviceTransportKind;
+  webRtcUpgrade: {
+    kind: "yuan-webrtc-datachannel";
+    enabled: boolean;
+    health: DualDeviceTransportHealth;
+    label: string;
+  };
+  publicFallback: {
+    kind: "yuan-wss" | "offline";
+    health: DualDeviceTransportHealth;
+    label: string;
+  };
+}
+
 export type DualDeviceMessageType =
   | "phone.message.delivered"
   | "phone.message.read"
@@ -151,6 +166,29 @@ export function selectPreferredTransport(candidates: DualDeviceTransportCandidat
     selected: selected.kind,
     fallback,
     reason: selected.reason ?? formatTransportReason(selected),
+  };
+}
+
+export function describeYuanRealtimeLink(candidates: DualDeviceTransportCandidate[]): YuanRealtimeLinkPresentation {
+  const selection = selectPreferredTransport(candidates);
+  const webRtc = candidates.find((candidate) => candidate.kind === "yuan-webrtc-datachannel");
+  const wss = candidates.find((candidate) => candidate.kind === "yuan-wss");
+  const webRtcHealth = webRtc?.health ?? "unavailable";
+  const wssHealth = wss?.health ?? "unavailable";
+
+  return {
+    current: selection.selected,
+    webRtcUpgrade: {
+      kind: "yuan-webrtc-datachannel",
+      enabled: webRtcHealth !== "unavailable",
+      health: webRtcHealth,
+      label: formatWebRtcUpgradeLabel(webRtcHealth),
+    },
+    publicFallback: {
+      kind: wssHealth === "unavailable" ? "offline" : "yuan-wss",
+      health: wssHealth,
+      label: wssHealth === "unavailable" ? "Yuan WSS 不可用，PC fallback 接管" : "Yuan WSS baseline / 公网兜底",
+    },
   };
 }
 
@@ -375,6 +413,16 @@ function formatTransportReason(candidate: DualDeviceTransportCandidate) {
     return `Yuan Host WSS 可用${latency}，作为稳定公网基线和 WebRTC signaling 通道。`;
   }
   return "离线状态，只能使用 PC fallback。";
+}
+
+function formatWebRtcUpgradeLabel(health: DualDeviceTransportHealth) {
+  if (health === "healthy") {
+    return "WebRTC DataChannel 已升级为当前低延迟链路";
+  }
+  if (health === "degraded") {
+    return "enableWebRTC=true，等待局域网候选协商";
+  }
+  return "enableWebRTC=true，但当前没有可用直连候选";
 }
 
 function createRandomBytes(length: number) {

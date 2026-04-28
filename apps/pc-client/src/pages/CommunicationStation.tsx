@@ -5,6 +5,7 @@ import {
   createDualDeviceMessage,
   createPairingSession,
   createYuanTerminalMessage,
+  describeYuanRealtimeLink,
   decodeYuanWireMessage,
   encodeYuanWireMessage,
   extractDualDeviceMessage,
@@ -73,10 +74,12 @@ export function CommunicationStation({
     .slice()
     .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
     .slice(0, 3);
-  const phoneTerminalLink = selectPreferredTransport([
+  const phoneTransportCandidates = [
     { kind: "yuan-webrtc-datachannel", health: "degraded", reason: "等待 Yuan Terminal 完成 WebRTC 无感升级。" },
     { kind: "yuan-wss", health: "healthy", rttMs: 60 },
-  ]);
+  ] as const;
+  const phoneTerminalLink = selectPreferredTransport([...phoneTransportCandidates]);
+  const realtimeLink = describeYuanRealtimeLink([...phoneTransportCandidates]);
   const hostTarget = getLatencyTarget(yuanBackedDualDevicePlan, "Yuan WSS Host RTT") ?? "同区域 20-80ms，跨区域 <150ms";
   const pairingExpired = isPairingSessionExpired(pairingSession);
 
@@ -281,6 +284,31 @@ export function CommunicationStation({
             <StatusTag tone={getPhoneStatusTone(phoneConnectionStatus)}>{formatPhoneConnectionStatus(phoneConnectionStatus)}</StatusTag>
           </div>
           <p>手机端是可选增强：扫码或手输码进入私人通讯终端，只接收 PC 授权的私密通讯，并回传 typed events。</p>
+          <div className="realtime-link-demo" aria-label="实时连接演示">
+            <div className="link-node link-node-pc">
+              <span>PC AUTH</span>
+              <strong>GameState</strong>
+              <small>authority</small>
+            </div>
+            <div className="link-lane link-lane-wss">
+              <span />
+              <em>WSS baseline</em>
+            </div>
+            <div className="link-node link-node-yuan">
+              <span>Yuan Host</span>
+              <strong>route + signal</strong>
+              <small>offer / answer</small>
+            </div>
+            <div className="link-lane link-lane-webrtc">
+              <span />
+              <em>WebRTC upgrade</em>
+            </div>
+            <div className="link-node link-node-phone">
+              <span>PHONE</span>
+              <strong>typed events</strong>
+              <small>read / answer</small>
+            </div>
+          </div>
           <div className="phone-pairing-grid">
             <div className="qr-frame" aria-label="手机终端 QR 码">
               {qrCodeUrl ? <img src={qrCodeUrl} alt="手机终端配对 QR 码" /> : <span>QR 生成中</span>}
@@ -310,8 +338,10 @@ export function CommunicationStation({
           </div>
           <FieldList
             rows={[
-              ["无感升级", phoneTerminalLink.selected],
-              ["WSS 基线", `${phoneTerminalLink.fallback} / ${hostTarget}`],
+              ["当前链路", phoneTerminalLink.selected],
+              ["局域网升级", `${realtimeLink.webRtcUpgrade.kind} / ${realtimeLink.webRtcUpgrade.label}`],
+              ["公网兜底", `${realtimeLink.publicFallback.kind} / ${hostTarget}`],
+              ["Yuan 配置", "enableWebRTC=true"],
               ["私密信号", formatPrivateSignalStatus(privateSignalStatus)],
               ["业务边界", "Stellar 只提供 PC/mobile 共享业务层；底层 Host/Terminal/WebRTC 交给 Yuan"],
             ]}

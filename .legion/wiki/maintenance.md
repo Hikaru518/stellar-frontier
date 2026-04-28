@@ -12,6 +12,10 @@ Before any production dual-device deployment, add short-lived pairing token enfo
 
 WebRTC DataChannel/TURN support remains delegated to Yuan and out of scope for the Rush + pnpm foundation. Production TURN/STUN and failure UX still need a separate deployment/design review before shipping.
 
+## Yuan WebRTC Integration Test
+
+当前 E2E 只验证 UI / 业务层语义：`enableWebRTC=true` 被展示为局域网升级，Yuan WSS 被展示为公网兜底。尚未覆盖真实 Yuan `Terminal` 的 `enableWebRTC=true` DataChannel 握手。后续需要单独测试 harness：启动 Yuan Host，启动 PC/mobile 两个 Yuan Terminal，开启 WebRTC，观察 WSS signaling 后 DataChannel 成功升级与失败回退。
+
 ## Yuan-Backed Business Layer RFC
 
 后续 RFC 应聚焦 `基于 Yuan Host/Protocol 构建 Stellar 双设备业务层`，而不是替换或重做 Stellar 专属 server。RFC 至少覆盖：room 与 Yuan host/tenant 的映射、PC/mobile 作为 Yuan Terminal 的生命周期、`DualDeviceMessage` 到 `ITerminalMessage` 的映射、room-scoped token TTL、PC/phone role enforcement、first-phone lock、origin/rate-limit policy、service whitelist、Terminal discovery 限制、Yuan ED25519 multi-tenancy 当前实现核实、STUN/TURN 部署、WebRTC 失败 UX、以及手机端 browser bundle 成本。

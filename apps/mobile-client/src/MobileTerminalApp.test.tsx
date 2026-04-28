@@ -11,7 +11,11 @@ describe("MobileTerminalApp", () => {
     render(<MobileTerminalApp />);
 
     expect(screen.getByRole("heading", { name: "等待配对" })).toBeInTheDocument();
-    expect(screen.getByText("yuan-wss")).toBeInTheDocument();
+    expect(screen.getAllByText(/yuan-wss/).length).toBeGreaterThan(0);
+    expect(screen.getByText("实时连接演示")).toBeInTheDocument();
+    expect(screen.getByText("局域网升级")).toBeInTheDocument();
+    expect(screen.getByText("公网兜底")).toBeInTheDocument();
+    expect(screen.getByText("enableWebRTC=true")).toBeInTheDocument();
     expect(screen.getByText(/游戏结算仍由 PC 完成/)).toBeInTheDocument();
   });
 

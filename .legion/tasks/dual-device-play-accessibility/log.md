@@ -16,3 +16,4 @@
 - Final validation after the Yuan-backed refactor passed: Rush update/install, content validation, lint, unit tests, build, normal PC E2E, and CI-style PC E2E.
 - Committed `af6499e` (`refactor: 改为 Yuan 双设备业务层`), rebased on latest `origin/main`, force-with-lease pushed the PR branch after history rewrite, and updated PR #16 body.
 - PR #16 check status after update: `test-build` passed; `deploy` skipped as expected for PR. Auto-merge/merge intentionally not enabled because this task's delivery constraint is to update the PR without merging.
+- Fixed transport presentation after review: WebRTC is now shown as the LAN upgrade path, Yuan WSS as the public fallback. Added a more visual realtime-link demo on PC/mobile and E2E assertions for that UI. Actual Yuan Terminal `enableWebRTC=true` DataChannel handshake remains a future integration harness.

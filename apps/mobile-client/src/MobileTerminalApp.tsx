@@ -3,6 +3,7 @@ import {
   buildYuanHostConnectionUrl,
   createDualDeviceMessage,
   createYuanTerminalMessage,
+  describeYuanRealtimeLink,
   decodeYuanWireMessage,
   encodeYuanWireMessage,
   extractDualDeviceMessage,
@@ -34,10 +35,12 @@ export function MobileTerminalApp() {
   const [localFeedback, setLocalFeedback] = useState("等待 PC 授权的私密通讯。未连接手机时，PC 仍可 fallback。");
   const socketRef = useRef<WebSocket | null>(null);
   const sequenceRef = useRef(1);
-  const selected = selectPreferredTransport([
+  const transportCandidates = [
     { kind: "yuan-webrtc-datachannel", health: "degraded", reason: "等待 Yuan Terminal 完成 WebRTC 无感升级。" },
     { kind: "yuan-wss", health: "healthy", rttMs: 60 },
-  ]);
+  ] as const;
+  const selected = selectPreferredTransport([...transportCandidates]);
+  const realtimeLink = describeYuanRealtimeLink([...transportCandidates]);
 
   useEffect(() => {
     if (!pairing || typeof WebSocket === "undefined") {
@@ -137,17 +140,46 @@ export function MobileTerminalApp() {
           </div>
         </section>
       ) : null}
+      <section className="terminal-card terminal-live-card" aria-label="实时连接演示">
+        <div className="live-heading">
+          <div>
+            <p className="eyebrow">Realtime Link Demo</p>
+            <h2>实时连接演示</h2>
+          </div>
+          <span>{connectionStatus === "connected" ? "LIVE" : "ARMED"}</span>
+        </div>
+        <div className="signal-orbit" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className="signal-route" aria-hidden="true">
+          <span>PC</span>
+          <b />
+          <span>Yuan</span>
+          <b />
+          <span>PHONE</span>
+        </div>
+      </section>
       <section className="terminal-card">
         <h2>推荐链路</h2>
         <p>{yuanBackedDualDevicePlan.summary}</p>
         <dl>
           <div>
-            <dt>当前首选</dt>
+            <dt>当前链路</dt>
             <dd>{selected.selected}</dd>
           </div>
           <div>
+            <dt>局域网升级</dt>
+            <dd>{realtimeLink.webRtcUpgrade.kind} / {realtimeLink.webRtcUpgrade.label}</dd>
+          </div>
+          <div>
             <dt>公网兜底</dt>
-            <dd>{selected.fallback}</dd>
+            <dd>{realtimeLink.publicFallback.kind} / {realtimeLink.publicFallback.label}</dd>
+          </div>
+          <div>
+            <dt>Yuan 配置</dt>
+            <dd>enableWebRTC=true</dd>
           </div>
         </dl>
       </section>

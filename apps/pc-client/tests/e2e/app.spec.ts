@@ -213,6 +213,21 @@ test("opens the communication station and shows a crew inventory", async ({ page
   await expect(page.getByText("可在失联或救援相关事件中提供定位帮助。")).toBeVisible();
 });
 
+test("shows the Yuan realtime link demo with WebRTC as LAN upgrade and WSS fallback", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /通讯台/ }).click();
+
+  const phonePanel = page.getByText("手机私人终端").locator("xpath=ancestor::section[1]");
+  await expect(phonePanel).toBeVisible();
+  await expect(phonePanel.getByLabel("实时连接演示")).toBeVisible();
+  await expect(phonePanel.getByText("局域网升级")).toBeVisible();
+  await expect(phonePanel.getByText(/yuan-webrtc-datachannel/)).toBeVisible();
+  await expect(phonePanel.getByText("公网兜底")).toBeVisible();
+  await expect(phonePanel.getByText(/yuan-wss \/ 同区域/)).toBeVisible();
+  await expect(phonePanel.getByText("enableWebRTC=true", { exact: true })).toBeVisible();
+});
+
 test("shows only the crash site and frontier window on a new map", async ({ page }) => {
   await page.goto("/");
 

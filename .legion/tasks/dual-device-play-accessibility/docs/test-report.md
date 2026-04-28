@@ -14,6 +14,7 @@ PASS
 - `node common/scripts/install-run-rush.js build`: pass, dual-device dist, PC Vite build, and mobile Vite build pass.
 - `node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client`: pass, PC Playwright suite passed.
 - `CI=1 node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client`: pass, CI-style PC Playwright suite passed.
+- Re-run after realtime-link demo and WebRTC/WSS copy fixes: `lint`, `test`, `build`, normal PC E2E, and CI-style PC E2E all passed.
 
 ## Why These Commands
 
@@ -21,7 +22,7 @@ PASS
 - Content validation protects the existing data-driven game contract after moving the PC client.
 - Lint/build cover TypeScript path migration, package boundaries, Vite app builds, and the shared dual-device package.
 - Unit tests cover Yuan-backed transport selection, pairing/message validation, mobile terminal copy, existing PC behavior, Yuan terminal message mapping, and fallback timing.
-- E2E protects the existing PC player flows after moving the app under `apps/pc-client`.
+- E2E protects the existing PC player flows after moving the app under `apps/pc-client` and now asserts that the UI presents WebRTC as a LAN upgrade and Yuan WSS as the public fallback.
 
 ## Corrected During Verification
 
@@ -33,3 +34,4 @@ PASS
 ## Skipped
 
 - No production Yuan Host deployment was attempted; that is out of scope for this scaffold PR.
+- No actual Yuan `Terminal` integration test with `enableWebRTC=true` was run. That requires a future harness that starts Yuan Host plus PC/mobile Yuan Terminal clients and observes a real DataChannel upgrade.

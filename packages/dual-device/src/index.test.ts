@@ -5,6 +5,7 @@ import {
   createPairingCode,
   createPairingSession,
   createYuanTerminalMessage,
+  describeYuanRealtimeLink,
   decodeYuanWireMessage,
   encodeYuanWireMessage,
   extractDualDeviceMessage,
@@ -35,6 +36,19 @@ describe("Yuan-backed dual-device business layer", () => {
     ]);
 
     expect(selection.selected).toBe("yuan-wss");
+  });
+
+  it("keeps WebRTC as a LAN upgrade and WSS as the public fallback", () => {
+    const presentation = describeYuanRealtimeLink([
+      { kind: "yuan-webrtc-datachannel", health: "degraded" },
+      { kind: "yuan-wss", health: "healthy", rttMs: 80 },
+    ]);
+
+    expect(presentation.current).toBe("yuan-wss");
+    expect(presentation.webRtcUpgrade).toMatchObject({ kind: "yuan-webrtc-datachannel", enabled: true, health: "degraded" });
+    expect(presentation.webRtcUpgrade.label).toContain("enableWebRTC=true");
+    expect(presentation.publicFallback).toMatchObject({ kind: "yuan-wss", health: "healthy" });
+    expect(presentation.publicFallback.label).toContain("公网兜底");
   });
 
   it("formats pairing codes without ambiguous characters", () => {
