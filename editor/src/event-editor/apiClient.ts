@@ -1,4 +1,9 @@
-import type { EventEditorLibraryResponse } from "./types";
+import type {
+  EventEditorLibraryResponse,
+  EventEditorSaveRequest,
+  EventEditorSaveResponse,
+  EventEditorValidateDraftResponse,
+} from "./types";
 
 export const DEFAULT_HELPER_BASE_URL = "http://127.0.0.1:4317";
 export const HELPER_START_COMMAND = "npm run editor:helper";
@@ -9,13 +14,19 @@ export class EventEditorApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly cause?: unknown;
+  readonly details?: Record<string, unknown>;
 
-  constructor(code: string, message: string, { status = 0, cause }: { status?: number; cause?: unknown } = {}) {
+  constructor(
+    code: string,
+    message: string,
+    { status = 0, cause, details }: { status?: number; cause?: unknown; details?: Record<string, unknown> } = {},
+  ) {
     super(message);
     this.name = "EventEditorApiError";
     this.code = code;
     this.status = status;
     this.cause = cause;
+    this.details = details;
   }
 }
 
@@ -52,16 +63,71 @@ export async function loadEventEditorLibrary({
   return response.json() as Promise<EventEditorLibraryResponse>;
 }
 
+export async function validateEventEditorDraft(
+  request: EventEditorSaveRequest,
+  options: { baseUrl?: string; fetchImpl?: FetchImpl } = {},
+): Promise<EventEditorValidateDraftResponse> {
+  return postEventEditorJson("/api/event-editor/validate-draft", request, options);
+}
+
+export async function saveEventEditorDraft(
+  request: EventEditorSaveRequest,
+  options: { baseUrl?: string; fetchImpl?: FetchImpl } = {},
+): Promise<EventEditorSaveResponse> {
+  return postEventEditorJson("/api/event-editor/save", request, options);
+}
+
+async function postEventEditorJson<ResponseBody>(
+  path: string,
+  body: EventEditorSaveRequest,
+  {
+    baseUrl = DEFAULT_HELPER_BASE_URL,
+    fetchImpl = globalThis.fetch.bind(globalThis),
+  }: {
+    baseUrl?: string;
+    fetchImpl?: FetchImpl;
+  },
+): Promise<ResponseBody> {
+  let response: Response;
+
+  try {
+    response = await fetchImpl(`${trimTrailingSlash(baseUrl)}${path}`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new EventEditorApiError(
+      "helper_unavailable",
+      `Unable to reach the local event editor helper. Start it with ${HELPER_START_COMMAND}, then refresh this page.`,
+      { cause: error },
+    );
+  }
+
+  if (!response.ok) {
+    const helperError = await readHelperError(response);
+    throw new EventEditorApiError(
+      helperError.code,
+      helperError.message || `Helper returned HTTP ${response.status}.`,
+      { status: response.status, details: helperError.details },
+    );
+  }
+
+  return response.json() as Promise<ResponseBody>;
+}
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
-async function readHelperError(response: Response): Promise<{ code: string; message: string }> {
+async function readHelperError(response: Response): Promise<{ code: string; message: string; details?: Record<string, unknown> }> {
   try {
-    const body = (await response.json()) as { error?: { code?: string; message?: string } };
+    const body = (await response.json()) as { error?: { code?: string; message?: string }; [key: string]: unknown };
+    const { error, ...details } = body;
     return {
-      code: body.error?.code ?? "helper_error",
-      message: body.error?.message ?? "",
+      code: error?.code ?? "helper_error",
+      message: error?.message ?? "",
+      details: Object.keys(details).length > 0 ? details : undefined,
     };
   } catch {
     return {

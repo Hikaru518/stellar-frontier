@@ -86,6 +86,159 @@ describe("EventEditorPage", () => {
     });
   });
 
+  it("shows the content write target and a change summary when the active asset has an unsaved draft", async () => {
+    const asset = createDefinitionAsset("forest.signal", { data: { id: "forest.signal", status: "ready", title: "Old title" } });
+    const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+    await changeRawJson({ ...asset.data, title: "New title" });
+
+    const savePanel = await screen.findByLabelText("Save draft panel");
+    expect(savePanel).toHaveTextContent("Writes to content target");
+    expect(savePanel).toHaveTextContent("content/events/definitions/forest.json");
+    expect(savePanel).toHaveTextContent("Changed fields: title");
+    expect(within(savePanel).getByRole("button", { name: "Save draft to content" })).toBeEnabled();
+  });
+
+  it("keeps the draft and surfaces validation issues when save preflight fails", async () => {
+    const asset = createDefinitionAsset("forest.signal", { data: { id: "forest.signal", status: "ready", title: "Old title" } });
+    const validation = {
+      passed: false,
+      issues: [
+        {
+          severity: "error" as const,
+          code: "schema_validation_failed",
+          message: "title is required",
+          file_path: asset.file_path,
+          asset_type: asset.asset_type,
+          asset_id: asset.id,
+          json_path: `${asset.json_path}/title`,
+        },
+      ],
+      command: "npm run validate:content",
+    };
+    const validateDraft = vi.fn(async () => ({
+      status: "validated" as const,
+      file_path: asset.file_path,
+      asset_type: "event_definition" as const,
+      asset_id: asset.id,
+      validation,
+    }));
+    const saveDraftAsset = vi.fn();
+    const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} validateDraft={validateDraft} saveDraftAsset={saveDraftAsset} />);
+    await changeRawJson({ ...asset.data, title: "" });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft to content" }));
+
+    expect(await screen.findByText("Draft did not pass validation.")).toBeInTheDocument();
+    expect(screen.getByText("schema_validation_failed")).toBeInTheDocument();
+    expect(saveDraftAsset).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem(buildDraftStorageKey(asset))).toContain('"title":""');
+  });
+
+  it("reports hash conflicts without overwriting the target asset", async () => {
+    const asset = createDefinitionAsset("forest.signal", { data: { id: "forest.signal", status: "ready", title: "Old title" } });
+    const validateDraft = vi.fn(async () => ({
+      status: "validated" as const,
+      file_path: asset.file_path,
+      asset_type: "event_definition" as const,
+      asset_id: asset.id,
+      validation: { passed: true, issues: [], command: "npm run validate:content" },
+    }));
+    const saveDraftAsset = vi.fn(async () =>
+      Promise.reject(
+        Object.assign(new Error("The target asset changed after this draft was created."), {
+          name: "EventEditorApiError",
+          code: "conflict",
+          status: 409,
+          details: { current_base_hash: "c".repeat(64) },
+        }),
+      ),
+    );
+    const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} validateDraft={validateDraft} saveDraftAsset={saveDraftAsset} />);
+    await changeRawJson({ ...asset.data, title: "Attempted overwrite" });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft to content" }));
+
+    expect(await screen.findByText("Hash conflict detected.")).toBeInTheDocument();
+    expect(screen.getByText(/Reload the library or manually merge/)).toBeInTheDocument();
+    expect(window.localStorage.getItem(buildDraftStorageKey(asset))).toContain("Attempted overwrite");
+    expect(loadLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the draft and gives a helper startup hint when saving cannot reach the helper", async () => {
+    const asset = createDefinitionAsset("forest.signal", { data: { id: "forest.signal", status: "ready", title: "Old title" } });
+    const validateDraft = vi.fn(async () => ({
+      status: "validated" as const,
+      file_path: asset.file_path,
+      asset_type: "event_definition" as const,
+      asset_id: asset.id,
+      validation: { passed: true, issues: [], command: "npm run validate:content" },
+    }));
+    const saveDraftAsset = vi.fn(async () =>
+      Promise.reject(
+        Object.assign(new Error("Unable to reach helper."), {
+          name: "EventEditorApiError",
+          code: "helper_unavailable",
+          status: 0,
+        }),
+      ),
+    );
+    const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} validateDraft={validateDraft} saveDraftAsset={saveDraftAsset} />);
+    await changeRawJson({ ...asset.data, title: "Local edit while helper offline" });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft to content" }));
+
+    expect(await screen.findByText(/Helper unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/npm run editor:helper/)).toBeInTheDocument();
+    expect(window.localStorage.getItem(buildDraftStorageKey(asset))).toContain("Local edit while helper offline");
+    expect(loadLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the saved draft and refreshes the library to the new base hash", async () => {
+    const asset = createDefinitionAsset("forest.signal", {
+      base_hash: "base-a",
+      data: { id: "forest.signal", status: "ready", title: "Old title" },
+    });
+    const refreshedAsset = createDefinitionAsset("forest.signal", {
+      base_hash: "base-b",
+      data: { id: "forest.signal", status: "ready", title: "Saved title" },
+    });
+    const loadLibrary = vi
+      .fn<() => Promise<EventEditorLibraryResponse>>()
+      .mockResolvedValueOnce(createLibraryResponse({ definitions: [asset] }))
+      .mockResolvedValueOnce(createLibraryResponse({ definitions: [refreshedAsset] }));
+    const validateDraft = vi.fn(async () => ({
+      status: "validated" as const,
+      file_path: asset.file_path,
+      asset_type: "event_definition" as const,
+      asset_id: asset.id,
+      validation: { passed: true, issues: [], command: "npm run validate:content" },
+    }));
+    const saveDraftAsset = vi.fn(async () => ({
+      status: "saved" as const,
+      file_path: asset.file_path,
+      asset_type: "event_definition" as const,
+      asset_id: asset.id,
+      base_hash: "base-b",
+      validation: { passed: true, issues: [], command: "npm run validate:content" },
+    }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} validateDraft={validateDraft} saveDraftAsset={saveDraftAsset} />);
+    await changeRawJson({ ...asset.data, title: "Saved title" });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft to content" }));
+
+    expect(await screen.findByText("Saved to content/events/definitions/forest.json.")).toBeInTheDocument();
+    expect(window.localStorage.getItem(buildDraftStorageKey(asset))).toBeNull();
+    expect((screen.getByLabelText("Raw JSON draft") as HTMLTextAreaElement).value).toContain("Saved title");
+    expect(screen.getByLabelText("Selection summary")).toHaveTextContent("base-b");
+    expect(loadLibrary).toHaveBeenCalledTimes(2);
+    expect(validateDraft.mock.invocationCallOrder[0]).toBeLessThan(saveDraftAsset.mock.invocationCallOrder[0]);
+  });
+
   it("updates the selection summary from the event browser and keeps legacy assets read-only", async () => {
     const definition = createDefinitionAsset("forest.signal", {
       data: {
@@ -197,6 +350,13 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
     validation: { passed: true, issues: [] },
     ...overrides,
   };
+}
+
+async function changeRawJson(nextDraft: unknown): Promise<void> {
+  const draftInput = await screen.findByLabelText("Raw JSON draft");
+  fireEvent.change(draftInput, {
+    target: { value: JSON.stringify(nextDraft, null, 2) },
+  });
 }
 
 function createAsset(id: string, overrides: Partial<EditorEventAsset<unknown>> = {}): EditorEventAsset<unknown> {

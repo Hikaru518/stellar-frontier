@@ -212,6 +212,7 @@ p {
 
 .event-browser,
 .selection-summary,
+.save-panel,
 .event-inspector {
   border: 1px dashed #b45b13;
   background: rgba(255, 255, 255, 0.28);
@@ -591,6 +592,11 @@ p {
 
 .status-error {
   color: #a13822;
+  font-weight: 700;
+}
+
+.status-success-text {
+  color: #245d3a;
   font-weight: 700;
 }
 

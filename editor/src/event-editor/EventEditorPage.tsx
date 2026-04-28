@@ -1,15 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
-import { EventEditorApiError, HELPER_START_COMMAND, loadEventEditorLibrary } from "./apiClient";
-import { loadDraft, saveDraft } from "./draftStorage";
+import {
+  EventEditorApiError,
+  HELPER_START_COMMAND,
+  loadEventEditorLibrary,
+  saveEventEditorDraft,
+  validateEventEditorDraft,
+} from "./apiClient";
+import { clearDraft, loadDraft, saveDraft } from "./draftStorage";
 import EventBrowser from "./EventBrowser";
 import EventDetailWorkspace from "./EventDetailWorkspace";
 import GraphPanel from "./GraphPanel";
 import PreviewPanel from "./PreviewPanel";
 import SchemaPanel from "./SchemaPanel";
-import type { EditorEventAsset, EventEditorLibraryResponse, ValidationIssue } from "./types";
+import SavePanel, { type SavePanelState } from "./SavePanel";
+import type {
+  EditorEventAsset,
+  EventEditorDraftRequest,
+  EventEditorLibraryResponse,
+  EventEditorSaveResponse,
+  EventEditorValidateDraftResponse,
+  ValidationIssue,
+  ValidationReport,
+} from "./types";
 import ValidationPanel from "./ValidationPanel";
 
 type LoadLibrary = () => Promise<EventEditorLibraryResponse>;
+type ValidateDraft = (request: EventEditorDraftRequest) => Promise<EventEditorValidateDraftResponse>;
+type SaveDraftAsset = (request: EventEditorDraftRequest) => Promise<EventEditorSaveResponse>;
+
+interface EventEditorPageProps {
+  loadLibrary?: LoadLibrary;
+  validateDraft?: ValidateDraft;
+  saveDraftAsset?: SaveDraftAsset;
+}
 
 interface DraftState {
   restoredCount: number;
@@ -20,7 +43,11 @@ interface DraftState {
 
 type InspectorTab = "schema" | "preview" | "graph" | "validation";
 
-export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }: { loadLibrary?: LoadLibrary }) {
+export default function EventEditorPage({
+  loadLibrary = loadEventEditorLibrary,
+  validateDraft = validateEventEditorDraft,
+  saveDraftAsset = saveEventEditorDraft,
+}: EventEditorPageProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [library, setLibrary] = useState<EventEditorLibraryResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -31,6 +58,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     selectedJsonPath: null,
   });
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("schema");
+  const [saveState, setSaveState] = useState<SavePanelState>({ status: "idle" });
 
   useEffect(() => {
     let isActive = true;
@@ -43,21 +71,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
           return;
         }
 
-        const editableAssets = getEditableAssets(nextLibrary);
-        const browserAssets = getBrowserAssets(nextLibrary);
-        const restoredDrafts = editableAssets
-          .map((asset) => ({ asset, draft: loadDraft<unknown>(asset) }))
-          .filter((entry): entry is { asset: EditorEventAsset<unknown>; draft: unknown } => entry.draft !== null);
-        const activeAsset = restoredDrafts[0]?.asset ?? editableAssets[0] ?? browserAssets[0] ?? null;
-        const activeDraft = activeAsset && canEditAsset(activeAsset) ? (loadDraft(activeAsset) ?? activeAsset.data) : null;
-
-        setLibrary(nextLibrary);
-        setDraftState({
-          restoredCount: restoredDrafts.length,
-          activeAsset,
-          draft: activeDraft,
-          selectedJsonPath: null,
-        });
+        applyLoadedLibrary(nextLibrary);
         setStatus("loaded");
       })
       .catch((nextError: unknown) => {
@@ -75,6 +89,13 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
   }, [loadLibrary]);
 
   const browserAssets = useMemo(() => (library ? getBrowserAssets(library) : []), [library]);
+  const hasUnsavedDraft =
+    draftState.activeAsset !== null &&
+    draftState.draft !== null &&
+    canSaveAsset(draftState.activeAsset) &&
+    !jsonEqual(draftState.activeAsset.data, draftState.draft);
+  const changeSummary =
+    draftState.activeAsset && draftState.draft !== null ? buildChangeSummary(draftState.activeAsset.data, draftState.draft) : "";
 
   if (status === "loading") {
     return (
@@ -134,6 +155,10 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
         <div className="event-editor-detail">
           {draftState.activeAsset ? <SelectionSummary asset={draftState.activeAsset} /> : null}
 
+          {draftState.activeAsset && canSaveAsset(draftState.activeAsset) && (hasUnsavedDraft || saveState.status === "success") ? (
+            <SavePanel asset={draftState.activeAsset} changeSummary={changeSummary} state={saveState} onSave={saveActiveDraft} />
+          ) : null}
+
           {draftState.activeAsset && library ? (
             <EventDetailWorkspace
               asset={draftState.activeAsset}
@@ -161,6 +186,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
 
   function selectAsset(asset: EditorEventAsset<unknown>): void {
     const draft = canEditAsset(asset) ? (loadDraft(asset) ?? asset.data) : null;
+    setSaveState({ status: "idle" });
     setDraftState((current) => ({
       ...current,
       activeAsset: asset,
@@ -186,7 +212,100 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     }
 
     saveDraft(draftState.activeAsset, draft);
+    setSaveState({ status: "idle" });
     setDraftState((current) => ({ ...current, draft }));
+  }
+
+  async function saveActiveDraft(): Promise<void> {
+    const asset = draftState.activeAsset;
+    const draft = draftState.draft;
+    if (!asset || !canSaveAsset(asset) || draft === null) {
+      return;
+    }
+
+    const request = buildSaveRequest(asset, draft, buildChangeSummary(asset.data, draft));
+
+    try {
+      setSaveState({ status: "validating" });
+      const validationResponse = await validateDraft(request);
+      applyValidationReport(validationResponse.validation);
+      if (!validationResponse.validation.passed) {
+        setInspectorTab("validation");
+        setSaveState({ status: "validation_failed", message: "Draft did not pass validation." });
+        return;
+      }
+
+      setSaveState({ status: "saving" });
+      const saveResponse = await saveDraftAsset(request);
+      applyValidationReport(saveResponse.validation);
+      clearDraft(asset);
+
+      const refreshedLibrary = await loadLibrary();
+      applyLoadedLibrary(refreshedLibrary, asset);
+      setSaveState({ status: "success", message: `Saved to ${saveResponse.file_path}.` });
+    } catch (nextError) {
+      handleSaveError(nextError);
+    }
+  }
+
+  function applyLoadedLibrary(nextLibrary: EventEditorLibraryResponse, preferredAsset?: EditorEventAsset<unknown>): void {
+    const editableAssets = getEditableAssets(nextLibrary);
+    const browserAssets = getBrowserAssets(nextLibrary);
+    const restoredDrafts = editableAssets
+      .map((asset) => ({ asset, draft: loadDraft<unknown>(asset) }))
+      .filter((entry): entry is { asset: EditorEventAsset<unknown>; draft: unknown } => entry.draft !== null);
+    const refreshedAsset = preferredAsset ? findMatchingAsset(nextLibrary, preferredAsset) : null;
+    const activeAsset = refreshedAsset ?? restoredDrafts[0]?.asset ?? editableAssets[0] ?? browserAssets[0] ?? null;
+    const activeDraft = activeAsset && canEditAsset(activeAsset) ? (loadDraft(activeAsset) ?? activeAsset.data) : null;
+
+    setLibrary(nextLibrary);
+    setDraftState({
+      restoredCount: restoredDrafts.length,
+      activeAsset,
+      draft: activeDraft,
+      selectedJsonPath: null,
+    });
+  }
+
+  function applyValidationReport(validation: ValidationReport): void {
+    setLibrary((current) => (current ? { ...current, validation } : current));
+  }
+
+  function handleSaveError(nextError: unknown): void {
+    const apiError = nextError as Partial<EventEditorApiError> & { details?: Record<string, unknown> };
+    const validation = apiError.details?.validation as ValidationReport | undefined;
+
+    if (validation) {
+      applyValidationReport(validation);
+      setInspectorTab("validation");
+    }
+
+    if (apiError.code === "validation_failed") {
+      setSaveState({ status: "validation_failed", message: "Draft did not pass validation." });
+      return;
+    }
+
+    if (apiError.code === "conflict") {
+      setSaveState({
+        status: "conflict",
+        message: "Hash conflict detected.",
+        currentBaseHash: typeof apiError.details?.current_base_hash === "string" ? apiError.details.current_base_hash : undefined,
+      });
+      return;
+    }
+
+    if (apiError.code === "helper_unavailable") {
+      setSaveState({
+        status: "error",
+        message: `Helper unavailable. Start it with ${HELPER_START_COMMAND}, then retry the save.`,
+      });
+      return;
+    }
+
+    setSaveState({
+      status: "error",
+      message: nextError instanceof Error ? nextError.message : "Save failed for an unknown reason.",
+    });
   }
 }
 
@@ -268,6 +387,10 @@ function SelectionSummary({ asset }: { asset: EditorEventAsset<unknown> }) {
           <dt>Edit mode</dt>
           <dd>{canEditAsset(asset) ? "Local draft scratchpad" : "Read-only legacy format"}</dd>
         </div>
+        <div>
+          <dt>Base hash</dt>
+          <dd>{asset.base_hash}</dd>
+        </div>
       </dl>
     </div>
   );
@@ -299,8 +422,39 @@ function canEditAsset(asset: EditorEventAsset<unknown>): boolean {
   return asset.editable && asset.asset_type !== "legacy_event";
 }
 
+function canSaveAsset(asset: EditorEventAsset<unknown>): asset is EditorEventAsset<unknown> & { asset_type: EventEditorDraftRequest["asset_type"] } {
+  return asset.editable && (asset.asset_type === "event_definition" || asset.asset_type === "call_template");
+}
+
+function buildSaveRequest(
+  asset: EditorEventAsset<unknown> & { asset_type: EventEditorDraftRequest["asset_type"] },
+  draft: unknown,
+  changeSummary: string,
+): EventEditorDraftRequest {
+  return {
+    asset_type: asset.asset_type,
+    asset_id: asset.id,
+    file_path: asset.file_path,
+    json_path: asset.json_path,
+    base_hash: asset.base_hash,
+    draft,
+    change_summary: changeSummary,
+  };
+}
+
 function draftForAsset(asset: EditorEventAsset<unknown>): unknown | null {
   return canEditAsset(asset) ? (loadDraft(asset) ?? asset.data) : null;
+}
+
+function findMatchingAsset(
+  library: EventEditorLibraryResponse,
+  target: Pick<EditorEventAsset<unknown>, "asset_type" | "id" | "file_path">,
+): EditorEventAsset<unknown> | null {
+  return (
+    getAllAssets(library).find(
+      (asset) => asset.asset_type === target.asset_type && asset.id === target.id && asset.file_path === target.file_path,
+    ) ?? null
+  );
 }
 
 function findAssetForIssue(library: EventEditorLibraryResponse | null, issue: ValidationIssue): EditorEventAsset<unknown> | null {
@@ -313,6 +467,38 @@ function findAssetForIssue(library: EventEditorLibraryResponse | null, issue: Va
       (asset) => asset.id === issue.asset_id && (!issue.asset_type || asset.asset_type === issue.asset_type),
     ) ?? null
   );
+}
+
+function getAllAssets(library: EventEditorLibraryResponse): EditorEventAsset<unknown>[] {
+  return [...library.definitions, ...library.call_templates, ...library.presets, ...library.legacy_events];
+}
+
+function buildChangeSummary(original: unknown, draft: unknown): string {
+  const fields = changedTopLevelFields(original, draft);
+
+  if (fields.length === 0) {
+    return "No changes detected.";
+  }
+
+  return `Changed fields: ${fields.join(", ")}`;
+}
+
+function changedTopLevelFields(original: unknown, draft: unknown): string[] {
+  if (!isRecord(original) || !isRecord(draft)) {
+    return jsonEqual(original, draft) ? [] : ["value"];
+  }
+
+  return Array.from(new Set([...Object.keys(original), ...Object.keys(draft)]))
+    .filter((key) => !jsonEqual(original[key], draft[key]))
+    .sort((first, second) => first.localeCompare(second));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonEqual(first: unknown, second: unknown): boolean {
+  return JSON.stringify(first) === JSON.stringify(second);
 }
 
 function formatCount(count: number, singular: string): string {

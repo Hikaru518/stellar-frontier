@@ -41,6 +41,35 @@ export interface ValidationReport {
   command?: string;
 }
 
+export interface EventEditorDraftRequest {
+  asset_type: "event_definition" | "call_template";
+  asset_id: string;
+  file_path: string;
+  json_path: string;
+  base_hash: string;
+  draft: unknown;
+  change_summary?: string;
+}
+
+export type EventEditorSaveRequest = EventEditorDraftRequest;
+
+export interface EventEditorValidateDraftResponse {
+  status: "validated";
+  file_path: string;
+  asset_type: EventEditorDraftRequest["asset_type"];
+  asset_id: string;
+  validation: ValidationReport;
+}
+
+export interface EventEditorSaveResponse {
+  status: "saved";
+  file_path: string;
+  asset_type: EventEditorDraftRequest["asset_type"];
+  asset_id: string;
+  base_hash: string;
+  validation: ValidationReport;
+}
+
 export interface EventEditorLibraryResponse {
   manifest: EventManifest;
   domains: string[];

@@ -23,7 +23,7 @@ source:
 | 7 | T007 | 实现 Event Browser 与搜索筛选 | completed | 1 |
 | 8 | T008 | 实现表单与 JSON 并排编辑工作区 | completed | 1 |
 | 9 | T009 | 实现 Schema、Preview、Graph、Validation 侧栏 | completed | 1 |
-| 10 | T010 | 打通保存 UX、冲突处理与刷新流程 | pending | 0 |
+| 10 | T010 | 打通保存 UX、冲突处理与刷新流程 | completed | 1 |
 | 11 | T011 | 集成收口与端到端验收 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -105,3 +105,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 实现右侧 inspector 标签栏，包含 Schema、Preview、Graph、Validation 面板；Preview 通过 adapter 包装 runtime call renderer，只渲染对白/选项并处理 sample context 缺失；validation issue 点击可切换 asset 并显示 json_path。
 - 质量检查: `npm run lint`、`npm run test`、`npm run editor:build` 均通过；`editor:build` 有 Vite chunk-size warning 但退出码为 0。
+
+### T010: 打通保存 UX、冲突处理与刷新流程
+- 状态: completed
+- 开始时间: 2026-04-28 16:10
+- 完成时间: 2026-04-28 16:10
+- 尝试次数: 1
+- Monkey summary: 打通前端保存 UX，未保存 draft 显示写入 content 目标路径与摘要，按 `validate-draft` 到 `save` 执行，覆盖 validation failure、hash conflict、helper offline、成功刷新和清除草稿；legacy readonly asset 无保存入口。
+- 质量检查: `npm run validate:content`、`npm run lint`、`npm run test`、`npm run editor:build` 均通过；`editor:build` 有 Vite chunk-size warning 但退出码为 0。

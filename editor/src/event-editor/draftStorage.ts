@@ -16,6 +16,10 @@ export function saveDraft<T>(asset: EditorEventAsset<unknown>, draft: T): void {
   getStorage()?.setItem(buildDraftStorageKey(asset), JSON.stringify(draft));
 }
 
+export function clearDraft(asset: EditorEventAsset<unknown>): void {
+  getStorage()?.removeItem(buildDraftStorageKey(asset));
+}
+
 export function loadDraft<T>(asset: EditorEventAsset<unknown>): T | null {
   const storage = getStorage();
   const key = buildDraftStorageKey(asset);

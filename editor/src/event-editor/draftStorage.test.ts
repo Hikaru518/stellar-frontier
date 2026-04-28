@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildDraftStorageKey, loadDraft, saveDraft } from "./draftStorage";
+import { buildDraftStorageKey, clearDraft, loadDraft, saveDraft } from "./draftStorage";
 import type { EditorEventAsset } from "./types";
 
 describe("event editor draft storage", () => {
@@ -31,6 +31,16 @@ describe("event editor draft storage", () => {
     const secondAsset = createAsset({ id: "forest.signal", file_path: "content/events/definitions/cave.json" });
 
     expect(buildDraftStorageKey(firstAsset)).not.toBe(buildDraftStorageKey(secondAsset));
+  });
+
+  it("clears a saved draft after the helper writes it to content", () => {
+    const asset = createAsset({ base_hash: "base-a" });
+    saveDraft(asset, { id: "forest.signal", status: "draft", notes: "saved edit" });
+
+    clearDraft(asset);
+
+    expect(loadDraft(asset)).toBeNull();
+    expect(window.localStorage.getItem(buildDraftStorageKey(asset))).toBeNull();
   });
 });
 
