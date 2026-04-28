@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { loadEventEditorLibrary } from "./contentStore.mjs";
 
 describe("contentStore", () => {
-  const repoRoot = path.resolve(import.meta.dirname, "../..");
+  const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
   it("loads structured event content, manifest, schemas, and validation report", async () => {
     const library = await loadEventEditorLibrary({ repoRoot });

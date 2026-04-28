@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
-import { formatEventManifestIssues, validateEventManifest } from "../../../scripts/generate-event-content-manifest.mjs";
+import { formatEventManifestIssues, validateEventManifest } from "../../editor/scripts/generate-event-content-manifest.mjs";
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const root = process.env.VALIDATE_CONTENT_ROOT

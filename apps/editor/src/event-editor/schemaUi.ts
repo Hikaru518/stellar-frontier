@@ -94,7 +94,8 @@ function getStructuredAssetSchema(asset: EditorEventAsset<unknown>, library: Eve
 
 function getDefinitionSchema(library: EventEditorLibraryResponse, schemaPath: string, definitionName: string): RJSFSchema | null {
   const rootSchema = library.schemas[schemaPath] as RJSFSchema | undefined;
-  const definition = getDefs(rootSchema)?.[definitionName];
+  const rootDefs = getDefs(rootSchema);
+  const definition = rootDefs?.[definitionName];
 
   if (!definition || typeof definition !== "object") {
     return null;
@@ -102,6 +103,7 @@ function getDefinitionSchema(library: EventEditorLibraryResponse, schemaPath: st
 
   return cloneSchema({
     ...(definition as RJSFSchema),
+    $defs: rootDefs,
     title: (definition as RJSFSchema).title ?? titleFromDefinitionName(definitionName),
   });
 }
@@ -118,6 +120,24 @@ function sanitizeEventDefinitionSchema(schema: RJSFSchema): RJSFSchema {
       type: "array",
       title: "Effect groups",
       items: { type: "object" },
+    };
+  }
+
+  if (properties.trigger) {
+    properties.trigger = {
+      type: "object",
+      title: "Trigger",
+      properties: {
+        type: {
+          type: "string",
+          title: "Trigger type",
+        },
+        conditions: {
+          type: "array",
+          title: "Conditions",
+          items: { type: "object" },
+        },
+      },
     };
   }
 
@@ -161,9 +181,9 @@ function inferSchemaFromValue(value: unknown, title: string): RJSFSchema {
   };
 }
 
-function getDefs(schema: RJSFSchema | undefined): Record<string, unknown> | undefined {
+function getDefs(schema: RJSFSchema | undefined): RJSFSchema["$defs"] | undefined {
   const maybeDefs = schema?.$defs;
-  return maybeDefs && typeof maybeDefs === "object" && !Array.isArray(maybeDefs) ? (maybeDefs as Record<string, unknown>) : undefined;
+  return maybeDefs && typeof maybeDefs === "object" && !Array.isArray(maybeDefs) ? maybeDefs : undefined;
 }
 
 function getSchemaProperties(schema: RJSFSchema | undefined): Record<string, RJSFSchema> {

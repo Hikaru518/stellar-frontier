@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createPathGuard } from "./pathGuard.mjs";
 
 describe("pathGuard", () => {
-  const repoRoot = path.resolve(import.meta.dirname, "../..");
+  const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
   it("resolves repository-relative paths inside allowed directories", () => {
     const guard = createPathGuard(repoRoot, ["content/events"]);

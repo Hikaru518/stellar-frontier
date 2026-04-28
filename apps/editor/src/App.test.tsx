@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
@@ -12,18 +12,21 @@ describe("Editor App", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
   });
 
-  it("renders the event editor shell with future editors disabled", () => {
+  it("renders top module navigation with future editors disabled", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Game Editor" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Event Editor" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "Character Editor" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Map Editor" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Item Editor" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "NPC Editor" })).toBeDisabled();
+    const moduleNav = screen.getByRole("navigation", { name: "Editor modules" });
+    expect(within(moduleNav).getByRole("button", { name: "Event Editor" })).toHaveAttribute("aria-current", "page");
+    expect(within(moduleNav).getByRole("button", { name: "Character Editor" })).toBeDisabled();
+    expect(within(moduleNav).getByRole("button", { name: "Map Editor" })).toBeDisabled();
+    expect(within(moduleNav).getByRole("button", { name: "Item Editor" })).toBeDisabled();
+    expect(within(moduleNav).getByRole("button", { name: "NPC Editor" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Collapse module sidebar" })).not.toBeInTheDocument();
     expect(screen.getByText("Loading event library...")).toBeInTheDocument();
   });
 });

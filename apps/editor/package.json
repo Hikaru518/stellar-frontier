@@ -4,10 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --config ../vite.editor.config.ts",
-    "build": "tsc -p ../tsconfig.editor.json && vite build --config ../vite.editor.config.ts",
-    "lint": "tsc -p ../tsconfig.editor.json",
-    "test": "vitest run --config ../vite.editor.config.ts"
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "helper": "node helper/server.mjs",
+    "generate:event-content": "node scripts/generate-event-content-manifest.mjs"
   },
   "dependencies": {
     "@rjsf/core": "^6.5.1",

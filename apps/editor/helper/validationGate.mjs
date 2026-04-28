@@ -8,7 +8,7 @@ const DEFAULT_COMMAND = "npm run validate:content";
 let validationModulePromise;
 let contentIndexModulePromise;
 
-export async function buildValidationReport(library, { repoRoot = path.resolve(import.meta.dirname, "../..") } = {}) {
+export async function buildValidationReport(library, { repoRoot = path.resolve(import.meta.dirname, "../../..") } = {}) {
   const [validationModule, contentIndexModule] = await Promise.all([
     loadValidationModule(repoRoot),
     loadContentIndexModule(repoRoot),
@@ -40,7 +40,7 @@ export async function buildValidationReport(library, { repoRoot = path.resolve(i
 
 export async function validateContentRoot({
   contentRoot,
-  sourceRoot = path.resolve(import.meta.dirname, "../.."),
+  sourceRoot = path.resolve(import.meta.dirname, "../../.."),
   target,
 } = {}) {
   if (!contentRoot) {

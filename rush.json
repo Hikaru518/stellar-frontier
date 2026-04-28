@@ -21,7 +21,7 @@
     },
     {
       "packageName": "@stellar-frontier/editor",
-      "projectFolder": "editor",
+      "projectFolder": "apps/editor",
       "tags": ["tool", "editor"]
     },
     {

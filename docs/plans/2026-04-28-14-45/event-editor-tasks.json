@@ -7,15 +7,15 @@
     "summary": "把现有结构化事件 domain 从手写静态 import 迁移到 manifest + generated module，为新建 domain 打基础。",
     "scope": [
       "新增 content/events/manifest.json，覆盖现有 definitions、call_templates 与 forest presets。",
-      "新增 scripts/generate-event-content-manifest.mjs，生成 src/content/generated/eventContentManifest.ts。",
-      "调整 src/content/contentData.ts，让结构化事件内容来自生成模块。",
+      "新增 apps/editor/scripts/generate-event-content-manifest.mjs，生成 apps/pc-client/src/content/generated/eventContentManifest.ts。",
+      "调整 apps/pc-client/src/content/contentData.ts，让结构化事件内容来自生成模块。",
       "让内容校验或生成脚本能发现 manifest 与目录文件不一致。"
     ],
     "suggested_files": [
       "content/events/manifest.json",
-      "scripts/generate-event-content-manifest.mjs",
-      "src/content/generated/eventContentManifest.ts",
-      "src/content/contentData.ts",
+      "apps/editor/scripts/generate-event-content-manifest.mjs",
+      "apps/pc-client/src/content/generated/eventContentManifest.ts",
+      "apps/pc-client/src/content/contentData.ts",
       "scripts/validate-content.mjs"
     ],
     "acceptance_criteria": [
@@ -35,7 +35,7 @@
     "summary": "在根目录建立独立 editor app，复用仓库依赖和控制台视觉，但不挂载玩家 App。",
     "scope": [
       "新增 editor/index.html、editor/src/main.tsx 与 editor/src/App.tsx。",
-      "新增 vite.editor.config.ts 与 tsconfig.editor.json，确保 editor 进入 typecheck。",
+      "新增 apps/editor/vite.config.ts 与 apps/editor/tsconfig.json，确保 editor 进入 typecheck。",
       "新增 editor:dev、editor:build 等 npm scripts。",
       "安装并接入 RJSF 基础依赖，为后续表单任务预留入口。",
       "复用或镜像 src/components/Layout.tsx 与 src/styles.css 的控制台风格。"
@@ -43,11 +43,11 @@
     "suggested_files": [
       "package.json",
       "package-lock.json",
-      "vite.editor.config.ts",
-      "tsconfig.editor.json",
-      "editor/index.html",
-      "editor/src/main.tsx",
-      "editor/src/App.tsx"
+      "apps/editor/vite.config.ts",
+      "apps/editor/tsconfig.json",
+      "apps/editor/index.html",
+      "apps/editor/src/main.tsx",
+      "apps/editor/src/App.tsx"
     ],
     "acceptance_criteria": [
       "npm run editor:dev 能启动 editor 入口。",
@@ -74,11 +74,11 @@
       "实现路径白名单与仓库根目录约束。"
     ],
     "suggested_files": [
-      "editor/helper/server.mjs",
-      "editor/helper/contentStore.mjs",
-      "editor/helper/pathGuard.mjs",
-      "editor/helper/validationGate.mjs",
-      "editor/src/event-editor/types.ts"
+      "apps/editor/helper/server.mjs",
+      "apps/editor/helper/contentStore.mjs",
+      "apps/editor/helper/pathGuard.mjs",
+      "apps/editor/helper/validationGate.mjs",
+      "apps/editor/src/event-editor/types.ts"
     ],
     "acceptance_criteria": [
       "helper 只监听 127.0.0.1，并能返回 health 信息。",
@@ -105,11 +105,11 @@
       "把 schema errors 与 EventValidationIssue 转为统一 ValidationIssue。"
     ],
     "suggested_files": [
-      "editor/helper/server.mjs",
-      "editor/helper/contentStore.mjs",
-      "editor/helper/validationGate.mjs",
-      "editor/helper/jsonFormat.mjs",
-      "editor/helper/hash.mjs"
+      "apps/editor/helper/server.mjs",
+      "apps/editor/helper/contentStore.mjs",
+      "apps/editor/helper/validationGate.mjs",
+      "apps/editor/helper/jsonFormat.mjs",
+      "apps/editor/helper/hash.mjs"
     ],
     "acceptance_criteria": [
       "有效 draft 保存后，目标 JSON 被格式化写入，并返回新 base_hash 与 validation report。",
@@ -136,10 +136,10 @@
       "处理 domain id 重复、非法文件名和 manifest 冲突。"
     ],
     "suggested_files": [
-      "editor/helper/server.mjs",
-      "editor/helper/manifestStore.mjs",
-      "editor/helper/validationGate.mjs",
-      "scripts/generate-event-content-manifest.mjs",
+      "apps/editor/helper/server.mjs",
+      "apps/editor/helper/manifestStore.mjs",
+      "apps/editor/helper/validationGate.mjs",
+      "apps/editor/scripts/generate-event-content-manifest.mjs",
       "content/events/manifest.json"
     ],
     "acceptance_criteria": [
@@ -168,11 +168,11 @@
       "helper 不可用时显示明确的本地启动提示。"
     ],
     "suggested_files": [
-      "editor/src/event-editor/apiClient.ts",
-      "editor/src/event-editor/types.ts",
-      "editor/src/event-editor/draftStorage.ts",
-      "editor/src/event-editor/EventEditorPage.tsx",
-      "editor/src/App.tsx"
+      "apps/editor/src/event-editor/apiClient.ts",
+      "apps/editor/src/event-editor/types.ts",
+      "apps/editor/src/event-editor/draftStorage.ts",
+      "apps/editor/src/event-editor/EventEditorPage.tsx",
+      "apps/editor/src/App.tsx"
     ],
     "acceptance_criteria": [
       "打开 Event Editor 时会请求 helper library API 并展示加载结果。",
@@ -199,11 +199,11 @@
       "选中 asset 后更新详情工作区。"
     ],
     "suggested_files": [
-      "editor/src/event-editor/EventBrowser.tsx",
-      "editor/src/event-editor/EventEditorPage.tsx",
-      "editor/src/event-editor/types.ts",
-      "editor/src/event-editor/eventFilters.ts",
-      "editor/src/event-editor/EventBrowser.test.tsx"
+      "apps/editor/src/event-editor/EventBrowser.tsx",
+      "apps/editor/src/event-editor/EventEditorPage.tsx",
+      "apps/editor/src/event-editor/types.ts",
+      "apps/editor/src/event-editor/eventFilters.ts",
+      "apps/editor/src/event-editor/EventBrowser.test.tsx"
     ],
     "acceptance_criteria": [
       "用户能按 domain、ID、trigger 和关键词筛选结构化事件。",
@@ -231,11 +231,11 @@
       "表单修改与 JSON 修改共享同一份 draft。"
     ],
     "suggested_files": [
-      "editor/src/event-editor/EventDetailWorkspace.tsx",
-      "editor/src/event-editor/JsonDraftPanel.tsx",
-      "editor/src/event-editor/rjsfWidgets.tsx",
-      "editor/src/event-editor/schemaUi.ts",
-      "editor/src/event-editor/EventDetailWorkspace.test.tsx"
+      "apps/editor/src/event-editor/EventDetailWorkspace.tsx",
+      "apps/editor/src/event-editor/JsonDraftPanel.tsx",
+      "apps/editor/src/event-editor/rjsfWidgets.tsx",
+      "apps/editor/src/event-editor/schemaUi.ts",
+      "apps/editor/src/event-editor/EventDetailWorkspace.test.tsx"
     ],
     "acceptance_criteria": [
       "选中 editable asset 后，中栏始终并排显示表单与 JSON。",
@@ -263,11 +263,11 @@
       "ValidationPanel 展示 structured issues，并能定位到 asset/json_path。"
     ],
     "suggested_files": [
-      "editor/src/event-editor/SchemaPanel.tsx",
-      "editor/src/event-editor/PreviewPanel.tsx",
-      "editor/src/event-editor/GraphPanel.tsx",
-      "editor/src/event-editor/ValidationPanel.tsx",
-      "editor/src/event-editor/previewRenderer.ts"
+      "apps/editor/src/event-editor/SchemaPanel.tsx",
+      "apps/editor/src/event-editor/PreviewPanel.tsx",
+      "apps/editor/src/event-editor/GraphPanel.tsx",
+      "apps/editor/src/event-editor/ValidationPanel.tsx",
+      "apps/editor/src/event-editor/previewRenderer.ts"
     ],
     "acceptance_criteria": [
       "用户能在右侧标签查看当前 asset 的 schema 信息、validation issues 和 graph 结构。",
@@ -297,11 +297,11 @@
       "确保 legacy readonly asset 没有保存入口。"
     ],
     "suggested_files": [
-      "editor/src/event-editor/EventEditorPage.tsx",
-      "editor/src/event-editor/EventDetailWorkspace.tsx",
-      "editor/src/event-editor/SavePanel.tsx",
-      "editor/src/event-editor/apiClient.ts",
-      "editor/src/event-editor/draftStorage.ts"
+      "apps/editor/src/event-editor/EventEditorPage.tsx",
+      "apps/editor/src/event-editor/EventDetailWorkspace.tsx",
+      "apps/editor/src/event-editor/SavePanel.tsx",
+      "apps/editor/src/event-editor/apiClient.ts",
+      "apps/editor/src/event-editor/draftStorage.ts"
     ],
     "acceptance_criteria": [
       "有未保存 draft 时，页面显示目标文件和变更摘要。",
@@ -329,8 +329,8 @@
       "补充必要的开发文档或 README 片段。"
     ],
     "suggested_files": [
-      "editor/README.md",
-      "editor/src/event-editor/*.test.tsx",
+      "apps/editor/README.md",
+      "apps/editor/src/event-editor/*.test.tsx",
       "scripts/*.test.mjs",
       "tests/e2e/editor.spec.ts",
       "package.json"

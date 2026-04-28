@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   EventEditorApiError,
   HELPER_START_COMMAND,
@@ -42,6 +42,13 @@ interface DraftState {
 }
 
 type InspectorTab = "schema" | "preview" | "graph" | "validation";
+type MainTab = "inspector" | "editor";
+type EditorTab = "form" | "json";
+
+const BROWSER_PANE_STORAGE_KEY = "editor.browserPane.v1";
+const DEFAULT_BROWSER_PANE_WIDTH = 320;
+const MIN_BROWSER_PANE_WIDTH = 220;
+const MAX_BROWSER_PANE_WIDTH = 720;
 
 export default function EventEditorPage({
   loadLibrary = loadEventEditorLibrary,
@@ -57,7 +64,10 @@ export default function EventEditorPage({
     draft: null,
     selectedJsonPath: null,
   });
+  const [mainTab, setMainTab] = useState<MainTab>("inspector");
+  const [editorTab, setEditorTab] = useState<EditorTab>("form");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("schema");
+  const [browserPaneState, setBrowserPaneState] = useState(loadBrowserPaneState);
   const [saveState, setSaveState] = useState<SavePanelState>({ status: "idle" });
 
   useEffect(() => {
@@ -87,6 +97,10 @@ export default function EventEditorPage({
       isActive = false;
     };
   }, [loadLibrary]);
+
+  useEffect(() => {
+    saveBrowserPaneState(browserPaneState);
+  }, [browserPaneState]);
 
   const browserAssets = useMemo(() => (library ? getBrowserAssets(library) : []), [library]);
   const hasUnsavedDraft =
@@ -133,53 +147,75 @@ export default function EventEditorPage({
     );
   }
 
+  if (!library) {
+    return null;
+  }
+
   return (
     <section className="panel panel-accent editor-main">
       <Header statusLabel="READY" />
-      <div className="editor-library-summary" aria-label="Event library summary">
-        <h3>Library loaded</h3>
-        <p className="muted-text">{formatCount(library?.domains.length ?? 0, "domain")}</p>
-        <ul>
-          <li>{formatCount(library?.definitions.length ?? 0, "definition")}</li>
-          <li>{formatCount(library?.call_templates.length ?? 0, "call template")}</li>
-          <li>{formatCount(library?.handlers.length ?? 0, "handler")}</li>
-          <li>{formatCount(library?.presets.length ?? 0, "preset")}</li>
-          <li>{formatCount(library?.legacy_events.length ?? 0, "legacy event")}</li>
-        </ul>
-        <p>{formatCount(draftState.restoredCount, "local draft")} restored</p>
-      </div>
+      {library ? <EventLibraryStatusBar library={library} restoredCount={draftState.restoredCount} /> : null}
 
-      <div className="event-editor-workspace">
-        {library ? <EventBrowser library={library} selectedAsset={draftState.activeAsset} onSelectAsset={selectAsset} /> : null}
+      <div
+        className={browserPaneState.collapsed ? "event-workspace-2col event-workspace-browser-collapsed" : "event-workspace-2col"}
+        style={{
+          gridTemplateColumns: browserPaneState.collapsed ? "48px minmax(0, 1fr)" : `${browserPaneState.width}px minmax(0, 1fr)`,
+        }}
+      >
+        {library ? (
+          <EventBrowserPane
+            collapsed={browserPaneState.collapsed}
+            onCollapse={() => setBrowserPaneState((current) => ({ ...current, collapsed: true }))}
+            onExpand={() => setBrowserPaneState((current) => ({ ...current, collapsed: false }))}
+            onResizeStart={startBrowserResize}
+          >
+            <EventBrowser library={library} selectedAsset={draftState.activeAsset} onSelectAsset={selectAsset} />
+          </EventBrowserPane>
+        ) : null}
 
-        <div className="event-editor-detail">
-          {draftState.activeAsset ? <SelectionSummary asset={draftState.activeAsset} /> : null}
+        <div className="event-detail-pane" aria-label="Selected event workspace">
+          {draftState.activeAsset ? (
+            <AssetHeaderStrip
+              asset={draftState.activeAsset}
+              draft={draftState.draft ?? draftState.activeAsset.data}
+              library={library}
+              hasUnsavedDraft={hasUnsavedDraft}
+              changeSummary={changeSummary}
+            />
+          ) : null}
 
           {draftState.activeAsset && canSaveAsset(draftState.activeAsset) && (hasUnsavedDraft || saveState.status === "success") ? (
             <SavePanel asset={draftState.activeAsset} changeSummary={changeSummary} state={saveState} onSave={saveActiveDraft} />
           ) : null}
 
+          {draftState.activeAsset && library ? <MainTabs activeTab={mainTab} onSelectTab={setMainTab} /> : null}
+
           {draftState.activeAsset && library ? (
-            <EventDetailWorkspace
-              asset={draftState.activeAsset}
-              draft={draftState.draft ?? draftState.activeAsset.data}
-              library={library}
-              onDraftChange={updateDraft}
-            />
+            <div className="main-tab-panel" role="tabpanel" aria-label={`${mainTabLabel(mainTab)} panel`}>
+              {mainTab === "inspector" ? (
+                <EventInspectorPanel
+                  activeTab={inspectorTab}
+                  asset={draftState.activeAsset}
+                  draft={draftState.draft ?? draftState.activeAsset.data}
+                  library={library}
+                  selectedJsonPath={draftState.selectedJsonPath}
+                  onSelectTab={setInspectorTab}
+                  onOpenIssue={openValidationIssue}
+                />
+              ) : null}
+              {mainTab === "editor" ? (
+                <EditorPanel
+                  activeTab={editorTab}
+                  asset={draftState.activeAsset}
+                  draft={draftState.draft ?? draftState.activeAsset.data}
+                  library={library}
+                  onSelectTab={setEditorTab}
+                  onDraftChange={updateDraft}
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
-
-        {draftState.activeAsset && library ? (
-          <EventInspectorSidebar
-            activeTab={inspectorTab}
-            asset={draftState.activeAsset}
-            draft={draftState.draft ?? draftState.activeAsset.data}
-            library={library}
-            selectedJsonPath={draftState.selectedJsonPath}
-            onSelectTab={setInspectorTab}
-            onOpenIssue={openValidationIssue}
-          />
-        ) : null}
       </div>
     </section>
   );
@@ -187,6 +223,7 @@ export default function EventEditorPage({
   function selectAsset(asset: EditorEventAsset<unknown>): void {
     const draft = canEditAsset(asset) ? (loadDraft(asset) ?? asset.data) : null;
     setSaveState({ status: "idle" });
+    setMainTab("inspector");
     setDraftState((current) => ({
       ...current,
       activeAsset: asset,
@@ -198,6 +235,7 @@ export default function EventEditorPage({
   function openValidationIssue(issue: ValidationIssue): void {
     const asset = issue.asset_id ? findAssetForIssue(library, issue) : null;
     setInspectorTab("validation");
+    setMainTab("inspector");
     setDraftState((current) => ({
       ...current,
       activeAsset: asset ?? current.activeAsset,
@@ -231,6 +269,7 @@ export default function EventEditorPage({
       applyValidationReport(validationResponse.validation);
       if (!validationResponse.validation.passed) {
         setInspectorTab("validation");
+        setMainTab("inspector");
         setSaveState({ status: "validation_failed", message: "Draft did not pass validation." });
         return;
       }
@@ -271,6 +310,25 @@ export default function EventEditorPage({
     setLibrary((current) => (current ? { ...current, validation } : current));
   }
 
+  function startBrowserResize(event: ReactMouseEvent<HTMLDivElement>): void {
+    event.preventDefault();
+    const initialX = event.clientX;
+    const initialWidth = browserPaneState.width;
+
+    function handleMouseMove(moveEvent: MouseEvent): void {
+      const nextWidth = clampBrowserPaneWidth(initialWidth + moveEvent.clientX - initialX);
+      setBrowserPaneState((current) => ({ ...current, width: nextWidth, collapsed: false }));
+    }
+
+    function handleMouseUp(): void {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }
+
   function handleSaveError(nextError: unknown): void {
     const apiError = nextError as Partial<EventEditorApiError> & { details?: Record<string, unknown> };
     const validation = apiError.details?.validation as ValidationReport | undefined;
@@ -278,6 +336,7 @@ export default function EventEditorPage({
     if (validation) {
       applyValidationReport(validation);
       setInspectorTab("validation");
+      setMainTab("inspector");
     }
 
     if (apiError.code === "validation_failed") {
@@ -309,7 +368,124 @@ export default function EventEditorPage({
   }
 }
 
-function EventInspectorSidebar({
+function EventLibraryStatusBar({ library, restoredCount }: { library: EventEditorLibraryResponse; restoredCount: number }) {
+  return (
+    <div className="editor-library-status-pill" aria-label="Event library status">
+      <strong>Loaded</strong>
+      <span>{formatCount(library.domains.length, "domain")}</span>
+      <span>{formatCount(library.definitions.length, "definition")}</span>
+      <span>{formatCount(library.call_templates.length, "call template")}</span>
+      <span>{formatCount(library.handlers.length, "handler")}</span>
+      <span>{formatCount(library.presets.length, "preset")}</span>
+      <span>{formatCount(library.legacy_events.length, "legacy event")}</span>
+      <span>{formatCount(restoredCount, "local draft")} restored</span>
+    </div>
+  );
+}
+
+function EventBrowserPane({
+  children,
+  collapsed,
+  onCollapse,
+  onExpand,
+  onResizeStart,
+}: {
+  children: ReactNode;
+  collapsed: boolean;
+  onCollapse: () => void;
+  onExpand: () => void;
+  onResizeStart: (event: ReactMouseEvent<HTMLDivElement>) => void;
+}) {
+  if (collapsed) {
+    return (
+      <aside className="browser-pane browser-pane-collapsed" aria-label="Event browser pane">
+        <button type="button" className="browser-pane-expand" aria-label="Expand event browser" onClick={onExpand}>
+          <span aria-hidden="true">E</span>
+          <span className="browser-pane-rail-label">EVENT BROWSER</span>
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="browser-pane" aria-label="Event browser pane">
+      <div className="browser-pane-toolbar">
+        <button type="button" className="browser-pane-toggle" aria-label="Collapse event browser" onClick={onCollapse}>
+          {"<"}
+        </button>
+      </div>
+      {children}
+      <div className="pane-resizer" role="separator" aria-label="Resize event browser" aria-orientation="vertical" onMouseDown={onResizeStart} />
+    </aside>
+  );
+}
+
+function MainTabs({ activeTab, onSelectTab }: { activeTab: MainTab; onSelectTab: (tab: MainTab) => void }) {
+  const tabs: { id: MainTab; label: string }[] = [
+    { id: "inspector", label: "Inspector" },
+    { id: "editor", label: "Editor" },
+  ];
+
+  return (
+    <div className="main-tabs" role="tablist" aria-label="Main workspace tabs">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab.id}
+          className={activeTab === tab.id ? "main-tab main-tab-active" : "main-tab"}
+          onClick={() => onSelectTab(tab.id)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EditorPanel({
+  activeTab,
+  asset,
+  draft,
+  library,
+  onSelectTab,
+  onDraftChange,
+}: {
+  activeTab: EditorTab;
+  asset: EditorEventAsset<unknown>;
+  draft: unknown;
+  library: EventEditorLibraryResponse;
+  onSelectTab: (tab: EditorTab) => void;
+  onDraftChange: (draft: unknown) => void;
+}) {
+  const tabs: { id: EditorTab; label: string }[] = [
+    { id: "form", label: "Form" },
+    { id: "json", label: "JSON" },
+  ];
+
+  return (
+    <section className="editor-tab-workspace" aria-label="Editor workspace">
+      <div className="editor-subtabs" role="tablist" aria-label="Editor tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={activeTab === tab.id ? "editor-subtab editor-subtab-active" : "editor-subtab"}
+            onClick={() => onSelectTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <EventDetailWorkspace asset={asset} draft={draft} library={library} mode={activeTab} onDraftChange={onDraftChange} />
+    </section>
+  );
+}
+
+function EventInspectorPanel({
   activeTab,
   asset,
   draft,
@@ -334,7 +510,7 @@ function EventInspectorSidebar({
   ];
 
   return (
-    <aside className="event-inspector" aria-label="Event inspector">
+    <section className="event-inspector" aria-label="Event inspector">
       <div className="event-inspector-heading">
         <div>
           <h3>Inspector</h3>
@@ -349,6 +525,7 @@ function EventInspectorSidebar({
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
+            aria-label={tab.id === "graph" ? "Inspector Graph" : undefined}
             className={activeTab === tab.id ? "inspector-tab inspector-tab-active" : "inspector-tab"}
             onClick={() => onSelectTab(tab.id)}
           >
@@ -363,18 +540,39 @@ function EventInspectorSidebar({
       {activeTab === "validation" ? (
         <ValidationPanel asset={asset} library={library} selectedJsonPath={selectedJsonPath} onOpenIssue={onOpenIssue} />
       ) : null}
-    </aside>
+    </section>
   );
 }
 
-function SelectionSummary({ asset }: { asset: EditorEventAsset<unknown> }) {
+function AssetHeaderStrip({
+  asset,
+  draft,
+  library,
+  hasUnsavedDraft,
+  changeSummary,
+}: {
+  asset: EditorEventAsset<unknown>;
+  draft: unknown;
+  library: EventEditorLibraryResponse;
+  hasUnsavedDraft: boolean;
+  changeSummary: string;
+}) {
+  const issueCount = library.validation.issues.filter((issue) => !issue.asset_id || issue.asset_id === asset.id).length;
+  const draftKeys = isRecord(draft) ? Object.keys(draft).sort() : [];
+
   return (
-    <div className="selection-summary" aria-label="Selection summary">
+    <section className="asset-header-strip" aria-label="Selection summary">
       <h3>Selection summary</h3>
-      <p>
-        Selected asset <code>{asset.id}</code>
-      </p>
-      <dl>
+      <div className="asset-header-main">
+        <strong>{asset.id}</strong>
+        <span className={hasUnsavedDraft ? "status-tag status-warning" : "status-tag status-success"}>
+          {hasUnsavedDraft ? "UNSAVED" : "MATCHED"}
+        </span>
+        <span className={library.validation.passed ? "status-tag status-success" : "status-tag status-error-tag"}>
+          {library.validation.passed ? "VALID" : `${formatCount(issueCount, "issue").toUpperCase()}`}
+        </span>
+      </div>
+      <dl className="asset-header-meta">
         <div>
           <dt>Type</dt>
           <dd>{asset.asset_type}</dd>
@@ -391,8 +589,28 @@ function SelectionSummary({ asset }: { asset: EditorEventAsset<unknown> }) {
           <dt>Base hash</dt>
           <dd>{asset.base_hash}</dd>
         </div>
+        <div>
+          <dt>File</dt>
+          <dd>
+            <code>{asset.file_path}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>JSON path</dt>
+          <dd>
+            <code>{asset.json_path}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>Change</dt>
+          <dd>{changeSummary || "No draft loaded."}</dd>
+        </div>
+        <div>
+          <dt>Fields</dt>
+          <dd>{draftKeys.length > 0 ? draftKeys.join(", ") : "Non-object draft"}</dd>
+        </div>
       </dl>
-    </div>
+    </section>
   );
 }
 
@@ -406,6 +624,10 @@ function Header({ statusLabel }: { statusLabel: string }) {
       <span className="status-tag status-success">{statusLabel}</span>
     </div>
   );
+}
+
+function mainTabLabel(tab: MainTab): string {
+  return tab[0].toUpperCase() + tab.slice(1);
 }
 
 function getEditableAssets(library: EventEditorLibraryResponse): EditorEventAsset<unknown>[] {
@@ -503,6 +725,35 @@ function jsonEqual(first: unknown, second: unknown): boolean {
 
 function formatCount(count: number, singular: string): string {
   return `${count} ${count === 1 ? singular : `${singular}s`}`;
+}
+
+function loadBrowserPaneState(): { width: number; collapsed: boolean } {
+  try {
+    const rawState = window.localStorage.getItem(BROWSER_PANE_STORAGE_KEY);
+    if (!rawState) {
+      return { width: DEFAULT_BROWSER_PANE_WIDTH, collapsed: false };
+    }
+
+    const parsedState = JSON.parse(rawState) as Partial<{ width: number; collapsed: boolean }>;
+    return {
+      width: clampBrowserPaneWidth(typeof parsedState.width === "number" ? parsedState.width : DEFAULT_BROWSER_PANE_WIDTH),
+      collapsed: parsedState.collapsed === true,
+    };
+  } catch {
+    return { width: DEFAULT_BROWSER_PANE_WIDTH, collapsed: false };
+  }
+}
+
+function saveBrowserPaneState(state: { width: number; collapsed: boolean }): void {
+  try {
+    window.localStorage.setItem(BROWSER_PANE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Browser storage is a convenience for layout preference; ignore unavailable storage.
+  }
+}
+
+function clampBrowserPaneWidth(width: number): number {
+  return Math.max(MIN_BROWSER_PANE_WIDTH, Math.min(MAX_BROWSER_PANE_WIDTH, Math.round(width)));
 }
 
 function isHelperUnavailable(error: Error | null): boolean {

@@ -1,9 +1,10 @@
 # Event Editor
 
-Event Editor 是本仓库的本地内容编辑工具。它由两部分组成：
+Event Editor 是本仓库的本地内容编辑工具，作为 Rush app 位于 `apps/editor`。它由两部分组成：
 
 - `editor:helper`：只监听 `127.0.0.1` 的本地 helper，负责读取、校验、保存 `content/events/`。
 - `editor:dev`：独立 Vite editor 前端，负责浏览事件库、编辑 draft、保存到内容文件。
+- `apps/editor/scripts/generate-event-content-manifest.mjs`：Event Editor 专属生成脚本，用于根据 `content/events/manifest.json` 刷新 PC 运行时聚合模块。
 
 ## 从干净 checkout 启动
 
@@ -18,6 +19,13 @@ npm run editor:helper
 
 ```bash
 npm run editor:dev
+```
+
+也可以在 `apps/editor` 内使用 Rush project script：
+
+```bash
+node ../../common/scripts/install-run-rushx.js helper
+node ../../common/scripts/install-run-rushx.js dev
 ```
 
 默认地址：

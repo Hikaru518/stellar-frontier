@@ -12,7 +12,7 @@ source:
 
 ## 1. 目标
 
-本计划把 Event Editor 策划案转化为可执行的开发任务。Event Editor 是根目录 `editor/` 下的本地 Game Editor 模块，服务策划与开发者，不进入玩家游戏入口。它共享 `content/`、事件 schema、事件校验和通话渲染逻辑，用来浏览、理解、编辑并安全写回结构化事件内容。
+本计划把 Event Editor 策划案转化为可执行的开发任务。Event Editor 是 `apps/editor/` 下的本地 Game Editor 模块，也是 Rush monorepo 中的独立 app 项目。它服务策划与开发者，不进入玩家游戏入口。它共享 `content/`、事件 schema、事件校验和通话渲染逻辑，用来浏览、理解、编辑并安全写回结构化事件内容。
 
 MVP 交付一条完整闭环：
 
@@ -29,7 +29,7 @@ MVP 交付一条完整闭环：
 
 ### Editor 入口
 
-Editor 使用独立 Vite 入口：`editor/index.html`、`editor/src/main.tsx`、`vite.editor.config.ts` 和 `tsconfig.editor.json`。根 `package.json` 继续管理依赖和脚本。玩家游戏仍走现有 `index.html` 与 `src/main.tsx`。
+Editor 使用独立 Vite 入口：`apps/editor/index.html`、`apps/editor/src/main.tsx`、`apps/editor/vite.config.ts` 和 `apps/editor/tsconfig.json`。根 `package.json` 保留 editor 转发脚本，具体依赖和脚本由 `@stellar-frontier/editor` 管理。玩家游戏仍走 `apps/pc-client` 的入口。
 
 ### Local Helper
 
@@ -37,7 +37,7 @@ Local Helper 是独立 Node localhost API，优先使用 Node 内置模块。它
 
 ### Manifest 与加载路径
 
-新增 `content/events/manifest.json`，记录结构化事件 domain 文件。新增 `scripts/generate-event-content-manifest.mjs` 生成 `src/content/generated/eventContentManifest.ts`，由 `src/content/contentData.ts` 读取。新增 domain 时，helper 更新 manifest、生成聚合模块，并通过校验门禁，避免“文件存在但游戏读不到”。
+新增 `content/events/manifest.json`，记录结构化事件 domain 文件。新增 `apps/editor/scripts/generate-event-content-manifest.mjs` 生成 `apps/pc-client/src/content/generated/eventContentManifest.ts`，由 `apps/pc-client/src/content/contentData.ts` 读取。新增 domain 时，helper 更新 manifest、生成聚合模块，并通过校验门禁，避免“文件存在但游戏读不到”。
 
 ### 表单与预览
 
@@ -70,7 +70,7 @@ Local Helper 是独立 Node localhost API，优先使用 Node 内置模块。它
 后续每个开发任务都应至少满足自己的 acceptance criteria，并在影响范围内运行命令：
 
 - 修改 `content/` 或事件 manifest：运行 `npm run validate:content`。
-- 修改 `src/`、`editor/`、脚本或配置：运行 `npm run lint`。
+- 修改 `apps/pc-client/src`、`apps/editor/src`、`apps/editor/helper`、脚本或配置：运行 `npm run lint`。
 - 修改逻辑或 UI 组件：运行 `npm run test`。
 - 若任务新增 editor e2e：运行 `npm run test:e2e` 或新增的 editor e2e 命令。
 

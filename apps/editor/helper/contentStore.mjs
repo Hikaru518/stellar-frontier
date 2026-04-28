@@ -32,7 +32,7 @@ const EDITABLE_ASSET_CONFIGS = {
 };
 
 export async function loadEventEditorLibrary({
-  repoRoot = path.resolve(import.meta.dirname, "../.."),
+  repoRoot = path.resolve(import.meta.dirname, "../../.."),
   sourceRoot = repoRoot,
 } = {}) {
   const guard = createPathGuard(repoRoot, [EVENT_ROOT, SCHEMA_ROOT]);
@@ -92,7 +92,7 @@ export async function loadEventEditorLibrary({
   };
 }
 
-export async function validateDraftAsset({ repoRoot = path.resolve(import.meta.dirname, "../.."), sourceRoot = repoRoot, body }) {
+export async function validateDraftAsset({ repoRoot = path.resolve(import.meta.dirname, "../../.."), sourceRoot = repoRoot, body }) {
   const request = normalizeDraftRequest(body);
   await loadEditableTarget(repoRoot, request);
   const validation = await validateDraftInTempRoot({ repoRoot, sourceRoot, request });
@@ -109,7 +109,7 @@ export async function validateDraftAsset({ repoRoot = path.resolve(import.meta.d
   };
 }
 
-export async function saveDraftAsset({ repoRoot = path.resolve(import.meta.dirname, "../.."), sourceRoot = repoRoot, body }) {
+export async function saveDraftAsset({ repoRoot = path.resolve(import.meta.dirname, "../../.."), sourceRoot = repoRoot, body }) {
   const request = normalizeDraftRequest(body, { requireBaseHash: true });
   const current = await loadEditableTarget(repoRoot, request);
 

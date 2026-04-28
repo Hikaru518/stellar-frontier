@@ -3,17 +3,18 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  root: fileURLToPath(new URL("editor", import.meta.url)),
+  root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react()],
   server: {
     port: 5174,
   },
   build: {
-    outDir: fileURLToPath(new URL("dist/editor", import.meta.url)),
+    outDir: "dist",
     emptyOutDir: true,
+    chunkSizeWarningLimit: 2000,
   },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}", "helper/**/*.test.mjs", "../scripts/generate-event-content-manifest.test.mjs"],
+    include: ["src/**/*.test.{ts,tsx}", "helper/**/*.test.mjs", "scripts/**/*.test.mjs"],
   },
 });

@@ -17,6 +17,32 @@ describe("EventDetailWorkspace", () => {
     expect(screen.getByLabelText("Raw JSON draft")).toBeInTheDocument();
   });
 
+  it("can render form and JSON panels independently for tabbed layouts", () => {
+    const { rerender } = renderWorkspace({ mode: "form" });
+
+    expect(screen.getByRole("form", { name: "Schema form editor" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Raw JSON draft")).not.toBeInTheDocument();
+
+    rerender(
+      <EventDetailWorkspace
+        asset={createAsset()}
+        draft={createDraft()}
+        library={createLibraryResponse()}
+        mode="json"
+        onDraftChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("form", { name: "Schema form editor" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Raw JSON draft")).toBeInTheDocument();
+  });
+
+  it("renders structured schemas that reference shared root definitions", () => {
+    expect(() => renderWorkspace({ library: createLibraryResponseWithSharedDefinitions() })).not.toThrow();
+
+    expect(screen.getByLabelText(/^Title/)).toHaveValue("Signal flare");
+  });
+
   it("updates the JSON draft when the schema form changes", async () => {
     const onDraftChange = vi.fn();
     renderWorkspace({ onDraftChange });
@@ -99,14 +125,16 @@ function renderWorkspace({
   asset = createAsset(),
   draft = createDraft(),
   library = createLibraryResponse(),
+  mode,
   onDraftChange = vi.fn(),
 }: {
   asset?: EditorEventAsset<unknown>;
   draft?: unknown;
   library?: EventEditorLibraryResponse;
+  mode?: "all" | "form" | "json";
   onDraftChange?: (draft: unknown) => void;
 } = {}) {
-  render(<EventDetailWorkspace asset={asset} draft={draft} library={library} onDraftChange={onDraftChange} />);
+  return render(<EventDetailWorkspace asset={asset} draft={draft} library={library} mode={mode} onDraftChange={onDraftChange} />);
 }
 
 function createDraft() {
@@ -212,4 +240,42 @@ function createLibraryResponse(): EventEditorLibraryResponse {
     },
     validation: { passed: true, issues: [] },
   };
+}
+
+function createLibraryResponseWithSharedDefinitions(): EventEditorLibraryResponse {
+  const library = createLibraryResponse();
+  library.schemas["content/schemas/events/event-definition.schema.json"] = {
+    $id: "https://stellar-frontier.local/schemas/events/event-definition.schema.json",
+    $defs: {
+      non_empty_string: {
+        type: "string",
+        minLength: 1,
+      },
+      trigger_definition: {
+        type: "object",
+        properties: {
+          type: { type: "string", title: "Trigger type" },
+          conditions: { $ref: "#/$defs/condition_array" },
+        },
+      },
+      condition_array: {
+        type: "array",
+        title: "Conditions",
+        items: { $ref: "https://stellar-frontier.local/schemas/events/condition.schema.json#/$defs/condition" },
+      },
+      event_definition: {
+        type: "object",
+        required: ["id", "title", "status", "trigger", "event_graph"],
+        properties: {
+          id: { type: "string", title: "ID" },
+          title: { $ref: "#/$defs/non_empty_string", title: "Title" },
+          status: { type: "string", title: "Status", enum: ["draft", "ready_for_test"] },
+          trigger: { $ref: "#/$defs/trigger_definition", title: "Trigger" },
+          event_graph: { type: "object", title: "Event graph" },
+          effect_groups: { type: "array", title: "Effect groups", items: { type: "object" } },
+        },
+      },
+    },
+  };
+  return library;
 }

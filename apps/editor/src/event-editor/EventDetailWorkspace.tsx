@@ -12,10 +12,11 @@ interface EventDetailWorkspaceProps {
   asset: EditorEventAsset<unknown>;
   draft: unknown;
   library: EventEditorLibraryResponse;
+  mode?: "all" | "form" | "json";
   onDraftChange: (draft: unknown) => void;
 }
 
-export default function EventDetailWorkspace({ asset, draft, library, onDraftChange }: EventDetailWorkspaceProps) {
+export default function EventDetailWorkspace({ asset, draft, library, mode = "all", onDraftChange }: EventDetailWorkspaceProps) {
   const [validDraft, setValidDraft] = useState<unknown>(draft);
   const [jsonText, setJsonText] = useState(formatJson(draft));
   const [parseError, setParseError] = useState<string | null>(null);
@@ -34,29 +35,31 @@ export default function EventDetailWorkspace({ asset, draft, library, onDraftCha
 
   return (
     <section className="event-detail-workspace" aria-label="Event detail workspace">
-      <section className="event-detail-panel schema-form-panel" aria-label="Schema form panel">
-        <div className="event-detail-panel-heading">
-          <h3>Form Editor</h3>
-          <span className="status-tag status-success">LOCAL DRAFT</span>
-        </div>
-        <p className="muted-text">Schema-driven fields edit the same draft shown in raw JSON.</p>
-        <div role="form" aria-label="Schema form editor">
-          <Form
-            schema={schema}
-            uiSchema={uiSchema}
-            formData={validDraft}
-            validator={validator}
-            fields={rjsfFields}
-            widgets={rjsfWidgets}
-            liveValidate={false}
-            omitExtraData={false}
-            noHtml5Validate
-            onChange={handleFormChange}
-          />
-        </div>
-      </section>
+      {mode === "all" || mode === "form" ? (
+        <section className="event-detail-panel schema-form-panel" aria-label="Schema form panel">
+          <div className="event-detail-panel-heading">
+            <h3>Form Editor</h3>
+            <span className="status-tag status-success">LOCAL DRAFT</span>
+          </div>
+          <p className="muted-text">Schema-driven fields edit the same draft shown in raw JSON.</p>
+          <div role="form" aria-label="Schema form editor">
+            <Form
+              schema={schema}
+              uiSchema={uiSchema}
+              formData={validDraft}
+              validator={validator}
+              fields={rjsfFields}
+              widgets={rjsfWidgets}
+              liveValidate={false}
+              omitExtraData={false}
+              noHtml5Validate
+              onChange={handleFormChange}
+            />
+          </div>
+        </section>
+      ) : null}
 
-      <JsonDraftPanel jsonText={jsonText} parseError={parseError} onJsonTextChange={handleJsonTextChange} />
+      {mode === "all" || mode === "json" ? <JsonDraftPanel jsonText={jsonText} parseError={parseError} onJsonTextChange={handleJsonTextChange} /> : null}
     </section>
   );
 

@@ -9,7 +9,7 @@ export const DEFAULT_PORT = 4317;
 export const API_VERSION = "event-editor-helper.v1";
 
 export function createHelperServer({
-  repoRoot = path.resolve(import.meta.dirname, "../.."),
+  repoRoot = path.resolve(import.meta.dirname, "../../.."),
   sourceRoot = repoRoot,
 } = {}) {
   return http.createServer(async (request, response) => {
@@ -27,7 +27,7 @@ export function createHelperServer({
 }
 
 export function startHelperServer({
-  repoRoot = path.resolve(import.meta.dirname, "../.."),
+  repoRoot = path.resolve(import.meta.dirname, "../../.."),
   sourceRoot = repoRoot,
   host = DEFAULT_HOST,
   port = Number(process.env.EVENT_EDITOR_HELPER_PORT ?? DEFAULT_PORT),

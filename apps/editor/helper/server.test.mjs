@@ -9,7 +9,7 @@ import { createHelperServer, DEFAULT_HOST } from "./server.mjs";
 describe("helper server", () => {
   const servers = [];
   const tempRoots = [];
-  const sourceRoot = path.resolve(import.meta.dirname, "../..");
+  const sourceRoot = path.resolve(import.meta.dirname, "../../..");
 
   afterEach(async () => {
     await Promise.all(

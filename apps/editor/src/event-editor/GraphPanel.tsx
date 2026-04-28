@@ -1,4 +1,4 @@
-import type { EventDefinition, EventEdge, EventGraph, EventNode } from "../../../apps/pc-client/src/events/types";
+import type { EventDefinition, EventEdge, EventGraph, EventNode } from "../../../pc-client/src/events/types";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 interface GraphPanelProps {

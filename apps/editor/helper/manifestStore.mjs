@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { generateEventContentManifest } from "../../scripts/generate-event-content-manifest.mjs";
+import { generateEventContentManifest } from "../scripts/generate-event-content-manifest.mjs";
 import { createPathGuard } from "./pathGuard.mjs";
 import { hashJson } from "./hash.mjs";
 import { formatJson } from "./jsonFormat.mjs";
@@ -14,7 +14,7 @@ const GENERATED_MANIFEST_PATH = "apps/pc-client/src/content/generated/eventConte
 const DOMAIN_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 export async function createEventDomain({
-  repoRoot = path.resolve(import.meta.dirname, "../.."),
+  repoRoot = path.resolve(import.meta.dirname, "../../.."),
   sourceRoot = repoRoot,
   body,
 } = {}) {

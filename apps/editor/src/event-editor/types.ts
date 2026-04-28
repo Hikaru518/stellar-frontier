@@ -1,4 +1,4 @@
-import type { CallTemplate, EventDefinition, HandlerDefinition, PresetDefinition } from "../../../apps/pc-client/src/events/types";
+import type { CallTemplate, EventDefinition, HandlerDefinition, PresetDefinition } from "../../../pc-client/src/events/types";
 
 export interface EventManifestDomain {
   id: string;

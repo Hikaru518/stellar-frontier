@@ -1,4 +1,4 @@
-import { renderRuntimeCall, type CallRendererError, type CallRendererGameState } from "../../../apps/pc-client/src/events/callRenderer";
+import { renderRuntimeCall, type CallRendererError, type CallRendererGameState } from "../../../pc-client/src/events/callRenderer";
 import type {
   CallNode,
   CallTemplate,
@@ -7,7 +7,7 @@ import type {
   RuntimeCallOption,
   RuntimeEvent,
   TriggerContext,
-} from "../../../apps/pc-client/src/events/types";
+} from "../../../pc-client/src/events/types";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 export type EventEditorPreviewStatus = "rendered" | "missing_context" | "unavailable" | "error";

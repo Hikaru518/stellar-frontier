@@ -27,7 +27,10 @@ describe("EventEditorPage", () => {
     render(<EventEditorPage loadLibrary={loadLibrary} />);
 
     expect(screen.getByText("Loading event library...")).toBeInTheDocument();
-    expect(await screen.findByText("Library loaded")).toBeInTheDocument();
+    const summary = await screen.findByLabelText("Event library status");
+    expect(summary).toHaveClass("editor-library-status-pill");
+    expect(within(summary).queryByRole("heading", { name: "Library loaded" })).not.toBeInTheDocument();
+    expect(within(summary).getByText("Loaded")).toBeInTheDocument();
     expect(screen.getByText("1 definition")).toBeInTheDocument();
     expect(screen.getByText("1 call template")).toBeInTheDocument();
     expect(screen.getByText("1 handler")).toBeInTheDocument();
@@ -57,6 +60,37 @@ describe("EventEditorPage", () => {
     expect(await screen.findByText("No editable event assets found")).toBeInTheDocument();
   });
 
+  it("defaults to the central inspector tab", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        definitions: [createDefinitionAsset("forest.signal", { data: createDefinitionData() })],
+        schemas: createSchemas(),
+      }),
+    );
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("tab", { name: "Inspector" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Schema" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("content/schemas/events/event-definition.schema.json")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Summary" })).not.toBeInTheDocument();
+  });
+
+  it("collapses and expands the event browser pane", async () => {
+    const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [createDefinitionAsset("forest.signal")] }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Event Browser" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse event browser" }));
+
+    expect(screen.getByRole("button", { name: "Expand event browser" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Event Browser" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand event browser" }));
+    expect(screen.getByRole("heading", { name: "Event Browser" })).toBeInTheDocument();
+  });
+
   it("restores a matching local draft and keeps changed-base drafts out of the active state", async () => {
     const asset = createDefinitionAsset("forest.signal", { base_hash: "base-a" });
     const staleAsset = createDefinitionAsset("forest.signal", { base_hash: "base-old" });
@@ -67,8 +101,28 @@ describe("EventEditorPage", () => {
     render(<EventEditorPage loadLibrary={loadLibrary} />);
 
     expect(await screen.findByText("1 local draft restored")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("tab", { name: "Editor" }));
+    fireEvent.click(screen.getByRole("tab", { name: "JSON" }));
     expect((screen.getByLabelText("Raw JSON draft") as HTMLTextAreaElement).value).toContain("matching draft");
     expect(screen.queryByText("stale draft")).not.toBeInTheDocument();
+  });
+
+  it("switches central workspace tabs without losing draft changes", async () => {
+    const asset = createDefinitionAsset("forest.signal", { data: createDefinitionData() });
+    const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("tab", { name: "Inspector" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Editor" }));
+    fireEvent.click(screen.getByRole("tab", { name: "JSON" }));
+    fireEvent.change(screen.getByLabelText("Raw JSON draft"), {
+      target: { value: JSON.stringify({ ...asset.data, title: "Tabbed edit" }, null, 2) },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Form" }));
+
+    expect(await screen.findByLabelText(/^Title/)).toHaveValue("Tabbed edit");
+    expect(screen.queryByLabelText("Raw JSON draft")).not.toBeInTheDocument();
   });
 
   it("persists draft edits to localStorage", async () => {
@@ -76,6 +130,8 @@ describe("EventEditorPage", () => {
     const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
 
     render(<EventEditorPage loadLibrary={loadLibrary} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Editor" }));
+    fireEvent.click(screen.getByRole("tab", { name: "JSON" }));
     const draftInput = await screen.findByLabelText("Raw JSON draft");
     fireEvent.change(draftInput, {
       target: { value: '{\n  "id": "forest.signal",\n  "notes": "local change"\n}' },
@@ -269,7 +325,7 @@ describe("EventEditorPage", () => {
     expect(screen.queryByLabelText("Raw JSON draft")).not.toBeInTheDocument();
   });
 
-  it("shows schema, graph, and validation details in the right sidebar", async () => {
+  it("shows schema, graph, and validation details in the central inspector", async () => {
     const definition = createDefinitionAsset("forest.signal", {
       data: createDefinitionData(),
     });
@@ -304,7 +360,7 @@ describe("EventEditorPage", () => {
     expect(screen.getByText("content/schemas/events/event-definition.schema.json")).toBeInTheDocument();
     expect(screen.getByText("$.event_graph.nodes")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Graph" }));
+    fireEvent.click(within(screen.getByRole("tablist", { name: "Inspector tabs" })).getByRole("tab", { name: "Inspector Graph" }));
     expect(within(screen.getByRole("list", { name: "Graph nodes" })).getByText("intro_call")).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Graph transitions" })).getByText("intro_call -> resolved")).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Terminal graph nodes" })).getByText("resolved")).toBeInTheDocument();
@@ -353,6 +409,10 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
 }
 
 async function changeRawJson(nextDraft: unknown): Promise<void> {
+  const editorTab = await screen.findByRole("tab", { name: "Editor" });
+  fireEvent.click(editorTab);
+  const jsonTab = await screen.findByRole("tab", { name: "JSON" });
+  fireEvent.click(jsonTab);
   const draftInput = await screen.findByLabelText("Raw JSON draft");
   fireEvent.change(draftInput, {
     target: { value: JSON.stringify(nextDraft, null, 2) },
