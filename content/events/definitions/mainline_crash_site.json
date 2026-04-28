@@ -114,10 +114,7 @@
           { "type": "world_flag_equals", "field": "repair_docs_available", "value": true },
           { "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "knows_repair_tech" }] },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-repair-docs" } },
-          { "type": "any_of", "conditions": [
-            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
-            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "scan" } }
-          ] }
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
         ]
       },
       "candidate_selection": { "priority": 85, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
@@ -139,7 +136,7 @@
       "log_templates": [{ "id": "repair_tech_learned_log", "summary": "维修技术已补学", "importance": "normal", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_repair_docs_repeat_learning.call.learn"] },
       "sample_contexts": [
-        { "trigger_type": "action_complete", "occurred_at": 360, "source": "crew_action", "crew_id": "amy", "tile_id": "4-4", "action_id": "scan:mainline-repair-docs:4-4:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "scan", "object_id": "mainline-repair-docs", "tags": ["repair_docs", "mainline_crash_site"] } }
+        { "trigger_type": "action_complete", "occurred_at": 360, "source": "crew_action", "crew_id": "amy", "tile_id": "4-4", "action_id": "survey:mainline-repair-docs:4-4:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-repair-docs", "tags": ["repair_docs", "mainline_crash_site"] } }
       ]
     }
   ]

@@ -42,10 +42,7 @@
         { "type": "world_flag_equals", "field": "medical_docs_available", "value": true },
         { "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "knows_field_first_aid" }] },
         { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-medical-docs" } },
-        { "type": "any_of", "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "scan" } }
-        ] }
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
       ] },
       "candidate_selection": { "priority": 83, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
       "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_medical_docs_repeat_learning:{crew_id}", "allow_while_active": false },
@@ -59,7 +56,7 @@
       ] }],
       "log_templates": [{ "id": "field_first_aid_learned_log", "summary": "野外急救已补学", "importance": "normal", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_medical_docs_repeat_learning.call.learn"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1380, "source": "crew_action", "crew_id": "kael", "tile_id": "4-1", "action_id": "scan:mainline-medical-docs:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "scan", "object_id": "mainline-medical-docs", "tags": ["mainline", "mainline_medical", "field_first_aid"] } }]
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1380, "source": "crew_action", "crew_id": "kael", "tile_id": "4-1", "action_id": "survey:mainline-medical-docs:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-medical-docs", "tags": ["mainline", "mainline_medical", "field_first_aid"] } }]
     },
     {
       "schema_version": "event-program-model-v1",

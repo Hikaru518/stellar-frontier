@@ -5,6 +5,7 @@ import hiveContent from "../../../../content/events/definitions/mainline_hive.js
 import medicalContent from "../../../../content/events/definitions/mainline_medical.json";
 import resourcesContent from "../../../../content/events/definitions/mainline_resources.json";
 import villageContent from "../../../../content/events/definitions/mainline_village.json";
+import defaultMap from "../../../../content/maps/default-map.json";
 
 type JsonRecord = Record<string, unknown>;
 type JsonDefinition = JsonRecord & {
@@ -18,6 +19,27 @@ type JsonDefinition = JsonRecord & {
 type JsonContent = { event_definitions: JsonDefinition[] };
 
 describe("mainline event content", () => {
+  it("keeps MVP mainline information flow survey-only instead of exposing scan", () => {
+    const mainlineDefinitions = [crashSiteContent, endingContent, medicalContent, resourcesContent, villageContent];
+
+    for (const content of mainlineDefinitions) {
+      expect(JSON.stringify(content)).not.toContain('"value":"scan"');
+      expect(JSON.stringify(content)).not.toContain('"action_type":"scan"');
+      expect(JSON.stringify(content)).not.toContain('scan:');
+    }
+
+    for (const objectId of [
+      "mainline-rosetta-device",
+      "mainline-medical-docs",
+      "mainline-damaged-warp-pod",
+      "mainline-repair-docs",
+      "mainline-basic-radar",
+      "mainline-dead-cockpit",
+    ]) {
+      expect(findMapObject(objectId).candidateActions ?? []).not.toContain("scan");
+    }
+  });
+
   it("covers crash-site supplies, radar clues, and repeatable repair-tech learning", () => {
     const surveyChain = findDefinition(crashSiteContent, "mainline_crash_site_survey_chain");
     const repeatLearning = findDefinition(crashSiteContent, "mainline_repair_docs_repeat_learning");
@@ -338,4 +360,11 @@ function findCallOption(definition: ReturnType<typeof findDefinition>, id: strin
     .find((item) => item.id === id);
   expect(option).toBeTruthy();
   return option!;
+}
+
+function findMapObject(id: string) {
+  const map = defaultMap as { tiles: Array<{ objects: Array<JsonRecord & { id?: string; candidateActions?: string[] }> }> };
+  const object = map.tiles.flatMap((tile) => tile.objects).find((item) => item.id === id);
+  expect(object).toBeTruthy();
+  return object!;
 }

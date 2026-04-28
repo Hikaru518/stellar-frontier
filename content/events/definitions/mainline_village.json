@@ -53,15 +53,12 @@
       "version": 1,
       "domain": "mainline_village",
       "title": "罗塞塔装置学习外星语言",
-      "summary": "调查或扫描罗塞塔装置后，当前队员获得外星语言知识，并设置后续可重复学习 flag。",
+      "summary": "调查罗塞塔装置后，当前队员获得外星语言知识，并设置后续可重复学习 flag。",
       "tags": ["mainline", "rosetta", "alien_language", "repeatable_knowledge"],
       "status": "approved",
       "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
         { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-rosetta-device" } },
-        { "type": "any_of", "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "scan" } }
-        ] }
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
       ] },
       "candidate_selection": { "priority": 82, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
       "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_rosetta_language_learning:{crew_id}", "allow_while_active": false },

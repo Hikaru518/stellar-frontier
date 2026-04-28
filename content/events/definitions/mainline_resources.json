@@ -165,7 +165,7 @@
       "version": 1,
       "domain": "mainline_resources",
       "title": "旧飞船遗迹取得折跃坐标",
-      "summary": "调查或扫描旧飞船遗迹后给当前队员 warp_coordinates，并设置 warp_coordinates_found。",
+      "summary": "调查旧飞船遗迹后给当前队员 warp_coordinates，并设置 warp_coordinates_found。",
       "tags": ["mainline", "old_ship", "warp_coordinates"],
       "status": "approved",
       "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
@@ -173,10 +173,7 @@
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-old-ship-wreck" } },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-dead-cockpit" } }
         ] },
-        { "type": "any_of", "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "scan" } }
-        ] }
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
       ] },
       "candidate_selection": { "priority": 80, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
       "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_old_ship_warp_coordinates:{crew_id}", "allow_while_active": false },
@@ -190,7 +187,7 @@
       ] }],
       "log_templates": [{ "id": "warp_coordinates_found_log", "summary": "折跃坐标已取得", "importance": "major", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_old_ship_warp_coordinates.call.coordinates"], "item_ids": ["warp_coordinates"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 2040, "source": "crew_action", "crew_id": "amy", "tile_id": "4-8", "action_id": "scan:mainline-dead-cockpit:4-8:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "scan", "object_id": "mainline-dead-cockpit", "tags": ["mainline", "mainline_old_ship", "warp_coordinates"] } }]
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 2040, "source": "crew_action", "crew_id": "amy", "tile_id": "4-8", "action_id": "survey:mainline-dead-cockpit:4-8:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-dead-cockpit", "tags": ["mainline", "mainline_old_ship", "warp_coordinates"] } }]
     }
   ]
 }

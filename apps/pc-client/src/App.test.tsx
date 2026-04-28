@@ -1844,6 +1844,17 @@ describe("App", () => {
   });
 
   it("opens a crew profile with attributes, tags, expertise, and diary entries", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: initialCrew.map((member) => (member.id === "mike" ? { ...member, conditions: ["knows_alien_language"] } : member)),
+        logs: initialLogs,
+        resources: initialResources,
+        baseInventory: [{ itemId: "iron_ore", quantity: 1240 }],
+      })),
+    );
+
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
@@ -1854,6 +1865,8 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Mike / 队员档案" })).toBeInTheDocument();
     expect(screen.getByText("5 维轻量属性")).toBeInTheDocument();
     expect(screen.getByText("嘴硬心软")).toBeInTheDocument();
+    expect(screen.getByText("状态 / 知识标签")).toBeInTheDocument();
+    expect(screen.getByText("外星语言")).toBeInTheDocument();
     expect(screen.getByText("拾荒者")).toBeInTheDocument();
     expect(screen.getByText(/信号弹 x2/)).toBeInTheDocument();
     expect(screen.getByText(/湖的位置不对/)).toBeInTheDocument();
