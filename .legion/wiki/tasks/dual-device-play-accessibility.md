@@ -2,16 +2,16 @@
 
 ## Status
 
-Implemented and verified locally; PR lifecycle still pending.
+Yuan-backed refactor implemented and verified locally; PR update/checks still pending.
 
 ## Result
 
-- Repo converted to Rush + pnpm with projects for PC client, mobile client, relay server, and shared protocol.
+- Repo converted to Rush + pnpm with projects for PC client, mobile client, and shared dual-device library.
 - PC client moved under `apps/pc-client` and remains authoritative for game state.
 - Mobile client renders the companion terminal waiting-for-pairing shell.
-- Relay-server provides an in-memory WSS/HTTP room broker skeleton.
-- Shared protocol package owns transport priority, pairing, message validation, and fallback helpers.
-- Imported design docs from `docs/plans/2026-04-27-22-52/` and implemented the visible P0 slice: QR/manual-code pairing, token expiry, mobile private signal handling, PC fallback, and token-locked relay room semantics.
+- `packages/dual-device` owns transport priority, pairing, `DualDeviceMessage` validation, Yuan terminal message mapping, and fallback helpers.
+- Stellar-owned server scaffold is removed; Yuan Host is treated as external infrastructure for WSS, terminal routing, WebRTC signaling, DataChannel upgrade, and fallback.
+- Imported design docs from `docs/plans/2026-04-27-22-52/` and implemented the visible P0 slice: QR/manual-code pairing, token expiry, mobile private signal handling, PC fallback, and Yuan connection metadata.
 
 ## Evidence
 

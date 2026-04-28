@@ -11,12 +11,16 @@ describe("MobileTerminalApp", () => {
     render(<MobileTerminalApp />);
 
     expect(screen.getByRole("heading", { name: "等待配对" })).toBeInTheDocument();
-    expect(screen.getByText("mainland-relay")).toBeInTheDocument();
+    expect(screen.getByText("yuan-wss")).toBeInTheDocument();
     expect(screen.getByText(/游戏结算仍由 PC 完成/)).toBeInTheDocument();
   });
 
   it("renders pairing params from a QR or manual-code URL", () => {
-    window.history.pushState({}, "", "/?roomId=sf-room&token=t1&code=ABCDEF&relayUrl=ws%3A%2F%2F127.0.0.1%3A8787%2Frelay");
+    window.history.pushState(
+      {},
+      "",
+      "/?roomId=sf-room&token=t1&code=ABCDEF&hostUrl=ws%3A%2F%2F127.0.0.1%3A8888%2F&tenantPublicKey=tenant-1&pcTerminalId=stellar-pc-host&phoneTerminalId=stellar-phone-abcdef",
+    );
 
     render(<MobileTerminalApp />);
 

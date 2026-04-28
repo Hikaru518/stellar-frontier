@@ -20,13 +20,8 @@
       "tags": ["app", "mobile-client"]
     },
     {
-      "packageName": "@stellar-frontier/relay-server",
-      "projectFolder": "apps/relay-server",
-      "tags": ["app", "server"]
-    },
-    {
-      "packageName": "@stellar-frontier/protocol",
-      "projectFolder": "packages/protocol",
+      "packageName": "@stellar-frontier/dual-device",
+      "projectFolder": "packages/dual-device",
       "tags": ["library", "shared"]
     }
   ]

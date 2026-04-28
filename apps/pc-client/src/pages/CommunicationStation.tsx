@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
-  buildRelayJoinUrl,
+  buildYuanHostConnectionUrl,
   createDualDeviceMessage,
   createPairingSession,
+  createYuanTerminalMessage,
+  decodeYuanWireMessage,
+  encodeYuanWireMessage,
+  extractDualDeviceMessage,
   getLatencyTarget,
   isPairingSessionExpired,
-  paidMainlandHybridPlan,
   selectPreferredTransport,
-  validateDualDeviceMessage,
+  yuanBackedDualDevicePlan,
   type DualDevicePairingSession,
-} from "@stellar-frontier/protocol";
+} from "@stellar-frontier/dual-device";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { getCrewActionTiming } from "../crewSystem";
@@ -71,10 +74,10 @@ export function CommunicationStation({
     .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
     .slice(0, 3);
   const phoneTerminalLink = selectPreferredTransport([
-    { kind: "lan-websocket", health: "healthy", rttMs: 20 },
-    { kind: "mainland-relay", health: "healthy", rttMs: 60 },
+    { kind: "yuan-webrtc-datachannel", health: "degraded", reason: "等待 Yuan Terminal 完成 WebRTC 无感升级。" },
+    { kind: "yuan-wss", health: "healthy", rttMs: 60 },
   ]);
-  const relayTarget = getLatencyTarget(paidMainlandHybridPlan, "同区域国内 relay RTT") ?? "20-80ms";
+  const hostTarget = getLatencyTarget(yuanBackedDualDevicePlan, "Yuan WSS Host RTT") ?? "同区域 20-80ms，跨区域 <150ms";
   const pairingExpired = isPairingSessionExpired(pairingSession);
 
   useEffect(() => {
@@ -103,24 +106,21 @@ export function CommunicationStation({
 
     setPhoneConnectionStatus("waiting");
     const socket = new WebSocket(
-      buildRelayJoinUrl(pairingSession.relayUrl, {
-        roomId: pairingSession.roomId,
-        clientId: pairingSession.pcClientId,
-        role: "pc",
-        token: pairingSession.token,
+      buildYuanHostConnectionUrl(pairingSession.hostUrl, {
+        terminalId: pairingSession.pcTerminalId,
+        hostToken: pairingSession.token,
+        publicKey: pairingSession.tenantPublicKey,
       }),
     );
     socketRef.current = socket;
 
     socket.addEventListener("message", (event) => {
-      const message = parseRelayMessage(event.data);
+      const yuanMessage = parseYuanWireMessage(event.data);
+      const message = yuanMessage ? extractDualDeviceMessage(yuanMessage) : null;
       if (!message) {
         return;
       }
 
-      if (message.type === "link.connected" && message.payload.role === "phone") {
-        setPhoneConnectionStatus("connected");
-      }
       if (message.type === "phone.message.read") {
         setPrivateSignalStatus("read");
       }
@@ -153,7 +153,7 @@ export function CommunicationStation({
     const message = createDualDeviceMessage({
       type: "phone.call.incoming",
       roomId: pairingSession.roomId,
-      clientId: pairingSession.pcClientId,
+      clientId: pairingSession.pcTerminalId,
       sequence: sequenceRef.current,
       payload: {
         title: "Amy 私频来电",
@@ -164,7 +164,9 @@ export function CommunicationStation({
     sequenceRef.current += 1;
 
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify(message));
+      socketRef.current.send(
+        encodeYuanWireMessage(createYuanTerminalMessage(message, { sourceTerminalId: pairingSession.pcTerminalId, targetTerminalId: pairingSession.phoneTerminalId })),
+      );
       setPrivateSignalStatus("sent");
       return;
     }
@@ -176,13 +178,15 @@ export function CommunicationStation({
     const message = createDualDeviceMessage({
       type: "phone.fallback.enabled",
       roomId: pairingSession.roomId,
-      clientId: pairingSession.pcClientId,
+      clientId: pairingSession.pcTerminalId,
       sequence: sequenceRef.current,
       payload: { reason: "pc_manual_fallback" },
     });
     sequenceRef.current += 1;
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify(message));
+      socketRef.current.send(
+        encodeYuanWireMessage(createYuanTerminalMessage(message, { sourceTerminalId: pairingSession.pcTerminalId, targetTerminalId: pairingSession.phoneTerminalId })),
+      );
     }
     setPrivateSignalStatus("fallback");
   }
@@ -286,7 +290,8 @@ export function CommunicationStation({
                 rows={[
                   ["短手输码", pairingSession.pairingCode],
                   ["过期", pairingExpired ? "已过期，请重新生成" : formatPairingExpiry(pairingSession)],
-                  ["Relay", pairingSession.relayUrl],
+                  ["Yuan Host", pairingSession.hostUrl],
+                  ["Tenant", pairingSession.tenantPublicKey],
                   ["手机链接", pairingSession.mobileUrl],
                 ]}
               />
@@ -305,10 +310,10 @@ export function CommunicationStation({
           </div>
           <FieldList
             rows={[
-              ["同网优先", phoneTerminalLink.selected],
-              ["公网基线", `${phoneTerminalLink.fallback} / ${relayTarget}`],
+              ["无感升级", phoneTerminalLink.selected],
+              ["WSS 基线", `${phoneTerminalLink.fallback} / ${hostTarget}`],
               ["私密信号", formatPrivateSignalStatus(privateSignalStatus)],
-              ["Relay 职责", "WSS room broker，仅中转 typed events，不持有 GameState"],
+              ["业务边界", "Stellar 只提供 PC/mobile 共享业务层；底层 Host/Terminal/WebRTC 交给 Yuan"],
             ]}
           />
           {privateSignalStatus === "fallback" ? <p className="accent-text">[PC 备份] Amy：别在主频道回复。我在森林边缘听见了第二组脚步声。</p> : null}
@@ -558,22 +563,22 @@ function formatEventImportance(importance: EventLog["importance"]) {
 
 function createPhoneTerminalPairingSession() {
   return createPairingSession({
-    relayUrl: getConfiguredRelayUrl(),
+    hostUrl: getConfiguredYuanHostUrl(),
     mobileBaseUrl: getConfiguredMobileTerminalUrl(),
-    pcClientId: "pc-host",
+    pcTerminalId: "stellar-pc-host",
   });
 }
 
-function getConfiguredRelayUrl() {
-  const configured = import.meta.env.VITE_DUAL_DEVICE_RELAY_URL as string | undefined;
+function getConfiguredYuanHostUrl() {
+  const configured = import.meta.env.VITE_YUAN_HOST_URL as string | undefined;
   if (configured) {
     return configured;
   }
 
   const url = new URL(window.location.href);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.port = "8787";
-  url.pathname = "/relay";
+  url.port = "8888";
+  url.pathname = "/";
   url.search = "";
   url.hash = "";
   return url.toString();
@@ -597,17 +602,12 @@ function getConfiguredMobileTerminalUrl() {
   return url.toString();
 }
 
-function parseRelayMessage(value: unknown) {
+function parseYuanWireMessage(value: unknown) {
   if (typeof value !== "string") {
     return null;
   }
 
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return validateDualDeviceMessage(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return decodeYuanWireMessage(value);
 }
 
 function formatPhoneConnectionStatus(status: PhoneConnectionStatus) {

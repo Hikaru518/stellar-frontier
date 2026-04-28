@@ -1,6 +1,8 @@
-export type DualDeviceTransportKind = "lan-websocket" | "mainland-relay" | "webrtc-datachannel" | "offline";
+export type DualDeviceTransportKind = "yuan-webrtc-datachannel" | "yuan-wss" | "offline";
 
 export type DualDeviceTransportHealth = "healthy" | "degraded" | "unavailable";
+
+export type DualDeviceRole = "pc" | "phone";
 
 export interface DualDeviceTransportCandidate {
   kind: DualDeviceTransportKind;
@@ -34,6 +36,17 @@ export interface DualDeviceMessage {
   payload: Record<string, unknown>;
 }
 
+export interface YuanTerminalMessage {
+  source_terminal_id: string;
+  target_terminal_id: string;
+  trace_id: string;
+  seq_id: number;
+  method?: string;
+  req?: unknown;
+  event?: { type: string; payload?: unknown };
+  done?: boolean;
+}
+
 export interface DualDeviceLinkStatus {
   transport: DualDeviceTransportKind;
   lastHeartbeatAt?: number;
@@ -42,10 +55,13 @@ export interface DualDeviceLinkStatus {
 
 export interface DualDevicePairingSession {
   roomId: string;
-  pcClientId: string;
+  hostId: string;
+  tenantPublicKey: string;
+  pcTerminalId: string;
+  phoneTerminalId: string;
   pairingCode: string;
   token: string;
-  relayUrl: string;
+  hostUrl: string;
   mobileUrl: string;
   createdAt: number;
   expiresAt: number;
@@ -54,9 +70,10 @@ export interface DualDevicePairingSession {
 export interface CreatePairingSessionOptions {
   nowMs?: number;
   expiresInMs?: number;
-  relayUrl: string;
+  hostUrl: string;
   mobileBaseUrl: string;
-  pcClientId?: string;
+  pcTerminalId?: string;
+  tenantPublicKey?: string;
   randomBytes?: (length: number) => Uint8Array;
 }
 
@@ -79,32 +96,30 @@ export interface DualDeviceDeploymentPlan {
 }
 
 const TRANSPORT_PRIORITY: Record<DualDeviceTransportKind, number> = {
-  "lan-websocket": 0,
-  "mainland-relay": 1,
-  "webrtc-datachannel": 2,
+  "yuan-webrtc-datachannel": 0,
+  "yuan-wss": 1,
   offline: 99,
 };
 
 const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const DEFAULT_PAIRING_TTL_MS = 5 * 60 * 1000;
 
-export const paidMainlandHybridPlan: DualDeviceDeploymentPlan = {
-  name: "Paid Mainland Hybrid",
-  summary: "中国内地 WSS relay 提供稳定公网基线，同网时优先 LAN WebSocket，PC 始终持有权威 GameState。",
+export const yuanBackedDualDevicePlan: DualDeviceDeploymentPlan = {
+  name: "Yuan-backed Dual Device",
+  summary: "Stellar 不再维护专属 server；PC 与手机都作为 Yuan Terminal 接入同一 host/tenant，业务层只定义配对、token、消息和 fallback。",
   projects: [
-    { name: "PC client", folder: "apps/pc-client", responsibility: "权威游戏状态、配对入口、fallback UI 与 PC 端通讯台。" },
-    { name: "Mobile client", folder: "apps/mobile-client", responsibility: "扫码进入的私人通讯终端，只展示派生状态并发送 typed events。" },
-    { name: "Relay server", folder: "apps/relay-server", responsibility: "中国内地 WSS room broker、短期 token、心跳与消息中转。" },
-    { name: "Protocol", folder: "packages/protocol", responsibility: "三端共享的消息 envelope、传输选择和配对规则。" },
+    { name: "PC client", folder: "apps/pc-client", responsibility: "权威 GameState、配对入口、PC-side DualDevice services 与 fallback UI。" },
+    { name: "Mobile client", folder: "apps/mobile-client", responsibility: "扫码进入的 Yuan Terminal companion，只展示派生状态并发送 typed events。" },
+    { name: "Dual-device library", folder: "packages/dual-device", responsibility: "PC/mobile 共享的 room、QR、token、Yuan message 映射和 fallback 业务抽象。" },
+    { name: "Yuan Host", folder: "external: No-Trade-No-Life/Yuan apps/host", responsibility: "外部 WSS Host、Terminal routing、WebRTC signaling、DataChannel upgrade 与 WS fallback。" },
   ],
-  transportPriority: ["lan-websocket", "mainland-relay", "webrtc-datachannel", "offline"],
+  transportPriority: ["yuan-webrtc-datachannel", "yuan-wss", "offline"],
   latencyTargets: [
     { label: "手机本地反馈", target: "<50ms" },
-    { label: "LAN WebSocket RTT", target: "<30ms" },
-    { label: "同区域国内 relay RTT", target: "20-80ms" },
-    { label: "跨区域国内 relay RTT", target: "<150ms" },
+    { label: "Yuan WebRTC DataChannel RTT", target: "同网时机会性低于 WSS" },
+    { label: "Yuan WSS Host RTT", target: "同区域 20-80ms，跨区域 <150ms" },
   ],
-  rollout: ["Rush monorepo scaffold", "协议模型与 UI 入口", "单区域国内 WSS relay", "LAN direct", "多地域 relay hardening"],
+  rollout: ["共享业务层 scaffold", "Yuan Host WSS 接入", "PC/mobile Terminal 化", "开启 Yuan WebRTC upgrade", "生产鉴权与观测 hardening"],
 };
 
 export function selectPreferredTransport(candidates: DualDeviceTransportCandidate[]): DualDeviceTransportSelection {
@@ -128,7 +143,7 @@ export function selectPreferredTransport(candidates: DualDeviceTransportCandidat
   const selected = available[0];
 
   if (!selected) {
-    return { selected: "offline", fallback: "offline", reason: "没有可用链路，必须启用 PC fallback。" };
+    return { selected: "offline", fallback: "offline", reason: "没有可用 Yuan 链路，必须启用 PC fallback。" };
   }
 
   const fallback = available.find((candidate) => candidate.kind !== selected.kind)?.kind ?? "offline";
@@ -154,25 +169,31 @@ export function createPairingCode(randomBytes: (length: number) => Uint8Array = 
 export function createPairingSession({
   nowMs = Date.now(),
   expiresInMs = DEFAULT_PAIRING_TTL_MS,
-  relayUrl,
+  hostUrl,
   mobileBaseUrl,
-  pcClientId = "pc-host",
+  pcTerminalId = "stellar-pc-host",
+  tenantPublicKey,
   randomBytes = createRandomBytes,
 }: CreatePairingSessionOptions): DualDevicePairingSession {
   const roomEntropy = randomBytes(10);
   const tokenEntropy = randomBytes(16);
   const pairingCode = formatPairingCode(roomEntropy);
   const roomId = `sf-${formatToken(roomEntropy).slice(0, 12)}`;
+  const publicKey = tenantPublicKey ?? `stellar-${formatToken(roomEntropy)}`;
+  const phoneTerminalId = `stellar-phone-${pairingCode.toLowerCase()}`;
   const token = formatToken(tokenEntropy);
   const expiresAt = nowMs + expiresInMs;
 
   return {
     roomId,
-    pcClientId,
+    hostId: publicKey,
+    tenantPublicKey: publicKey,
+    pcTerminalId,
+    phoneTerminalId,
     pairingCode,
     token,
-    relayUrl,
-    mobileUrl: buildMobilePairingUrl(mobileBaseUrl, { roomId, token, pairingCode, relayUrl }),
+    hostUrl,
+    mobileUrl: buildMobilePairingUrl(mobileBaseUrl, { roomId, hostUrl, tenantPublicKey: publicKey, token, pairingCode, pcTerminalId, phoneTerminalId, expiresAt }),
     createdAt: nowMs,
     expiresAt,
   };
@@ -180,22 +201,44 @@ export function createPairingSession({
 
 export function buildMobilePairingUrl(
   mobileBaseUrl: string,
-  params: { roomId: string; token: string; pairingCode: string; relayUrl: string },
+  params: {
+    roomId: string;
+    hostUrl: string;
+    tenantPublicKey: string;
+    token: string;
+    pairingCode: string;
+    pcTerminalId: string;
+    phoneTerminalId: string;
+    expiresAt: number;
+  },
 ): string {
   const url = new URL(mobileBaseUrl);
   url.searchParams.set("roomId", params.roomId);
+  url.searchParams.set("hostUrl", params.hostUrl);
+  url.searchParams.set("tenantPublicKey", params.tenantPublicKey);
   url.searchParams.set("token", params.token);
   url.searchParams.set("code", params.pairingCode);
-  url.searchParams.set("relayUrl", params.relayUrl);
+  url.searchParams.set("pcTerminalId", params.pcTerminalId);
+  url.searchParams.set("phoneTerminalId", params.phoneTerminalId);
+  url.searchParams.set("expiresAt", String(params.expiresAt));
   return url.toString();
 }
 
-export function buildRelayJoinUrl(relayUrl: string, params: { roomId: string; clientId: string; role: "pc" | "phone"; token: string }): string {
-  const url = new URL(relayUrl);
-  url.searchParams.set("roomId", params.roomId);
-  url.searchParams.set("clientId", params.clientId);
-  url.searchParams.set("role", params.role);
-  url.searchParams.set("token", params.token);
+export function buildYuanHostConnectionUrl(
+  hostUrl: string,
+  params: { terminalId: string; hostToken?: string; publicKey?: string; signature?: string },
+): string {
+  const url = new URL(hostUrl);
+  url.searchParams.set("terminal_id", params.terminalId);
+  if (params.hostToken) {
+    url.searchParams.set("host_token", params.hostToken);
+  }
+  if (params.publicKey) {
+    url.searchParams.set("public_key", params.publicKey);
+  }
+  if (params.signature) {
+    url.searchParams.set("signature", params.signature);
+  }
   return url.toString();
 }
 
@@ -212,6 +255,49 @@ export function createDualDeviceMessage({
   nowMs = Date.now(),
 }: CreateDualDeviceMessageOptions): DualDeviceMessage {
   return { type, roomId, clientId, sequence, sentAt: nowMs, payload };
+}
+
+export function createYuanTerminalMessage(
+  message: DualDeviceMessage,
+  params: { sourceTerminalId: string; targetTerminalId: string; traceId?: string; seqId?: number },
+): YuanTerminalMessage {
+  return {
+    source_terminal_id: params.sourceTerminalId,
+    target_terminal_id: params.targetTerminalId,
+    trace_id: params.traceId ?? `${message.roomId}-${message.sequence}`,
+    seq_id: params.seqId ?? message.sequence,
+    method: `DualDevice/${message.type}`,
+    req: message,
+  };
+}
+
+export function encodeYuanWireMessage(message: YuanTerminalMessage): string {
+  const headers = {
+    target_terminal_id: message.target_terminal_id,
+    source_terminal_id: message.source_terminal_id,
+  };
+  return `${JSON.stringify(headers)}\n${JSON.stringify(message)}`;
+}
+
+export function decodeYuanWireMessage(raw: string): YuanTerminalMessage | null {
+  const separator = raw.indexOf("\n");
+  const body = separator >= 0 ? raw.slice(separator + 1) : raw;
+  try {
+    const value = JSON.parse(body) as unknown;
+    return validateYuanTerminalMessage(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function extractDualDeviceMessage(message: YuanTerminalMessage): DualDeviceMessage | null {
+  if (validateDualDeviceMessage(message.req)) {
+    return message.req;
+  }
+  if (validateDualDeviceMessage(message.event?.payload)) {
+    return message.event.payload;
+  }
+  return null;
 }
 
 export function validateDualDeviceMessage(value: unknown): value is DualDeviceMessage {
@@ -234,6 +320,23 @@ export function validateDualDeviceMessage(value: unknown): value is DualDeviceMe
     typeof sentAt === "number" &&
     Number.isFinite(sentAt) &&
     isRecord(value.payload)
+  );
+}
+
+export function validateYuanTerminalMessage(value: unknown): value is YuanTerminalMessage {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.source_terminal_id === "string" &&
+    value.source_terminal_id.length > 0 &&
+    typeof value.target_terminal_id === "string" &&
+    value.target_terminal_id.length > 0 &&
+    typeof value.trace_id === "string" &&
+    value.trace_id.length > 0 &&
+    typeof value.seq_id === "number" &&
+    Number.isInteger(value.seq_id)
   );
 }
 
@@ -265,14 +368,11 @@ function healthScore(health: DualDeviceTransportHealth) {
 
 function formatTransportReason(candidate: DualDeviceTransportCandidate) {
   const latency = typeof candidate.rttMs === "number" ? `，估计 RTT ${candidate.rttMs}ms` : "";
-  if (candidate.kind === "lan-websocket") {
-    return `同一局域网直连可用${latency}，优先使用最低延迟链路。`;
+  if (candidate.kind === "yuan-webrtc-datachannel") {
+    return `Yuan WebRTC DataChannel 可用${latency}，优先使用无感升级后的低延迟链路。`;
   }
-  if (candidate.kind === "mainland-relay") {
-    return `国内 WSS relay 可用${latency}，作为稳定公网基线。`;
-  }
-  if (candidate.kind === "webrtc-datachannel") {
-    return `WebRTC DataChannel 可用${latency}，作为机会性直连优化。`;
+  if (candidate.kind === "yuan-wss") {
+    return `Yuan Host WSS 可用${latency}，作为稳定公网基线和 WebRTC signaling 通道。`;
   }
   return "离线状态，只能使用 PC fallback。";
 }

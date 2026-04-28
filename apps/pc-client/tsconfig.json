@@ -14,7 +14,7 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@stellar-frontier/protocol": ["../../packages/protocol/src/index.ts"]
+      "@stellar-frontier/dual-device": ["../../packages/dual-device/src/index.ts"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

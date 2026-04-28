@@ -5,6 +5,7 @@
 - [Decisions](decisions.md)
 - [Patterns](patterns.md)
 - [Maintenance](maintenance.md)
+- [调研：基于 Yuan 构建 Stellar 双设备业务层](research/yuan-protocol-relay-assessment.md)
 - [Task: Dual-Device Play Accessibility](tasks/dual-device-play-accessibility.md)
 
 ## Current Query Path

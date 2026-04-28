@@ -12,9 +12,9 @@ importers:
 
   ../../apps/mobile-client:
     dependencies:
-      '@stellar-frontier/protocol':
+      '@stellar-frontier/dual-device':
         specifier: workspace:*
-        version: link:../../packages/protocol
+        version: link:../../packages/dual-device
       react:
         specifier: ^19.2.5
         version: 19.2.5
@@ -55,9 +55,9 @@ importers:
 
   ../../apps/pc-client:
     dependencies:
-      '@stellar-frontier/protocol':
+      '@stellar-frontier/dual-device':
         specifier: workspace:*
-        version: link:../../packages/protocol
+        version: link:../../packages/dual-device
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -111,29 +111,7 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@25.6.0)(jsdom@29.1.0)(vite@8.0.10(@types/node@25.6.0))
 
-  ../../apps/relay-server:
-    dependencies:
-      '@stellar-frontier/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      ws:
-        specifier: ^8.18.3
-        version: 8.20.0
-    devDependencies:
-      '@types/node':
-        specifier: ^25.6.0
-        version: 25.6.0
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4.1.5
-        version: 4.1.5(@types/node@25.6.0)(jsdom@29.1.0)(vite@8.0.10(@types/node@25.6.0))
-
-  ../../packages/protocol:
+  ../../packages/dual-device:
     devDependencies:
       '@types/node':
         specifier: ^25.6.0
@@ -413,9 +391,6 @@ packages:
 
   '@types/react@19.2.14':
     resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
-
-  '@types/ws@8.18.1':
-    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@vitejs/plugin-react@6.0.1':
     resolution: {integrity: sha512-l9X/E3cDb+xY3SWzlG1MOGt2usfEHGMNIaegaUGFsLkb3RCn/k8/TOXBcab+OndDI4TBtktT8/9BwwW8Vi9KUQ==}
@@ -1018,18 +993,6 @@ packages:
     resolution: {integrity: sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA==}
     engines: {node: '>=8'}
 
-  ws@8.20.0:
-    resolution: {integrity: sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
     engines: {node: '>=18'}
@@ -1263,10 +1226,6 @@ snapshots:
   '@types/react@19.2.14':
     dependencies:
       csstype: 3.2.3
-
-  '@types/ws@8.18.1':
-    dependencies:
-      '@types/node': 25.6.0
 
   '@vitejs/plugin-react@6.0.1(vite@8.0.10(@types/node@25.6.0))':
     dependencies:
@@ -1759,8 +1718,6 @@ snapshots:
       ansi-styles: 4.3.0
       string-width: 4.2.3
       strip-ansi: 6.0.1
-
-  ws@8.20.0: {}
 
   xml-name-validator@5.0.0: {}
 

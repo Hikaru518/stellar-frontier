@@ -6,7 +6,7 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
-            "@stellar-frontier/protocol": fileURLToPath(new URL("../../packages/protocol/src/index.ts", import.meta.url)),
+            "@stellar-frontier/dual-device": fileURLToPath(new URL("../../packages/dual-device/src/index.ts", import.meta.url)),
         },
     },
     test: {

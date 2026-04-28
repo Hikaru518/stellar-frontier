@@ -98,7 +98,7 @@ https://<用户名>.github.io/stellar-frontier/
 
 - **控制中心**：游戏主入口，展示资源状态、系统日志和可交互设施（窗户、中控台、咖啡机、唱片机、冰箱、研究台、星际贸易、星际之门等）。
 - **通讯台**：查看队员位置、状态、背包、通讯/失联状态和来电，并进入通话事件。
-- **手机私人终端**：PC 通讯台可生成 QR 码与短手输码；手机端作为 companion terminal 接收 PC 授权的私密通讯，只回传 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。
+- **手机私人终端**：PC 通讯台可生成 QR 码与短手输码；手机端作为 Yuan Terminal companion 接收 PC 授权的私密通讯，只回传 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。Stellar 仅维护共享 dual-device 业务库，不维护专属 relay server。
 - **通话**：承载角色事件、普通行动（移动 / 调查 / 采集 / 建设 / 待命）和紧急决策；选择结果会更新队员、地图与系统日志。
 - **地图**：以可配置网格（默认 `8 x 8`）展示地形、自然资源、建筑、仪器、危险与队员位置。地图只读，不直接下达指令。
 - **人物详情**：展示背景档案、5 维轻量属性、自由性格标签、专长以及关键节点日记，并按通讯/失联/找回状态控制日记可见性。
@@ -128,10 +128,9 @@ https://<用户名>.github.io/stellar-frontier/
 │   ├── pc-client/           # PC 权威游戏客户端（原 React/Vite app）
 │   │   ├── src/             # 页面、系统规则、内容加载、组件测试
 │   │   └── tests/e2e/       # Playwright 端到端测试
-│   ├── mobile-client/       # 手机 companion terminal 浏览器客户端
-│   └── relay-server/        # WSS room broker 骨架：token 校验、首台手机锁定、消息中转
+│   └── mobile-client/       # 手机 companion terminal 浏览器客户端
 ├── packages/
-│   └── protocol/            # 三端共享的配对、传输、消息 envelope 协议
+│   └── dual-device/         # PC/mobile 共享的配对、Yuan message 映射、typed events 与 fallback 规则
 ├── common/config/rush/      # Rush + pnpm 配置与 lockfile
 ├── package.json
 └── rush.json

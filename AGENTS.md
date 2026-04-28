@@ -8,7 +8,7 @@
 - `docs/core-ideas.md` 是特殊的全局核心想法与设计原则页，保持短小、指导性，不使用普通子系统 wiki 的 10 章模板；任何对它的更新都必须先获得人类确认，agent 不得在未确认的情况下自动改写核心原则。
 - `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品/地图的具体配置写在 `content/`。
 - 仓库使用 Rush + pnpm monorepo；不要恢复 npm workspaces，也不要提交 root `package-lock.json`。
-- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src`、`apps/relay-server/src` 或 `packages/protocol/src` 后必须能通过 `npm run lint` 和 `npm run test`。
+- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
 
 ## docs/ 知识库结构
 
@@ -56,7 +56,7 @@
 - **事件触发**：抵达地块、调查完成、采集完成、建设完成、长时间待命、通话选项均可触发事件；事件依据队员属性 / 携带物 / 标签 / 概率结算；紧急事件以来电进入通讯台并形成倒计时。
 - **人物表达**：每名队员具备背景档案、通话语气、5 维轻量属性（体能 / 敏捷 / 智力 / 感知 / 运气，取值 `1-6`）、自由性格标签、专长标签与关键节点日记。
 - **日记可见性**：日记按 `已传回 / 未传回 / 失联锁定 / 找回解锁` 四态控制可见性。
-- **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，接收 PC 授权的私密信号并回传 typed events；relay-server 只做 token 校验、首台手机锁定与消息中转。
+- **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，接收 PC 授权的私密信号并回传 typed events；共享 dual-device library 负责 room / token / Yuan message 映射，底层 Host / Terminal / WebRTC upgrade 交给外部 Yuan Host。
 - **存档**：以 `localStorage`（key `stellar-frontier-save-v1`）保存全量游戏状态；Debug toolbox 提供重置入口。
 
 ### 内容数据
@@ -89,7 +89,7 @@
 
 ## 约束与假设
 
-- **平台**：PC 与手机端都是浏览器应用；PC 仍持有权威 `GameState` 并依赖 `localStorage` 持久化，relay-server 只做房间中转，不持有游戏状态。
+- **平台**：PC 与手机端都是浏览器应用；PC 仍持有权威 `GameState` 并依赖 `localStorage` 持久化；Stellar 不维护专属 server 组件，跨设备 transport 依赖外部 Yuan Host。
 - **网格**：星球地图为可配置网格，默认 `8 x 8`，移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
 - **指令通道**：移动 / 调查 / 采集 / 建设等所有队员指令必须经"通讯台 → 通话"发出；地图与控制中心都不直接下达指令。
 - **行动并行性**：每名队员同一时间只能执行一个主行动；移动中改派必须先停止当前行动。
@@ -125,10 +125,9 @@
 │   │   ├── src/App.tsx                    # 页面流转、全局 GameState、游戏循环、事件结算汇总
 │   │   ├── src/*System.ts                 # crew / diary / event / time / inventory / map 系统
 │   │   └── tests/e2e/app.spec.ts          # Playwright 端到端流程测试
-│   ├── mobile-client/                    # 手机 companion terminal 浏览器客户端
-│   └── relay-server/                     # WSS room broker 骨架：token 校验、首台手机锁定、消息中转，不持有 GameState
+│   └── mobile-client/                    # 手机 companion terminal 浏览器客户端
 ├── packages/
-│   └── protocol/                         # 三端共享的配对、传输选择、消息 envelope 与 fallback 规则
+│   └── dual-device/                      # PC/mobile 共享的配对、Yuan message 映射、typed events 与 fallback 规则
 ├── common/config/rush/                   # Rush + pnpm 配置、command-line、pnpm lock、repo state
 ├── common/scripts/                       # Rush 生成的 install-run 脚本
 └── rush.json                             # Rush 项目拓扑与 pnpmVersion

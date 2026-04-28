@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  buildRelayJoinUrl,
+  buildYuanHostConnectionUrl,
   createDualDeviceMessage,
-  paidMainlandHybridPlan,
+  createYuanTerminalMessage,
+  decodeYuanWireMessage,
+  encodeYuanWireMessage,
+  extractDualDeviceMessage,
   selectPreferredTransport,
-  validateDualDeviceMessage,
-} from "@stellar-frontier/protocol";
+  yuanBackedDualDevicePlan,
+} from "@stellar-frontier/dual-device";
 
 type MobileConnectionStatus = "manual" | "connecting" | "connected" | "disconnected";
 
@@ -13,8 +16,10 @@ interface PairingParams {
   roomId: string;
   token: string;
   code: string;
-  relayUrl: string;
+  hostUrl: string;
+  tenantPublicKey: string;
   clientId: string;
+  pcTerminalId: string;
 }
 
 interface PrivateSignal {
@@ -30,8 +35,8 @@ export function MobileTerminalApp() {
   const socketRef = useRef<WebSocket | null>(null);
   const sequenceRef = useRef(1);
   const selected = selectPreferredTransport([
-    { kind: "lan-websocket", health: "degraded", reason: "等待 PC 本地候选地址。" },
-    { kind: "mainland-relay", health: "healthy", rttMs: 60 },
+    { kind: "yuan-webrtc-datachannel", health: "degraded", reason: "等待 Yuan Terminal 完成 WebRTC 无感升级。" },
+    { kind: "yuan-wss", health: "healthy", rttMs: 60 },
   ]);
 
   useEffect(() => {
@@ -40,7 +45,9 @@ export function MobileTerminalApp() {
     }
 
     setConnectionStatus("connecting");
-    const socket = new WebSocket(buildRelayJoinUrl(pairing.relayUrl, { roomId: pairing.roomId, clientId: pairing.clientId, role: "phone", token: pairing.token }));
+    const socket = new WebSocket(
+      buildYuanHostConnectionUrl(pairing.hostUrl, { terminalId: pairing.clientId, hostToken: pairing.token, publicKey: pairing.tenantPublicKey }),
+    );
     socketRef.current = socket;
 
     socket.addEventListener("open", () => {
@@ -49,7 +56,8 @@ export function MobileTerminalApp() {
     });
 
     socket.addEventListener("message", (event) => {
-      const message = parseRelayMessage(event.data);
+      const yuanMessage = parseYuanWireMessage(event.data);
+      const message = yuanMessage ? extractDualDeviceMessage(yuanMessage) : null;
       if (!message) {
         return;
       }
@@ -81,7 +89,7 @@ export function MobileTerminalApp() {
       }
       socket.close();
     };
-  }, [pairing?.clientId, pairing?.relayUrl, pairing?.roomId, pairing?.token]);
+  }, [pairing?.clientId, pairing?.hostUrl, pairing?.roomId, pairing?.tenantPublicKey, pairing?.token]);
 
   function acknowledgePrivateSignal(kind: "read" | "answer") {
     if (!pairing || !privateSignal) {
@@ -131,7 +139,7 @@ export function MobileTerminalApp() {
       ) : null}
       <section className="terminal-card">
         <h2>推荐链路</h2>
-        <p>{paidMainlandHybridPlan.summary}</p>
+        <p>{yuanBackedDualDevicePlan.summary}</p>
         <dl>
           <div>
             <dt>当前首选</dt>
@@ -157,26 +165,24 @@ function readPairingParams(): PairingParams | null {
   const roomId = url.searchParams.get("roomId")?.trim() ?? "";
   const token = url.searchParams.get("token")?.trim() ?? "";
   const code = url.searchParams.get("code")?.trim() ?? "";
-  const relayUrl = url.searchParams.get("relayUrl")?.trim() ?? "";
+  const hostUrl = url.searchParams.get("hostUrl")?.trim() ?? "";
+  const tenantPublicKey = url.searchParams.get("tenantPublicKey")?.trim() ?? "";
+  const pcTerminalId = url.searchParams.get("pcTerminalId")?.trim() ?? "";
+  const phoneTerminalId = url.searchParams.get("phoneTerminalId")?.trim() ?? "";
 
-  if (!roomId || !token || !code || !relayUrl) {
+  if (!roomId || !token || !code || !hostUrl || !tenantPublicKey || !pcTerminalId || !phoneTerminalId) {
     return null;
   }
 
-  return { roomId, token, code, relayUrl, clientId: `phone-${code.toLowerCase()}` };
+  return { roomId, token, code, hostUrl, tenantPublicKey, clientId: phoneTerminalId, pcTerminalId };
 }
 
-function parseRelayMessage(value: unknown) {
+function parseYuanWireMessage(value: unknown) {
   if (typeof value !== "string") {
     return null;
   }
 
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return validateDualDeviceMessage(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return decodeYuanWireMessage(value);
 }
 
 function sendPhoneEvent(
@@ -190,17 +196,14 @@ function sendPhoneEvent(
     return;
   }
 
-  socket.send(
-    JSON.stringify(
-      createDualDeviceMessage({
-        type,
-        roomId: pairing.roomId,
-        clientId: pairing.clientId,
-        sequence: sequenceRef.current,
-        payload,
-      }),
-    ),
-  );
+  const message = createDualDeviceMessage({
+    type,
+    roomId: pairing.roomId,
+    clientId: pairing.clientId,
+    sequence: sequenceRef.current,
+    payload,
+  });
+  socket.send(encodeYuanWireMessage(createYuanTerminalMessage(message, { sourceTerminalId: pairing.clientId, targetTerminalId: pairing.pcTerminalId })));
   sequenceRef.current += 1;
 }
 
