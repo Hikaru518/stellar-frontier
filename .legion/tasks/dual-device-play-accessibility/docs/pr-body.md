@@ -4,6 +4,7 @@
 - Add the first dual-device foundation from `docs/plans/2026-04-27-22-52/dual-device-play-design.md`: QR/manual-code pairing, token expiry, mobile companion shell, private signal read/answer events, PC fallback, and Yuan Host connection metadata.
 - Remove the Stellar-owned server scaffold; PC and mobile now instantiate real Yuan `Terminal`s and exchange Stellar typed events through Yuan services while Yuan Host remains external infrastructure.
 - Improve the realtime connection demo and clarify transport semantics: WebRTC is the LAN upgrade path; Yuan WSS is the public fallback.
+- Add browser build shims for Yuan's node-only fallback imports so CI builds stay warning-free.
 - Update CI/docs for Rush-managed pnpm and the new PC app artifact path.
 
 ## Tests

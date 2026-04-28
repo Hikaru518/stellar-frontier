@@ -15,7 +15,7 @@ PASS
 - `node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client`: pass, PC Playwright suite passed.
 - `CI=1 node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client`: pass, CI-style PC Playwright suite passed.
 - Re-run after realtime-link demo and WebRTC/WSS copy fixes: `lint`, `test`, `build`, normal PC E2E, and CI-style PC E2E all passed.
-- Re-run after real Yuan Terminal integration: `rush update`, `lint`, `test`, `build`, normal PC E2E, and CI-style PC E2E passed. Vite build emits Yuan dependency warnings for node-only modules externalized in browser bundles, but the browser smoke test loads and runs.
+- Re-run after real Yuan Terminal integration: `rush update`, `validate-content`, `lint`, `test`, `build`, normal PC E2E, and CI-style PC E2E passed. Yuan browser dependency warnings were removed with Vite browser stubs for node-only fallback imports.
 - Local real-Yuan smoke: pass. Started local Yuan Host from `/Users/c1/Work/Yuan/apps/host/lib/cli.js`, started PC/mobile Vite apps, opened both with Playwright, verified phone connects, PC private call reaches phone, and phone answer reaches PC.
 
 ## Why These Commands
@@ -36,6 +36,7 @@ PASS
 - Replaced raw browser WebSocket business messaging with real `@yuants/protocol` `Terminal`, `server.provideService`, and `client.requestByMessage` on both PC and mobile.
 - Added a short delayed Terminal lease/cache so React dev StrictMode does not double-connect the same `terminal_id` and trigger Yuan Host replacement cleanup.
 - Added Vite `define.global = globalThis` for PC/mobile so Yuan's browser dependency chain can run in Vite.
+- Added browser stubs for Yuan dependency fallback imports (`fs`, `fs/promises`, `path`, `crypto`, `events`, `util`) so CI `rush build` exits cleanly instead of failing on warnings.
 
 ## Skipped
 
