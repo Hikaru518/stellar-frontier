@@ -136,6 +136,58 @@ describe("structured condition evaluator", () => {
     ).toBe(false);
   });
 
+  it("checks all available communicable crew are at the requested tile", () => {
+    const baseState = createState();
+    const amy = (baseState.crew as Record<string, Record<string, unknown>>).amy;
+    const condition: Condition = {
+      type: "handler_condition",
+      handler_type: "all_available_crew_at_tile",
+      params: { tile_id: "4-4" },
+    };
+    const context = createContext(
+      {
+        ...baseState,
+        crew: {
+          amy: { ...amy, tile_id: "4-4", status: "idle", communication_state: "available" },
+          mike: { id: "mike", tile_id: "4-4", status: "idle", communication_state: "available", condition_tags: [] },
+          garry: { id: "garry", tile_id: "3-3", status: "lost_contact", communication_state: "lost_contact", condition_tags: [] },
+          lin_xia: { id: "lin_xia", tile_id: "2-2", status: "dead", communication_state: "available", condition_tags: ["dead"] },
+          kael: { id: "kael", tile_id: "1-1", status: "unavailable", communication_state: "available", condition_tags: [] },
+        },
+      },
+      {
+        handler_registry: [
+          handlerDefinition({
+            handler_type: "all_available_crew_at_tile",
+            allowed_target_types: [],
+          }),
+        ],
+      },
+    );
+
+    expect(evaluateCondition(condition, context)).toEqual({ passed: true, errors: [] });
+
+    const negativeContext = createContext(
+      {
+        ...baseState,
+        crew: {
+          amy: { ...amy, tile_id: "4-4", status: "idle", communication_state: "available" },
+          mike: { id: "mike", tile_id: "4-3", status: "idle", communication_state: "available", condition_tags: [] },
+        },
+      },
+      {
+        handler_registry: [
+          handlerDefinition({
+            handler_type: "all_available_crew_at_tile",
+            allowed_target_types: [],
+          }),
+        ],
+      },
+    );
+
+    expect(evaluateCondition(condition, negativeContext).passed).toBe(false);
+  });
+
   it("returns located errors for missing fields, incompatible operators, and invalid handler params", () => {
     const context = createContext(createState(), {
       handler_registry: [

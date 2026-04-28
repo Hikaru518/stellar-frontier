@@ -76,6 +76,14 @@ interface FieldReadResult {
 }
 
 const builtInConditionHandlers: Record<string, ConditionHandler> = {
+  all_available_crew_at_tile({ context, condition, path, params }) {
+    const tileId = readStringParam(params, "tile_id", `${path}.params.tile_id`, condition.handler_type ?? "handler");
+    if (tileId.errors.length > 0) {
+      return tileId;
+    }
+
+    return pass(getCrewEntries(context.state.crew).filter(isAvailableCommunicableCrew).every((member) => getCrewTileId(member) === tileId.value));
+  },
   world_history_value_equals({ context, condition, path, params }) {
     const key = readStringParam(params, "key", `${path}.params.key`, condition.handler_type ?? "handler");
     if (key.errors.length > 0) {
@@ -696,6 +704,36 @@ function getCollectionItem(
   }
 
   return collection[id];
+}
+
+function getCrewEntries(crew: Record<Id, unknown> | unknown[] | undefined): unknown[] {
+  if (!crew) {
+    return [];
+  }
+
+  return Array.isArray(crew) ? crew : Object.values(crew);
+}
+
+function isAvailableCommunicableCrew(member: unknown): boolean {
+  if (!isRecord(member)) {
+    return false;
+  }
+
+  const status = stringFieldValue(member, ["status"]);
+  const communicationState = stringFieldValue(member, ["communication_state", "communicationState"]);
+  const unavailable = readFieldValue(member, "unavailable") === true;
+  const canCommunicate = readFieldValue(member, "canCommunicate");
+  const conditions = collectStringArray(member, ["condition_tags", "conditions"]);
+
+  if (unavailable || canCommunicate === false || communicationState === "lost_contact") {
+    return false;
+  }
+
+  return ![status, ...conditions].some((value) => value === "lost" || value === "lost_contact" || value === "dead" || value === "unavailable");
+}
+
+function getCrewTileId(member: unknown): string | undefined {
+  return stringFieldValue(member, ["tile_id", "tileId", "currentTile"]);
 }
 
 function readField(value: unknown, field: string): FieldReadResult {

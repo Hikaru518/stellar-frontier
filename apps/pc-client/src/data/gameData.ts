@@ -10,7 +10,7 @@ import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 import { deriveLegacyTiles, getTileLocationLabel, type RuntimeMapState } from "../mapSystem";
 
-export type PageId = "control" | "station" | "call" | "map";
+export type PageId = "control" | "station" | "call" | "map" | "ending";
 
 export type CrewId = "mike" | "amy" | "garry" | "lin_xia" | "kael";
 

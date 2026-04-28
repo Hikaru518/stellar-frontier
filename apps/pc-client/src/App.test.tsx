@@ -24,6 +24,45 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /通讯台/ })).toBeInTheDocument();
   });
 
+  it("enters the ending page when return home is completed", async () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 3723,
+        crew: initialCrew,
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+        world_flags: {
+          return_home_completed: {
+            key: "return_home_completed",
+            value: true,
+            value_type: "boolean",
+            created_at: 3600,
+            updated_at: 3600,
+          },
+          return_home_completed_at: {
+            key: "return_home_completed_at",
+            value: 3600,
+            value_type: "number",
+            created_at: 3600,
+            updated_at: 3600,
+          },
+        },
+      })),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "返航完成" })).toBeInTheDocument();
+    expect(screen.getByText("完成时间：第 1 日 01 小时 00 分钟 00 秒")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重置游戏" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "回控制中心查看记录" }));
+    expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
+  });
+
   it("creates the initial runtime map state from the default map config", () => {
     render(<App />);
 

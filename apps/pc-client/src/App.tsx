@@ -3,6 +3,7 @@ import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
+import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
 import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
 import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, hydrateMoveActionRoute, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
@@ -69,6 +70,9 @@ function App() {
 
   const { elapsedGameSeconds, crew, map, tiles, logs, resources } = gameState;
   const gameTimeLabel = formatGameTime(elapsedGameSeconds);
+  const returnHomeCompleted = gameState.world_flags.return_home_completed?.value === true;
+  const returnHomeCompletedAt = getWorldFlagNumber(gameState, "return_home_completed_at");
+  const completedAtLabel = formatGameTime(returnHomeCompletedAt ?? elapsedGameSeconds);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -81,6 +85,12 @@ function App() {
   useEffect(() => {
     saveGameState(gameState);
   }, [gameState]);
+
+  useEffect(() => {
+    if (returnHomeCompleted) {
+      setPage("ending");
+    }
+  }, [returnHomeCompleted]);
 
   function appendLog(text: string, tone: Tone = "neutral") {
     setGameState((state) => ({
@@ -291,6 +301,17 @@ function App() {
             result: "移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。",
           }
         : call,
+    );
+  }
+
+  if (page === "ending") {
+    return (
+      <EndingPage
+        completedAtLabel={completedAtLabel}
+        gameTimeLabel={gameTimeLabel}
+        onResetGame={resetGame}
+        onReturnControl={() => setPage("control")}
+      />
     );
   }
 
@@ -961,6 +982,11 @@ function numericResources(resources: ResourceSummary): Record<string, number> {
     sol: resources.sol,
     power: resources.power,
   };
+}
+
+function getWorldFlagNumber(state: GameState, key: string): number | undefined {
+  const value = state.world_flags[key]?.value;
+  return typeof value === "number" ? value : undefined;
 }
 
 function crewInventoryId(crewId: CrewId) {

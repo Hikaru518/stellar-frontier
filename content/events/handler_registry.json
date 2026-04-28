@@ -1,6 +1,17 @@
 {
   "handlers": [
     {
+      "handler_type": "all_available_crew_at_tile",
+      "kind": "condition",
+      "description": "检查所有可通讯且可用的队员是否都位于指定地块。",
+      "params_schema_ref": "#/$defs/all_available_crew_at_tile_params",
+      "allowed_target_types": [],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": []
+    },
+    {
       "handler_type": "world_history_value_equals",
       "kind": "condition",
       "description": "检查 world_history 条目是否保存了预期值。",
