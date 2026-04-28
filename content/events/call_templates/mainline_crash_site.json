@@ -1,0 +1,60 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_crash_site_survey_chain.call.first",
+      "version": 1,
+      "domain": "mainline_crash_site",
+      "event_definition_id": "mainline_crash_site_survey_chain",
+      "node_id": "first_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_crash_first_opening", "text": "{{crew_display_name}} 从坠毁残骸中恢复了基础物资，并确认折跃仓不是简单断电。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_crash_first_body", "text": "主目标已明确：小队必须修复损坏折跃仓、找到可用燃料和返航坐标。当前物资只够支撑前期探索。", "priority": 0 }] }],
+      "option_lines": { "ack": { "selection": "best_match", "variants": [{ "id": "mainline_crash_ack_first", "text": "记录返航主目标，继续扩大调查。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_crash_site_survey_chain.call.radar",
+      "version": 1,
+      "domain": "mainline_crash_site",
+      "event_definition_id": "mainline_crash_site_survey_chain",
+      "node_id": "radar_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_crash_radar_opening", "text": "{{crew_display_name}} 重新接通基础雷达，得到几组稳定但粗糙的方向线索。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_crash_radar_body", "text": "北侧有密集生命迹象，可能是外星村落；东侧有旧金属反应，像旧飞船遗迹；南侧高温反应指向火山；西侧医疗应答信标来自废弃医疗舱。这些线索不依赖随机扫描或高属性判断。", "priority": 0 }] }],
+      "option_lines": { "ack": { "selection": "best_match", "variants": [{ "id": "mainline_crash_ack_radar", "text": "标记村落、旧飞船遗迹、火山和医疗舱方向。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_crash_site_survey_chain.call.repair_docs",
+      "version": 1,
+      "domain": "mainline_crash_site",
+      "event_definition_id": "mainline_crash_site_survey_chain",
+      "node_id": "repair_docs_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_crash_docs_opening", "text": "{{crew_display_name}} 在日志技术文档中找到了折跃仓维修流程。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_crash_docs_body", "text": "当前队员已掌握维修技术。文档已保存，之后缺少 knows_repair_tech 的队员可回到坠毁点的日志技术文档处重复学习。", "priority": 0 }] }],
+      "option_lines": { "ack": { "selection": "best_match", "variants": [{ "id": "mainline_crash_ack_docs", "text": "保存技术文档，标记为可重复学习来源。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_repair_docs_repeat_learning.call.learn",
+      "version": 1,
+      "domain": "mainline_crash_site",
+      "event_definition_id": "mainline_repair_docs_repeat_learning",
+      "node_id": "learn_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_repair_repeat_opening", "text": "{{crew_display_name}} 正在读取坠毁点保存的日志技术文档。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_repair_repeat_body", "text": "文档中的维修流程足够完整，可以让缺少维修技术的队员补学 knows_repair_tech。", "priority": 0 }] }],
+      "option_lines": { "learn": { "selection": "best_match", "variants": [{ "id": "mainline_repair_repeat_option", "text": "学习维修技术。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

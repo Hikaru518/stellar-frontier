@@ -1701,11 +1701,11 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
-    expect(within(garryCard as HTMLElement).getByText("位置：铁脊矿带 (-1,1)")).toBeInTheDocument();
+    expect(within(garryCard as HTMLElement).getByText("位置：丘陵矿带 (-1,1)")).toBeInTheDocument();
     expect(within(garryCard as HTMLElement).queryByText("iron_ore")).not.toBeInTheDocument();
 
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "查看档案" }));
-    expect(screen.getAllByText("铁脊矿带 (-1,1)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("丘陵矿带 (-1,1)").length).toBeGreaterThan(0);
     expect(screen.queryByText(/row|col/)).not.toBeInTheDocument();
   });
 

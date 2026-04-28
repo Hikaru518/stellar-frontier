@@ -1,0 +1,32 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_rare_ore_gather_progress.call.trace",
+      "version": 1,
+      "domain": "mainline_resources",
+      "event_definition_id": "mainline_rare_ore_gather_progress",
+      "node_id": "trace_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_rare_ore_trace_opening", "text": "{{crew_display_name}} 完成丘陵铁矿床采集，基础铁矿已经入包。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_rare_ore_trace_body", "text": "矿渣里出现了稳定的异常杂质，但样本还不够完整。继续在丘陵矿带采集，第三次起可以保底分离出稀有矿石样本。", "priority": 0 }] }],
+      "option_lines": { "ack": { "selection": "best_match", "variants": [{ "id": "mainline_rare_ore_trace_ack", "text": "记录稀有矿石采集进度。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_rare_ore_gather_progress.call.sample",
+      "version": 1,
+      "domain": "mainline_resources",
+      "event_definition_id": "mainline_rare_ore_gather_progress",
+      "node_id": "sample_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_rare_ore_sample_opening", "text": "{{crew_display_name}} 从丘陵铁矿床中分离出一份稀有矿石样本。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_rare_ore_sample_body", "text": "样本进入当前队员个人背包。第三次后继续采集仍可能再次取得样本，用于缓解携带者失效导致交易路线锁死的风险。", "priority": 0 }] }],
+      "option_lines": { "ack": { "selection": "best_match", "variants": [{ "id": "mainline_rare_ore_sample_ack", "text": "保存稀有矿石样本。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_rare_ore_gather_progress",
+      "version": 1,
+      "domain": "mainline_resources",
+      "title": "丘陵稀有矿石采集进度",
+      "summary": "丘陵铁矿床采集继续保留基础铁矿收益，同时递增稀有矿石采集计数；第 3 次起保底给当前队员稀有矿石样本。",
+      "tags": ["mainline", "resources", "rare_ore", "gather"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "gather" } },
+          {
+            "type": "any_of",
+            "conditions": [
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-rare-ore-strata" } },
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "iron-ridge-outcrop" } }
+            ]
+          }
+        ]
+      },
+      "candidate_selection": { "priority": 75, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_rare_ore_gather_progress", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "increment_rare_ore_count",
+        "nodes": [
+          { "id": "increment_rare_ore_count", "type": "log_only", "title": "记录丘陵采集次数", "event_log_template_id": "rare_ore_gather_counter_log", "effect_refs": ["increment_rare_ore_gather_count"], "next_node_id": "select_rare_ore_result", "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null } },
+          {
+            "id": "select_rare_ore_result",
+            "type": "check",
+            "title": "选择稀有矿石结果",
+            "branches": [
+              { "id": "guaranteed_sample", "conditions": [{ "type": "compare_field", "target": { "type": "world_flags" }, "field": "rare_ore_gather_count.value", "op": "gte", "value": 3 }], "next_node_id": "sample_report", "effect_refs": ["rare_ore_sample_reward"] }
+            ],
+            "default_next_node_id": "trace_report",
+            "evaluation_order": "first_match",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          { "id": "trace_report", "type": "call", "title": "报告稀有矿石杂质", "call_template_id": "mainline_rare_ore_gather_progress.call.trace", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "trace_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "sample_report", "type": "call", "title": "报告稀有矿石样本", "call_template_id": "mainline_rare_ore_gather_progress.call.sample", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "sample_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "trace_end", "type": "end", "title": "稀有矿石线索已记录", "resolution": "resolved", "result_key": "rare_ore_trace_noted", "event_log_template_id": "rare_ore_trace_noted_log", "history_writes": [{ "key_template": "mainline_rare_ore_gather_progress:trace:{crew_id}", "scope": "crew", "value": "rare_ore_trace_noted" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } },
+          { "id": "sample_end", "type": "end", "title": "稀有矿石样本已取得", "resolution": "resolved", "result_key": "rare_ore_sample_obtained", "event_log_template_id": "rare_ore_sample_obtained_log", "history_writes": [{ "key_template": "mainline_rare_ore_gather_progress:sample:{crew_id}:{tile_id}", "scope": "crew_tile", "value": "rare_ore_sample_obtained" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["trace_end", "sample_end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [
+        { "id": "increment_rare_ore_gather_count", "effects": [{ "id": "rare_ore_gather_counter", "type": "increment_world_counter", "target": { "type": "world_flags" }, "params": { "key": "rare_ore_gather_count", "amount": 1, "tags": ["mainline", "rare_ore"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "rare_ore_sample_reward", "effects": [
+          { "id": "rare_ore_sample_add_item", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "rare_ore_sample", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "rare_ore_sample_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "丘陵铁矿床采集进度达到保底阈值，当前队员取得稀有矿石样本；之后继续采集仍可再次取得样本。", "importance": "major", "visibility": "player_visible", "result_key": "rare_ore_sample_obtained" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [
+        { "id": "rare_ore_gather_counter_log", "summary": "丘陵稀有矿石采集计数已更新", "importance": "minor", "visibility": "player_visible" },
+        { "id": "rare_ore_trace_noted_log", "summary": "丘陵矿带发现稀有矿石杂质", "importance": "normal", "visibility": "player_visible" },
+        { "id": "rare_ore_sample_obtained_log", "summary": "稀有矿石样本已取得", "importance": "major", "visibility": "player_visible" }
+      ],
+      "content_refs": { "call_template_ids": ["mainline_rare_ore_gather_progress.call.trace", "mainline_rare_ore_gather_progress.call.sample"], "item_ids": ["rare_ore_sample", "iron_ore"] },
+      "sample_contexts": [
+        { "trigger_type": "action_complete", "occurred_at": 600, "source": "crew_action", "crew_id": "garry", "tile_id": "3-3", "action_id": "gather:mainline-rare-ore-strata:3-3:120", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "gather", "object_id": "mainline-rare-ore-strata", "tags": ["mainline", "mainline_resources", "mainline_rare_ore_source", "rare_ore"] } }
+      ]
+    }
+  ]
+}

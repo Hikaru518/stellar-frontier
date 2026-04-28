@@ -35,8 +35,8 @@ describe("mapSystem", () => {
   });
 
   it("uses area name and player coordinates for location labels", () => {
-    expect(getTileAreaName(defaultMapConfig, "3-3")).toBe("铁脊矿带");
-    expect(getTileLocationLabel(defaultMapConfig, "3-3")).toBe("铁脊矿带 (-1,1)");
+    expect(getTileAreaName(defaultMapConfig, "3-3")).toBe("丘陵矿带");
+    expect(getTileLocationLabel(defaultMapConfig, "3-3")).toBe("丘陵矿带 (-1,1)");
     expect(getTileLocationLabel(defaultMapConfig, "missing")).toBe("missing");
   });
 
@@ -87,7 +87,7 @@ describe("mapSystem", () => {
     expect(tiles.find((tile) => tile.id === "3-3")).toMatchObject({
       coord: "(-1,1)",
       terrain: "丘陵",
-      resources: ["iron_ore"],
+      resources: expect.arrayContaining(["iron_ore"]),
       buildings: ["采矿厂：铁 #2"],
       instruments: ["mercury_thermometer"],
       crew: ["garry"],
