@@ -4,6 +4,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   base: process.env.NODE_ENV === "production" ? "/stellar-frontier/" : "/",
+  define: {
+    global: "globalThis",
+  },
   plugins: [react()],
   server: {
     port: 5173,

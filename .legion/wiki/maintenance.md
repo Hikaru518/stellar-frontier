@@ -14,7 +14,7 @@ WebRTC DataChannel/TURN support remains delegated to Yuan and out of scope for t
 
 ## Yuan WebRTC Integration Test
 
-当前 E2E 只验证 UI / 业务层语义：`enableWebRTC=true` 被展示为局域网升级，Yuan WSS 被展示为公网兜底。尚未覆盖真实 Yuan `Terminal` 的 `enableWebRTC=true` DataChannel 握手。后续需要单独测试 harness：启动 Yuan Host，启动 PC/mobile 两个 Yuan Terminal，开启 WebRTC，观察 WSS signaling 后 DataChannel 成功升级与失败回退。
+当前 PR 已有本地 smoke 覆盖真实 Yuan `Terminal` + Yuan Host WSS 路由：PC/mobile 均开启 `enable_WebRTC: true`，手机心跳可让 PC 变为已连接，PC 私密来电可投递到手机，手机接听可回写 PC。尚未覆盖真实 DataChannel tunnel 断言。后续需要单独测试 harness：启动 Yuan Host，启动 PC/mobile 两个 Yuan Terminal，开启 WebRTC，观察 WSS signaling 后 DataChannel 成功升级与失败回退，最好直接读取 Yuan tunnel metrics 或暴露测试钩子。
 
 ## Yuan-Backed Business Layer RFC
 

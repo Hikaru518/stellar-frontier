@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
-  buildYuanHostConnectionUrl,
   createDualDeviceMessage,
   createPairingSession,
-  createYuanTerminalMessage,
+  acquireYuanDualDeviceTerminal,
   describeYuanRealtimeLink,
-  decodeYuanWireMessage,
-  encodeYuanWireMessage,
-  extractDualDeviceMessage,
+  DUAL_DEVICE_PC_EVENT_METHOD,
+  DUAL_DEVICE_PHONE_DELIVERY_METHOD,
   getLatencyTarget,
   isPairingSessionExpired,
+  provideDualDeviceService,
+  requestDualDeviceMessage,
   selectPreferredTransport,
   yuanBackedDualDevicePlan,
   type DualDevicePairingSession,
+  type DualDeviceMessage,
+  type YuanDualDeviceTerminal,
 } from "@stellar-frontier/dual-device";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
@@ -56,7 +58,7 @@ export function CommunicationStation({
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [phoneConnectionStatus, setPhoneConnectionStatus] = useState<PhoneConnectionStatus>("waiting");
   const [privateSignalStatus, setPrivateSignalStatus] = useState<PrivateSignalStatus>("idle");
-  const socketRef = useRef<WebSocket | null>(null);
+  const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
   const sequenceRef = useRef(1);
   const activeRuntimeCalls = Object.values(activeCalls)
     .filter((call) => isRuntimeCallActive(call, elapsedGameSeconds))
@@ -103,46 +105,36 @@ export function CommunicationStation({
   }, [pairingSession.mobileUrl]);
 
   useEffect(() => {
-    if (typeof WebSocket === "undefined") {
+    if (!shouldStartYuanTerminal()) {
       return;
     }
 
     setPhoneConnectionStatus("waiting");
-    const socket = new WebSocket(
-      buildYuanHostConnectionUrl(pairingSession.hostUrl, {
-        terminalId: pairingSession.pcTerminalId,
-        hostToken: pairingSession.token,
-        publicKey: pairingSession.tenantPublicKey,
-      }),
-    );
-    socketRef.current = socket;
+    const lease = acquireYuanDualDeviceTerminal({
+      hostUrl: pairingSession.hostUrl,
+      terminalId: pairingSession.pcTerminalId,
+      token: pairingSession.token,
+      tenantPublicKey: pairingSession.tenantPublicKey,
+      name: "Stellar Frontier PC Authority",
+      enableWebRTC: true,
+    });
+    const { terminal } = lease;
+    terminalRef.current = terminal;
 
-    socket.addEventListener("message", (event) => {
-      const yuanMessage = parseYuanWireMessage(event.data);
-      const message = yuanMessage ? extractDualDeviceMessage(yuanMessage) : null;
-      if (!message) {
-        return;
-      }
-
-      if (message.type === "phone.message.read") {
-        setPrivateSignalStatus("read");
-      }
-      if (message.type === "phone.call.answer") {
-        setPrivateSignalStatus("answered");
-      }
-      if (message.type === "link.heartbeat") {
-        setPhoneConnectionStatus("connected");
-      }
+    const connectionSubscription = terminal.isConnected$.subscribe((connected) => {
+      setPhoneConnectionStatus((status) => (connected ? status : status === "connected" ? "disconnected" : "waiting"));
+    });
+    const service = provideDualDeviceService(terminal, DUAL_DEVICE_PC_EVENT_METHOD, (message) => {
+      handlePhoneEventMessage(message, setPrivateSignalStatus, setPhoneConnectionStatus);
     });
 
-    socket.addEventListener("error", () => setPhoneConnectionStatus("weak"));
-    socket.addEventListener("close", () => setPhoneConnectionStatus((status) => (status === "connected" ? "disconnected" : status)));
-
     return () => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
+      service.dispose();
+      connectionSubscription.unsubscribe();
+      if (terminalRef.current === terminal) {
+        terminalRef.current = null;
       }
-      socket.close();
+      lease.dispose();
     };
   }, [pairingSession]);
 
@@ -152,7 +144,7 @@ export function CommunicationStation({
     setPrivateSignalStatus("idle");
   }
 
-  function sendPrivateSignal() {
+  async function sendPrivateSignal() {
     const message = createDualDeviceMessage({
       type: "phone.call.incoming",
       roomId: pairingSession.roomId,
@@ -166,18 +158,21 @@ export function CommunicationStation({
     });
     sequenceRef.current += 1;
 
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(
-        encodeYuanWireMessage(createYuanTerminalMessage(message, { sourceTerminalId: pairingSession.pcTerminalId, targetTerminalId: pairingSession.phoneTerminalId })),
-      );
+    if (terminalRef.current && !pairingExpired) {
       setPrivateSignalStatus("sent");
+      await requestDualDeviceMessage({
+        terminal: terminalRef.current,
+        targetTerminalId: pairingSession.phoneTerminalId,
+        method: DUAL_DEVICE_PHONE_DELIVERY_METHOD,
+        message,
+      }).catch(() => setPrivateSignalStatus("fallback"));
       return;
     }
 
     setPrivateSignalStatus("fallback");
   }
 
-  function enablePhoneFallback() {
+  async function enablePhoneFallback() {
     const message = createDualDeviceMessage({
       type: "phone.fallback.enabled",
       roomId: pairingSession.roomId,
@@ -186,10 +181,13 @@ export function CommunicationStation({
       payload: { reason: "pc_manual_fallback" },
     });
     sequenceRef.current += 1;
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(
-        encodeYuanWireMessage(createYuanTerminalMessage(message, { sourceTerminalId: pairingSession.pcTerminalId, targetTerminalId: pairingSession.phoneTerminalId })),
-      );
+    if (terminalRef.current) {
+      await requestDualDeviceMessage({
+        terminal: terminalRef.current,
+        targetTerminalId: pairingSession.phoneTerminalId,
+        method: DUAL_DEVICE_PHONE_DELIVERY_METHOD,
+        message,
+      }).catch(() => undefined);
     }
     setPrivateSignalStatus("fallback");
   }
@@ -595,8 +593,11 @@ function createPhoneTerminalPairingSession() {
   return createPairingSession({
     hostUrl: getConfiguredYuanHostUrl(),
     mobileBaseUrl: getConfiguredMobileTerminalUrl(),
-    pcTerminalId: "stellar-pc-host",
   });
+}
+
+function shouldStartYuanTerminal() {
+  return import.meta.env.MODE !== "test" && typeof WebSocket !== "undefined";
 }
 
 function getConfiguredYuanHostUrl() {
@@ -632,14 +633,6 @@ function getConfiguredMobileTerminalUrl() {
   return url.toString();
 }
 
-function parseYuanWireMessage(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  return decodeYuanWireMessage(value);
-}
-
 function formatPhoneConnectionStatus(status: PhoneConnectionStatus) {
   if (status === "connected") {
     return "已连接";
@@ -651,6 +644,22 @@ function formatPhoneConnectionStatus(status: PhoneConnectionStatus) {
     return "已断开";
   }
   return "等待配对";
+}
+
+function handlePhoneEventMessage(
+  message: DualDeviceMessage,
+  setPrivateSignalStatus: (status: PrivateSignalStatus) => void,
+  setPhoneConnectionStatus: (status: PhoneConnectionStatus) => void,
+) {
+  if (message.type === "phone.message.read") {
+    setPrivateSignalStatus("read");
+  }
+  if (message.type === "phone.call.answer") {
+    setPrivateSignalStatus("answered");
+  }
+  if (message.type === "link.heartbeat") {
+    setPhoneConnectionStatus("connected");
+  }
 }
 
 function getPhoneStatusTone(status: PhoneConnectionStatus) {

@@ -43,6 +43,21 @@ npm run dev:mobile
 
 默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Yuan Host 为 `ws://localhost:8888/`。
 
+双设备真实联调需要先启动 Yuan Host。若使用本地 Yuan 仓库，可运行：
+
+```bash
+node /Users/c1/Work/Yuan/apps/host/lib/cli.js
+```
+
+然后分别启动 PC 与手机端。PC 通讯台会创建真实 Yuan `Terminal(enable_WebRTC: true)`；手机扫码打开 companion 页面后也会创建 Yuan Terminal，并通过 Yuan service 回传心跳、已读、接听事件。
+
+真实手机扫码时，手机端 dev server 需要暴露到局域网，且 `VITE_MOBILE_TERMINAL_URL` 需要指向手机能访问到的地址，例如：
+
+```bash
+npm run dev:mobile:lan
+VITE_MOBILE_TERMINAL_URL=http://<LAN-IP>:5174/ npm run dev:pc
+```
+
 构建生产版本：
 
 ```bash

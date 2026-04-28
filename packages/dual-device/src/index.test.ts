@@ -68,11 +68,11 @@ describe("Yuan-backed dual-device business layer", () => {
 
     expect(session.roomId).toBe("sf-000102030405");
     expect(session.hostId).toBe("tenant-pubkey");
-    expect(session.pcTerminalId).toBe("stellar-pc-host");
+    expect(session.pcTerminalId).toBe("stellar-pc-abcdef");
     expect(session.phoneTerminalId).toBe("stellar-phone-abcdef");
     expect(session.mobileUrl).toContain("hostUrl=wss%3A%2F%2Fyuan.example.test%2Fhost");
     expect(session.mobileUrl).toContain("tenantPublicKey=tenant-pubkey");
-    expect(buildYuanHostConnectionUrl(session.hostUrl, { terminalId: session.pcTerminalId, hostToken: session.token })).toContain("terminal_id=stellar-pc-host");
+    expect(buildYuanHostConnectionUrl(session.hostUrl, { terminalId: session.pcTerminalId, hostToken: session.token })).toContain("terminal_id=stellar-pc-abcdef");
     expect(isPairingSessionExpired(session, 300999)).toBe(false);
     expect(isPairingSessionExpired(session, 301000)).toBe(true);
   });

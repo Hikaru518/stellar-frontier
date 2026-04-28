@@ -1,3 +1,5 @@
+import { Terminal, type IResponse } from "@yuants/protocol";
+
 export type DualDeviceTransportKind = "yuan-webrtc-datachannel" | "yuan-wss" | "offline";
 
 export type DualDeviceTransportHealth = "healthy" | "degraded" | "unavailable";
@@ -101,6 +103,31 @@ export interface CreateDualDeviceMessageOptions {
   nowMs?: number;
 }
 
+export interface CreateYuanDualDeviceTerminalOptions {
+  hostUrl: string;
+  terminalId: string;
+  token: string;
+  name: string;
+  tenantPublicKey?: string;
+  enableWebRTC?: boolean;
+  verbose?: boolean;
+}
+
+export type YuanDualDeviceTerminal = Terminal;
+
+export interface SendDualDeviceMessageOptions {
+  terminal: Terminal;
+  targetTerminalId: string;
+  method: string;
+  message: DualDeviceMessage;
+  timeoutMs?: number;
+}
+
+export interface YuanDualDeviceTerminalLease {
+  terminal: Terminal;
+  dispose: () => void;
+}
+
 export interface DualDeviceDeploymentPlan {
   name: string;
   summary: string;
@@ -118,6 +145,9 @@ const TRANSPORT_PRIORITY: Record<DualDeviceTransportKind, number> = {
 
 const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const DEFAULT_PAIRING_TTL_MS = 5 * 60 * 1000;
+
+export const DUAL_DEVICE_PHONE_DELIVERY_METHOD = "DualDevice/DeliverToPhone";
+export const DUAL_DEVICE_PC_EVENT_METHOD = "DualDevice/PhoneEvent";
 
 export const yuanBackedDualDevicePlan: DualDeviceDeploymentPlan = {
   name: "Yuan-backed Dual Device",
@@ -209,7 +239,7 @@ export function createPairingSession({
   expiresInMs = DEFAULT_PAIRING_TTL_MS,
   hostUrl,
   mobileBaseUrl,
-  pcTerminalId = "stellar-pc-host",
+  pcTerminalId,
   tenantPublicKey,
   randomBytes = createRandomBytes,
 }: CreatePairingSessionOptions): DualDevicePairingSession {
@@ -218,6 +248,7 @@ export function createPairingSession({
   const pairingCode = formatPairingCode(roomEntropy);
   const roomId = `sf-${formatToken(roomEntropy).slice(0, 12)}`;
   const publicKey = tenantPublicKey ?? `stellar-${formatToken(roomEntropy)}`;
+  const pcId = pcTerminalId ?? `stellar-pc-${pairingCode.toLowerCase()}`;
   const phoneTerminalId = `stellar-phone-${pairingCode.toLowerCase()}`;
   const token = formatToken(tokenEntropy);
   const expiresAt = nowMs + expiresInMs;
@@ -226,12 +257,12 @@ export function createPairingSession({
     roomId,
     hostId: publicKey,
     tenantPublicKey: publicKey,
-    pcTerminalId,
+    pcTerminalId: pcId,
     phoneTerminalId,
     pairingCode,
     token,
     hostUrl,
-    mobileUrl: buildMobilePairingUrl(mobileBaseUrl, { roomId, hostUrl, tenantPublicKey: publicKey, token, pairingCode, pcTerminalId, phoneTerminalId, expiresAt }),
+    mobileUrl: buildMobilePairingUrl(mobileBaseUrl, { roomId, hostUrl, tenantPublicKey: publicKey, token, pairingCode, pcTerminalId: pcId, phoneTerminalId, expiresAt }),
     createdAt: nowMs,
     expiresAt,
   };
@@ -278,6 +309,136 @@ export function buildYuanHostConnectionUrl(
     url.searchParams.set("signature", params.signature);
   }
   return url.toString();
+}
+
+export function createYuanDualDeviceTerminal({
+  hostUrl,
+  terminalId,
+  token,
+  name,
+  tenantPublicKey,
+  enableWebRTC = true,
+  verbose = false,
+}: CreateYuanDualDeviceTerminalOptions): Terminal {
+  return new Terminal(
+    buildYuanHostConnectionUrl(hostUrl, {
+      terminalId,
+      hostToken: token,
+      publicKey: tenantPublicKey,
+    }),
+    {
+      terminal_id: terminalId,
+      name,
+      enable_WebRTC: enableWebRTC,
+      tags: {
+        app: "stellar-frontier",
+        role: terminalId.includes("phone") ? "phone" : "pc",
+      },
+    },
+    {
+      verbose,
+      disableMetrics: true,
+    },
+  );
+}
+
+const terminalLeases = new Map<
+  string,
+  {
+    connectionKey: string;
+    terminal: Terminal;
+    references: number;
+    disposeTimer?: ReturnType<typeof globalThis.setTimeout>;
+  }
+>();
+
+export function acquireYuanDualDeviceTerminal(options: CreateYuanDualDeviceTerminalOptions): YuanDualDeviceTerminalLease {
+  const connectionKey = formatTerminalConnectionKey(options);
+  const existing = terminalLeases.get(options.terminalId);
+
+  if (existing && existing.connectionKey === connectionKey) {
+    if (existing.disposeTimer !== undefined) {
+      globalThis.clearTimeout(existing.disposeTimer);
+      existing.disposeTimer = undefined;
+    }
+    existing.references += 1;
+    return {
+      terminal: existing.terminal,
+      dispose: () => releaseYuanDualDeviceTerminal(options.terminalId, existing.terminal),
+    };
+  }
+
+  if (existing) {
+    existing.terminal.dispose();
+    terminalLeases.delete(options.terminalId);
+  }
+
+  const terminal = createYuanDualDeviceTerminal(options);
+  terminalLeases.set(options.terminalId, { connectionKey, terminal, references: 1 });
+  return {
+    terminal,
+    dispose: () => releaseYuanDualDeviceTerminal(options.terminalId, terminal),
+  };
+}
+
+export function provideDualDeviceService(
+  terminal: Terminal,
+  method: string,
+  onMessage: (message: DualDeviceMessage) => void | Promise<void>,
+): { dispose: () => void } {
+  return terminal.server.provideService<DualDeviceMessage, { delivered: true }>(method, dualDeviceMessageSchema, async ({ req }) => {
+    if (!validateDualDeviceMessage(req)) {
+      return { res: { code: 400, message: "Invalid DualDeviceMessage" } };
+    }
+
+    await onMessage(req);
+    return { res: { code: 0, message: "OK", data: { delivered: true } } };
+  });
+}
+
+export function requestDualDeviceMessage({ terminal, targetTerminalId, method, message, timeoutMs = 5000 }: SendDualDeviceMessageOptions): Promise<IResponse<unknown>> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
+    let subscription: { unsubscribe: () => void } | undefined;
+    const cleanup = () => {
+      if (timeoutId !== undefined) {
+        globalThis.clearTimeout(timeoutId);
+      }
+      subscription?.unsubscribe();
+    };
+
+    subscription = terminal.client
+      .requestByMessage<DualDeviceMessage, unknown>({
+        method,
+        target_terminal_id: targetTerminalId,
+        req: message,
+      })
+      .subscribe({
+        next: (responseMessage) => {
+          if (!settled && responseMessage.res) {
+            settled = true;
+            cleanup();
+            resolve(responseMessage.res);
+          }
+        },
+        error: (error) => {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            reject(error);
+          }
+        },
+      });
+
+    timeoutId = globalThis.setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        reject(new Error(`DualDevice message request timed out: ${method} -> ${targetTerminalId}`));
+      }
+    }, timeoutMs);
+  });
 }
 
 export function isPairingSessionExpired(session: Pick<DualDevicePairingSession, "expiresAt">, nowMs = Date.now()): boolean {
@@ -361,6 +522,19 @@ export function validateDualDeviceMessage(value: unknown): value is DualDeviceMe
   );
 }
 
+const dualDeviceMessageSchema = {
+  type: "object",
+  required: ["type", "roomId", "clientId", "sequence", "sentAt", "payload"],
+  properties: {
+    type: { type: "string" },
+    roomId: { type: "string", minLength: 1 },
+    clientId: { type: "string", minLength: 1 },
+    sequence: { type: "number" },
+    sentAt: { type: "number" },
+    payload: { type: "object" },
+  },
+} as const;
+
 export function validateYuanTerminalMessage(value: unknown): value is YuanTerminalMessage {
   if (!isRecord(value)) {
     return false;
@@ -423,6 +597,31 @@ function formatWebRtcUpgradeLabel(health: DualDeviceTransportHealth) {
     return "enableWebRTC=true，等待局域网候选协商";
   }
   return "enableWebRTC=true，但当前没有可用直连候选";
+}
+
+function formatTerminalConnectionKey({ hostUrl, terminalId, token, tenantPublicKey, enableWebRTC }: CreateYuanDualDeviceTerminalOptions) {
+  return [hostUrl, terminalId, token, tenantPublicKey ?? "", enableWebRTC === false ? "wss-only" : "webrtc"].join("|");
+}
+
+function releaseYuanDualDeviceTerminal(terminalId: string, terminal: Terminal) {
+  const lease = terminalLeases.get(terminalId);
+  if (!lease || lease.terminal !== terminal) {
+    return;
+  }
+
+  lease.references -= 1;
+  if (lease.references > 0) {
+    return;
+  }
+
+  lease.disposeTimer = globalThis.setTimeout(() => {
+    const latest = terminalLeases.get(terminalId);
+    if (!latest || latest.terminal !== terminal || latest.references > 0) {
+      return;
+    }
+    terminalLeases.delete(terminalId);
+    terminal.dispose();
+  }, 1000);
 }
 
 function createRandomBytes(length: number) {
