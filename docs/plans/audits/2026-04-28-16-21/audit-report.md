@@ -52,10 +52,7 @@ Focused documentation audit completed.
 
 ## Backups
 
-- `docs/plans/audits/2026-04-28-16-21/backups/root/README.md.bak`
-- `docs/plans/audits/2026-04-28-16-21/backups/root/AGENTS.md.bak`
-- `docs/plans/audits/2026-04-28-16-21/backups/docs/index.md.bak`
-- `docs/plans/2026-04-27-22-52/wiki-backup-20260428-162100.md`
+Backup files were omitted from the PR to keep the documentation branch focused. The canonical updated content is in the real files listed above, and the pre-change versions remain available through git history.
 
 ## Pending Code TODO
 

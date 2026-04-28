@@ -4,7 +4,7 @@
 
 - Source design: `docs/plans/2026-04-27-22-52/dual-device-play-design.md`
 - Target wiki: `docs/gameplay/dual-device-play/dual-device-play.md`
-- Backup: `docs/plans/2026-04-27-22-52/wiki-backup-20260428-162100.md`
+- Backup: none. Target wiki did not exist before this merge.
 
 ## Summary
 
