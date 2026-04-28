@@ -80,7 +80,7 @@ flowchart TD
 | `legacyResource` | `string | null` | 供旧事件系统派生 `resources`。 |
 | `legacyBuilding` | `string | null` | 供旧 UI / 旧事件派生 `buildings`。 |
 | `legacyInstrument` | `string | null` | 供旧 UI 派生 `instruments`。 |
-| `candidateActions` | `string[]` | 未来行动声明位；当前不直接驱动通话菜单。 |
+| `candidateActions` | `string[]` | 可由已揭示对象提供的通话候选行动。schema 当前允许 `move`、`survey`、`gather`、`build`、`standby`、`extract`、`scan`；对象按钮生成只解析 `content/call-actions/*.json` 中 `category = object_action` 的定义，并要求对象类型匹配。 |
 
 ### 3.4 `tile_special_state_definition`
 
@@ -286,7 +286,7 @@ type InvestigationReport = {
 - 通讯台和队员卡片展示区域名与行动状态。
 - 通话移动目标列表可包含已发现地块和 `frontier` 地块。
 - 未探索目标显示为“未探索信号（x,y）”，不得泄露真实区域名、地形、天气、对象或特殊状态。
-- 地块对象可声明候选行动，但候选行动如何进入通话菜单仍需要独立模型。
+- 已揭示地块对象可通过 `candidateActions` 生成通话动态按钮；按钮定义、耗时、handler、对象类型约束来自 `content/call-actions/*.json`。
 
 ### 事件系统
 
@@ -322,7 +322,7 @@ type InvestigationReport = {
 - 事件系统与天气联调：天气参与事件触发、概率修正或行动风险。
 - 事件系统与特殊状态联调：明确状态来源、持续时间、过期、刷新、揭示和日志规则。
 - 事件系统与环境属性联调：温度、湿度、磁场、辐射等结构化读数可进入事件条件。
-- 地块对象候选行动模型：对象声明采矿、勘测、道具调查、修复等行动，并由通话系统决定展示与可用性。
+- 地块对象行动元数据扩展：当前对象只声明 `candidateActions`，行动定义集中在 `content/call-actions/*.json`；未来如果需要每个对象覆盖耗时、消耗或工具需求，需要扩展内容模型。
 - 移除 legacy `MapTile` 事实源：统一由地图配置和 `GameState.map` 派生。
 
 ## 来源
@@ -331,3 +331,4 @@ type InvestigationReport = {
 | --- | --- |
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/configurable-map-system-design.md` |
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/technical-design.md` |
+| 2026-04-28 | `docs/plans/2026-04-27-22-56/communication-table-gameplay-design.md` |

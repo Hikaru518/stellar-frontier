@@ -23,7 +23,7 @@ flowchart TD
 
 ### 1.1 Wiki 扫描 subagent
 
-对每个 wiki 文件输出一段 YAML-ish summary：
+对每个 gameplay wiki 文件输出一段 YAML-ish summary：
 
 ```yaml
 - path: docs/gameplay/time-system/time-system.md
@@ -51,6 +51,43 @@ flowchart TD
 ```
 
 如某章节为空（`*（暂无）*`），对应字段写 `[]` 或 `null`，**不要**编造内容。
+
+对每个 `docs/game_model/<topic>.md` 文件输出一段 YAML-ish summary：
+
+```yaml
+- path: docs/game_model/crew.md
+  frontmatter:
+    title: <如有>
+    scope: data-model
+    last_updated: <如有>
+    maintained_by: <如有>
+  title: Crew 模型
+  overview: <H1 后第一段第一句>
+  models:
+    - name: CrewDefinition
+      source: src/content/contentData.ts
+      description: <模型清单表中的介绍>
+  content_fields:
+    - name: crewId
+      type_or_constraint: <类型 / 约束>
+      relation: <和其他模型的关系>
+  runtime_fields:
+    - name: currentTile
+      type_or_constraint: <类型 / 约束>
+      readers_writers: [<读取或修改该字段的系统>]
+  boundaries:
+    - target: docs/game_model/map.md
+      input: <从对方读取>
+      output: <写给对方>
+      shared_state: <共享对象 / 状态>
+  schema_validation:
+    - path: content/schemas/crew.schema.json
+      rule: <关键约束>
+  open_questions:
+    - <Open Questions 原文>
+```
+
+如果 game_model 文档缺 frontmatter，不要补写；`frontmatter` 对应字段写 `null`。如果某份旧格式文档没有标准字段表，只提取能直接从标题、段落、表格读出的事实。
 
 ### 1.2 Code 扫描 subagent
 
@@ -120,7 +157,7 @@ opencode_json:
 ```markdown
 # Scan Summary
 
-## 1. Wikis
+## 1. Wikis and Game Models
 <!-- 来自 Step 2 wiki 扫描 subagent 的逐文件输出，按路径字典序 -->
 
 ## 2. Code
@@ -152,11 +189,14 @@ opencode_json:
 - wiki 章节 5.1 状态机有 4 个状态，src `enum` 只有 3 个
 - wiki 章节 6 列「事件 / 信号」E，src 没有任何代码 emit / listen E
 - src 用户可见 UI 文字与 wiki 章节 3 / 4 中的术语写法不一致（例如 wiki 写「时段」，UI 写「Time of Day」且无对应中文）
+- game_model 字段表里的字段名 / 类型 / 约束与 src 中对应 `type` / `interface` / `enum` 不一致
+- game_model 引用的 schema 路径与 `content/schemas/` 或 `content/schemas/events/` 实际路径不一致
 
 判定要点：
 
 - **代码即事实**：当 wiki 与 code 矛盾时，**默认建议**采用 code（除非用户明确表示 wiki 是目标设计、代码尚未跟上）
 - **用户可见文案**：UI 文案与 wiki 不同 → 一定升级为 finding，由用户决定哪边是规范
+- **数据契约同等审计**：game_model 与 gameplay wiki 使用同一优先级规则，不因字段表更接近代码而自动提级；具体优先级仍按 §3.5 判定
 
 ### 3.3 类别 C：wiki ↔ design principles
 
@@ -173,8 +213,11 @@ opencode_json:
 
 - src 已实现的 system 在 wiki 中**完全不存在**（例如 `src/diarySystem.ts` 存在但 `docs/gameplay/diary/` 没有 wiki）
 - wiki 列出的核心机制在 src 中**完全没有任何对应代码**
+- src 中已存在的字段在对应 game_model 字段表中完全缺失
+- game_model 字段表列出但 src 中找不到对应字段
 - AGENTS.md / README.md 引用了已不存在的文件
 - `docs/index.md` 没收录某个已存在的 wiki
+- `docs/index.md` 没收录某个已存在的 `docs/game_model/<topic>.md`
 
 ### 3.5 优先级
 

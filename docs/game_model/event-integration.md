@@ -52,7 +52,7 @@
 | --- | --- | --- |
 | `id` | `string` | 行动实例 ID。 |
 | `crew_id` | `string` | 执行动作的队员。 |
-| `type` | `move` / `survey` / `gather` / `build` / `extract` / `return_to_base` / `event_waiting` / `guarding_event_site` | 行动类型。 |
+| `type` | `move` / `survey` / `gather` / `build` / `extract` / `scan` / `return_to_base` / `event_waiting` / `guarding_event_site` | 行动类型。当前内容层的初始 `ActiveAction` 类型仍以 `move`、`survey`、`gather`、`build`、`standby`、`event` 为主；通讯台对象行动结算层额外支持 `extract` 与 `scan`。 |
 | `status` | `queued` / `active` / `paused` / `completed` / `failed` / `interrupted` / `cancelled` | 行动状态。 |
 | `source` | `player_command` / `event_action_request` / `objective` / `system` | 行动来源。 |
 | `parent_event_id` | `string | null` | 请求该行动的事件。 |
@@ -74,6 +74,8 @@
 - `objective` 可以要求某类行动完成后推进 parent event。
 - 行动完成后用 `action_complete` 或 `objective_completed` 触发事件推进。
 - 事件不能把行动执行进度藏在事件节点内部；行动耗时、路径、中断和完成状态由行动系统维护。
+- 通讯台普通行动由 `content/call-actions/*.json` 定义并创建真实行动；事件系统消费 `arrival`、`action_complete`、`idle_time` 或 `call_choice`，而不是把每个普通按钮都建成事件图节点。
+- 地块对象行动当前通过 `candidateActions` 与 call-actions 定义映射到 `survey`、`gather`、`build`、`extract` 或 `scan`，完成后以 `action_complete` payload 携带 action type、object id 和 tags。
 
 ## 4. `tile_state` 事件可访问字段
 
@@ -109,6 +111,8 @@
 ## 5. `item`、`resource` 与 `inventory`
 
 事件系统区分三类 target：`crew_inventory`、`base_inventory` / `base_resources`、`tile_resources`。
+
+通讯台对象交互产生的简单携带物复用队员 inventory。当前规则只记录物品 / 资源 ID 与数量，不引入重量、容量、丢弃、交付回基地或运输链；如后续需要这些规则，应扩展 inventory model，而不是把隐性字段塞进事件日志。
 
 ### 5.1 `item_definition`
 
@@ -253,3 +257,4 @@
 | --- | --- |
 | 2026-04-27 | `docs/plans/2026-04-27-15-33/event-program-model-player-journey-game-model-spec.md` |
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/configurable-map-system-design.md` |
+| 2026-04-28 | `docs/plans/2026-04-27-22-56/communication-table-gameplay-design.md` |

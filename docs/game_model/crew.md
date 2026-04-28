@@ -120,6 +120,8 @@ crew.attributes.perception >= 3
 | `inventory[].itemId` | 物品 ID | ID 字符串 | 队员携带的物品类型。 | 关联 `content/items/items.json` 中的 `ItemDefinition.itemId`。 |
 | `inventory[].quantity` | 数量 | 整数，最小 `1` | 该物品的数量。 | `inventorySystem` 会过滤数量小于等于 0 的条目；事件和专长可增加或消耗。 |
 
+通讯台对象交互产生的简单携带物复用 `CrewMember.inventory`。当前队员模型只记录物品 ID 与数量，不包含重量、容量、丢弃、交付基地或资源运输链。
+
 背包和事件系统有三种主要关系：
 
 - 条件判断：事件条件支持 `inventory.has(itemId)`，检查队员背包是否有指定物品且数量大于 `0`。
@@ -134,7 +136,7 @@ crew.attributes.perception >= 3
 
 | 代码名称 | 中文名 | 类型 / 约束 | 介绍 | 关系 |
 | --- | --- | --- | --- | --- |
-| `activeAction.actionType` | 行动类型 | `move` / `gather` / `build` / `survey` / `standby` / `event` | 初始行动类型。 | 转为运行时 `ActiveAction.actionType`；决定结算逻辑和事件触发来源。 |
+| `activeAction.actionType` | 行动类型 | `move` / `gather` / `build` / `survey` / `standby` / `event` | 初始行动类型。 | 转为运行时 `ActiveAction.actionType`；决定结算逻辑和事件触发来源。通讯台对象行动结算层还支持 `extract` 与 `scan` 作为动态行动，不作为队员内容文件的初始行动类型。 |
 | `activeAction.status` | 行动状态 | `pending` / `inProgress` / `completed` / `interrupted` / `failed` | 初始行动状态。 | 只有 `inProgress` 会被时间推进逻辑持续结算。 |
 | `activeAction.targetTile` | 目标地块 | 形如 `1-1` 的字符串 | 行动目标或所在地块。 | 转为运行时 `targetTile`；移动行动还会生成初始 `route`。 |
 | `activeAction.durationSeconds` | 持续秒数 | 整数，最小 `0` | 初始行动总时长。 | 转为运行时 `durationSeconds` 和 `finishTime`。 |
@@ -164,7 +166,8 @@ crew.attributes.perception >= 3
 
 - 地图：移动行动根据 `MapTile` 地形寻找路线；抵达后更新 `CrewMember.currentTile`、`coord`、`location`，再通过 `syncTileCrew` 更新 `MapTile.crew`。
 - 时间：`elapsedGameSeconds` 驱动 `finishTime`、`stepFinishTime`、紧急事件升级和行动结算。
-- 事件：移动完成触发 `arrival`；调查、采集、建设完成分别可触发 `surveyComplete`、`gatherComplete`、`buildComplete`。
+- 通讯台：普通通话通过 `content/call-actions/*.json` 创建调查、采集、建设、回收、扫描、待命或停止等行动；地块对象按钮来自已揭示对象的 `candidateActions`。
+- 事件：移动完成触发 `arrival`；调查、采集、建设、回收、扫描等行动完成后发出 `action_complete`。
 - 日记：部分行动完成会追加角色日记，例如 Mike 抵达湖边、Garry 调查矿床。
 
 ## 紧急事件 EmergencyEvent

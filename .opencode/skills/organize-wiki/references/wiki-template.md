@@ -1,16 +1,18 @@
-# Wiki Template（全量游戏设计 wiki / 中文）
+# Wiki Template（玩法 wiki / 中文）
 
-本模板用于 `organize-wiki` skill 的 Step 4，作为目标 wiki 文件的章节骨架。
+本模板用于 `organize-wiki` skill 的 Step 4，作为玩法 wiki 文件的章节骨架。
 
 ## 使用约束
 
 - **当前态描述**：所有正文用「这个系统是 ...」「玩家会 ...」之类的当前态语气；**严禁**出现「本轮 / 本次 / 本版本 / MVP / Later」之类的版本性措辞——那些属于策划案，不属于 wiki。
+- **适用范围**：本模板只适用于 `whole-game` / `system` / `feature` scope。`data-model` scope 的目标文档使用 [`game-model-template.md`](./game-model-template.md)。
 - **章节顺序固定**：必须严格按下面的 10 个章节顺序排列；新章节追加到 Open Questions 之前。
 - **末尾保留「变更记录 / 来源策划案」段**：由 organize-wiki 自动维护，不要手工覆盖。
 - **章节可以为空**：如果某章节当前没有内容，保留章节标题与一行 `*（暂无）*`，不要省略章节。
 - **scope 字段决定文件位置**：
   - `whole-game` → `docs/core-ideas.md`
   - `system` → `docs/gameplay/<system>/<system>.md`
+  - `data-model` → `docs/game_model/<topic>.md`（使用 [`game-model-template.md`](./game-model-template.md)）
   - `feature` → 按 `target_wiki` 字段决定
 
 ## frontmatter 字段定义
@@ -18,7 +20,7 @@
 | 字段 | 含义 | 取值 |
 | --- | --- | --- |
 | `title` | wiki 标题 | 中文标题 |
-| `scope` | wiki 类型 | `whole-game` \| `system` \| `feature` |
+| `scope` | wiki 类型 | `whole-game` \| `system` \| `feature`；`data-model` 见 [`game-model-template.md`](./game-model-template.md) |
 | `last_updated` | 最近一次 organize-wiki 整理日期 | `YYYY-MM-DD` |
 | `maintained_by` | 维护者标签 | `organize-wiki`（恒定） |
 
