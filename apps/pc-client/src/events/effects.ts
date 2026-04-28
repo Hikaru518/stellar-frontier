@@ -1,4 +1,5 @@
 import { appendDiaryEntryId } from "../diarySystem";
+import type { MapObjectDefinition, RuntimeMapObjectsState } from "../content/mapObjects";
 import type {
   CrewActionState,
   CrewActionType,
@@ -33,6 +34,7 @@ export interface EffectGameState extends EventRuntimeState {
   resources?: Record<string, number>;
   map?: {
     tilesById?: Record<string, { revealedObjectIds?: string[] } | undefined>;
+    mapObjects?: RuntimeMapObjectsState;
   };
 }
 
@@ -229,9 +231,68 @@ function applyEffect(effect: Effect, context: EffectExecutionContext, path: stri
       return unlockEventDefinition(effect, context, path);
     case "handler_effect":
       return applyHandlerEffect(effect, context, target.target, path);
+    case "set_object_status":
+      return setObjectStatus(effect, context, path);
     default:
       return fail(context.state, effect, "invalid_effect", `${path}.type`, `Unsupported effect type: ${effect.type}`);
   }
+}
+
+// TODO(Task 2): replace this placeholder with a real import of
+// `mapObjectDefinitionById` from "../content/mapObjects" once the glob loader
+// lands. For now we read from a hook on globalThis so tests can inject a
+// fixture without forcing Task 1 to bring up the loader.
+function getMapObjectDefinition(objectId: string): MapObjectDefinition | undefined {
+  const lookup = (globalThis as { __mapObjectDefinitionById?: Map<string, MapObjectDefinition> }).__mapObjectDefinitionById;
+  if (!lookup) {
+    return undefined;
+  }
+  return lookup.get(objectId);
+}
+
+function setObjectStatus(effect: Effect, context: EffectExecutionContext, path: string): ApplyResult {
+  const objectId = readString(effect, "object_id", path);
+  const status = readString(effect, "status", path);
+  if (objectId.errors.length > 0 || status.errors.length > 0) {
+    return { state: context.state, errors: [...objectId.errors, ...status.errors] };
+  }
+
+  // TODO(Task 2): replace these soft warnings with hard `missing_target`
+  // failures once `mapObjectDefinitionById` is wired up via the glob loader.
+  // For Task 1 the lookup is best-effort so tests can run without the loader.
+  const def = getMapObjectDefinition(objectId.value);
+  if (!def) {
+    console.warn(
+      `[set_object_status] Object definition for ${objectId.value} not found; writing status anyway (Task 1 placeholder).`,
+    );
+  } else if (!def.status_options.includes(status.value)) {
+    console.warn(
+      `[set_object_status] status ${status.value} not in options for ${objectId.value}.`,
+    );
+  }
+
+  const previousMap = context.state.map ?? {};
+  const previousObjects = previousMap.mapObjects ?? {};
+  const previousEntry = previousObjects[objectId.value];
+  const nextObjects: RuntimeMapObjectsState = {
+    ...previousObjects,
+    [objectId.value]: {
+      ...(previousEntry ?? { id: objectId.value, status_enum: status.value }),
+      id: objectId.value,
+      status_enum: status.value,
+    },
+  };
+
+  return {
+    state: {
+      ...context.state,
+      map: {
+        ...previousMap,
+        mapObjects: nextObjects,
+      },
+    },
+    errors: [],
+  };
 }
 
 function updateCrewArrayField(

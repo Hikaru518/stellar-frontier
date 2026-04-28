@@ -143,7 +143,8 @@ export type EffectType =
   | "add_diary_entry"
   | "spawn_event"
   | "unlock_event_definition"
-  | "handler_effect";
+  | "handler_effect"
+  | "set_object_status";
 
 export type EffectFailurePolicy = "fail_event" | "skip_effect" | "skip_group" | "retry_later";
 

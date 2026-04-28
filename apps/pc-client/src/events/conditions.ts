@@ -102,6 +102,43 @@ const builtInConditionHandlers: Record<string, ConditionHandler> = {
     const read = readField(context.trigger_context, field.value);
     return pass(read.ok && Object.is(read.value, params.value));
   },
+  object_status_equals({ context, condition, path, params }) {
+    const objectId = readStringParam(params, "object_id", `${path}.params.object_id`, condition.handler_type ?? "handler");
+    if (objectId.errors.length > 0) {
+      return objectId;
+    }
+    const status = readStringParam(params, "status", `${path}.params.status`, condition.handler_type ?? "handler");
+    if (status.errors.length > 0) {
+      return status;
+    }
+
+    const mapObjects = (context.state as ConditionGameState & { map?: { mapObjects?: Record<string, { status_enum?: string }> } }).map
+      ?.mapObjects;
+    const entry = mapObjects?.[objectId.value];
+    return pass(Boolean(entry && entry.status_enum === status.value));
+  },
+};
+
+/**
+ * Built-in handler definitions registered alongside `builtInConditionHandlers`.
+ *
+ * These let condition `handler_type` references resolve without requiring the
+ * caller to inject the metadata via `context.handler_registry`. The registry
+ * stays the source of truth for content-defined handlers; built-ins are looked
+ * up from this table as a fallback.
+ */
+const builtInHandlerDefinitions: Record<string, HandlerDefinition> = {
+  object_status_equals: {
+    handler_type: "object_status_equals",
+    kind: "condition",
+    description: "Checks whether a runtime map object's status_enum equals the requested value.",
+    params_schema_ref: "#/$defs/object_status_equals_params",
+    allowed_target_types: [],
+    deterministic: true,
+    uses_random: false,
+    failure_policy: "fail_event",
+    sample_fixtures: [],
+  },
 };
 
 export function evaluateConditions(
@@ -979,15 +1016,16 @@ function getHandlerDefinition(
   registry: HandlerDefinition[] | Map<string, HandlerDefinition> | undefined,
   handlerType: string,
 ): HandlerDefinition | undefined {
-  if (!registry) {
-    return undefined;
+  if (registry) {
+    const fromRegistry = registry instanceof Map
+      ? registry.get(handlerType)
+      : registry.find((handler) => handler.handler_type === handlerType);
+    if (fromRegistry) {
+      return fromRegistry;
+    }
   }
 
-  if (registry instanceof Map) {
-    return registry.get(handlerType);
-  }
-
-  return registry.find((handler) => handler.handler_type === handlerType);
+  return builtInHandlerDefinitions[handlerType];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
