@@ -2,7 +2,7 @@
 
 ## Status
 
-Yuan-backed refactor implemented and verified locally; PR update/checks still pending.
+Yuan-backed refactor implemented, verified locally, and pushed to PR #16. PR check `test-build` passed; PR remains open intentionally.
 
 ## Result
 

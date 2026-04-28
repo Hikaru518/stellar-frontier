@@ -14,3 +14,5 @@
 - Rebased the PR worktree on latest `origin/main` and resolved conflicts from the new call action/content additions into `apps/pc-client`.
 - Revised the architecture after Yuan discussion: Stellar no longer keeps a dedicated server component; `packages/dual-device` becomes the PC/mobile shared business layer over external Yuan Host/Protocol.
 - Final validation after the Yuan-backed refactor passed: Rush update/install, content validation, lint, unit tests, build, normal PC E2E, and CI-style PC E2E.
+- Committed `af6499e` (`refactor: 改为 Yuan 双设备业务层`), rebased on latest `origin/main`, force-with-lease pushed the PR branch after history rewrite, and updated PR #16 body.
+- PR #16 check status after update: `test-build` passed; `deploy` skipped as expected for PR. Auto-merge/merge intentionally not enabled because this task's delivery constraint is to update the PR without merging.

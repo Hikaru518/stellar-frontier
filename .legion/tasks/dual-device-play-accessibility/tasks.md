@@ -16,4 +16,4 @@
 - [x] Run `rush update` / install flow and verify generated pnpm lock state.
 - [x] Run validation: content, lint, unit tests, e2e if feasible, build.
 - [x] Record verification, readiness review, walkthrough, and wiki/writeback evidence.
-- [ ] Commit, rebase on `origin/main`, push branch, and update PR without merging.
+- [x] Commit, rebase on `origin/main`, push branch, and update PR without merging.
