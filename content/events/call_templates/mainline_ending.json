@@ -1,0 +1,23 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_warp_pod_final_sequence.call.sequence",
+      "version": 1,
+      "domain": "mainline_ending",
+      "event_definition_id": "mainline_warp_pod_final_sequence",
+      "node_id": "warp_pod_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "ending_opening", "text": "{{crew_display_name}} 正在折跃仓前等待终局指令。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "ending_body", "text": "返航需按顺序完成三步：先用 warp_pod_repair_kit 修复仓体，再注入 alien_slime_fuel，最后输入 warp_coordinates 并确认所有可通讯可行动队员都在 4-4。", "priority": 0 }] }],
+      "option_lines": {
+        "repair_hull": { "selection": "best_match", "variants": [{ "id": "ending_hull", "text": "修复折跃仓仓体。", "priority": 0 }] },
+        "inject_fuel": { "selection": "best_match", "variants": [{ "id": "ending_fuel", "text": "注入外星粘液燃料。", "priority": 0 }] },
+        "launch_home": { "selection": "best_match", "variants": [{ "id": "ending_launch", "text": "输入折跃坐标并启动返航。", "priority": 0 }] },
+        "inspect": { "selection": "best_match", "variants": [{ "id": "ending_inspect", "text": "检查终局需求。", "priority": 0 }] }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

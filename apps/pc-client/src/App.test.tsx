@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import App from "./App";
+import App, { mergeEventRuntimeState, toEventEngineState } from "./App";
 import { crewDefinitions, defaultMapConfig, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
-import { createInitialMapState, initialLogs, initialTiles, resources as initialResources } from "./data/gameData";
-import { createEmptyEventRuntimeState, type CrewActionState } from "./events/types";
+import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
+import { evaluateCondition } from "./events/conditions";
+import { executeEffects } from "./events/effects";
+import { createEmptyEventRuntimeState, type CrewActionState, type Effect } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 
 describe("App", () => {
@@ -20,6 +22,80 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
     expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /通讯台/ })).toBeInTheDocument();
+  });
+
+  it("enters the ending page when return home is completed", async () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 3723,
+        crew: initialCrew,
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+        world_flags: {
+          return_home_completed: {
+            key: "return_home_completed",
+            value: true,
+            value_type: "boolean",
+            created_at: 3600,
+            updated_at: 3600,
+          },
+          return_home_completed_at: {
+            key: "return_home_completed_at",
+            value: 3600,
+            value_type: "number",
+            created_at: 3600,
+            updated_at: 3600,
+          },
+        },
+      })),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "返航完成" })).toBeInTheDocument();
+    expect(screen.getByText("完成时间：第 1 日 01 小时 00 分钟 00 秒")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重置游戏" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "回控制中心查看记录" }));
+    expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
+  });
+
+  it("fills return home completion time when event content leaves a placeholder", () => {
+    const state = createCompatibleSavedGameState({
+      elapsedGameSeconds: 3723,
+      crew: initialCrew,
+      tiles: initialTiles,
+      map: createInitialMapState(),
+      logs: initialLogs,
+      resources: initialResources,
+      baseInventory: [{ itemId: "iron_ore", quantity: 1240 }],
+    }) as unknown as GameState;
+    const runtimeState = {
+      ...toEventEngineState(state),
+      world_flags: {
+        return_home_completed: {
+          key: "return_home_completed",
+          value: true,
+          value_type: "boolean" as const,
+          created_at: 3700,
+          updated_at: 3700,
+        },
+        return_home_completed_at: {
+          key: "return_home_completed_at",
+          value: 0,
+          value_type: "number" as const,
+          created_at: 3700,
+          updated_at: 3700,
+        },
+      },
+    };
+
+    const merged = mergeEventRuntimeState(state, runtimeState);
+
+    expect(merged.world_flags.return_home_completed_at?.value).toBe(3723);
   });
 
   it("creates the initial runtime map state from the default map config", () => {
@@ -527,6 +603,91 @@ describe("App", () => {
         .find((definition) => definition.id === "volcanic_ash_trace")
         ?.event_graph.nodes.some((node) => node.type === "objective"),
     ).toBe(true);
+  });
+
+  it("syncs event inventory item changes back to crew inventory for later conditions", () => {
+    const mike = initialCrew.find((member) => member.id === "mike");
+    expect(mike).toBeDefined();
+    const state = createCompatibleSavedGameState({
+      elapsedGameSeconds: 0,
+      crew: [
+        {
+          ...mike,
+          inventory: [{ itemId: "ration", quantity: 1 }],
+          conditions: ["steady"],
+          personalityTags: ["baseline"],
+        },
+      ],
+      tiles: initialTiles,
+      map: createInitialMapState(),
+      logs: initialLogs,
+      resources: initialResources,
+      baseInventory: [{ itemId: "iron_ore", quantity: 1240 }],
+      inventories: {
+        base: {
+          id: "base",
+          owner_type: "base",
+          owner_id: "base",
+          items: [{ item_id: "iron_ore", quantity: 1 }],
+          resources: { ...initialResources, iron: 1 },
+        },
+        "crew:mike": {
+          id: "crew:mike",
+          owner_type: "crew",
+          owner_id: "mike",
+          items: [{ item_id: "old_compass", quantity: 99 }],
+          resources: {},
+        },
+      },
+    }) as unknown as GameState;
+
+    const runtimeState = toEventEngineState(state);
+    expect(runtimeState.inventories["crew:mike"].items).toEqual([{ item_id: "ration", quantity: 1 }]);
+    expect(
+      evaluateCondition(hasCrewItemCondition("ration"), {
+        state: runtimeState,
+        trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 0, crew_id: "mike" },
+      }).passed,
+    ).toBe(true);
+
+    const executed = executeEffects([removeCrewItemEffect("ration", 1), addCrewItemEffect("iron_ore", 2)], {
+      state: {
+        ...runtimeState,
+        crew: {
+          ...runtimeState.crew,
+          mike: {
+            ...runtimeState.crew.mike,
+            condition_tags: [...runtimeState.crew.mike.condition_tags, "runtime_condition"],
+            personality_tags: [...runtimeState.crew.mike.personality_tags, "runtime_tag"],
+          },
+        },
+      },
+      trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 0, crew_id: "mike" },
+    });
+    expect(executed.status).toBe("success");
+
+    const merged = mergeEventRuntimeState(state, executed.state);
+    const mergedMike = merged.crew.find((member) => member.id === "mike");
+    expect(mergedMike).toBeDefined();
+    expect(mergedMike!.inventory).toEqual([{ itemId: "iron_ore", quantity: 2 }]);
+    expect(mergedMike!.conditions).toContain("runtime_condition");
+    expect(mergedMike!.personalityTags).toContain("runtime_tag");
+    expect(merged.baseInventory).toEqual([{ itemId: "iron_ore", quantity: 1240 }]);
+    expect(merged.resources.iron).toBe(1240);
+
+    const nextRuntimeState = toEventEngineState(merged);
+    expect(
+      evaluateCondition(hasCrewItemCondition("iron_ore", 2), {
+        state: nextRuntimeState,
+        trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 1, crew_id: "mike" },
+      }).passed,
+    ).toBe(true);
+    expect(
+      evaluateCondition(hasCrewItemCondition("ration"), {
+        state: nextRuntimeState,
+        trigger_context: { trigger_type: "call_choice", source: "call", occurred_at: 1, crew_id: "mike" },
+      }).passed,
+    ).toBe(false);
   });
 
   it("creates the seeded forest trace sample when Garry is placed on a forest tile", () => {
@@ -1575,11 +1736,11 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
-    expect(within(garryCard as HTMLElement).getByText("位置：铁脊矿带 (-1,1)")).toBeInTheDocument();
+    expect(within(garryCard as HTMLElement).getByText("位置：丘陵矿带 (-1,1)")).toBeInTheDocument();
     expect(within(garryCard as HTMLElement).queryByText("iron_ore")).not.toBeInTheDocument();
 
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "查看档案" }));
-    expect(screen.getAllByText("铁脊矿带 (-1,1)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("丘陵矿带 (-1,1)").length).toBeGreaterThan(0);
     expect(screen.queryByText(/row|col/)).not.toBeInTheDocument();
   });
 
@@ -1683,6 +1844,17 @@ describe("App", () => {
   });
 
   it("opens a crew profile with attributes, tags, expertise, and diary entries", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: initialCrew.map((member) => (member.id === "mike" ? { ...member, conditions: ["knows_alien_language"] } : member)),
+        logs: initialLogs,
+        resources: initialResources,
+        baseInventory: [{ itemId: "iron_ore", quantity: 1240 }],
+      })),
+    );
+
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
@@ -1693,6 +1865,8 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Mike / 队员档案" })).toBeInTheDocument();
     expect(screen.getByText("5 维轻量属性")).toBeInTheDocument();
     expect(screen.getByText("嘴硬心软")).toBeInTheDocument();
+    expect(screen.getByText("状态 / 知识标签")).toBeInTheDocument();
+    expect(screen.getByText("外星语言")).toBeInTheDocument();
     expect(screen.getByText("拾荒者")).toBeInTheDocument();
     expect(screen.getByText(/信号弹 x2/)).toBeInTheDocument();
     expect(screen.getByText(/湖的位置不对/)).toBeInTheDocument();
@@ -1853,6 +2027,34 @@ function savedCrew(saved: { crew?: SavedCrewForTest[] }, crewId: string) {
   const member = saved.crew?.find((item) => item.id === crewId);
   expect(member).toBeDefined();
   return member!;
+}
+
+function hasCrewItemCondition(itemId: string, minQuantity = 1) {
+  return {
+    type: "inventory_has_item" as const,
+    target: { type: "crew_inventory" as const },
+    value: itemId,
+    params: { min_quantity: minQuantity },
+  };
+}
+
+function addCrewItemEffect(itemId: string, quantity: number): Effect {
+  return inventoryEffect("add_item", itemId, quantity);
+}
+
+function removeCrewItemEffect(itemId: string, quantity: number): Effect {
+  return inventoryEffect("remove_item", itemId, quantity);
+}
+
+function inventoryEffect(type: "add_item" | "remove_item", itemId: string, quantity: number): Effect {
+  return {
+    id: `${type}:${itemId}`,
+    type,
+    target: { type: "crew_inventory" },
+    params: { item_id: itemId, quantity },
+    failure_policy: "fail_event",
+    record_policy: { write_event_log: false, write_world_history: false },
+  };
 }
 
 function findRuntimeEvent(saved: { active_events?: Record<string, unknown> }, eventDefinitionId: string) {

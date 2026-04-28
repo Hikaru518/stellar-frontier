@@ -3,6 +3,7 @@ import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
+import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
 import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
 import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, hydrateMoveActionRoute, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
@@ -21,6 +22,7 @@ import {
   type RuntimeCall,
   type TileState,
   type TriggerContext,
+  type WorldFlag,
 } from "./events/types";
 import { defaultMapConfig } from "./content/contentData";
 import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
@@ -69,6 +71,9 @@ function App() {
 
   const { elapsedGameSeconds, crew, map, tiles, logs, resources } = gameState;
   const gameTimeLabel = formatGameTime(elapsedGameSeconds);
+  const returnHomeCompleted = gameState.world_flags.return_home_completed?.value === true;
+  const returnHomeCompletedAt = getWorldFlagNumber(gameState, "return_home_completed_at");
+  const completedAtLabel = formatGameTime(returnHomeCompletedAt ?? elapsedGameSeconds);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -81,6 +86,12 @@ function App() {
   useEffect(() => {
     saveGameState(gameState);
   }, [gameState]);
+
+  useEffect(() => {
+    if (returnHomeCompleted) {
+      setPage("ending");
+    }
+  }, [returnHomeCompleted]);
 
   function appendLog(text: string, tone: Tone = "neutral") {
     setGameState((state) => ({
@@ -291,6 +302,17 @@ function App() {
             result: "移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。",
           }
         : call,
+    );
+  }
+
+  if (page === "ending") {
+    return (
+      <EndingPage
+        completedAtLabel={completedAtLabel}
+        gameTimeLabel={gameTimeLabel}
+        onResetGame={resetGame}
+        onReturnControl={() => setPage("control")}
+      />
     );
   }
 
@@ -680,7 +702,7 @@ function findRuntimeCallForCrew(state: GameState, crewId: CrewId): RuntimeCall |
   );
 }
 
-function toEventEngineState(state: GameState): GraphRunnerGameState {
+export function toEventEngineState(state: GameState): GraphRunnerGameState {
   return {
     ...state,
     elapsed_game_seconds: state.elapsedGameSeconds,
@@ -688,20 +710,23 @@ function toEventEngineState(state: GameState): GraphRunnerGameState {
     tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile)])),
     resources: numericResources(state.resources),
     inventories: {
-      ...toInventoryStates(state),
       ...state.inventories,
+      ...toInventoryStates(state),
     },
   };
 }
 
-function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
+export function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
   const views = syncEventRuntimeToViews(state, eventState);
   const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventState);
   const eventMap = (eventState as GraphRunnerGameState & { map?: GameMapState }).map;
+  const worldFlags = withReturnHomeCompletionTime(state, eventState.world_flags);
 
   return {
     ...state,
     crew: bridged.crew,
+    baseInventory: views.baseInventory,
+    resources: views.resources,
     map: eventMap ?? state.map,
     tiles: views.tiles,
     logs: bridged.logs,
@@ -710,10 +735,37 @@ function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameSta
     objectives: eventState.objectives,
     event_logs: eventState.event_logs,
     world_history: eventState.world_history,
-    world_flags: eventState.world_flags,
+    world_flags: worldFlags,
     crew_actions: eventState.crew_actions,
     inventories: eventState.inventories,
     rng_state: eventState.rng_state,
+  };
+}
+
+function withReturnHomeCompletionTime(state: GameState, worldFlags: GameState["world_flags"]): GameState["world_flags"] {
+  if (worldFlags.return_home_completed?.value !== true) {
+    return worldFlags;
+  }
+
+  const existing = worldFlags.return_home_completed_at;
+  if (typeof existing?.value === "number" && existing.value > 0) {
+    return worldFlags;
+  }
+
+  const completedAt = Math.max(0, state.elapsedGameSeconds);
+  const flag: WorldFlag = {
+    key: "return_home_completed_at",
+    value: completedAt,
+    value_type: "number",
+    created_at: existing?.created_at ?? completedAt,
+    updated_at: completedAt,
+    source_event_id: existing?.source_event_id ?? worldFlags.return_home_completed.source_event_id ?? null,
+    tags: existing?.tags ?? ["mainline", "ending", "completion_time"],
+  };
+
+  return {
+    ...worldFlags,
+    return_home_completed_at: flag,
   };
 }
 
@@ -787,17 +839,22 @@ function compareCrewActionRecency(left: CrewActionState, right: CrewActionState)
 }
 
 function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameState) {
+  const baseInventory = eventState.inventories.base;
+
   return {
     crew: state.crew.map((member) => {
       const runtimeCrew = eventState.crew[member.id];
-      if (!runtimeCrew) {
-        return member;
-      }
+      const crewInventory = eventState.inventories[crewInventoryId(member.id)];
 
       return {
         ...member,
-        personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
-        conditions: mergeStringLists(member.conditions, runtimeCrew.condition_tags),
+        ...(runtimeCrew
+          ? {
+              personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
+              conditions: mergeStringLists(member.conditions, runtimeCrew.condition_tags),
+            }
+          : {}),
+        ...(crewInventory ? { inventory: toGameInventoryEntries(crewInventory.items) } : {}),
       };
     }),
     tiles: state.tiles.map((tile) => {
@@ -812,6 +869,26 @@ function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameSt
         eventMarks: mergeEventMarks(tile.eventMarks ?? [], runtimeTile.event_marks),
       };
     }),
+    baseInventory: baseInventory ? toGameInventoryEntries(baseInventory.items) : state.baseInventory,
+    resources: baseInventory ? toResourceSummary(state.resources, baseInventory.resources) : state.resources,
+  };
+}
+
+function toGameInventoryEntries(items: InventoryState["items"]): GameState["baseInventory"] {
+  return items.filter((item) => item.quantity > 0).map((item) => ({ itemId: item.item_id, quantity: item.quantity }));
+}
+
+function toResourceSummary(existing: ResourceSummary, resources: Record<string, number>): ResourceSummary {
+  return {
+    ...existing,
+    energy: resources.energy ?? existing.energy,
+    iron: resources.iron ?? existing.iron,
+    wood: resources.wood ?? existing.wood,
+    food: resources.food ?? existing.food,
+    water: resources.water ?? existing.water,
+    baseIntegrity: resources.baseIntegrity ?? existing.baseIntegrity,
+    sol: resources.sol ?? existing.sol,
+    power: resources.power ?? existing.power,
   };
 }
 
@@ -934,6 +1011,11 @@ function numericResources(resources: ResourceSummary): Record<string, number> {
     sol: resources.sol,
     power: resources.power,
   };
+}
+
+function getWorldFlagNumber(state: GameState, key: string): number | undefined {
+  const value = state.world_flags[key]?.value;
+  return typeof value === "number" ? value : undefined;
 }
 
 function crewInventoryId(crewId: CrewId) {
