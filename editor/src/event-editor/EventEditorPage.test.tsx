@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventEditorApiError } from "./apiClient";
 import { buildDraftStorageKey } from "./draftStorage";
@@ -115,6 +115,73 @@ describe("EventEditorPage", () => {
     expect(summary).toHaveTextContent("Read-only legacy format");
     expect(screen.queryByLabelText("Raw JSON draft")).not.toBeInTheDocument();
   });
+
+  it("shows schema, graph, and validation details in the right sidebar", async () => {
+    const definition = createDefinitionAsset("forest.signal", {
+      data: createDefinitionData(),
+    });
+    const callTemplate = createCallTemplateAsset("forest.signal.call", {
+      data: createCallTemplateData(),
+      json_path: "$.call_templates[0]",
+    });
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        definitions: [definition],
+        call_templates: [callTemplate],
+        schemas: createSchemas(),
+        validation: {
+          passed: false,
+          issues: [
+            {
+              severity: "error",
+              code: "missing_variant",
+              message: "Opening line needs a default variant.",
+              asset_type: "call_template",
+              asset_id: "forest.signal.call",
+              json_path: "$.call_templates[0].opening_lines",
+            },
+          ],
+        },
+      }),
+    );
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(screen.getByText("content/schemas/events/event-definition.schema.json")).toBeInTheDocument();
+    expect(screen.getByText("$.event_graph.nodes")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Graph" }));
+    expect(within(screen.getByRole("list", { name: "Graph nodes" })).getByText("intro_call")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Graph transitions" })).getByText("intro_call -> resolved")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Terminal graph nodes" })).getByText("resolved")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Validation" }));
+    fireEvent.click(screen.getByRole("button", { name: /open issue missing_variant/i }));
+
+    expect(screen.getByLabelText("Selection summary")).toHaveTextContent("forest.signal.call");
+    const selectedPath = screen.getByLabelText("Selected JSON path");
+    expect(selectedPath).toHaveTextContent("Selected JSON path");
+    expect(selectedPath).toHaveTextContent("$.call_templates[0].opening_lines");
+  });
+
+  it("previews call dialogue and options without entering the save flow", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        definitions: [createDefinitionAsset("forest.signal", { data: createDefinitionData() })],
+        call_templates: [createCallTemplateAsset("forest.signal.call", { data: createCallTemplateData() })],
+      }),
+    );
+
+    render(<EventEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
+
+    expect(screen.getByText("Amy reports a signal flare.")).toBeInTheDocument();
+    expect(screen.getByText("Ask Amy to investigate.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+  });
 });
 
 function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = {}): EventEditorLibraryResponse {
@@ -185,6 +252,150 @@ function createHandler() {
     uses_random: false,
     failure_policy: "fail_event" as const,
     sample_fixtures: [],
+  };
+}
+
+function createDefinitionData(): unknown {
+  return {
+    schema_version: "event-definition.v1",
+    id: "forest.signal",
+    version: 1,
+    domain: "forest",
+    title: "Signal flare",
+    summary: "Crew finds a rescue marker.",
+    status: "ready_for_test",
+    trigger: { type: "arrival" },
+    candidate_selection: {
+      priority: 10,
+      weight: 1,
+      max_instances_per_trigger: 1,
+      requires_blocking_slot: false,
+    },
+    repeat_policy: {
+      scope: "global",
+      cooldown_seconds: 0,
+      history_key_template: "forest.signal",
+      allow_while_active: false,
+    },
+    event_graph: {
+      entry_node_id: "intro_call",
+      nodes: [
+        {
+          id: "intro_call",
+          type: "call",
+          title: "Incoming signal",
+          blocking: { occupies_crew_action: false, occupies_communication: true },
+          call_template_id: "forest.signal.call",
+          speaker_crew_ref: { type: "crew_id", id: "amy" },
+          urgency: "normal",
+          delivery: "incoming_call",
+          options: [{ id: "investigate", is_default: true }],
+          option_node_mapping: { investigate: "resolved" },
+        },
+        {
+          id: "resolved",
+          type: "end",
+          title: "Resolved",
+          blocking: { occupies_crew_action: false, occupies_communication: false },
+        },
+      ],
+      edges: [{ from_node_id: "intro_call", to_node_id: "resolved", via: "investigate" }],
+      terminal_node_ids: ["resolved"],
+      graph_rules: { acyclic: true, max_active_nodes: 1, allow_parallel_nodes: false },
+    },
+    effect_groups: [
+      {
+        id: "effects",
+        effects: [
+          {
+            id: "grant-signal-flare",
+            type: "handler_effect",
+            target: { type: "crew_inventory", ref: "amy" },
+            handler_type: "grant_item",
+            params: { item_id: "signal_flare", quantity: 1 },
+            failure_policy: "fail_event",
+            record_policy: { write_event_log: false, write_world_history: false },
+          },
+        ],
+      },
+    ],
+    sample_contexts: [
+      {
+        trigger_type: "arrival",
+        occurred_at: 25,
+        source: "tile_system",
+        crew_id: "amy",
+        tile_id: "forest-a1",
+        payload: {
+          preview_state: {
+            crew: {
+              amy: {
+                id: "amy",
+                display_name: "Amy",
+              },
+            },
+            baseInventory: [],
+          },
+        },
+      },
+    ],
+  };
+}
+
+function createCallTemplateData(): unknown {
+  return {
+    schema_version: "event-call-template.v1",
+    id: "forest.signal.call",
+    version: 1,
+    domain: "forest",
+    event_definition_id: "forest.signal",
+    node_id: "intro_call",
+    render_context_fields: ["crew_display_name"],
+    opening_lines: {
+      selection: "first_match",
+      variants: [{ id: "default", text: "{{crew_display_name}} reports a signal flare.", priority: 0 }],
+    },
+    option_lines: {
+      investigate: {
+        selection: "first_match",
+        variants: [{ id: "default", text: "Ask {{crew_display_name}} to investigate.", priority: 0 }],
+      },
+    },
+    fallback_order: ["default"],
+    default_variant_required: true,
+  };
+}
+
+function createSchemas(): Record<string, unknown> {
+  return {
+    "content/schemas/events/event-definition.schema.json": {
+      $defs: {
+        event_definition: {
+          type: "object",
+          required: ["id", "event_graph"],
+          properties: {
+            id: { type: "string", description: "Unique event definition id." },
+            title: { type: "string", description: "Planning-facing title." },
+            event_graph: {
+              type: "object",
+              properties: {
+                nodes: { type: "array", description: "Runtime graph nodes." },
+              },
+            },
+          },
+        },
+      },
+    },
+    "content/schemas/events/call-template.schema.json": {
+      $defs: {
+        call_template: {
+          type: "object",
+          properties: {
+            opening_lines: { type: "object", description: "Rendered opening dialogue." },
+          },
+        },
+      },
+    },
   };
 }
 
