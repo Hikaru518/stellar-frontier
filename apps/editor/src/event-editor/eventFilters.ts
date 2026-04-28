@@ -1,13 +1,10 @@
-import type { EditorEventAsset, EventEditorLibraryResponse, ValidationIssue } from "./types";
-
-export type EventBrowserValidationStatus = "all" | "valid" | "issues" | "errors" | "warnings";
+import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 export interface EventBrowserFilters {
   domain?: string;
   assetType?: string;
   trigger?: string;
   handler?: string;
-  validationStatus?: EventBrowserValidationStatus;
   query?: string;
 }
 
@@ -15,7 +12,6 @@ export interface EventBrowserItem {
   asset: EditorEventAsset<unknown>;
   trigger: string | null;
   handlers: string[];
-  issues: ValidationIssue[];
   linkedCallTemplateIds: string[];
   eventDefinitionId: string | null;
   nodeId: string | null;
@@ -27,7 +23,6 @@ export function buildEventBrowserItems(library: EventEditorLibraryResponse): Eve
   const assets: EditorEventAsset<unknown>[] = [
     ...(library.definitions as EditorEventAsset<unknown>[]),
     ...callTemplates,
-    ...(library.legacy_events as EditorEventAsset<unknown>[]),
   ];
 
   return assets.map((asset) => {
@@ -39,13 +34,11 @@ export function buildEventBrowserItems(library: EventEditorLibraryResponse): Eve
         : [];
     const trigger = readNestedString(asset.data, ["trigger", "type"]);
     const handlers = extractStringValuesByKey(asset.data, "handler_type");
-    const issues = library.validation.issues.filter((issue) => issueMatchesAsset(issue, asset));
 
     return {
       asset,
       trigger,
       handlers,
-      issues,
       linkedCallTemplateIds,
       eventDefinitionId,
       nodeId,
@@ -56,7 +49,6 @@ export function buildEventBrowserItems(library: EventEditorLibraryResponse): Eve
 
 export function filterEventBrowserItems(items: EventBrowserItem[], filters: EventBrowserFilters): EventBrowserItem[] {
   const query = normalize(filters.query ?? "");
-  const validationStatus = filters.validationStatus ?? "all";
 
   return items.filter((item) => {
     if (filters.domain && item.asset.domain !== filters.domain) {
@@ -75,48 +67,12 @@ export function filterEventBrowserItems(items: EventBrowserItem[], filters: Even
       return false;
     }
 
-    if (!matchesValidationStatus(item, validationStatus)) {
-      return false;
-    }
-
     return query.length === 0 || item.searchText.includes(query);
   });
 }
 
 export function getBrowserItemKey(item: EventBrowserItem): string {
   return `${item.asset.asset_type}:${item.asset.file_path}:${item.asset.id}`;
-}
-
-function matchesValidationStatus(item: EventBrowserItem, status: EventBrowserValidationStatus): boolean {
-  if (status === "all") {
-    return true;
-  }
-
-  if (status === "valid") {
-    return item.issues.length === 0;
-  }
-
-  if (status === "errors") {
-    return item.issues.some((issue) => issue.severity === "error");
-  }
-
-  if (status === "warnings") {
-    return item.issues.some((issue) => issue.severity === "warning");
-  }
-
-  return item.issues.length > 0;
-}
-
-function issueMatchesAsset(issue: ValidationIssue, asset: EditorEventAsset<unknown>): boolean {
-  if (issue.asset_id && issue.asset_id !== asset.id) {
-    return false;
-  }
-
-  if (issue.asset_type && String(issue.asset_type) !== asset.asset_type) {
-    return false;
-  }
-
-  return Boolean(issue.asset_id || issue.file_path === asset.file_path || issue.json_path === asset.json_path);
 }
 
 function getCallTemplateDefinitionId(template: EditorEventAsset<unknown>): string | null {

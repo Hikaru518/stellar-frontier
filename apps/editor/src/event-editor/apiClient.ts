@@ -1,9 +1,4 @@
-import type {
-  EventEditorLibraryResponse,
-  EventEditorSaveRequest,
-  EventEditorSaveResponse,
-  EventEditorValidateDraftResponse,
-} from "./types";
+import type { EventEditorLibraryResponse } from "./types";
 
 export const DEFAULT_HELPER_BASE_URL = "http://127.0.0.1:4317";
 export const HELPER_START_COMMAND = "npm run editor:helper";
@@ -61,59 +56,6 @@ export async function loadEventEditorLibrary({
   }
 
   return response.json() as Promise<EventEditorLibraryResponse>;
-}
-
-export async function validateEventEditorDraft(
-  request: EventEditorSaveRequest,
-  options: { baseUrl?: string; fetchImpl?: FetchImpl } = {},
-): Promise<EventEditorValidateDraftResponse> {
-  return postEventEditorJson("/api/event-editor/validate-draft", request, options);
-}
-
-export async function saveEventEditorDraft(
-  request: EventEditorSaveRequest,
-  options: { baseUrl?: string; fetchImpl?: FetchImpl } = {},
-): Promise<EventEditorSaveResponse> {
-  return postEventEditorJson("/api/event-editor/save", request, options);
-}
-
-async function postEventEditorJson<ResponseBody>(
-  path: string,
-  body: EventEditorSaveRequest,
-  {
-    baseUrl = DEFAULT_HELPER_BASE_URL,
-    fetchImpl = globalThis.fetch.bind(globalThis),
-  }: {
-    baseUrl?: string;
-    fetchImpl?: FetchImpl;
-  },
-): Promise<ResponseBody> {
-  let response: Response;
-
-  try {
-    response = await fetchImpl(`${trimTrailingSlash(baseUrl)}${path}`, {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    throw new EventEditorApiError(
-      "helper_unavailable",
-      `Unable to reach the local event editor helper. Start it with ${HELPER_START_COMMAND}, then refresh this page.`,
-      { cause: error },
-    );
-  }
-
-  if (!response.ok) {
-    const helperError = await readHelperError(response);
-    throw new EventEditorApiError(
-      helperError.code,
-      helperError.message || `Helper returned HTTP ${response.status}.`,
-      { status: response.status, details: helperError.details },
-    );
-  }
-
-  return response.json() as Promise<ResponseBody>;
 }
 
 function trimTrailingSlash(value: string): string {

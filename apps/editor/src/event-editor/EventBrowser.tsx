@@ -5,7 +5,6 @@ import {
   getBrowserItemKey,
   type EventBrowserFilters,
   type EventBrowserItem,
-  type EventBrowserValidationStatus,
 } from "./eventFilters";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
@@ -18,15 +17,6 @@ interface EventBrowserProps {
 const ASSET_TYPE_OPTIONS = [
   { value: "event_definition", label: "Definitions" },
   { value: "call_template", label: "Call templates" },
-  { value: "legacy_event", label: "Legacy events" },
-];
-
-const VALIDATION_OPTIONS: { value: EventBrowserValidationStatus; label: string }[] = [
-  { value: "all", label: "All validation" },
-  { value: "valid", label: "Valid" },
-  { value: "issues", label: "Has issues" },
-  { value: "errors", label: "Errors" },
-  { value: "warnings", label: "Warnings" },
 ];
 
 export default function EventBrowser({ library, selectedAsset, onSelectAsset }: EventBrowserProps) {
@@ -35,7 +25,6 @@ export default function EventBrowser({ library, selectedAsset, onSelectAsset }: 
     assetType: "",
     trigger: "",
     handler: "",
-    validationStatus: "all",
     query: "",
   });
 
@@ -119,21 +108,6 @@ export default function EventBrowser({ library, selectedAsset, onSelectAsset }: 
             ))}
           </select>
         </label>
-
-        <label>
-          Validation
-          <select
-            aria-label="Validation filter"
-            value={filters.validationStatus}
-            onChange={(event) => updateFilter("validationStatus", event.target.value as EventBrowserValidationStatus)}
-          >
-            {VALIDATION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       {filteredItems.length > 0 ? (
@@ -167,10 +141,6 @@ function AssetRow({ item }: { item: EventBrowserItem }) {
     <>
       <span className="event-browser-row-topline">
         <strong>{item.asset.id}</strong>
-        <span className="event-browser-tags">
-          <StatusTag item={item} />
-          {item.asset.asset_type === "legacy_event" ? <span className="status-tag status-muted">READ-ONLY LEGACY</span> : null}
-        </span>
       </span>
       <span className="event-browser-meta">
         <span>{formatAssetType(item.asset.asset_type)}</span>
@@ -189,18 +159,6 @@ function AssetRow({ item }: { item: EventBrowserItem }) {
       ) : null}
     </>
   );
-}
-
-function StatusTag({ item }: { item: EventBrowserItem }) {
-  if (item.issues.some((issue) => issue.severity === "error")) {
-    return <span className="status-tag status-error-tag">ERROR</span>;
-  }
-
-  if (item.issues.some((issue) => issue.severity === "warning")) {
-    return <span className="status-tag status-warning">WARNING</span>;
-  }
-
-  return <span className="status-tag status-success">OK</span>;
 }
 
 function formatAssetType(assetType: EditorEventAsset<unknown>["asset_type"]): string {

@@ -1,4 +1,8 @@
-import type { EventDefinition, EventEdge, EventGraph, EventNode } from "../../../pc-client/src/events/types";
+import { useEffect, useMemo, useState } from "react";
+import type { EventDefinition, EventGraph } from "../../../pc-client/src/events/types";
+import GraphCanvas from "./GraphCanvas";
+import GraphDetailPanel, { TriggerSummary, type GraphSelection } from "./GraphDetailPanel";
+import { deriveGraphEdges } from "./graphModel";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 interface GraphPanelProps {
@@ -10,20 +14,26 @@ interface GraphPanelProps {
 export default function GraphPanel({ asset, draft, library }: GraphPanelProps) {
   const definition = resolveDefinition(asset, draft, library);
   const graph = definition?.event_graph;
+  const edges = useMemo(() => (definition ? deriveGraphEdges(definition) : []), [definition]);
+  const [selection, setSelection] = useState<GraphSelection>({ type: "trigger" });
+
+  useEffect(() => {
+    setSelection(graph ? { type: "node", nodeId: graph.entry_node_id } : { type: "trigger" });
+  }, [definition?.id, graph?.entry_node_id]);
 
   return (
     <section className="inspector-panel" aria-label="Graph inspector">
-      <h4>Graph Outline</h4>
+      <h4>Graph Canvas</h4>
       {definition ? (
         <p className="muted-text">
-          Read-only graph for <code>{definition.id}</code>
+          Read-only graph for <code>{definition.id}</code>. Transitions are derived from node fields and explicit graph edges.
         </p>
       ) : (
         <p className="muted-text">No structured event graph is available for this asset.</p>
       )}
 
       {graph ? (
-        <>
+        <div className="graph-inspector-workspace">
           <dl className="inspector-summary">
             <div>
               <dt>Entry</dt>
@@ -35,78 +45,16 @@ export default function GraphPanel({ asset, draft, library }: GraphPanelProps) {
             </div>
             <div>
               <dt>Transitions</dt>
-              <dd>{graph.edges.length}</dd>
+              <dd>{edges.length}</dd>
             </div>
           </dl>
 
-          <NodeList nodes={graph.nodes} />
-          <EdgeList edges={graph.edges} />
-          <GraphList title="Terminal Nodes" label="Terminal graph nodes" items={graph.terminal_node_ids} />
-        </>
+          <TriggerSummary definition={definition} />
+          <GraphCanvas definition={definition} edges={edges} selection={selection} onSelect={setSelection} />
+          <GraphDetailPanel definition={definition} library={library} edges={edges} selection={selection} onSelect={setSelection} />
+        </div>
       ) : null}
     </section>
-  );
-}
-
-function NodeList({ nodes }: { nodes: EventNode[] }) {
-  return (
-    <>
-      <h5>Nodes</h5>
-      {nodes.length > 0 ? (
-        <ul className="inspector-list" aria-label="Graph nodes">
-          {nodes.map((node) => (
-            <li key={node.id} className="inspector-card">
-              <div className="inspector-card-heading">
-                <code>{node.id}</code>
-                <span className="status-tag status-muted">{node.type}</span>
-              </div>
-              <p>{node.title}</p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted-text">No nodes recorded.</p>
-      )}
-    </>
-  );
-}
-
-function EdgeList({ edges }: { edges: EventEdge[] }) {
-  return (
-    <>
-      <h5>Transitions</h5>
-      {edges.length > 0 ? (
-        <ul className="inspector-list" aria-label="Graph transitions">
-          {edges.map((edge) => (
-            <li key={`${edge.from_node_id}:${edge.to_node_id}:${edge.via ?? ""}`} className="inspector-card">
-              <code>{formatEdge(edge)}</code>
-              {edge.via ? <p className="muted-text">via {edge.via}</p> : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted-text">No transitions recorded.</p>
-      )}
-    </>
-  );
-}
-
-function GraphList({ title, label, items }: { title: string; label: string; items: string[] }) {
-  return (
-    <>
-      <h5>{title}</h5>
-      {items.length > 0 ? (
-        <ul className="inspector-list" aria-label={label}>
-          {items.map((item) => (
-            <li key={item} className="inspector-card">
-              {item}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted-text">No {title.toLowerCase()} recorded.</p>
-      )}
-    </>
   );
 }
 
@@ -121,10 +69,6 @@ function resolveDefinition(asset: EditorEventAsset<unknown>, draft: unknown, lib
   }
 
   return null;
-}
-
-function formatEdge(edge: EventEdge): string {
-  return `${edge.from_node_id} -> ${edge.to_node_id}`;
 }
 
 function isEventDefinition(value: unknown): value is EventDefinition {

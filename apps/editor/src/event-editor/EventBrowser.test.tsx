@@ -6,7 +6,7 @@ import { buildEventBrowserItems, filterEventBrowserItems } from "./eventFilters"
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 describe("EventBrowser filters", () => {
-  it("filters event assets by domain, type, trigger, handler, validation status, and query", () => {
+  it("filters event assets by domain, type, trigger, handler, and query", () => {
     const library = createLibraryResponse({
       definitions: [
         createDefinitionAsset("forest.signal", {
@@ -32,18 +32,6 @@ describe("EventBrowser filters", () => {
           }),
         }),
       ],
-      validation: {
-        passed: false,
-        issues: [
-          {
-            severity: "error",
-            code: "missing_call_template",
-            message: "Missing call template.",
-            asset_type: "event_definition",
-            asset_id: "forest.signal",
-          },
-        ],
-      },
     });
 
     const items = buildEventBrowserItems(library);
@@ -52,7 +40,6 @@ describe("EventBrowser filters", () => {
       assetType: "event_definition",
       trigger: "arrival",
       handler: "grant_item",
-      validationStatus: "issues",
       query: "rescue",
     });
 
@@ -65,7 +52,17 @@ describe("EventBrowser", () => {
     cleanup();
   });
 
-  it("shows definitions, call template associations, legacy read-only status, and validation issues", () => {
+  it("renders the available filter chips for the trimmed asset set", () => {
+    const library = createLibraryResponse();
+
+    render(<EventBrowser library={library} selectedAsset={null} onSelectAsset={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: "Event Browser" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Asset type filter")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Validation filter")).not.toBeInTheDocument();
+  });
+
+  it("shows definitions and call template associations without validation badges", () => {
     const library = createLibraryResponse({
       definitions: [
         createDefinitionAsset("forest.signal", {
@@ -87,46 +84,44 @@ describe("EventBrowser", () => {
           }),
         }),
       ],
-      legacy_events: [
-        createLegacyAsset("legacy.distress", {
-          data: { id: "legacy.distress", title: "Legacy distress beacon" },
-          editable: false,
-        }),
-      ],
-      validation: {
-        passed: false,
-        issues: [
-          {
-            severity: "warning",
-            code: "deprecated_field",
-            message: "Deprecated field.",
-            asset_type: "call_template",
-            asset_id: "forest.signal.call",
-          },
-        ],
-      },
     });
 
     render(<EventBrowser library={library} selectedAsset={null} onSelectAsset={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "Event Browser" })).toBeInTheDocument();
     const definitionRow = screen.getByRole("button", { name: /select forest.signal$/i });
     const callTemplateRow = screen.getByRole("button", { name: /select forest.signal.call/i });
-    const legacyRow = screen.getByRole("button", { name: /select legacy.distress/i });
 
     expect(within(definitionRow).getByText("forest.signal")).toBeInTheDocument();
     expect(definitionRow).toHaveTextContent("arrival");
     expect(callTemplateRow).toHaveTextContent("event_definition_id: forest.signal");
     expect(callTemplateRow).toHaveTextContent("node_id: intro_call");
-    expect(legacyRow).toHaveTextContent("legacy.distress");
-    expect(legacyRow).toHaveTextContent("READ-ONLY LEGACY");
-    expect(callTemplateRow).toHaveTextContent("WARNING");
+    expect(definitionRow).not.toHaveTextContent(/OK|ERROR|WARNING/);
+    expect(callTemplateRow).not.toHaveTextContent(/OK|ERROR|WARNING/);
+  });
+
+  it("does not surface legacy events in the browser list", () => {
+    const library = createLibraryResponse({
+      definitions: [
+        createDefinitionAsset("forest.signal", {
+          data: createDefinitionData({
+            id: "forest.signal",
+            title: "Signal flare",
+            summary: "Crew finds a rescue marker.",
+            triggerType: "arrival",
+            handlerType: "grant_item",
+          }),
+        }),
+      ],
+    });
+
+    render(<EventBrowser library={library} selectedAsset={null} onSelectAsset={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: /select legacy/i })).not.toBeInTheDocument();
   });
 
   it("lets users combine browser filters and select a matching asset", () => {
     const onSelectAsset = vi.fn();
     const library = createLibraryResponse({
-      domains: ["forest", "cave"],
       definitions: [
         createDefinitionAsset("forest.signal", {
           domain: "forest",
@@ -171,15 +166,9 @@ describe("EventBrowser", () => {
 
 function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = {}): EventEditorLibraryResponse {
   return {
-    manifest: { schema_version: "event-manifest.v1", domains: [] },
-    domains: ["forest"],
     definitions: [],
     call_templates: [],
-    handlers: [],
-    presets: [],
-    legacy_events: [],
     schemas: {},
-    validation: { passed: true, issues: [] },
     ...overrides,
   };
 }
@@ -191,9 +180,8 @@ function createAsset(id: string, overrides: Partial<EditorEventAsset<unknown>> =
     asset_type: "event_definition",
     file_path: "content/events/definitions/forest.json",
     json_path: "$.event_definitions[0]",
-    base_hash: "base-a",
     data: { id },
-    editable: true,
+    editable: false,
     ...overrides,
   };
 }
@@ -214,15 +202,6 @@ function createCallTemplateAsset(
     file_path: "content/events/call_templates/forest.json",
     ...overrides,
   }) as EventEditorLibraryResponse["call_templates"][number];
-}
-
-function createLegacyAsset(id: string, overrides: Partial<EditorEventAsset<unknown>> = {}): EditorEventAsset<unknown> {
-  return createAsset(id, {
-    asset_type: "legacy_event",
-    file_path: "content/events/events.json",
-    editable: false,
-    ...overrides,
-  });
 }
 
 function createDefinitionData({

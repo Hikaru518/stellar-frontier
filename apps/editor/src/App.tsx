@@ -16,7 +16,7 @@ function App() {
         <div className="editor-topbar-brand">
           <p className="global-time">LOCAL GAME EDITOR</p>
           <h1>Game Editor</h1>
-          <p>Local tooling for browsing and editing Stellar Frontier content.</p>
+          <p>Local viewer for Stellar Frontier event content.</p>
         </div>
 
         <nav className="editor-topbar-nav" aria-label="Editor modules">

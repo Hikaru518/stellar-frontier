@@ -1,5 +1,4 @@
-import type { RJSFSchema } from "@rjsf/utils";
-import { buildAssetSchema } from "./schemaUi";
+import { buildAssetSchema, type SchemaNode } from "./schemaUi";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 const EVENT_DEFINITION_SCHEMA_PATH = "content/schemas/events/event-definition.schema.json";
@@ -68,7 +67,7 @@ function schemaPathForAsset(asset: EditorEventAsset<unknown>): string | null {
   return null;
 }
 
-function getRawAssetSchema(asset: EditorEventAsset<unknown>, library: EventEditorLibraryResponse): RJSFSchema | null {
+function getRawAssetSchema(asset: EditorEventAsset<unknown>, library: EventEditorLibraryResponse): SchemaNode | null {
   const schemaPath = schemaPathForAsset(asset);
   if (!schemaPath) {
     return null;
@@ -77,15 +76,15 @@ function getRawAssetSchema(asset: EditorEventAsset<unknown>, library: EventEdito
   const rootSchema = library.schemas[schemaPath];
   const definitionName = asset.asset_type === "event_definition" ? "event_definition" : "call_template";
   const definition = getDefs(rootSchema)?.[definitionName];
-  return isRecord(definition) ? (definition as RJSFSchema) : null;
+  return isRecord(definition) ? (definition as SchemaNode) : null;
 }
 
-function summarizeSchemaFields(schema: RJSFSchema): FieldSummary[] {
+function summarizeSchemaFields(schema: SchemaNode): FieldSummary[] {
   const required = Array.isArray(schema.required) ? schema.required.filter((item): item is string => typeof item === "string") : [];
   return summarizeProperties(getProperties(schema), "$", new Set(required));
 }
 
-function summarizeProperties(properties: Record<string, RJSFSchema>, parentPath: string, required: Set<string>): FieldSummary[] {
+function summarizeProperties(properties: Record<string, SchemaNode>, parentPath: string, required: Set<string>): FieldSummary[] {
   return Object.entries(properties).flatMap(([key, property]) => {
     const path = `${parentPath}.${key}`;
     const childRequired = Array.isArray(property.required)
@@ -104,14 +103,14 @@ function summarizeProperties(properties: Record<string, RJSFSchema>, parentPath:
 }
 
 function getDefs(schema: unknown): Record<string, unknown> | null {
-  return isRecord(schema) && isRecord(schema.$defs) ? schema.$defs : null;
+  return isRecord(schema) && isRecord(schema.$defs) ? (schema.$defs as Record<string, unknown>) : null;
 }
 
-function getProperties(schema: RJSFSchema): Record<string, RJSFSchema> {
-  return isRecord(schema.properties) ? (schema.properties as Record<string, RJSFSchema>) : {};
+function getProperties(schema: SchemaNode): Record<string, SchemaNode> {
+  return isRecord(schema.properties) ? (schema.properties as Record<string, SchemaNode>) : {};
 }
 
-function formatSchemaType(schema: RJSFSchema): string {
+function formatSchemaType(schema: SchemaNode): string {
   if (Array.isArray(schema.type)) {
     return schema.type.join(" | ");
   }

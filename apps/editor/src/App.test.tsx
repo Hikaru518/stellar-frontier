@@ -33,14 +33,8 @@ describe("Editor App", () => {
 
 function createLibraryResponse() {
   return {
-    manifest: { schema_version: "event-manifest.v1", domains: [] },
-    domains: [],
     definitions: [],
     call_templates: [],
-    handlers: [],
-    presets: [],
-    legacy_events: [],
     schemas: {},
-    validation: { passed: true, issues: [] },
   };
 }
