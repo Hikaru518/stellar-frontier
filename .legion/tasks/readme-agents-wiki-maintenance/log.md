@@ -9,3 +9,4 @@
 - Validation evidence recorded in `docs/test-report.md`: Rush lint passed, content validation passed, and the new dual-device full wiki has no phase-specific wording.
 - User clarified PR #16 had already merged. Moved the docs changes onto new branch `legion/readme-agents-wiki-maintenance-docs` from latest `origin/main` and preserved newer main documentation entries, including `communication-table`.
 - Revalidated in the new branch worktree: `rush install`, `rush lint`, `rush validate-content`, and the dual-device wiki phase-wording check passed.
+- Opened PR #20: https://github.com/Hikaru518/stellar-frontier/pull/20. Branch `legion/readme-agents-wiki-maintenance-docs` is based on `origin/main`; worktree path is `.worktrees/readme-agents-wiki-maintenance/`; `test-build` passed and `deploy` skipped as expected for PR. PR remains open for review; auto-merge was not enabled.

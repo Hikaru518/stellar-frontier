@@ -6,4 +6,4 @@
 - [x] Update AGENTS with current monorepo/dual-device implementation and validation commands.
 - [x] Update docs index and Legion wiki with current dual-device/Yuan/WebRTC truth.
 - [x] Validate documentation and relevant Rush checks.
-- [ ] Commit, push, update PR #16, and follow checks.
+- [x] Commit, push, open PR #20, and follow checks.

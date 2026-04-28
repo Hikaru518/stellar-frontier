@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress on branch `legion/readme-agents-wiki-maintenance-docs` based on latest `origin/main`. PR #16 has already merged, so this task is no longer delivered through the old PR branch.
+PR #20 is open on branch `legion/readme-agents-wiki-maintenance-docs` based on latest `origin/main`. PR #16 has already merged, so this task is delivered through the new branch. `test-build` passed; `deploy` skipped as expected for PR. The PR remains open for review.
 
 ## Scope
 
