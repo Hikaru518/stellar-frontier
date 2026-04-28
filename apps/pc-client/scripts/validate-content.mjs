@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
+import { formatEventManifestIssues, validateEventManifest } from "../../../scripts/generate-event-content-manifest.mjs";
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const root = process.env.VALIDATE_CONTENT_ROOT
@@ -55,6 +56,12 @@ const validAddItemTargets = new Set(["crewInventory", "baseInventory"]);
 
 let failed = false;
 let eventSchemaFailed = false;
+
+const eventManifestResult = validateEventManifest(root);
+if (eventManifestResult.issues.length > 0) {
+  console.error(formatEventManifestIssues(eventManifestResult.issues));
+  failed = true;
+}
 
 for (const [dataPath, schemaPath] of legacyPairs) {
   failed = validateJsonFile(dataPath, schemaPath, loaded[dataPath]) || failed;
