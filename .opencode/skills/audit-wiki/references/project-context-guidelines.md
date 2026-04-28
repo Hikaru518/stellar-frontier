@@ -42,6 +42,7 @@ docs 这个文件夹中的所有内容需要自包含。当你需要引用文件
 - **入口索引**：[`docs/index.md`](./docs/index.md)（由 `audit-wiki` skill 重生成）
 - **整体游戏理念**：[`docs/core-ideas.md`](./docs/core-ideas.md)（由 `organize-wiki` skill 维护）
 - **子系统 wiki**：`docs/gameplay/<system>/<system>.md`（由 `organize-wiki` skill 维护）
+- **数据契约文档**：`docs/game_model/<topic>.md`（由 `organize-wiki` skill 维护）
 - **UI 设计**：`docs/ui-designs/`（手工维护）
 - **策划案**：`docs/plans/`（按时间戳子目录组织）
 
@@ -49,6 +50,12 @@ docs 这个文件夹中的所有内容需要自包含。当你需要引用文件
 
 - `docs/gameplay/<system-1>/<system-1>.md`
 - `docs/gameplay/<system-2>/<system-2>.md`
+- ...
+
+当前已成文的 game_model 文档：
+
+- `docs/game_model/<topic-1>.md`
+- `docs/game_model/<topic-2>.md`
 - ...
 <!-- audit-wiki:end 文档体系 -->
 ```
@@ -60,8 +67,8 @@ docs 这个文件夹中的所有内容需要自包含。当你需要引用文件
 | Skill | 入口 | 职责 |
 | --- | --- | --- |
 | `game-design-brainstorm` | 有新机制 / 新系统的想法 | 把粗略想法转化为版本化中文策划案 |
-| `organize-wiki` | 已确认的策划案 | 把策划案合并进全量 wiki |
-| `audit-wiki` | 阶段性审计 | wiki ↔ code 一致性、维护 index、同步项目根 |
+| `organize-wiki` | 已确认的策划案 | 把策划案合并进全量设计文档（gameplay wiki / game_model） |
+| `audit-wiki` | 阶段性审计 | 设计文档 ↔ code 一致性、维护 index、同步项目根 |
 
 详细流程见各 skill 的 `SKILL.md`。
 <!-- audit-wiki:end skill 体系 -->
@@ -180,6 +187,7 @@ docs 这个文件夹中的所有内容需要自包含。当你需要引用文件
 +-- docs/
 |   +-- core-ideas.md
 |   +-- index.md
+|   +-- game_model/
 |   +-- gameplay/
 |   +-- plans/
 |   +-- ui-designs/

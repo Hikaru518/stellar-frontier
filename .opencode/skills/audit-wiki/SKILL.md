@@ -1,19 +1,20 @@
 ---
 name: audit-wiki
-description: "对全量游戏设计 wiki 做一致性审计：(1) 把 docs/ 内的所有 wiki（core-ideas、gameplay/<system>/*、ui-designs/）与 src/ 当前代码实现交叉比对，发现矛盾后与用户澄清并修正；(2) 重新生成 docs/index.md 索引页，并审计 docs/core-ideas.md 与子系统 wiki 的一致性；(3) 同步更新项目级 AGENTS.md 与 README.md，使其反映当前文档体系与代码实现。在策划案合并完成、阶段性代码改动落地、或长期未审计后调用。"
+description: "对全量游戏设计文档做一致性审计：(1) 把 docs/ 内的所有 wiki 与数据契约文档（core-ideas、gameplay/<system>/*、game_model/*、ui-designs/）与 src/ 当前代码实现交叉比对，发现矛盾后与用户澄清并修正；(2) 重新生成 docs/index.md 索引页，并审计 docs/core-ideas.md、子系统 wiki 与 game_model 的一致性；(3) 同步更新项目级 AGENTS.md 与 README.md，使其反映当前文档体系与代码实现。在策划案合并完成、阶段性代码改动落地、或长期未审计后调用。"
 ---
 
 # audit-wiki
 
 ## 概述
 
-本 skill 负责把**全量 wiki**、**当前 src 代码**、**项目级上下文**（`AGENTS.md` / `README.md`）三者**对齐**，并维护 `docs/index.md` 索引页。
+本 skill 负责把**全量设计文档**、**当前 src 代码**、**项目级上下文**（`AGENTS.md` / `README.md`）三者**对齐**，并维护 `docs/index.md` 索引页。
 
 **核心边界**：
 
 - **只审计与对齐，不发明**：与 `organize-wiki` 一样，本 skill 不引入策划案 / wiki / 代码中都没有的设计决策。
 - **不动 `src/` 代码**：发现 wiki↔code 矛盾时，最多在本轮结果摘要中记录为「待代码处理」，或经用户确认后修改 wiki；本 skill 不会修改任何 `.ts` / `.tsx` / `.css` 文件。
 - **与 `organize-wiki` 互补**：`organize-wiki` 处理「策划案 → wiki」的合入；本 skill 处理「wiki ↔ code」「wiki ↔ wiki」「项目根上下文 ↔ 当前文档体系」的对齐。
+- **覆盖 game_model**：`docs/game_model/<topic>.md` 是代码层数据契约，与 `docs/gameplay/<system>/<system>.md` 平级纳入扫描、索引和一致性矩阵；审计强度与 gameplay wiki 相同。
 - **冲突先问**：每一处矛盾都用 question tool 提问，不要静默改写 wiki。
 - **不产生审计工作区**：本 skill 不在仓库中创建临时审计目录、审计报告文件或备份目录；扫描摘要、findings、决议与待处理项保留在当前对话和最终回复中。
 
@@ -60,7 +61,7 @@ flowchart TD
    ```
 2. **在当前对话中记录范围选择**：包含选择、一句话理由、涉及的 wiki / src / 项目根路径列表；不要把范围记录写入仓库。
 3. **罗列待审计文件清单**：
-   - 待审计 wiki：`docs/core-ideas.md`、`docs/gameplay/<system>/<system>.md`（递归）、`docs/ui-designs/*.md`
+   - 待审计 wiki / 数据契约文档：`docs/core-ideas.md`、`docs/gameplay/<system>/<system>.md`（递归）、`docs/game_model/<topic>.md`（递归）、`docs/ui-designs/*.md`
    - 待审计代码：`src/**/*.ts`、`src/**/*.tsx`（按 Step 1.1 的范围裁剪）
    - 待审计项目根：`AGENTS.md`、`README.md`、`opencode.json`
 4. **编辑前先读取目标文件**：任何改写都必须基于最新文件内容；不要为 audit 另建仓库内临时文件。
@@ -69,13 +70,14 @@ flowchart TD
 
 并行 dispatch 三个 `@explore` subagent（详细扫描指引见 [`references/audit-protocol.md`](./references/audit-protocol.md) §1）：
 
-- **Wiki 扫描 subagent**：读取 Step 1.3 罗列的所有 wiki 文件，提取每个文件的：
+- **Wiki 扫描 subagent**：读取 Step 1.3 罗列的所有 wiki / game_model 文件，并按 [`references/audit-protocol.md`](./references/audit-protocol.md) §1.1 的两类格式提取事实。对 gameplay wiki 提取：
   - frontmatter（`title` / `scope` / `last_updated` / `maintained_by`）
   - 章节 1-2 的「概述 / 设计意图」一句话摘要
   - 章节 3 的关键术语列表
   - 章节 5「机制与规则」中的具体数值、参数、状态名、规则
   - 章节 6「系统交互」中的依赖、被依赖、共享对象、事件
   - 章节 10 的 Open Questions
+  对 game_model 文档提取模型清单、内容字段、运行时字段、schema / 校验关系、跨模型边界和 Open Questions。
 - **Code 扫描 subagent**：读取 Step 1.3 罗列的所有 src 文件，提取：
   - 每个 system file（`timeSystem.ts` / `eventSystem.ts` / `crewSystem.ts` / `diarySystem.ts`）公开的 type / enum / constant / 关键函数与默认值
   - 页面层（`pages/*.tsx`）的状态字段、行动选项、用户可见的术语
@@ -93,7 +95,7 @@ flowchart TD
 基于 Step 2 的扫描事实计算四类一致性问题（详见 [`references/audit-protocol.md`](./references/audit-protocol.md) §3）：
 
 - **类别 A：wiki ↔ wiki**：不同 wiki 文件之间的术语 / 数值 / 规则矛盾，或同一 wiki 内章节自相矛盾
-- **类别 B：wiki ↔ code**：wiki 描述的状态机 / 参数 / 流程与 src 当前实现不一致
+- **类别 B：wiki ↔ code**：wiki 描述的状态机 / 参数 / 流程与 src 当前实现不一致；game_model 字段表 / 类型 / schema 路径与 src 或 content schema 不一致也归入本类
 - **类别 C：wiki ↔ design principles**：与 `docs/ui-designs/ui-design-principles.md` 或 `docs/core-ideas.md` 的设计意图抵触
 - **类别 D：缺口（gaps）**：代码已有但 wiki 完全没写、或 wiki 已有但代码完全没实现
 
@@ -143,7 +145,7 @@ wiki 现状：
 对每个被决议要修改的 wiki 文件：
 
 1. **先读取目标文件当前内容**，确认没有未处理的用户改动。
-2. **改写**：严格按决议改写，**不引入决议之外的内容**。改写时遵循 `organize-wiki/references/wiki-template.md` 的章节结构与去阶段化措辞规则。
+2. **改写**：严格按决议改写，**不引入决议之外的内容**。玩法 wiki 遵循 `organize-wiki/references/wiki-template.md`；game_model 文档遵循 `organize-wiki/references/game-model-template.md`；两类都应用去阶段化措辞规则。
 3. **末尾追加变更记录行**：在被修改 wiki 的「变更记录 / 来源策划案」表末尾追加一行，来源使用概括性说明，不引用临时审计文件：
    ```
    | <YYYY-MM-DD> | audit-wiki 一致性审计 | audit 修正：<一句话摘要> |
@@ -158,8 +160,8 @@ wiki 现状：
 
 1. 读取现有 `docs/index.md`，确认它可被重生成覆盖。
 2. 基于 Step 2 wiki 扫描结果，按 [`references/index-template.md`](./references/index-template.md) 重新生成完整的 `docs/index.md`：
-   - 每个 wiki 一行（标题 / scope / last_updated / 一句话概述 / 路径链接）
-   - 按 scope 分组（`whole-game` → `system` → `feature`）
+   - 每个 wiki / game_model 文档一行（标题 / scope / last_updated / 一句话概述 / 路径链接）
+   - 按 scope 分组（`whole-game` → `system` → `data-model` → `feature`）
    - 末尾追加「系统耦合关系图」：用 mermaid 从各 wiki 章节 6「系统交互」的「依赖于 / 被依赖于」自动汇总
 3. 如果某 wiki 缺 frontmatter 字段或概述章节，**不要**在 index 里编造；标 `*（缺字段，待 organize-wiki 补全）*`，并在最终回复的「索引页缺口」段记录。
 
@@ -187,7 +189,7 @@ wiki 现状：
 1. 读取现有 `AGENTS.md`。
 2. 按 [`references/project-context-guidelines.md`](./references/project-context-guidelines.md) §2 整理：
    - 保留所有用户已写入的强制规则原文（包括"docs 自包含"规则）
-   - 在「文档体系」段更新：当前 wiki 总数、文件清单、维护方
+   - 在「文档体系」段更新：当前 gameplay wiki 与 game_model 文档总数、文件清单、维护方
    - 在「skill 体系」段更新：可用 skill 列表与各自职责（`game-design-brainstorm` / `organize-wiki` / `audit-wiki`）
    - 在「当前实现状态」段更新：src 已实现的子系统 vs 仅在 wiki 中的子系统
 3. **不要**删除任何用户手写的规则；不确定一段是否过时时，问用户：
@@ -254,6 +256,7 @@ wiki 现状：
 docs/index.md                  # Step 5 重新生成
 docs/core-ideas.md             # Step 5 仅在用户已确认的修订上动
 docs/gameplay/<...>/<wiki>.md  # Step 4 仅在用户已确认的修订上动
+docs/game_model/<topic>.md     # Step 4 仅在用户已确认的修订上动
 AGENTS.md                      # Step 6 同步
 README.md                      # Step 6 同步
 ```

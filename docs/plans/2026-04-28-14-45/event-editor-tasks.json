@@ -1,0 +1,347 @@
+[
+  {
+    "id": "T001",
+    "title": "建立事件 manifest 与生成式运行时聚合模块",
+    "priority": "P0",
+    "depends_on": [],
+    "summary": "把现有结构化事件 domain 从手写静态 import 迁移到 manifest + generated module，为新建 domain 打基础。",
+    "scope": [
+      "新增 content/events/manifest.json，覆盖现有 definitions、call_templates 与 forest presets。",
+      "新增 scripts/generate-event-content-manifest.mjs，生成 src/content/generated/eventContentManifest.ts。",
+      "调整 src/content/contentData.ts，让结构化事件内容来自生成模块。",
+      "让内容校验或生成脚本能发现 manifest 与目录文件不一致。"
+    ],
+    "suggested_files": [
+      "content/events/manifest.json",
+      "scripts/generate-event-content-manifest.mjs",
+      "src/content/generated/eventContentManifest.ts",
+      "src/content/contentData.ts",
+      "scripts/validate-content.mjs"
+    ],
+    "acceptance_criteria": [
+      "现有 crash_site、crew_kael、desert、forest、mine、mountain domain 都在 manifest 中。",
+      "运行生成脚本后，生成模块包含 manifest 中所有 definitions 与 call_templates 的静态 import。",
+      "游戏侧 eventContentLibrary 仍能暴露与迁移前等价的结构化事件、call templates、handlers 与 presets。",
+      "manifest 中列出不存在文件，或目录中存在未登记 domain 文件时，生成或校验会失败并给出明确错误。",
+      "npm run validate:content、npm run lint、npm run test 通过。"
+    ],
+    "notes": "生成文件可以提交；文件头应注明由脚本生成，避免手改。"
+  },
+  {
+    "id": "T002",
+    "title": "搭建独立 editor Vite/TS/RJSF 工程入口",
+    "priority": "P0",
+    "depends_on": [],
+    "summary": "在根目录建立独立 editor app，复用仓库依赖和控制台视觉，但不挂载玩家 App。",
+    "scope": [
+      "新增 editor/index.html、editor/src/main.tsx 与 editor/src/App.tsx。",
+      "新增 vite.editor.config.ts 与 tsconfig.editor.json，确保 editor 进入 typecheck。",
+      "新增 editor:dev、editor:build 等 npm scripts。",
+      "安装并接入 RJSF 基础依赖，为后续表单任务预留入口。",
+      "复用或镜像 src/components/Layout.tsx 与 src/styles.css 的控制台风格。"
+    ],
+    "suggested_files": [
+      "package.json",
+      "package-lock.json",
+      "vite.editor.config.ts",
+      "tsconfig.editor.json",
+      "editor/index.html",
+      "editor/src/main.tsx",
+      "editor/src/App.tsx"
+    ],
+    "acceptance_criteria": [
+      "npm run editor:dev 能启动 editor 入口。",
+      "npm run editor:build 能构建 editor，不构建或挂载玩家 App。",
+      "npm run lint 覆盖 editor TypeScript 文件。",
+      "Editor shell 显示 Event Editor 可用入口，Character/Map/Item/NPC 为禁用未来入口。",
+      "npm run lint 和 npm run test 通过。"
+    ],
+    "notes": "如根仓库没有 package-lock.json，以实际 package manager 产生的 lockfile 为准。"
+  },
+  {
+    "id": "T003",
+    "title": "实现 Local Helper 基础服务与只读 library API",
+    "priority": "P0",
+    "depends_on": [
+      "T001"
+    ],
+    "summary": "提供独立 Node localhost helper，读取事件内容、schema、manifest 与校验结果，供 editor 初始化使用。",
+    "scope": [
+      "新增 editor/helper/server.mjs，监听 127.0.0.1。",
+      "新增 contentStore 读取 definitions、call_templates、handler_registry、presets、legacy events 与 schemas。",
+      "实现 GET /api/health 与 GET /api/event-editor/library。",
+      "返回 asset file_path、json_path、base_hash、editable 标记与 validation report。",
+      "实现路径白名单与仓库根目录约束。"
+    ],
+    "suggested_files": [
+      "editor/helper/server.mjs",
+      "editor/helper/contentStore.mjs",
+      "editor/helper/pathGuard.mjs",
+      "editor/helper/validationGate.mjs",
+      "editor/src/event-editor/types.ts"
+    ],
+    "acceptance_criteria": [
+      "helper 只监听 127.0.0.1，并能返回 health 信息。",
+      "library API 能列出结构化 definitions、call templates、handlers、presets、legacy readonly assets、schemas 与 manifest。",
+      "legacy content/events/events.json 在 response 中 editable 为 false。",
+      "传入试图逃逸仓库或白名单目录的路径时，helper 拒绝访问。",
+      "npm run validate:content、npm run lint、npm run test 通过。"
+    ],
+    "notes": "Helper 优先使用 Node 内置模块；不要引入线上后端框架，除非实现时发现明确必要。"
+  },
+  {
+    "id": "T004",
+    "title": "实现 validation gate 与已有 asset 保存 API",
+    "priority": "P0",
+    "depends_on": [
+      "T003"
+    ],
+    "summary": "让 editor 可以保存已有 definitions 或 call templates，但所有最终写入都必须先在临时目录通过校验。",
+    "scope": [
+      "实现 POST /api/event-editor/validate-draft。",
+      "实现 POST /api/event-editor/save，用于保存已有 event_definition 或 call_template。",
+      "在临时目录应用 draft，格式化 JSON，运行内容校验，再决定是否写入最终文件。",
+      "实现 base_hash 冲突检测，防止覆盖外部改动。",
+      "把 schema errors 与 EventValidationIssue 转为统一 ValidationIssue。"
+    ],
+    "suggested_files": [
+      "editor/helper/server.mjs",
+      "editor/helper/contentStore.mjs",
+      "editor/helper/validationGate.mjs",
+      "editor/helper/jsonFormat.mjs",
+      "editor/helper/hash.mjs"
+    ],
+    "acceptance_criteria": [
+      "有效 draft 保存后，目标 JSON 被格式化写入，并返回新 base_hash 与 validation report。",
+      "无效 draft 校验失败时，最终 content 文件不发生变化。",
+      "base_hash 与当前文件不一致时，API 返回 conflict，不覆盖文件。",
+      "validation response 包含 issue code、message、file_path、asset_id 和 json_path。",
+      "npm run validate:content、npm run lint、npm run test 通过。"
+    ],
+    "notes": "保存 API 不支持 legacy events，也不支持任意 content 路径。"
+  },
+  {
+    "id": "T005",
+    "title": "实现新建 domain API 与 manifest 同步",
+    "priority": "P1",
+    "depends_on": [
+      "T004"
+    ],
+    "summary": "支持创建新的 definitions + call_templates 文件包，并保证新 domain 能进入游戏加载路径。",
+    "scope": [
+      "实现 POST /api/event-editor/create-domain。",
+      "生成 definitions/<domain>.json 与 call_templates/<domain>.json 的最小合法 scaffold。",
+      "同步更新 content/events/manifest.json。",
+      "运行 generate-event-content-manifest 脚本并纳入保存门禁。",
+      "处理 domain id 重复、非法文件名和 manifest 冲突。"
+    ],
+    "suggested_files": [
+      "editor/helper/server.mjs",
+      "editor/helper/manifestStore.mjs",
+      "editor/helper/validationGate.mjs",
+      "scripts/generate-event-content-manifest.mjs",
+      "content/events/manifest.json"
+    ],
+    "acceptance_criteria": [
+      "创建新 domain 成功后，definitions 文件、call_templates 文件、manifest 和生成模块全部同步更新。",
+      "新 domain 通过 npm run validate:content，并能被游戏侧 eventContentLibrary 加载。",
+      "domain id 已存在、包含非法路径字符或 scaffold 无效时，API 拒绝写入最终文件。",
+      "任何校验失败都不会留下半写入的 content 文件或 manifest。",
+      "npm run validate:content、npm run lint、npm run test 通过。"
+    ],
+    "notes": "MVP 不自动生成完整可玩剧情包，只生成可继续编辑的基础文件包。"
+  },
+  {
+    "id": "T006",
+    "title": "实现 editor API client、library state 与 draft storage",
+    "priority": "P0",
+    "depends_on": [
+      "T002",
+      "T003"
+    ],
+    "summary": "让 editor 前端可以连接 helper、加载事件库，并在本机保存未落盘草稿。",
+    "scope": [
+      "实现 editor/src/event-editor/apiClient.ts。",
+      "实现 library loading、loading/error/empty 状态。",
+      "实现 draftStorage，把草稿存入 localStorage。",
+      "draft key 包含 asset id、file path 与 base hash。",
+      "helper 不可用时显示明确的本地启动提示。"
+    ],
+    "suggested_files": [
+      "editor/src/event-editor/apiClient.ts",
+      "editor/src/event-editor/types.ts",
+      "editor/src/event-editor/draftStorage.ts",
+      "editor/src/event-editor/EventEditorPage.tsx",
+      "editor/src/App.tsx"
+    ],
+    "acceptance_criteria": [
+      "打开 Event Editor 时会请求 helper library API 并展示加载结果。",
+      "helper 未启动或返回错误时，页面提示如何启动 helper。",
+      "修改 draft 后刷新页面，草稿可以从 localStorage 恢复。",
+      "base hash 变化时，旧草稿不会自动覆盖新内容。",
+      "npm run lint 和 npm run test 通过。"
+    ],
+    "notes": "草稿、筛选偏好和布局状态不能写入 content。"
+  },
+  {
+    "id": "T007",
+    "title": "实现 Event Browser 与搜索筛选",
+    "priority": "P0",
+    "depends_on": [
+      "T006"
+    ],
+    "summary": "建立左侧内容浏览器，帮助策划按 domain、ID、trigger、handler 和校验状态查找事件。",
+    "scope": [
+      "实现 EventBrowser 组件。",
+      "支持 domain、asset type、trigger、handler、validation status 与关键词筛选。",
+      "显示 definitions 与 call templates 的关联关系。",
+      "显示 legacy events，并标记为只读旧格式。",
+      "选中 asset 后更新详情工作区。"
+    ],
+    "suggested_files": [
+      "editor/src/event-editor/EventBrowser.tsx",
+      "editor/src/event-editor/EventEditorPage.tsx",
+      "editor/src/event-editor/types.ts",
+      "editor/src/event-editor/eventFilters.ts",
+      "editor/src/event-editor/EventBrowser.test.tsx"
+    ],
+    "acceptance_criteria": [
+      "用户能按 domain、ID、trigger 和关键词筛选结构化事件。",
+      "有 validation issue 的 asset 在列表中有明确状态标识。",
+      "call template 能显示其关联的 event_definition_id 与 node_id。",
+      "legacy events 可见但不能进入编辑保存流程。",
+      "npm run lint 和 npm run test 通过。"
+    ],
+    "notes": "列表优先信息密度与可扫描性，不做文件树拖拽。"
+  },
+  {
+    "id": "T008",
+    "title": "实现表单与 JSON 并排编辑工作区",
+    "priority": "P0",
+    "depends_on": [
+      "T006",
+      "T007"
+    ],
+    "summary": "实现中栏详情编辑区，让策划用 RJSF 表单编辑，也让开发者直接核对原始 JSON。",
+    "scope": [
+      "实现 EventDetailWorkspace、JsonDraftPanel 和 RJSF 表单容器。",
+      "基础字段由 schema 驱动渲染。",
+      "实现 graph、condition/effect、handler params、引用字段的最小 custom widgets。",
+      "JSON 解析失败时暂停表单同步，并显示 parse error。",
+      "表单修改与 JSON 修改共享同一份 draft。"
+    ],
+    "suggested_files": [
+      "editor/src/event-editor/EventDetailWorkspace.tsx",
+      "editor/src/event-editor/JsonDraftPanel.tsx",
+      "editor/src/event-editor/rjsfWidgets.tsx",
+      "editor/src/event-editor/schemaUi.ts",
+      "editor/src/event-editor/EventDetailWorkspace.test.tsx"
+    ],
+    "acceptance_criteria": [
+      "选中 editable asset 后，中栏始终并排显示表单与 JSON。",
+      "修改表单会更新 JSON draft，修改合法 JSON 会同步表单。",
+      "非法 JSON 不会破坏最后一次合法 draft，并能显示解析错误。",
+      "复杂字段至少提供比裸 JSON 更清楚的结构化编辑入口。",
+      "npm run lint 和 npm run test 通过。"
+    ],
+    "notes": "不要在 MVP 中做拖拽 graph 画布或保存图布局。"
+  },
+  {
+    "id": "T009",
+    "title": "实现 Schema、Preview、Graph、Validation 侧栏",
+    "priority": "P0",
+    "depends_on": [
+      "T006",
+      "T008"
+    ],
+    "summary": "实现右侧标签面板，把字段说明、通话表现预览、只读 graph 和校验结果集中展示。",
+    "scope": [
+      "实现 SchemaPanel、PreviewPanel、GraphPanel、ValidationPanel。",
+      "SchemaPanel 展示当前 asset 相关 schema 与字段路径说明。",
+      "PreviewPanel 复用 renderRuntimeCall 做通话表现预览。",
+      "GraphPanel 以只读树或列表展示 nodes、transitions 和 terminal nodes。",
+      "ValidationPanel 展示 structured issues，并能定位到 asset/json_path。"
+    ],
+    "suggested_files": [
+      "editor/src/event-editor/SchemaPanel.tsx",
+      "editor/src/event-editor/PreviewPanel.tsx",
+      "editor/src/event-editor/GraphPanel.tsx",
+      "editor/src/event-editor/ValidationPanel.tsx",
+      "editor/src/event-editor/previewRenderer.ts"
+    ],
+    "acceptance_criteria": [
+      "用户能在右侧标签查看当前 asset 的 schema 信息、validation issues 和 graph 结构。",
+      "选中 call node 和对应 call template 时，PreviewPanel 能显示渲染后的对白与选项。",
+      "PreviewPanel 不执行 effects、不推进时间、不修改玩家状态。",
+      "点击 validation issue 能把用户带回对应 asset，并显示 json_path。",
+      "npm run lint 和 npm run test 通过。"
+    ],
+    "notes": "如果 sample context 不足，预览应降级显示缺失信息，而不是假装成功。"
+  },
+  {
+    "id": "T010",
+    "title": "打通保存 UX、冲突处理与刷新流程",
+    "priority": "P0",
+    "depends_on": [
+      "T004",
+      "T006",
+      "T008",
+      "T009"
+    ],
+    "summary": "把前端保存按钮接到 helper save API，清楚展示变更摘要、校验进度、失败原因和成功刷新。",
+    "scope": [
+      "实现保存按钮、保存确认与变更摘要。",
+      "调用 validate-draft 和 save API。",
+      "处理 schema/reference validation failure、hash conflict、helper offline 和成功状态。",
+      "保存成功后清除对应草稿，刷新 library。",
+      "确保 legacy readonly asset 没有保存入口。"
+    ],
+    "suggested_files": [
+      "editor/src/event-editor/EventEditorPage.tsx",
+      "editor/src/event-editor/EventDetailWorkspace.tsx",
+      "editor/src/event-editor/SavePanel.tsx",
+      "editor/src/event-editor/apiClient.ts",
+      "editor/src/event-editor/draftStorage.ts"
+    ],
+    "acceptance_criteria": [
+      "有未保存 draft 时，页面显示目标文件和变更摘要。",
+      "校验失败时，最终 content 不变，草稿保留，ValidationPanel 显示错误。",
+      "hash conflict 时，页面提示重新加载或手动合并，不覆盖文件。",
+      "保存成功后，草稿清除，列表和详情刷新到新 base hash。",
+      "npm run validate:content、npm run lint、npm run test 通过。"
+    ],
+    "notes": "保存 UX 应明确“写入 content”的目标路径。"
+  },
+  {
+    "id": "T011",
+    "title": "集成收口与端到端验收",
+    "priority": "P1",
+    "depends_on": [
+      "T005",
+      "T010"
+    ],
+    "summary": "补齐全链路验收，确保浏览、编辑、保存、新建 domain 与玩家内容加载路径一起工作。",
+    "scope": [
+      "补充或更新 editor 相关测试入口。",
+      "验证 helper + editor 的本地启动说明。",
+      "覆盖浏览结构化事件、修改已有事件、新建 domain、校验失败不写入、legacy readonly 的关键路径。",
+      "确认生成模块、contentData、validate-content 与 editor UI 的边界一致。",
+      "补充必要的开发文档或 README 片段。"
+    ],
+    "suggested_files": [
+      "editor/README.md",
+      "editor/src/event-editor/*.test.tsx",
+      "scripts/*.test.mjs",
+      "tests/e2e/editor.spec.ts",
+      "package.json"
+    ],
+    "acceptance_criteria": [
+      "从干净 checkout 按文档能启动 helper 和 editor。",
+      "用户能浏览一个现有事件，修改 draft，保存成功，并看到 content 文件更新。",
+      "无效 draft 保存失败且最终 content 文件不变。",
+      "新建 domain 后，manifest、生成模块和 eventContentLibrary 都包含该 domain。",
+      "npm run validate:content、npm run lint、npm run test 通过；如新增 e2e，则 npm run test:e2e 也通过。"
+    ],
+    "notes": "本任务只做集成收口，不引入 Later 范围的完整 dry-run、schema-aware diff 或 review 工作流。"
+  }
+]
