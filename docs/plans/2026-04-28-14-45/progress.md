@@ -19,7 +19,7 @@ source:
 | 3 | T003 | 实现 Local Helper 基础服务与只读 library API | completed | 1 |
 | 4 | T004 | 实现 validation gate 与已有 asset 保存 API | completed | 1 |
 | 5 | T005 | 实现新建 domain API 与 manifest 同步 | completed | 1 |
-| 6 | T006 | 实现 editor API client、library state 与 draft storage | pending | 0 |
+| 6 | T006 | 实现 editor API client、library state 与 draft storage | completed | 1 |
 | 7 | T007 | 实现 Event Browser 与搜索筛选 | pending | 0 |
 | 8 | T008 | 实现表单与 JSON 并排编辑工作区 | pending | 0 |
 | 9 | T009 | 实现 Schema、Preview、Graph、Validation 侧栏 | pending | 0 |
@@ -73,3 +73,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 实现 `create-domain` API 与 `manifestStore`，支持生成 definitions/call_templates scaffold、更新 manifest、刷新 generated module、manifest hash conflict 检测，以及失败回滚；测试 domain 仅在临时目录中创建。
 - 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 均通过。
+
+### T006: 实现 editor API client、library state 与 draft storage
+- 状态: completed
+- 开始时间: 2026-04-28 16:10
+- 完成时间: 2026-04-28 16:10
+- 尝试次数: 1
+- Monkey summary: 实现 editor helper API client、library loading/error/empty/summary 状态，以及包含 asset type、asset id、file path、base hash 的 localStorage draftStorage；Event Editor 页面接入最小草稿 scratchpad 和 helper 启动提示。
+- 质量检查: `npm run lint`、`npm run test`、`npm run editor:build` 均通过。

@@ -1,6 +1,4 @@
-import Form from "@rjsf/core";
-import type { RJSFSchema } from "@rjsf/utils";
-import validator from "@rjsf/validator-ajv8";
+import EventEditorPage from "./event-editor/EventEditorPage";
 import "./styles.css";
 
 const editorNavItems = [
@@ -10,18 +8,6 @@ const editorNavItems = [
   { label: "Item Editor", status: "Future", disabled: true },
   { label: "NPC Editor", status: "Future", disabled: true },
 ];
-
-const eventFormSchema: RJSFSchema = {
-  title: "Event Draft Preview",
-  type: "object",
-  required: ["eventId"],
-  properties: {
-    eventId: {
-      type: "string",
-      title: "Event ID",
-    },
-  },
-};
 
 function App() {
   return (
@@ -47,30 +33,7 @@ function App() {
           </div>
         </nav>
 
-        <section className="panel panel-accent editor-main">
-          <div className="editor-panel-heading">
-            <div>
-              <h2 className="panel-title">Event Editor</h2>
-              <p className="muted-text">Independent Vite entry. Player App is not mounted here.</p>
-            </div>
-            <span className="status-tag status-success">READY</span>
-          </div>
-
-          <div className="rjsf-preview" aria-label="RJSF preview">
-            <h3>RJSF schema form layer ready</h3>
-            <Form
-              schema={eventFormSchema}
-              validator={validator}
-              formData={{ eventId: "event.placeholder" }}
-              disabled
-              noHtml5Validate
-            >
-              <button type="submit" disabled>
-                Save unavailable in T002
-              </button>
-            </Form>
-          </div>
-        </section>
+        <EventEditorPage />
       </section>
     </main>
   );

@@ -188,6 +188,40 @@ p {
   color: #171a1c;
 }
 
+.editor-state-card,
+.editor-library-summary {
+  border: 1px dashed #b45b13;
+  background: rgba(255, 255, 255, 0.28);
+  padding: 16px;
+}
+
+.editor-library-summary ul {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding-left: 18px;
+}
+
+.draft-scratchpad-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.rjsf-preview textarea {
+  width: 100%;
+  border: 1px solid #77736b;
+  background: #f7f4ec;
+  padding: 10px;
+  color: #171a1c;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.status-error {
+  color: #a13822;
+  font-weight: 700;
+}
+
 @media (max-width: 760px) {
   .editor-layout {
     grid-template-columns: 1fr;

@@ -1,9 +1,20 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
 describe("Editor App", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(createLibraryResponse()), { status: 200 })),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders the event editor shell with future editors disabled", () => {
     render(<App />);
 
@@ -13,6 +24,20 @@ describe("Editor App", () => {
     expect(screen.getByRole("button", { name: "Map Editor" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Item Editor" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "NPC Editor" })).toBeDisabled();
-    expect(screen.getByText("RJSF schema form layer ready")).toBeInTheDocument();
+    expect(screen.getByText("Loading event library...")).toBeInTheDocument();
   });
 });
+
+function createLibraryResponse() {
+  return {
+    manifest: { schema_version: "event-manifest.v1", domains: [] },
+    domains: [],
+    definitions: [],
+    call_templates: [],
+    handlers: [],
+    presets: [],
+    legacy_events: [],
+    schemas: {},
+    validation: { passed: true, issues: [] },
+  };
+}
