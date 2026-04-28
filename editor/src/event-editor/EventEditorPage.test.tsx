@@ -67,7 +67,7 @@ describe("EventEditorPage", () => {
     render(<EventEditorPage loadLibrary={loadLibrary} />);
 
     expect(await screen.findByText("1 local draft restored")).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/matching draft/)).toBeInTheDocument();
+    expect((screen.getByLabelText("Raw JSON draft") as HTMLTextAreaElement).value).toContain("matching draft");
     expect(screen.queryByText("stale draft")).not.toBeInTheDocument();
   });
 
@@ -76,7 +76,7 @@ describe("EventEditorPage", () => {
     const loadLibrary = vi.fn(async () => createLibraryResponse({ definitions: [asset] }));
 
     render(<EventEditorPage loadLibrary={loadLibrary} />);
-    const draftInput = await screen.findByLabelText("Draft JSON scratchpad");
+    const draftInput = await screen.findByLabelText("Raw JSON draft");
     fireEvent.change(draftInput, {
       target: { value: '{\n  "id": "forest.signal",\n  "notes": "local change"\n}' },
     });
@@ -113,7 +113,7 @@ describe("EventEditorPage", () => {
     const summary = screen.getByLabelText("Selection summary");
     expect(summary).toHaveTextContent("legacy.distress");
     expect(summary).toHaveTextContent("Read-only legacy format");
-    expect(screen.queryByLabelText("Draft JSON scratchpad")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Raw JSON draft")).not.toBeInTheDocument();
   });
 });
 

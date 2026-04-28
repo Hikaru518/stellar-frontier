@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { EventEditorApiError, HELPER_START_COMMAND, loadEventEditorLibrary } from "./apiClient";
 import { loadDraft, saveDraft } from "./draftStorage";
 import EventBrowser from "./EventBrowser";
+import EventDetailWorkspace from "./EventDetailWorkspace";
 import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
 
 type LoadLibrary = () => Promise<EventEditorLibraryResponse>;
@@ -9,8 +10,7 @@ type LoadLibrary = () => Promise<EventEditorLibraryResponse>;
 interface DraftState {
   restoredCount: number;
   activeAsset: EditorEventAsset<unknown> | null;
-  text: string;
-  error: string | null;
+  draft: unknown | null;
 }
 
 export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }: { loadLibrary?: LoadLibrary }) {
@@ -20,8 +20,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
   const [draftState, setDraftState] = useState<DraftState>({
     restoredCount: 0,
     activeAsset: null,
-    text: "",
-    error: null,
+    draft: null,
   });
 
   useEffect(() => {
@@ -47,8 +46,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
         setDraftState({
           restoredCount: restoredDrafts.length,
           activeAsset,
-          text: activeDraft ? JSON.stringify(activeDraft, null, 2) : "",
-          error: null,
+          draft: activeDraft,
         });
         setStatus("loaded");
       })
@@ -126,24 +124,13 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
         <div className="event-editor-detail">
           {draftState.activeAsset ? <SelectionSummary asset={draftState.activeAsset} /> : null}
 
-          {draftState.activeAsset && canEditAsset(draftState.activeAsset) ? (
-            <div className="rjsf-preview" aria-label="Draft storage preview">
-              <h3>Local draft scratchpad</h3>
-              <p className="muted-text">
-                Previewing local-only draft storage for <code>{draftState.activeAsset.id}</code>. Save UX arrives in a later task.
-              </p>
-              <label className="draft-scratchpad-label" htmlFor="draft-json-scratchpad">
-                Draft JSON scratchpad
-              </label>
-              <textarea
-                id="draft-json-scratchpad"
-                aria-label="Draft JSON scratchpad"
-                value={draftState.text}
-                onChange={(event) => updateDraftText(event.target.value)}
-                rows={10}
-              />
-              {draftState.error ? <p className="status-error">{draftState.error}</p> : null}
-            </div>
+          {draftState.activeAsset && library ? (
+            <EventDetailWorkspace
+              asset={draftState.activeAsset}
+              draft={draftState.draft ?? draftState.activeAsset.data}
+              library={library}
+              onDraftChange={updateDraft}
+            />
           ) : null}
         </div>
       </div>
@@ -155,23 +142,17 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     setDraftState((current) => ({
       ...current,
       activeAsset: asset,
-      text: draft ? JSON.stringify(draft, null, 2) : "",
-      error: null,
+      draft,
     }));
   }
 
-  function updateDraftText(text: string): void {
+  function updateDraft(draft: unknown): void {
     if (!draftState.activeAsset || !canEditAsset(draftState.activeAsset)) {
       return;
     }
 
-    try {
-      const parsedDraft = JSON.parse(text);
-      saveDraft(draftState.activeAsset, parsedDraft);
-      setDraftState((current) => ({ ...current, text, error: null }));
-    } catch {
-      setDraftState((current) => ({ ...current, text, error: "Draft JSON is invalid and was not saved." }));
-    }
+    saveDraft(draftState.activeAsset, draft);
+    setDraftState((current) => ({ ...current, draft }));
   }
 }
 
