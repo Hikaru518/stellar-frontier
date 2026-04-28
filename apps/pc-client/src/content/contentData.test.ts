@@ -1,26 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { CallActionDef, eventContentLibrary } from "./contentData";
+import type { eventContentLibrary } from "./contentData";
 
 type JsonModule<T> = T | { default: T };
-
-describe("call-actions content exports", () => {
-  it("exports typed call actions from basic and object content", async () => {
-    const contentData = (await import("./contentData")) as unknown as {
-      callActionsContent?: CallActionDef[];
-    };
-
-    expect(contentData.callActionsContent?.map((action) => action.id)).toEqual(
-      expect.arrayContaining(["survey", "move", "standby", "stop", "gather", "build", "extract", "scan"]),
-    );
-    expect(contentData.callActionsContent?.find((action) => action.id === "stop")).toMatchObject({
-      category: "universal",
-      availableWhenBusy: true,
-    });
-    expect(contentData.callActionsContent?.filter((action) => action.category === "object_action")).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "gather", applicableObjectKinds: expect.any(Array) })]),
-    );
-  });
-});
 
 describe("event content exports", () => {
   it("aggregates event definitions, call templates, and presets from content globs", async () => {
@@ -44,6 +25,18 @@ describe("event content exports", () => {
     expect(contentData.eventContentLibrary.call_templates).toHaveLength(collectContentArray(callTemplateModules, "call_templates").length);
     expect(contentData.eventContentLibrary.presets).toHaveLength(collectContentArray(presetModules, "presets").length);
     expect(contentData.eventContentLibrary.handlers.length).toBeGreaterThan(0);
+  });
+});
+
+describe("default map config", () => {
+  it("exposes tile.objectIds (post-migration) and no legacy tile.objects field", async () => {
+    const { defaultMapConfig } = await import("./contentData");
+    expect(defaultMapConfig.tiles.length).toBeGreaterThan(0);
+    for (const tile of defaultMapConfig.tiles) {
+      expect(Array.isArray(tile.objectIds)).toBe(true);
+      // The legacy `tile.objects` projection must be gone — Task 3 deleted it.
+      expect("objects" in tile).toBe(false);
+    }
   });
 });
 

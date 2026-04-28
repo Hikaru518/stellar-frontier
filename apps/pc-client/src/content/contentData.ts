@@ -3,9 +3,6 @@ import handlerRegistryContent from "../../../../content/events/handler_registry.
 import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
-import basicCallActionsContent from "../../../../content/call-actions/basic-actions.json";
-import objectCallActionsContent from "../../../../content/call-actions/object-actions.json";
-import { mapObjectDefinitionById as newMapObjectDefinitionById } from "./mapObjects";
 import type { EventContentLibrary } from "../events/contentIndex";
 import type {
   CallTemplate,
@@ -39,11 +36,7 @@ export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted
 export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recovered";
 export type MapVisibility = "onDiscovered" | "onInvestigated" | "hidden";
 export type MapRadiationLevel = "none" | "low" | "medium" | "high" | "critical";
-export type MapObjectKind = "resourceNode" | "structure" | "signal" | "hazard" | "facility" | "ruin" | "landmark";
-export type MapCandidateAction = "move" | "survey" | "gather" | "build" | "standby" | "extract" | "scan";
 export type MapSpecialStateSeverity = "low" | "medium" | "high" | "critical";
-export type CallActionCategory = "universal" | "object_action";
-export type CallActionId = MapCandidateAction | "stop";
 
 export interface CrewAttributeMap {
   physical: number;
@@ -118,7 +111,6 @@ export interface EventChoiceDefinition {
   baseSuccessChance?: number;
   dangerStageModifier?: number;
   durationSeconds?: number;
-  usesItemTag?: string;
   unavailableHint?: string;
   successEffects?: EventEffectDefinition[];
   failureEffects?: EventEffectDefinition[];
@@ -213,19 +205,6 @@ export interface MapEnvironmentDefinition {
   notes?: string;
 }
 
-export interface MapObjectDefinition {
-  id: string;
-  kind: MapObjectKind;
-  name: string;
-  description?: string;
-  visibility: Exclude<MapVisibility, "hidden">;
-  tags?: string[];
-  legacyResource?: string;
-  legacyBuilding?: string;
-  legacyInstrument?: string;
-  candidateActions?: MapCandidateAction[];
-}
-
 export interface MapSpecialStateDefinition {
   id: string;
   name: string;
@@ -246,15 +225,8 @@ export interface MapTileDefinition {
   terrain: string;
   weather: string;
   environment: MapEnvironmentDefinition;
-  /** New schema: identifiers into `mapObjectDefinitionById`. Authoritative going forward. */
+  /** Identifiers into `mapObjectDefinitionById` (the only authoritative pointer to map-object content). */
   objectIds: string[];
-  /**
-   * Backwards-compatible legacy projection synthesised from `objectIds` plus the
-   * new `mapObjectDefinitionById` index. Task 3 will remove this in favour of
-   * direct `objectIds` lookups everywhere.
-   * @deprecated use `objectIds` and `mapObjectDefinitionById` instead.
-   */
-  objects: MapObjectDefinition[];
   specialStates: MapSpecialStateDefinition[];
 }
 
@@ -272,18 +244,6 @@ export interface MapConfigDefinition {
   tiles: MapTileDefinition[];
 }
 
-export interface CallActionDef {
-  id: CallActionId;
-  category: CallActionCategory;
-  label: string;
-  tone: Tone;
-  availableWhenBusy: boolean;
-  applicableObjectKinds?: MapObjectKind[];
-  durationSeconds: number;
-  handler: string;
-  params?: Record<string, unknown>;
-}
-
 export const eventProgramDefinitions = collectContentArray(eventDefinitionModules, "event_definitions") as unknown as ProgramEventDefinition[];
 export const callTemplates = collectContentArray(callTemplateModules, "call_templates") as unknown as CallTemplate[];
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
@@ -299,21 +259,7 @@ export const eventDefinitions = eventsContent.events as unknown as EventDefiniti
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
 
-const KNOWN_CANDIDATE_ACTION_VERBS: ReadonlySet<MapCandidateAction> = new Set([
-  "move",
-  "survey",
-  "gather",
-  "build",
-  "standby",
-  "extract",
-  "scan",
-]);
-
-export const defaultMapConfig: MapConfigDefinition = projectDefaultMapConfig(defaultMapJson as unknown as MapConfigDefinition);
-export const callActionsContent = [
-  ...basicCallActionsContent.call_actions,
-  ...objectCallActionsContent.call_actions,
-] as unknown as CallActionDef[];
+export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigDefinition);
 
 export const eventDefinitionById = new Map(eventDefinitions.map((event) => [event.eventId, event]));
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));
@@ -337,69 +283,17 @@ function unwrapJsonModule<T extends object>(module: JsonModule<T>): T {
 }
 
 /**
- * Bridge the migrated map JSON (which now stores `tile.objectIds: string[]`)
- * to the legacy `tile.objects` runtime shape consumed by callActions, mapSystem,
- * App.tsx, etc. Task 3 will remove this projection along with the legacy field.
+ * Defensive normalization of the migrated map JSON: ensures every tile has an
+ * `objectIds` array (defaulting to `[]`). All consumers should now read
+ * `tile.objectIds` and resolve definitions via `mapObjectDefinitionById`; the
+ * legacy synthesised `tile.objects` projection has been removed.
  */
-function projectDefaultMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
+function normalizeMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
   return {
     ...rawConfig,
-    tiles: rawConfig.tiles.map((tile) => projectTile(tile)),
+    tiles: rawConfig.tiles.map((tile) => ({
+      ...tile,
+      objectIds: Array.isArray(tile.objectIds) ? tile.objectIds : [],
+    })),
   };
-}
-
-function projectTile(tile: MapTileDefinition): MapTileDefinition {
-  const objectIds = Array.isArray(tile.objectIds) ? tile.objectIds : [];
-  const objects = objectIds
-    .map((id) => projectMapObject(id))
-    .filter((object): object is MapObjectDefinition => Boolean(object));
-  return {
-    ...tile,
-    objectIds,
-    objects,
-  };
-}
-
-function projectMapObject(id: string): MapObjectDefinition | undefined {
-  const definition = newMapObjectDefinitionById.get(id);
-  if (!definition) {
-    return undefined;
-  }
-
-  const candidateActions = extractCandidateActions(definition);
-  const projected: MapObjectDefinition = {
-    id: definition.id,
-    kind: definition.kind,
-    name: definition.name,
-    description: definition.description,
-    visibility: (definition.visibility === "hidden" ? "onInvestigated" : definition.visibility) as Exclude<MapVisibility, "hidden">,
-    tags: definition.tags,
-    legacyResource: definition.legacyResource,
-    legacyBuilding: definition.legacyBuilding,
-    legacyInstrument: definition.legacyInstrument,
-  };
-  if (candidateActions.length > 0) {
-    projected.candidateActions = candidateActions;
-  }
-  return projected;
-}
-
-function extractCandidateActions(definition: { actions?: Array<{ id: string }> }): MapCandidateAction[] {
-  if (!Array.isArray(definition.actions)) {
-    return [];
-  }
-
-  const verbs: MapCandidateAction[] = [];
-  for (const action of definition.actions) {
-    const colonIndex = action.id.lastIndexOf(":");
-    if (colonIndex < 0) {
-      continue;
-    }
-    const verb = action.id.slice(colonIndex + 1) as MapCandidateAction;
-    if (!KNOWN_CANDIDATE_ACTION_VERBS.has(verb) || verbs.includes(verb)) {
-      continue;
-    }
-    verbs.push(verb);
-  }
-  return verbs;
 }

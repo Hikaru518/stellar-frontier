@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App, { mergeEventRuntimeState, toEventEngineState } from "./App";
 import { crewDefinitions, defaultMapConfig, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
+import { mapObjectDefinitionById } from "./content/mapObjects";
 import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
 import { evaluateCondition } from "./events/conditions";
 import { executeEffects } from "./events/effects";
@@ -245,12 +246,15 @@ describe("App", () => {
   it("does not create Garry's mine anomaly call when gathering lacks the mineral_deposit tag", () => {
     vi.useFakeTimers();
     const untaggedIronTile = defaultMapConfig.tiles.find((tile) =>
-      tile.objects.some(
-        (object) =>
-          object.legacyResource === "iron_ore" &&
-          object.candidateActions?.includes("gather") &&
-          !object.tags?.includes("mineral_deposit"),
-      ),
+      tile.objectIds.some((objectId) => {
+        const object = mapObjectDefinitionById.get(objectId);
+        return Boolean(
+          object &&
+            object.legacyResource === "iron_ore" &&
+            object.actions.some((action) => action.id === `${object.id}:gather`) &&
+            !object.tags?.includes("mineral_deposit"),
+        );
+      }),
     );
     expect(untaggedIronTile).toBeDefined();
 
@@ -364,7 +368,9 @@ describe("App", () => {
   it("reveals investigated map objects through a tag-selected survey target", () => {
     vi.useFakeTimers();
     const signalTile = findTileWithObjectTag("signal", { visibility: "onInvestigated" });
-    const signalObject = signalTile.objects.find((object) => object.tags?.includes("signal") && object.visibility === "onInvestigated");
+    const signalObject = signalTile.objectIds
+      .map((objectId) => mapObjectDefinitionById.get(objectId))
+      .find((object) => object?.tags?.includes("signal") && object.visibility === "onInvestigated");
     const map = createInitialMapState();
     map.discoveredTileIds = ["4-4", signalTile.id];
     map.tilesById[signalTile.id] = {
@@ -804,7 +810,9 @@ describe("App", () => {
   it("opens Mike's crash site recon call and marks the wreckage signal", () => {
     vi.useFakeTimers();
     const crashTile = findTileWithObjectTag("crash_site");
-    const crashObject = crashTile.objects.find((object) => object.tags?.includes("crash_site"));
+    const crashObject = crashTile.objectIds
+      .map((objectId) => mapObjectDefinitionById.get(objectId))
+      .find((object) => object?.tags?.includes("crash_site"));
     expect(crashObject).toBeDefined();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -872,7 +880,9 @@ describe("App", () => {
   it("lets Mike withdraw from crash site recon without revealing the wreckage signal", () => {
     vi.useFakeTimers();
     const crashTile = findTileWithObjectTag("crash_site");
-    const crashObject = crashTile.objects.find((object) => object.tags?.includes("crash_site"));
+    const crashObject = crashTile.objectIds
+      .map((objectId) => mapObjectDefinitionById.get(objectId))
+      .find((object) => object?.tags?.includes("crash_site"));
     expect(crashObject).toBeDefined();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -2116,7 +2126,10 @@ function startAmyBeastEmergencyFromStandby() {
 
 function findTileWithObjectTag(tag: string, filters: { visibility?: string } = {}) {
   const tile = defaultMapConfig.tiles.find((item) =>
-    item.objects.some((object) => object.tags?.includes(tag) && (!filters.visibility || object.visibility === filters.visibility)),
+    item.objectIds.some((objectId) => {
+      const object = mapObjectDefinitionById.get(objectId);
+      return Boolean(object?.tags?.includes(tag) && (!filters.visibility || object.visibility === filters.visibility));
+    }),
   );
   expect(tile).toBeDefined();
   return tile!;

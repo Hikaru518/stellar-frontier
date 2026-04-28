@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { applyImmediateOrCreateAction, settleAction, type SettlementActiveAction } from "./callActionSettlement";
-import type { MapObjectDefinition } from "./content/contentData";
+import { defaultMapConfig } from "./content/contentData";
+import { mapObjectDefinitionById } from "./content/mapObjects";
 import type { CrewMember, GameMapState, GameState, MapTile, ResourceSummary } from "./data/gameData";
 
 type TileWithContent = MapTile & {
   tags?: string[];
-  objects?: MapObjectDefinition[];
 };
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
@@ -13,7 +13,7 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
     id: "amy",
     name: "Amy",
     role: "Scout",
-    currentTile: "test-tile",
+    currentTile: "3-3",
     location: "Test Tile",
     coord: "(0,0)",
     status: "待命中。",
@@ -46,13 +46,14 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   };
 }
 
-function createTile(overrides: Partial<TileWithContent> = {}): TileWithContent {
+function createTile(tileId: string, overrides: Partial<TileWithContent> = {}): TileWithContent {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
   return {
-    id: "test-tile",
+    id: tileId,
     coord: "(0,0)",
-    row: 1,
-    col: 1,
-    terrain: "平原",
+    row: configTile?.row ?? 1,
+    col: configTile?.col ?? 1,
+    terrain: configTile?.terrain ?? "平原",
     resources: [],
     buildings: [],
     instruments: [],
@@ -61,20 +62,6 @@ function createTile(overrides: Partial<TileWithContent> = {}): TileWithContent {
     status: "已发现",
     investigated: false,
     tags: ["test_tile"],
-    objects: [],
-    ...overrides,
-  };
-}
-
-function createObject(overrides: Partial<MapObjectDefinition> = {}): MapObjectDefinition {
-  return {
-    id: "test-object",
-    kind: "resourceNode",
-    name: "测试资源点",
-    visibility: "onDiscovered",
-    tags: ["test_object"],
-    legacyResource: "iron_ore",
-    candidateActions: ["gather"],
     ...overrides,
   };
 }
@@ -93,13 +80,13 @@ function createResources(): ResourceSummary {
   };
 }
 
-function createMap(tileId = "test-tile"): GameMapState {
+function createMap(tileId = "3-3"): GameMapState {
   return {
-    configId: "test-map",
-    configVersion: 1,
-    rows: 1,
-    cols: 1,
-    originTileId: tileId,
+    configId: defaultMapConfig.id,
+    configVersion: defaultMapConfig.version,
+    rows: defaultMapConfig.size.rows,
+    cols: defaultMapConfig.size.cols,
+    originTileId: defaultMapConfig.originTileId,
     discoveredTileIds: [tileId],
     investigationReportsById: {},
     tilesById: {
@@ -110,12 +97,13 @@ function createMap(tileId = "test-tile"): GameMapState {
         revealedSpecialStateIds: [],
       },
     },
+    mapObjects: {},
   };
 }
 
 function createGameState(overrides: Partial<GameState> = {}): GameState {
   const member = createMember();
-  const tile = createTile();
+  const tile = createTile("3-3");
 
   return {
     schema_version: "test",
@@ -145,13 +133,13 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
 describe("applyImmediateOrCreateAction", () => {
   it("settles standby immediately and emits an idle_time trigger", () => {
     const activeAction: SettlementActiveAction = {
-      id: "amy-survey-test-tile",
+      id: "amy-survey-3-3",
       actionType: "survey",
       status: "inProgress",
       startTime: 10,
       durationSeconds: 120,
       finishTime: 130,
-      targetTile: "test-tile",
+      targetTile: "3-3",
       params: {},
     };
     const state = createGameState({
@@ -171,21 +159,19 @@ describe("applyImmediateOrCreateAction", () => {
         occurred_at: 42,
         source: "crew_action",
         crew_id: "amy",
-        tile_id: "test-tile",
+        tile_id: "3-3",
         action_id: "standby",
       }),
     ]);
   });
 
   it.each([
-    ["survey", undefined, "survey"],
-    ["gather:test-object", createObject({ candidateActions: ["gather"] }), "gather"],
-    ["build:test-object", createObject({ kind: "structure", candidateActions: ["build"], legacyResource: undefined }), "build"],
-    ["extract:test-object", createObject({ kind: "structure", candidateActions: ["extract"], legacyResource: undefined }), "extract"],
-    ["scan:test-object", createObject({ kind: "signal", candidateActions: ["scan"], legacyResource: undefined }), "scan"],
-  ])("creates an in-progress activeAction for %s", (actionViewId, object, actionType) => {
-    const tile = createTile({ objects: object ? [object] : [] });
-    const state = createGameState({ tiles: [tile] });
+    ["survey", "survey"],
+    ["gather:iron-ridge-deposit", "gather"],
+    ["build:mainline-damaged-warp-pod", "build"],
+    ["extract:mainline-damaged-warp-pod", "extract"],
+  ])("creates an in-progress activeAction for %s", (actionViewId, actionType) => {
+    const state = createGameState();
 
     const result = applyImmediateOrCreateAction({ state, crewId: "amy", actionViewId, occurredAt: 100 });
 
@@ -196,7 +182,6 @@ describe("applyImmediateOrCreateAction", () => {
         status: "inProgress",
         startTime: 100,
         finishTime: expect.any(Number),
-        targetTile: "test-tile",
         params: expect.any(Object),
       }),
     );
@@ -215,24 +200,24 @@ describe("applyImmediateOrCreateAction", () => {
 });
 
 describe("settleAction", () => {
-  it("reveals investigated objects and emits an action_complete trigger with tile and object tags", () => {
-    const hiddenObject = createObject({
-      id: "buried-cache",
-      name: "埋藏缓存",
-      visibility: "onInvestigated",
-      tags: ["cache"],
-      candidateActions: ["survey"],
-    });
-    const tile = createTile({ tags: ["ruins"], objects: [hiddenObject] });
-    const member = createMember();
+  it("reveals onInvestigated objects and emits an action_complete trigger with tile and object tags", () => {
+    // tile `5-3` carries `southwest-timber` (visibility: onInvestigated) per the
+    // migrated default-map.json — surveying it should flip that object into
+    // revealedObjectIds.
+    const tileId = "5-3";
+    const investigatedObject = mapObjectDefinitionById.get("southwest-timber");
+    expect(investigatedObject).toBeDefined();
+
+    const tile = createTile(tileId, { tags: ["forest_marsh"] });
+    const member = createMember({ currentTile: tileId });
     const action: SettlementActiveAction = {
-      id: "amy-survey-test-tile",
+      id: "amy-survey-5-3",
       actionType: "survey",
       status: "inProgress",
       startTime: 0,
       durationSeconds: 120,
       finishTime: 120,
-      targetTile: "test-tile",
+      targetTile: tileId,
       params: { surveyLevel: "standard" },
     };
 
@@ -243,45 +228,37 @@ describe("settleAction", () => {
       resources: createResources(),
       baseInventory: [],
       tiles: [tile],
-      map: createMap(),
+      map: createMap(tileId),
       logs: [],
     });
 
-    expect(patch.map.tilesById["test-tile"]?.revealedObjectIds).toContain("buried-cache");
+    expect(patch.map.tilesById[tileId]?.revealedObjectIds).toContain("southwest-timber");
     expect(patch.triggerContexts).toEqual([
       expect.objectContaining({
         trigger_type: "action_complete",
         occurred_at: 120,
         source: "crew_action",
         crew_id: "amy",
-        tile_id: "test-tile",
-        action_id: "amy-survey-test-tile",
+        tile_id: tileId,
+        action_id: "amy-survey-5-3",
         payload: expect.objectContaining({
-          tags: expect.arrayContaining(["ruins", "cache"]),
+          tags: expect.arrayContaining(["forest_marsh"]),
         }),
       }),
     ]);
   });
 
   it("adds mineral deposit yield from action params instead of a hardcoded amount", () => {
-    const mineralDeposit = createObject({
-      id: "iron-deposit",
-      name: "铁矿床",
-      tags: ["mineral_deposit"],
-      legacyResource: "iron_ore",
-      candidateActions: ["gather"],
-    });
-    const tile = createTile({ objects: [mineralDeposit] });
     const member = createMember();
     const action: SettlementActiveAction = {
-      id: "amy-gather-iron-deposit",
+      id: "amy-gather-iron-ridge-deposit",
       actionType: "gather",
       status: "inProgress",
       startTime: 0,
       durationSeconds: 180,
       finishTime: 180,
-      targetTile: "test-tile",
-      objectId: "iron-deposit",
+      targetTile: "3-3",
+      objectId: "iron-ridge-deposit",
       params: {
         perRoundYieldByResource: {
           iron_ore: 7,
@@ -295,8 +272,8 @@ describe("settleAction", () => {
       occurredAt: 180,
       resources: createResources(),
       baseInventory: [],
-      tiles: [tile],
-      map: createMap(),
+      tiles: [createTile("3-3")],
+      map: createMap("3-3"),
       logs: [],
     });
 
