@@ -1,11 +1,4 @@
-import desertCallTemplatesContent from "../../../../content/events/call_templates/desert.json";
-import forestCallTemplatesContent from "../../../../content/events/call_templates/forest.json";
-import mountainCallTemplatesContent from "../../../../content/events/call_templates/mountain.json";
-import desertDefinitionsContent from "../../../../content/events/definitions/desert.json";
-import forestDefinitionsContent from "../../../../content/events/definitions/forest.json";
-import mountainDefinitionsContent from "../../../../content/events/definitions/mountain.json";
 import handlerRegistryContent from "../../../../content/events/handler_registry.json";
-import forestPresetsContent from "../../../../content/events/presets/forest.json";
 import { buildEventContentIndex, type EventContentIndex, type EventContentIndexResult } from "./contentIndex";
 import { assignObjective, completeObjective, processEventWakeups, processTrigger, selectCallOption, type EventEngineResult } from "./eventEngine";
 import type { GraphRunnerGameState, GraphRunnerResult } from "./graphRunner";
@@ -16,7 +9,6 @@ import {
   type EventDefinition,
   type HandlerDefinition,
   type Id,
-  type PresetDefinition,
   type RuntimeEvent,
   type RuntimeEventStatus,
   type TileState,
@@ -95,20 +87,322 @@ export function dryRunApprovedSampleEvents(): SampleDryRunReport[] {
 
 function sampleEventContentLibrary() {
   return {
-    domains: ["forest", "mountain", "desert"],
-    event_definitions: [
-      ...readDefinitions(forestDefinitionsContent),
-      ...readDefinitions(mountainDefinitionsContent),
-      ...readDefinitions(desertDefinitionsContent),
-    ],
-    call_templates: [
-      ...readCallTemplates(forestCallTemplatesContent),
-      ...readCallTemplates(mountainCallTemplatesContent),
-      ...readCallTemplates(desertCallTemplatesContent),
-    ],
+    domains: ["fixture_forest", "fixture_desert"],
+    event_definitions: sampleEventDefinitions(),
+    call_templates: sampleCallTemplates(),
     handlers: (handlerRegistryContent.handlers ?? []) as HandlerDefinition[],
-    presets: (forestPresetsContent.presets ?? []) as PresetDefinition[],
+    presets: [],
   };
+}
+
+function sampleEventDefinitions(): EventDefinition[] {
+  return [
+    callToEndDefinition({
+      id: "forest_trace_small_camp",
+      domain: "fixture_forest",
+      title: "Fixture forest trace",
+      summary: "A crew member reports a small trace.",
+      tag: "normal_discovery",
+      triggerTag: "forest",
+      callTemplateId: "forest_trace_small_camp.call.report",
+      callNodeId: "trace_report",
+      optionId: "mark_camp",
+      endNodeId: "trace_resolved",
+      resultKey: "trace_resolved",
+      context: {
+        trigger_type: "action_complete",
+        occurred_at: 120,
+        source: "crew_action",
+        crew_id: "amy",
+        tile_id: "2-3",
+        action_id: "amy-survey-2-3",
+        payload: { action_type: "survey" },
+      },
+    }),
+    callToEndDefinition({
+      id: "forest_beast_emergency",
+      domain: "fixture_forest",
+      title: "Fixture emergency call",
+      summary: "A crew member reports an urgent threat.",
+      tag: "emergency_multi_call",
+      triggerTag: "beast_tracks",
+      triggerField: "danger_tags",
+      callTemplateId: "forest_beast_emergency.call.report",
+      callNodeId: "beast_emergency_call",
+      optionId: "evacuate",
+      endNodeId: "beast_evacuated_end",
+      resultKey: "beast_evacuated",
+      urgency: "emergency",
+      delivery: "incoming_call",
+      requiresBlockingSlot: true,
+      mutexGroup: "fixture_crew_emergency",
+      context: {
+        trigger_type: "action_complete",
+        occurred_at: 240,
+        source: "crew_action",
+        crew_id: "amy",
+        tile_id: "2-3",
+        action_id: "current-area-survey:amy:2-3:240",
+        payload: { action_type: "survey" },
+      },
+    }),
+    objectiveDefinition(),
+  ];
+}
+
+function sampleCallTemplates(): CallTemplate[] {
+  return [
+    callTemplate("forest_trace_small_camp.call.report", "fixture_forest", "forest_trace_small_camp", "trace_report", [
+      "mark_camp",
+    ]),
+    callTemplate("forest_beast_emergency.call.report", "fixture_forest", "forest_beast_emergency", "beast_emergency_call", [
+      "evacuate",
+    ]),
+    callTemplate("volcanic_ash_trace.call.briefing", "fixture_desert", "volcanic_ash_trace", "ash_trace_call", [
+      "assign_probe",
+    ]),
+  ];
+}
+
+function callToEndDefinition({
+  id,
+  domain,
+  title,
+  summary,
+  tag,
+  triggerTag,
+  triggerField = "tags",
+  callTemplateId,
+  callNodeId,
+  optionId,
+  endNodeId,
+  resultKey,
+  urgency = "normal",
+  delivery = "queued_message",
+  requiresBlockingSlot = false,
+  mutexGroup = null,
+  context,
+}: {
+  id: SampleEventId;
+  domain: string;
+  title: string;
+  summary: string;
+  tag: string;
+  triggerTag: string;
+  triggerField?: "tags" | "danger_tags";
+  callTemplateId: Id;
+  callNodeId: Id;
+  optionId: Id;
+  endNodeId: Id;
+  resultKey: string;
+  urgency?: "normal" | "emergency";
+  delivery?: "queued_message" | "incoming_call";
+  requiresBlockingSlot?: boolean;
+  mutexGroup?: string | null;
+  context: TriggerContext;
+}): EventDefinition {
+  return {
+    schema_version: "event-program-model-v1",
+    id,
+    version: 1,
+    domain,
+    title,
+    summary,
+    tags: ["sample_fixture", tag],
+    status: "approved",
+    trigger: {
+      type: "action_complete",
+      required_context: ["crew_id", "tile_id", "action_id"],
+      conditions: [{ type: "has_tag", target: { type: "event_tile" }, field: triggerField, value: triggerTag }],
+    },
+    candidate_selection: {
+      priority: requiresBlockingSlot ? 90 : 30,
+      weight: 1,
+      mutex_group: mutexGroup,
+      max_instances_per_trigger: 1,
+      requires_blocking_slot: requiresBlockingSlot,
+    },
+    repeat_policy: {
+      scope: "crew_tile",
+      max_trigger_count: 1,
+      cooldown_seconds: 0,
+      history_key_template: `event:${id}:{crew_id}:{tile_id}`,
+      allow_while_active: false,
+    },
+    event_graph: {
+      entry_node_id: callNodeId,
+      nodes: [
+        {
+          id: callNodeId,
+          type: "call",
+          title,
+          call_template_id: callTemplateId,
+          speaker_crew_ref: { type: "primary_crew" },
+          urgency,
+          delivery,
+          options: [{ id: optionId, is_default: true }],
+          option_node_mapping: { [optionId]: endNodeId },
+          blocking: communicationBlocking(),
+          expires_in_seconds: 180,
+        },
+        endNode(endNodeId, resultKey),
+      ],
+      edges: [],
+      terminal_node_ids: [endNodeId],
+      graph_rules: { acyclic: true, max_active_nodes: 1, allow_parallel_nodes: false },
+    },
+    log_templates: [logTemplate(`${id}.log`)],
+    content_refs: { call_template_ids: [callTemplateId] },
+    sample_contexts: [context],
+  };
+}
+
+function objectiveDefinition(): EventDefinition {
+  return {
+    schema_version: "event-program-model-v1",
+    id: "volcanic_ash_trace",
+    version: 1,
+    domain: "fixture_desert",
+    title: "Fixture cross-crew objective",
+    summary: "A crew member asks another crew member to inspect a trace.",
+    tags: ["sample_fixture", "cross_crew_objective"],
+    status: "approved",
+    trigger: {
+      type: "action_complete",
+      required_context: ["crew_id", "tile_id", "action_id"],
+      conditions: [{ type: "has_tag", target: { type: "event_tile" }, field: "tags", value: "volcanic" }],
+    },
+    candidate_selection: {
+      priority: 35,
+      weight: 1,
+      mutex_group: null,
+      max_instances_per_trigger: 1,
+      requires_blocking_slot: false,
+    },
+    repeat_policy: {
+      scope: "tile",
+      max_trigger_count: 1,
+      cooldown_seconds: 0,
+      history_key_template: "event:volcanic_ash_trace:{tile_id}",
+      allow_while_active: false,
+    },
+    event_graph: {
+      entry_node_id: "ash_trace_call",
+      nodes: [
+        {
+          id: "ash_trace_call",
+          type: "call",
+          title: "Report trace",
+          call_template_id: "volcanic_ash_trace.call.briefing",
+          speaker_crew_ref: { type: "primary_crew" },
+          urgency: "normal",
+          delivery: "queued_message",
+          options: [{ id: "assign_probe", is_default: true }],
+          option_node_mapping: { assign_probe: "ash_cross_crew_objective" },
+          blocking: communicationBlocking(),
+          expires_in_seconds: 180,
+        },
+        {
+          id: "ash_cross_crew_objective",
+          type: "objective",
+          title: "Inspect trace",
+          objective_template: {
+            title: "Inspect trace",
+            summary: "Send a second crew member to inspect the trace.",
+            target_tile_ref: { type: "event_tile" },
+            required_action_type: "survey",
+            required_action_params: { duration_seconds: 45, can_interrupt: true },
+          },
+          mode: "create_and_wait",
+          on_completed_node_id: "ash_mapped_end",
+          on_failed_node_id: "ash_failed_end",
+          expires_in_seconds: 600,
+          parent_event_link: true,
+          blocking: nonBlocking(),
+        },
+        endNode("ash_mapped_end", "ash_trace_mapped"),
+        endNode("ash_failed_end", "ash_trace_lost", "failed"),
+      ],
+      edges: [],
+      terminal_node_ids: ["ash_mapped_end", "ash_failed_end"],
+      graph_rules: { acyclic: true, max_active_nodes: 1, allow_parallel_nodes: false },
+    },
+    log_templates: [logTemplate("volcanic_ash_trace.log")],
+    content_refs: { call_template_ids: ["volcanic_ash_trace.call.briefing"] },
+    sample_contexts: [
+      {
+        trigger_type: "action_complete",
+        occurred_at: 480,
+        source: "crew_action",
+        crew_id: "garry",
+        tile_id: "4-3",
+        action_id: "garry-survey-4-3",
+        payload: { action_type: "survey", dry_run_assignee_crew_id: "amy" },
+      },
+    ],
+  };
+}
+
+function endNode(id: Id, resultKey: string, resolution: "resolved" | "failed" = "resolved"): EventDefinition["event_graph"]["nodes"][number] {
+  return {
+    id,
+    type: "end",
+    title: resultKey,
+    resolution,
+    result_key: resultKey,
+    event_log_template_id: `${resultKey}.log`,
+    history_writes: [],
+    blocking: nonBlocking(),
+    cleanup_policy: {
+      release_blocking_claims: true,
+      delete_active_calls: true,
+      keep_player_summary: true,
+    },
+  };
+}
+
+function callTemplate(id: Id, domain: string, eventDefinitionId: Id, nodeId: Id, optionIds: Id[]): CallTemplate {
+  return {
+    schema_version: "event-program-model-v1",
+    id,
+    version: 1,
+    domain,
+    event_definition_id: eventDefinitionId,
+    node_id: nodeId,
+    render_context_fields: ["crew_id", "crew_display_name", "tile_id"],
+    opening_lines: {
+      selection: "best_match",
+      variants: [{ id: `${id}.opening`, text: "Fixture event report.", priority: 0 }],
+    },
+    option_lines: Object.fromEntries(
+      optionIds.map((optionId) => [
+        optionId,
+        {
+          selection: "best_match",
+          variants: [{ id: `${id}.${optionId}`, text: "Continue.", priority: 0 }],
+        },
+      ]),
+    ),
+    fallback_order: ["default"],
+    default_variant_required: true,
+  };
+}
+
+function logTemplate(id: Id): NonNullable<EventDefinition["log_templates"]>[number] {
+  return {
+    id,
+    summary: "Fixture event completed.",
+    importance: "normal",
+    visibility: "player_visible",
+  };
+}
+
+function communicationBlocking() {
+  return { occupies_crew_action: false, occupies_communication: true, blocking_key_template: null };
+}
+
+function nonBlocking() {
+  return { occupies_crew_action: false, occupies_communication: false, blocking_key_template: null };
 }
 
 function dryRunSampleContext(
@@ -403,14 +697,4 @@ function missingDefinitionReport(eventDefinitionId: SampleEventId): SampleDryRun
 function readPayloadString(context: TriggerContext, key: string): string | undefined {
   const value = context.payload?.[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function readDefinitions(content: unknown): EventDefinition[] {
-  return ((content as { event_definitions?: EventDefinition[] }).event_definitions ?? []).filter((definition) =>
-    SAMPLE_EVENT_IDS.includes(definition.id as SampleEventId),
-  );
-}
-
-function readCallTemplates(content: unknown): CallTemplate[] {
-  return (content as { call_templates?: CallTemplate[] }).call_templates ?? [];
 }

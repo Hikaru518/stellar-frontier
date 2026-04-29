@@ -2,24 +2,6 @@
   "schema_version": "event-manifest.v1",
   "domains": [
     {
-      "id": "crash_site",
-      "definitions": "definitions/crash_site.json",
-      "call_templates": "call_templates/crash_site.json",
-      "presets": null
-    },
-    {
-      "id": "desert",
-      "definitions": "definitions/desert.json",
-      "call_templates": "call_templates/desert.json",
-      "presets": null
-    },
-    {
-      "id": "forest",
-      "definitions": "definitions/forest.json",
-      "call_templates": "call_templates/forest.json",
-      "presets": "presets/forest.json"
-    },
-    {
       "id": "mainline_crash_site",
       "definitions": "definitions/mainline_crash_site.json",
       "call_templates": "call_templates/mainline_crash_site.json",
@@ -53,18 +35,6 @@
       "id": "mainline_village",
       "definitions": "definitions/mainline_village.json",
       "call_templates": "call_templates/mainline_village.json",
-      "presets": null
-    },
-    {
-      "id": "mine",
-      "definitions": "definitions/mine.json",
-      "call_templates": "call_templates/mine.json",
-      "presets": null
-    },
-    {
-      "id": "mountain",
-      "definitions": "definitions/mountain.json",
-      "call_templates": "call_templates/mountain.json",
       "presets": null
     }
   ]

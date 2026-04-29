@@ -12,7 +12,7 @@ describe("generated event content exports", () => {
     "mainline_ending",
   ];
 
-  const legacyStructuredDomainsPendingRemoval = [
+  const removedStructuredDomains = [
     "crash_site",
     "desert",
     "forest",
@@ -20,13 +20,10 @@ describe("generated event content exports", () => {
     "mountain",
   ];
 
-  const structuredDomains = [...legacyStructuredDomainsPendingRemoval, ...playableStructuredDomains].sort();
+  const structuredDomains = [...playableStructuredDomains].sort();
   const sortedPlayableStructuredDomains = [...playableStructuredDomains].sort();
 
-  it("documents the only playable structured event domains for this content boundary", () => {
-    const playableDomainSet = new Set(playableStructuredDomains);
-    const mainlineManifestDomains = eventManifest.domains.map((domain) => domain.id).filter((domain) => playableDomainSet.has(domain)).sort();
-
+  it("registers only mainline structured event domains for this content boundary", () => {
     expect(playableStructuredDomains).toEqual([
       "mainline_crash_site",
       "mainline_resources",
@@ -35,14 +32,15 @@ describe("generated event content exports", () => {
       "mainline_hive",
       "mainline_ending",
     ]);
-    expect(mainlineManifestDomains).toEqual(sortedPlayableStructuredDomains);
+    expect(eventManifest.domains.map((domain) => domain.id).sort()).toEqual(sortedPlayableStructuredDomains);
   });
 
-  it("keeps non-mainline runtime domains explicit until the cleanup tasks remove them", () => {
-    const playableDomainSet = new Set(playableStructuredDomains);
-    const nonMainlineManifestDomains = eventManifest.domains.map((domain) => domain.id).filter((domain) => !playableDomainSet.has(domain)).sort();
+  it("does not register removed legacy structured event domains", () => {
+    const manifestDomains = new Set(eventManifest.domains.map((domain) => domain.id));
 
-    expect(nonMainlineManifestDomains).toEqual(legacyStructuredDomainsPendingRemoval);
+    for (const removedDomain of removedStructuredDomains) {
+      expect(manifestDomains.has(removedDomain)).toBe(false);
+    }
   });
 
   it("tracks every authored structured event domain in the manifest", () => {

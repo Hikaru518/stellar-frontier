@@ -3,13 +3,6 @@
  * Do not edit by hand. Update content/events/manifest.json, then rerun the generator.
  */
 import type { CallTemplate, EventDefinition, PresetDefinition } from "../../events/types";
-import crashSiteEventDefinitionsContent from "../../../../../content/events/definitions/crash_site.json";
-import crashSiteCallTemplatesContent from "../../../../../content/events/call_templates/crash_site.json";
-import desertEventDefinitionsContent from "../../../../../content/events/definitions/desert.json";
-import desertCallTemplatesContent from "../../../../../content/events/call_templates/desert.json";
-import forestEventDefinitionsContent from "../../../../../content/events/definitions/forest.json";
-import forestCallTemplatesContent from "../../../../../content/events/call_templates/forest.json";
-import forestPresetsContent from "../../../../../content/events/presets/forest.json";
 import mainlineCrashSiteEventDefinitionsContent from "../../../../../content/events/definitions/mainline_crash_site.json";
 import mainlineCrashSiteCallTemplatesContent from "../../../../../content/events/call_templates/mainline_crash_site.json";
 import mainlineEndingEventDefinitionsContent from "../../../../../content/events/definitions/mainline_ending.json";
@@ -22,53 +15,33 @@ import mainlineResourcesEventDefinitionsContent from "../../../../../content/eve
 import mainlineResourcesCallTemplatesContent from "../../../../../content/events/call_templates/mainline_resources.json";
 import mainlineVillageEventDefinitionsContent from "../../../../../content/events/definitions/mainline_village.json";
 import mainlineVillageCallTemplatesContent from "../../../../../content/events/call_templates/mainline_village.json";
-import mineEventDefinitionsContent from "../../../../../content/events/definitions/mine.json";
-import mineCallTemplatesContent from "../../../../../content/events/call_templates/mine.json";
-import mountainEventDefinitionsContent from "../../../../../content/events/definitions/mountain.json";
-import mountainCallTemplatesContent from "../../../../../content/events/call_templates/mountain.json";
 
 export const generatedEventDomains = [
-  "crash_site",
-  "desert",
-  "forest",
   "mainline_crash_site",
   "mainline_ending",
   "mainline_hive",
   "mainline_medical",
   "mainline_resources",
   "mainline_village",
-  "mine",
-  "mountain",
 ] as const;
 
 export const generatedEventProgramDefinitions = [
-  ...crashSiteEventDefinitionsContent.event_definitions,
-  ...desertEventDefinitionsContent.event_definitions,
-  ...forestEventDefinitionsContent.event_definitions,
   ...mainlineCrashSiteEventDefinitionsContent.event_definitions,
   ...mainlineEndingEventDefinitionsContent.event_definitions,
   ...mainlineHiveEventDefinitionsContent.event_definitions,
   ...mainlineMedicalEventDefinitionsContent.event_definitions,
   ...mainlineResourcesEventDefinitionsContent.event_definitions,
   ...mainlineVillageEventDefinitionsContent.event_definitions,
-  ...mineEventDefinitionsContent.event_definitions,
-  ...mountainEventDefinitionsContent.event_definitions,
 ] as unknown as EventDefinition[];
 
 export const generatedCallTemplates = [
-  ...crashSiteCallTemplatesContent.call_templates,
-  ...desertCallTemplatesContent.call_templates,
-  ...forestCallTemplatesContent.call_templates,
   ...mainlineCrashSiteCallTemplatesContent.call_templates,
   ...mainlineEndingCallTemplatesContent.call_templates,
   ...mainlineHiveCallTemplatesContent.call_templates,
   ...mainlineMedicalCallTemplatesContent.call_templates,
   ...mainlineResourcesCallTemplatesContent.call_templates,
   ...mainlineVillageCallTemplatesContent.call_templates,
-  ...mineCallTemplatesContent.call_templates,
-  ...mountainCallTemplatesContent.call_templates,
 ] as unknown as CallTemplate[];
 
 export const generatedPresetDefinitions = [
-  ...forestPresetsContent.presets,
 ] as unknown as PresetDefinition[];

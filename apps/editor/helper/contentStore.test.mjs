@@ -17,7 +17,7 @@ describe("contentStore", () => {
     expect(library.definitions[0]).toEqual(
       expect.objectContaining({
         asset_type: "event_definition",
-        file_path: "content/events/definitions/crash_site.json",
+        file_path: "content/events/definitions/mainline_crash_site.json",
         json_path: "/event_definitions/0",
         editable: false,
       }),
@@ -25,7 +25,7 @@ describe("contentStore", () => {
     expect(library.call_templates[0]).toEqual(
       expect.objectContaining({
         asset_type: "call_template",
-        file_path: "content/events/call_templates/crash_site.json",
+        file_path: "content/events/call_templates/mainline_crash_site.json",
         json_path: "/call_templates/0",
         editable: false,
       }),
