@@ -1,0 +1,651 @@
+{
+  "topic": "game-system-demock",
+  "created": "2026-04-29",
+  "source": {
+    "design": "docs/plans/2026-04-29-15-29/game-system-demock-design.md",
+    "technical_design": "docs/plans/2026-04-29-15-29/game-system-demock-technical-design.md"
+  },
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "固化去 mock 与去 legacy 审计清单",
+      "priority": "P0",
+      "depends_on": [],
+      "summary": "建立本轮删除对象的可执行清单，明确哪些 legacy、旧角色、mock 文案和无机制字段必须清理，哪些历史设计文档允许保留。",
+      "scope": [
+        "用关键词审计 `legacy`、`events.json`、`deriveLegacyTiles`、`legacyResource`、`legacyBuilding`、`legacyInstrument`、`legacyDanger`、`lin_xia`、`kael`、`summary`、 mock 世界状态词。",
+        "把审计结果整理为实现阶段可跟踪的清单，区分 runtime/content/UI/docs/tests/generated。",
+        "明确允许例外：本轮 plans 目录中的历史设计材料可以描述被删除对象。",
+        "不修改业务逻辑，只补充本轮 implementation note 或 task-local checklist。"
+      ],
+      "suggested_files": [
+        "docs/plans/2026-04-29-15-29/game-system-demock-technical-design.md",
+        "docs/plans/2026-04-29-15-29/game-system-demock-implementation-plan.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: 清单覆盖 content、apps/pc-client、apps/mobile-client、apps/editor、docs 和测试中的主要残留类别。",
+        "AC2: 清单明确哪些路径是历史设计输入，不参与当前事实审计。",
+        "AC3: 不引入任何兼容 shim 或业务行为改动。"
+      ],
+      "notes": "如果实现阶段直接用全文搜索替代文档清单，也必须在任务总结中列出搜索词和处理范围。"
+    },
+    {
+      "id": "T002",
+      "title": "三人化 crew content、schema 与类型",
+      "priority": "P0",
+      "depends_on": [
+        "T001"
+      ],
+      "summary": "只保留 Mike、Amy、Garry，并删除无机制支撑的 crew summary 字段。",
+      "scope": [
+        "从 `content/crew/crew.json` 删除 Lin Xia 和 Kael。",
+        "删除 `summary` 字段值及其 schema 定义。",
+        "更新 `CrewId`、`CrewDefinition`、`CrewMember` 等 crew 类型。",
+        "更新 crew 初始化逻辑，使角色档案只读取有清晰语义的字段。"
+      ],
+      "suggested_files": [
+        "content/crew/crew.json",
+        "content/schemas/crew.schema.json",
+        "apps/pc-client/src/content/contentData.ts",
+        "apps/pc-client/src/data/gameData.ts",
+        "apps/pc-client/src/content/contentData.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: 运行时 crew id 只允许 `mike`、`amy`、`garry`。",
+        "AC2: `crew.summary` 不再被 schema、TypeScript 类型、初始化逻辑或 UI 读取。",
+        "AC3: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "不要把 Lin Xia 或 Kael 的个人剧情迁移给其他角色。"
+    },
+    {
+      "id": "T003",
+      "title": "删除旧角色相关结构化事件资产",
+      "priority": "P0",
+      "depends_on": [
+        "T002"
+      ],
+      "summary": "删除 Kael 专属 domain 和所有引用 Lin Xia / Kael 的结构化事件资产，并同步 manifest 与生成模块。",
+      "scope": [
+        "删除 `crew_kael` domain 的 definitions 与 call templates。",
+        "从 `content/events/manifest.json` 删除 `crew_kael`。",
+        "审计 desert、mountain、mainline_medical 等 domain 中的 Lin Xia / Kael 引用，删除相关事件或内容引用。",
+        "重新生成 `apps/pc-client/src/content/generated/eventContentManifest.ts`。"
+      ],
+      "suggested_files": [
+        "content/events/manifest.json",
+        "content/events/definitions/crew_kael.json",
+        "content/events/call_templates/crew_kael.json",
+        "content/events/definitions/*.json",
+        "content/events/call_templates/*.json",
+        "apps/pc-client/src/content/generated/eventContentManifest.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: `content/events/manifest.json` 不再引用 `crew_kael`。",
+        "AC2: 当前结构化事件内容中不再引用 `lin_xia` 或 `kael`。",
+        "AC3: 生成后的 event manifest module 不再 import 被删除 domain。",
+        "AC4: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "如果某个事件只为旧角色服务，删除而不是重写。"
+    },
+    {
+      "id": "T004",
+      "title": "三人化地图、初始状态与测试 fixture",
+      "priority": "P0",
+      "depends_on": [
+        "T002",
+        "T003"
+      ],
+      "summary": "清理地图、初始状态、sample fixtures 和 e2e 中的旧角色位置与断言。",
+      "scope": [
+        "删除 `initialTiles`、default map 或 map runtime 中 Lin Xia / Kael 的初始位置。",
+        "更新事件 sample fixtures、unit tests 和 e2e fixtures。",
+        "更新任何固定断言中的五人数量。",
+        "确保三人初始地图状态仍能进入控制中心、通讯台和地图页。"
+      ],
+      "suggested_files": [
+        "content/maps/default-map.json",
+        "apps/pc-client/src/data/gameData.ts",
+        "apps/pc-client/src/events/sampleFixtures.ts",
+        "apps/pc-client/src/App.test.tsx",
+        "apps/pc-client/tests/e2e/app.spec.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: 运行时初始状态、地图和测试 fixture 不再包含 Lin Xia / Kael。",
+        "AC2: 角色数量相关断言改为三人事实。",
+        "AC3: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "不需要填补两人留下的地图信息密度。"
+    },
+    {
+      "id": "T005",
+      "title": "删除 legacy event 内容入口",
+      "priority": "P0",
+      "depends_on": [
+        "T003"
+      ],
+      "summary": "移除旧 `content/events/events.json` 事件入口，使结构化事件成为唯一事件内容系统。",
+      "scope": [
+        "删除 `content/events/events.json` 和 `content/schemas/events.schema.json`。",
+        "移除 `apps/pc-client/src/content/contentData.ts` 中的 legacy events import、`eventDefinitions` 导出和 `eventDefinitionById`。",
+        "移除 validate-content 脚本中的 legacy event schema pair。",
+        "更新依赖 legacy events 的测试。"
+      ],
+      "suggested_files": [
+        "content/events/events.json",
+        "content/schemas/events.schema.json",
+        "apps/pc-client/src/content/contentData.ts",
+        "apps/pc-client/scripts/validate-content.mjs",
+        "scripts/validate-content.mjs",
+        "apps/pc-client/src/content/contentData.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: 游戏运行时不再加载 `content/events/events.json`。",
+        "AC2: content 校验不再寻找 legacy event schema pair。",
+        "AC3: `eventDefinitions` legacy 导出被删除，引用方已更新。",
+        "AC4: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "删除文件后同步清理 manifest、README 或测试里的旧路径说明。"
+    },
+    {
+      "id": "T006",
+      "title": "删除 editor legacy event 展示",
+      "priority": "P0",
+      "depends_on": [
+        "T005"
+      ],
+      "summary": "让 editor 只浏览和编辑结构化事件资产，不再提供 legacy event 只读展示。",
+      "scope": [
+        "从 editor 类型中删除 `legacy_event`。",
+        "移除 Event Browser、helper response 或测试中 legacy readonly 分支。",
+        "更新 editor README 中关于 `content/events/events.json` 的说明。",
+        "确保 editor library 仍能列出 definitions、call templates、presets、handlers 和 schemas。"
+      ],
+      "suggested_files": [
+        "apps/editor/src/event-editor/types.ts",
+        "apps/editor/src/event-editor/EventBrowser.tsx",
+        "apps/editor/src/event-editor/EventBrowser.test.tsx",
+        "apps/editor/helper/contentStore.mjs",
+        "apps/editor/README.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: editor 类型系统中不再存在 `legacy_event` asset type。",
+        "AC2: editor UI 不再展示 legacy event 分组或只读旧格式提示。",
+        "AC3: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "如果 helper 仍返回旧 asset，应在同一任务中删除。"
+    },
+    {
+      "id": "T007",
+      "title": "建立 crew_actions 派生视图模型",
+      "priority": "P0",
+      "depends_on": [
+        "T004"
+      ],
+      "summary": "建立页面读取行动状态的 selector / view model，为删除 `CrewMember.activeAction` 打基础。",
+      "scope": [
+        "新增或整理从 `EventRuntimeState.crew_actions`、`CrewState.current_action_id`、active calls 和 map state 派生 crew UI 状态的函数。",
+        "页面先通过 view model 读取行动标题、进度、状态、可通讯性和阻塞原因。",
+        "保留必要的兼容型展示字段，但标记为派生数据，不作为逻辑事实源。",
+        "补充 selector 单元测试。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/data/gameData.ts",
+        "apps/pc-client/src/crewSystem.ts",
+        "apps/pc-client/src/events/types.ts",
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/pages/CommunicationStation.tsx",
+        "apps/pc-client/src/pages/CallPage.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 页面需要的 crew 行动显示可以从 `crew_actions` 派生。",
+        "AC2: 新 selector 不读取 content 中已删除的 `summary`。",
+        "AC3: selector 覆盖 idle、moving、waiting call、blocked action 等核心状态。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "这是 runtime 重写的缓冲任务，避免后续一次性改所有页面。"
+    },
+    {
+      "id": "T008",
+      "title": "强化阻塞与单主行动约束",
+      "priority": "P0",
+      "depends_on": [
+        "T007"
+      ],
+      "summary": "统一同一角色同一时间只能拥有一个阻塞型主事件或主行动的规则。",
+      "scope": [
+        "为 create crew action effect 添加 active action 检查。",
+        "确保 blocking claim、active call、communication busy 和 `current_action_id` 使用同一判断。",
+        "让冲突时返回明确错误或选择停止流程，而不是覆盖旧行动。",
+        "补充事件引擎和 effects 单元测试。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/events/effects.ts",
+        "apps/pc-client/src/events/eventEngine.ts",
+        "apps/pc-client/src/events/conditions.ts",
+        "apps/pc-client/src/events/effects.test.ts",
+        "apps/pc-client/src/events/eventEngine.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: crew 已有 active `current_action_id` 时，新的阻塞型行动不能静默覆盖。",
+        "AC2: crew 已有 blocking call 或 blocking event 时，候选事件不能再占用同一 blocking slot。",
+        "AC3: 非阻塞背景事件仍可存在，但不会创建第二个主行动。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "本任务只做约束，不迁移具体移动或调查行为。"
+    },
+    {
+      "id": "T009",
+      "title": "迁移时间推进到 crew_actions",
+      "priority": "P0",
+      "depends_on": [
+        "T008"
+      ],
+      "summary": "让 `settleGameTime` 以 `CrewActionState` 为事实源推进行动完成、清理 current_action_id 并发出 trigger。",
+      "scope": [
+        "扫描 active `crew_actions`，按 `ends_at` 判断完成。",
+        "完成后更新 action status、crew status、`current_action_id` 和 event trigger。",
+        "把 objective completion 与 event wakeup 接到新的 action completion 流程。",
+        "删除对 `CrewMember.activeAction` 完成时间的依赖。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/events/types.ts",
+        "apps/pc-client/src/events/eventEngine.ts",
+        "apps/pc-client/src/events/objectives.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 到期的 active `CrewActionState` 会被标记为 completed，并清理 crew 的 `current_action_id`。",
+        "AC2: action completion 会产生可被事件图和 objective 使用的 `action_complete` trigger。",
+        "AC3: 不再需要从 `CrewMember.activeAction.finishTime` 推进行动完成。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "可先保留少量旧 helper 函数，但调用入口必须基于 `crew_actions`。"
+    },
+    {
+      "id": "T010",
+      "title": "迁移移动行动到 crew_actions",
+      "priority": "P0",
+      "depends_on": [
+        "T009"
+      ],
+      "summary": "让移动的创建、路径推进、抵达、地图发现和 arrival trigger 全部基于 `CrewActionState`。",
+      "scope": [
+        "把移动路径、step timing、目标 tile 等参数放入 `CrewActionState.action_params` 或明确字段。",
+        "时间推进移动行动时更新 crew tile 与 runtime map state。",
+        "抵达后发出 `arrival` trigger。",
+        "更新移动相关 tests。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/crewSystem.ts",
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/mapSystem.ts",
+        "apps/pc-client/src/events/types.ts",
+        "apps/pc-client/src/crewSystem.test.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 移动行动不再需要写入 `CrewMember.activeAction`。",
+        "AC2: 移动中和抵达后的 UI 状态来自 `crew_actions` 派生视图。",
+        "AC3: 抵达新地块会更新地图发现状态并触发 `arrival`。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "地图直接下令仍然不允许；地图只选择候选目的地。"
+    },
+    {
+      "id": "T011",
+      "title": "迁移停止与待命行动到事件 runtime",
+      "priority": "P0",
+      "depends_on": [
+        "T009"
+      ],
+      "summary": "把停止当前行动和原地待命从旧 settlement 迁到 `crew_actions` / event runtime。",
+      "scope": [
+        "实现停止当前行动对 active `CrewActionState` 的取消或中断流程。",
+        "实现原地待命的 runtime 状态更新和 idle_time trigger。",
+        "确保停止耗时规则仍为 10 秒或按 content 参数定义。",
+        "更新对应 UI 和 tests。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/events/effects.ts",
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/callActionSettlement.ts",
+        "apps/pc-client/src/App.test.tsx",
+        "apps/pc-client/src/events/effects.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: 停止行动不会调用 legacy dispatch 或覆盖另一个 active action。",
+        "AC2: 待命会产生真实 idle 状态或 idle trigger，而不是 UI mock 文案。",
+        "AC3: 停止和待命按钮只在对应条件下可用。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "如果停止采用两阶段中断行动，应在 UI 中显示中性状态。"
+    },
+    {
+      "id": "T012",
+      "title": "迁移调查当前区域到地点事件入口",
+      "priority": "P0",
+      "depends_on": [
+        "T009"
+      ],
+      "summary": "把基础调查从通用 survey handler 改为触发当前地点的结构化调查事件或中性空状态。",
+      "scope": [
+        "定义调查当前区域如何按 crew tile、map object、world history 选择结构化事件。",
+        "没有可触发调查事件时，显示中性空状态而不是虚构结果。",
+        "删除或隔离旧通用 survey settlement 入口。",
+        "补充调查事件触发和空状态 tests。"
+      ],
+      "suggested_files": [
+        "content/universal-actions/universal-actions.json",
+        "content/events/definitions/*.json",
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/pages/CallPage.tsx",
+        "apps/pc-client/src/events/eventEngine.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 调查当前区域会进入结构化事件候选选择或显示中性空状态。",
+        "AC2: 调查不再通过 `legacy.survey` 或旧 survey dispatch 执行。",
+        "AC3: 地点没有调查内容时，不生成硬编码剧情结果。",
+        "AC4: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "本任务不要求补完整主线，只要求路径正确。"
+    },
+    {
+      "id": "T013",
+      "title": "重构基础行动 content 与 schema",
+      "priority": "P0",
+      "depends_on": [
+        "T010",
+        "T011",
+        "T012"
+      ],
+      "summary": "让 `universal-actions` 只表达移动、待命、停止、调查四类基础行动，并删除 `event_id: legacy.*`。",
+      "scope": [
+        "更新 `content/universal-actions/universal-actions.json`。",
+        "更新 universal actions schema，移除 legacy event id 假设。",
+        "删除 gather/build/extract/scan 作为基础或 cross-object 通用行动。",
+        "更新 action 可用性评估和按钮渲染。"
+      ],
+      "suggested_files": [
+        "content/universal-actions/universal-actions.json",
+        "content/schemas/universal-actions.schema.json",
+        "apps/pc-client/src/content/mapObjects.ts",
+        "apps/pc-client/src/conditions/callActionContext.ts",
+        "apps/pc-client/src/callActions.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: `universal-actions` 只包含移动、原地待命、停止当前行动、调查当前区域。",
+        "AC2: schema 不再要求或允许 `event_id: legacy.*`。",
+        "AC3: 通话页不再显示通用采集、建设、回收、扫描按钮。",
+        "AC4: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "剧情需要的采集/建设/交易必须在事件内容中显式出现。"
+    },
+    {
+      "id": "T014",
+      "title": "删除 legacy dispatch 与旧行动入口",
+      "priority": "P0",
+      "depends_on": [
+        "T013"
+      ],
+      "summary": "移除 `translateActionIdToLegacyDispatch`、`legacy.<verb>` 和 `applyImmediateOrCreateAction` 作为通话按钮入口。",
+      "scope": [
+        "删除 `App.handleDecision` 中的 legacy translator。",
+        "删除 `callActionSettlement.ts` 中 legacy verb registry，或改造为只接受 `CrewActionState` 的 runtime executor。",
+        "移除测试中的 `legacy.gather`、`legacy.survey` 等断言。",
+        "确保 runtime call option 只通过事件图推进。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/callActionSettlement.ts",
+        "apps/pc-client/src/callActionSettlement.test.ts",
+        "apps/pc-client/src/callActions.integration.test.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 全仓当前事实代码中不再出现 `legacy.<verb>` dispatch。",
+        "AC2: 通话 option selection 不再调用 `applyImmediateOrCreateAction`。",
+        "AC3: 剩余 action executor 如存在，只接受新 runtime action 输入。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "不要把 legacy 字符串改名为 action 字符串后保留翻译层。"
+    },
+    {
+      "id": "T015",
+      "title": "建立地点剧情动作事件样例",
+      "priority": "P1",
+      "depends_on": [
+        "T014"
+      ],
+      "summary": "用 1-2 个最小主线地点动作证明专属剧情动作通过结构化事件运行，而不是通用行动菜单。",
+      "scope": [
+        "选择坠毁现场调查进度、医疗舱学习、村落交易或火山取黑曜石中的 1-2 个作为样例。",
+        "写入结构化 event definitions 和 call templates。",
+        "让对应地点触发专属选项和结果结算。",
+        "验证事件文本只在真实触发后展示。"
+      ],
+      "suggested_files": [
+        "content/events/definitions/*.json",
+        "content/events/call_templates/*.json",
+        "content/events/manifest.json",
+        "apps/pc-client/src/content/generated/eventContentManifest.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 至少一个地点剧情动作可以从通话进入事件图并完成结果结算。",
+        "AC2: 样例动作不依赖 `gather`、`build`、`trade` 通用按钮。",
+        "AC3: 事件台词和结果只来自结构化 content。",
+        "AC4: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "本任务不是完整 minimal use case 内容实现，只证明新模式。"
+    },
+    {
+      "id": "T016",
+      "title": "删除地图 legacy content 字段与 schema",
+      "priority": "P0",
+      "depends_on": [
+        "T013"
+      ],
+      "summary": "从 map objects、map special states 和 schema 中删除 legacy 投影字段。",
+      "scope": [
+        "删除 `legacyResource`、`legacyBuilding`、`legacyInstrument`、`legacyDanger` 字段。",
+        "更新 `content/map-objects/*.json`、`content/maps/default-map.json`。",
+        "更新 `map-objects.schema.json`、`maps.schema.json`。",
+        "更新 map object TypeScript 类型。"
+      ],
+      "suggested_files": [
+        "content/map-objects/*.json",
+        "content/maps/default-map.json",
+        "content/schemas/map-objects.schema.json",
+        "content/schemas/maps.schema.json",
+        "apps/pc-client/src/content/mapObjects.ts",
+        "apps/pc-client/src/content/contentData.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: content 和 schema 不再允许任何 `legacyResource`、`legacyBuilding`、`legacyInstrument`、`legacyDanger` 字段。",
+        "AC2: map object 类型不再包含 legacy 字段。",
+        "AC3: `npm run validate:content`、`npm run lint`、`npm run test` 通过。"
+      ],
+      "notes": "不要用新字段保存同样的旧展示列表。"
+    },
+    {
+      "id": "T017",
+      "title": "删除 deriveLegacyTiles 与旧 MapTile 投影",
+      "priority": "P0",
+      "depends_on": [
+        "T016"
+      ],
+      "summary": "地图 UI 和 runtime 不再通过 legacy tile 投影展示资源、建筑、仪器和 danger 文本。",
+      "scope": [
+        "删除 `deriveLegacyTiles`。",
+        "删除旧 `MapTile.resources`、`buildings`、`instruments`、`danger` 读取路径。",
+        "地图页面改为展示地块基础信息、可见对象、特殊状态和中性空状态。",
+        "同步更新地图 tests。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/mapSystem.ts",
+        "apps/pc-client/src/data/gameData.ts",
+        "apps/pc-client/src/App.tsx",
+        "apps/pc-client/src/pages/MapPage.tsx",
+        "apps/pc-client/src/mapSystem.test.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 当前事实代码不再调用 `deriveLegacyTiles`。",
+        "AC2: 地图页面不再依赖旧 resources/buildings/instruments/danger 投影字段。",
+        "AC3: 地图空状态是中性的，不补虚构危险或信号文本。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "如果需要地块 view model，应作为派生展示层实现。"
+    },
+    {
+      "id": "T018",
+      "title": "清理 PC UI mock 文案",
+      "priority": "P0",
+      "depends_on": [
+        "T007",
+        "T015",
+        "T017"
+      ],
+      "summary": "清理 PC 客户端页面中的虚构世界状态、硬编码剧情句和假系统数值。",
+      "scope": [
+        "清理通讯台中的频道、噪声、天线、最近通讯、脚步声、固定求救等文案。",
+        "清理控制中心、通话页、地图页中的唱片机、异常数量、假设施状态等 mock 暗示。",
+        "替换为真实 runtime 状态、正式 content 或中性空状态。",
+        "更新 UI tests。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/pages/CommunicationStation.tsx",
+        "apps/pc-client/src/pages/ControlCenter.tsx",
+        "apps/pc-client/src/pages/CallPage.tsx",
+        "apps/pc-client/src/pages/MapPage.tsx",
+        "apps/pc-client/src/data/gameData.ts",
+        "apps/pc-client/src/App.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "AC1: 通讯台不再显示硬编码信号噪声、天线偏移、脚步声或最近通讯。",
+        "AC2: PC UI 中保留的占位文案都是中性 UI 说明、空状态或调试说明。",
+        "AC3: UI 不通过硬编码剧情句提高信息密度。",
+        "AC4: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "正式事件台词只能在 runtime call 或事件结果中展示。"
+    },
+    {
+      "id": "T019",
+      "title": "清理 mobile UI mock 文案",
+      "priority": "P1",
+      "depends_on": [
+        "T018"
+      ],
+      "summary": "手机端只展示真实连接状态、配对状态和中性说明，不再显示演示性质世界状态。",
+      "scope": [
+        "审计 `MobileTerminalApp` 中“演示”标签和固定剧情文案。",
+        "保留 Yuan/配对/连接相关真实状态。",
+        "没有真实私密来电时显示中性空状态。",
+        "更新 mobile tests。"
+      ],
+      "suggested_files": [
+        "apps/mobile-client/src/MobileTerminalApp.tsx",
+        "apps/mobile-client/src/MobileTerminalApp.test.tsx",
+        "packages/dual-device/src/index.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: mobile UI 不再展示固定剧情求救或演示型世界状态。",
+        "AC2: 连接、配对和消息状态来自真实 runtime 或 dual-device 状态。",
+        "AC3: `npm run lint` 和 `npm run test` 通过。"
+      ],
+      "notes": "除非实际改 dual-device 类型，否则不要触碰 shared transport 逻辑。"
+    },
+    {
+      "id": "T020",
+      "title": "更新正式项目文档",
+      "priority": "P0",
+      "depends_on": [
+        "T018",
+        "T019"
+      ],
+      "summary": "同步当前事实文档，删除五人队伍、legacy 资产、旧基础行动和 mock 状态说明。",
+      "scope": [
+        "更新 `AGENTS.md` 中当前系统能力、内容结构和模块描述。",
+        "更新 `docs/game_model/crew.md`、`event.md`、`map.md`。",
+        "更新 `docs/gameplay/*/*.md` 中五人、legacy、旧通用行动表述。",
+        "更新 UI docs 中与通讯台、基础行动、地图展示相关的事实。"
+      ],
+      "suggested_files": [
+        "AGENTS.md",
+        "docs/game_model/crew.md",
+        "docs/game_model/event.md",
+        "docs/game_model/map.md",
+        "docs/gameplay/*/*.md",
+        "docs/ui-designs/**/*.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: 正式当前文档只描述 Mike、Amy、Garry 三人队伍。",
+        "AC2: 正式当前文档不再把 legacy event、legacy map 投影或通用采集/建设菜单描述为当前事实。",
+        "AC3: 文档明确基础行动为移动、待命、停止、调查，剧情动作由事件提供。",
+        "AC4: 不修改 `docs/core-ideas.md`。"
+      ],
+      "notes": "历史 plans 文档不需要改写。"
+    },
+    {
+      "id": "T021",
+      "title": "全仓关键词审计与生成产物同步",
+      "priority": "P0",
+      "depends_on": [
+        "T020"
+      ],
+      "summary": "执行最终关键词审计，处理不应残留的 legacy、旧角色、mock 文案和生成产物漂移。",
+      "scope": [
+        "审计 `legacy`、`events.json`、`deriveLegacyTiles`、legacy map 字段、`lin_xia`、`kael`、`summary`、mock 世界状态词。",
+        "重生成 `eventContentManifest.ts`。",
+        "确认 schema、content、runtime、tests、docs 没有当前事实残留。",
+        "把允许例外限制在本轮 plans 历史设计材料。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/content/generated/eventContentManifest.ts",
+        "docs/plans/2026-04-29-15-29/game-system-demock-technical-design.md",
+        "docs/plans/2026-04-29-15-29/game-system-demock-implementation-plan.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: 当前事实代码、content、schema、tests 和正式 docs 中不再残留禁止关键词。",
+        "AC2: 生成的 event manifest module 与 `content/events/manifest.json` 一致。",
+        "AC3: 任务总结列出审计关键词、剩余允许例外和处理结果。",
+        "AC4: `npm run validate:content` 通过。"
+      ],
+      "notes": "不要为了通过审计把关键词改成同义 legacy 概念。"
+    },
+    {
+      "id": "T022",
+      "title": "集成验证与收口",
+      "priority": "P0",
+      "depends_on": [
+        "T021"
+      ],
+      "summary": "运行全量验证并修复跨任务集成问题，确保去 mock、去 legacy、三人化和事件行动重写形成可运行闭环。",
+      "scope": [
+        "运行 `npm run validate:content`。",
+        "运行 `npm run lint`。",
+        "运行 `npm run test`。",
+        "视 UI 影响运行 `npm run test:e2e`。",
+        "修复集成阶段暴露的类型、测试、内容校验和 UI 断点。"
+      ],
+      "suggested_files": [
+        "content/**/*.json",
+        "apps/pc-client/src/**/*.ts",
+        "apps/pc-client/src/**/*.tsx",
+        "apps/mobile-client/src/**/*.tsx",
+        "apps/editor/src/**/*.tsx",
+        "docs/**/*.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: `npm run validate:content` 通过。",
+        "AC2: `npm run lint` 通过。",
+        "AC3: `npm run test` 通过。",
+        "AC4: 如果运行 e2e，结果通过；如果未运行，任务总结说明原因。",
+        "AC5: 游戏 UI 可启动并显示三人队伍、无 mock 通讯台、四类基础行动和结构化事件入口。"
+      ],
+      "notes": "本任务只做收口修复，不新增新的玩法范围。"
+    }
+  ]
+}
