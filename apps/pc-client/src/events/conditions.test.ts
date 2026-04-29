@@ -322,7 +322,7 @@ function createState(): ConditionGameState {
     active_events: {
       evt_beast: {
         id: "evt_beast",
-        event_definition_id: "forest_beast_encounter",
+        event_definition_id: "fixture_emergency_encounter",
         event_definition_version: 1,
         status: "waiting_call",
         current_node_id: "call_warning",
@@ -395,7 +395,7 @@ function triggerContext(): TriggerContext {
     tile_id: "2-3",
     action_id: "act_survey",
     event_id: "evt_beast",
-    event_definition_id: "forest_beast_encounter",
+    event_definition_id: "fixture_emergency_encounter",
     node_id: "call_warning",
     call_id: null,
     objective_id: "obj_rescue",

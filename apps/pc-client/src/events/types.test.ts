@@ -104,12 +104,12 @@ describe("event program model contracts", () => {
 
     const definition = {
       schema_version: "event-program-model-v1",
-      id: "forest_trace_small_camp",
+      id: "fixture_normal_discovery",
       version: 1,
-      domain: "forest",
-      title: "Forest Trace",
-      summary: "A small forest trace event.",
-      tags: ["forest"],
+      domain: "fixture_events",
+      title: "Fixture Discovery",
+      summary: "A small fixture discovery event.",
+      tags: ["fixture"],
       status: "draft",
       trigger: {
         type: "arrival",
@@ -127,7 +127,7 @@ describe("event program model contracts", () => {
         scope: "crew_tile",
         max_trigger_count: 1,
         cooldown_seconds: 0,
-        history_key_template: "crew_tile:{crew_id}:{tile_id}:forest_trace_small_camp",
+        history_key_template: "crew_tile:{crew_id}:{tile_id}:fixture_normal_discovery",
         allow_while_active: false,
       },
       event_graph: {

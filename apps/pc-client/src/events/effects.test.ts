@@ -31,7 +31,7 @@ describe("structured effect executor", () => {
       expect.objectContaining({
         id: "evt_beast:log",
         event_id: "evt_beast",
-        event_definition_id: "forest_beast_encounter",
+        event_definition_id: "fixture_emergency_encounter",
         occurred_at: 120,
         summary: "Amy found a safe trail.",
         crew_ids: ["amy"],
@@ -45,7 +45,7 @@ describe("structured effect executor", () => {
         key: "forest.safe_trail",
         scope: "crew",
         event_id: "evt_beast",
-        event_definition_id: "forest_beast_encounter",
+        event_definition_id: "fixture_emergency_encounter",
         crew_id: "amy",
         tile_id: "2-3",
         first_triggered_at: 120,
@@ -409,7 +409,7 @@ function createState(): EffectGameState {
     active_events: {
       evt_beast: {
         id: "evt_beast",
-        event_definition_id: "forest_beast_encounter",
+        event_definition_id: "fixture_emergency_encounter",
         event_definition_version: 1,
         status: "waiting_call",
         current_node_id: "call_warning",
@@ -508,7 +508,7 @@ function triggerContext(): TriggerContext {
     tile_id: "2-3",
     action_id: "act_survey",
     event_id: "evt_beast",
-    event_definition_id: "forest_beast_encounter",
+    event_definition_id: "fixture_emergency_encounter",
     node_id: "call_warning",
     call_id: null,
     objective_id: "obj_rescue",

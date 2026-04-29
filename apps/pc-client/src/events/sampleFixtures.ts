@@ -16,9 +16,9 @@ import {
 } from "./types";
 
 export const SAMPLE_EVENT_IDS = [
-  "forest_trace_small_camp",
-  "forest_beast_emergency",
-  "volcanic_ash_trace",
+  "fixture_normal_discovery",
+  "fixture_emergency_call",
+  "fixture_cross_crew_objective",
 ] as const;
 
 export type SampleEventId = (typeof SAMPLE_EVENT_IDS)[number];
@@ -30,15 +30,15 @@ export type SampleCoverageCategory =
 export type SampleReachability = "manual-reachable" | "seeded-regression" | "future-integration";
 
 export const SAMPLE_EVENT_COVERAGE = {
-  normal_discovery: ["forest_trace_small_camp"],
-  emergency_multi_call: ["forest_beast_emergency"],
-  cross_crew_objective: ["volcanic_ash_trace"],
+  normal_discovery: ["fixture_normal_discovery"],
+  emergency_multi_call: ["fixture_emergency_call"],
+  cross_crew_objective: ["fixture_cross_crew_objective"],
 } satisfies Record<SampleCoverageCategory, readonly SampleEventId[]>;
 
 export const SAMPLE_EVENT_REACHABILITY = {
-  forest_trace_small_camp: "seeded-regression",
-  forest_beast_emergency: "seeded-regression",
-  volcanic_ash_trace: "seeded-regression",
+  fixture_normal_discovery: "seeded-regression",
+  fixture_emergency_call: "seeded-regression",
+  fixture_cross_crew_objective: "seeded-regression",
 } satisfies Record<SampleEventId, SampleReachability>;
 
 export interface SampleDryRunReport {
@@ -87,7 +87,7 @@ export function dryRunApprovedSampleEvents(): SampleDryRunReport[] {
 
 function sampleEventContentLibrary() {
   return {
-    domains: ["fixture_forest", "fixture_desert"],
+    domains: ["fixture_events"],
     event_definitions: sampleEventDefinitions(),
     call_templates: sampleCallTemplates(),
     handlers: (handlerRegistryContent.handlers ?? []) as HandlerDefinition[],
@@ -98,15 +98,15 @@ function sampleEventContentLibrary() {
 function sampleEventDefinitions(): EventDefinition[] {
   return [
     callToEndDefinition({
-      id: "forest_trace_small_camp",
-      domain: "fixture_forest",
-      title: "Fixture forest trace",
-      summary: "A crew member reports a small trace.",
+      id: "fixture_normal_discovery",
+      domain: "fixture_events",
+      title: "Fixture normal discovery",
+      summary: "A crew member reports a small fixture signal.",
       tag: "normal_discovery",
-      triggerTag: "forest",
-      callTemplateId: "forest_trace_small_camp.call.report",
+      triggerTag: "fixture_signal",
+      callTemplateId: "fixture_normal_discovery.call.report",
       callNodeId: "trace_report",
-      optionId: "mark_camp",
+      optionId: "acknowledge_signal",
       endNodeId: "trace_resolved",
       resultKey: "trace_resolved",
       context: {
@@ -120,18 +120,18 @@ function sampleEventDefinitions(): EventDefinition[] {
       },
     }),
     callToEndDefinition({
-      id: "forest_beast_emergency",
-      domain: "fixture_forest",
+      id: "fixture_emergency_call",
+      domain: "fixture_events",
       title: "Fixture emergency call",
       summary: "A crew member reports an urgent threat.",
       tag: "emergency_multi_call",
-      triggerTag: "beast_tracks",
+      triggerTag: "urgent_signal",
       triggerField: "danger_tags",
-      callTemplateId: "forest_beast_emergency.call.report",
-      callNodeId: "beast_emergency_call",
-      optionId: "evacuate",
-      endNodeId: "beast_evacuated_end",
-      resultKey: "beast_evacuated",
+      callTemplateId: "fixture_emergency_call.call.report",
+      callNodeId: "emergency_call",
+      optionId: "stabilize",
+      endNodeId: "emergency_resolved_end",
+      resultKey: "emergency_resolved",
       urgency: "emergency",
       delivery: "incoming_call",
       requiresBlockingSlot: true,
@@ -152,14 +152,14 @@ function sampleEventDefinitions(): EventDefinition[] {
 
 function sampleCallTemplates(): CallTemplate[] {
   return [
-    callTemplate("forest_trace_small_camp.call.report", "fixture_forest", "forest_trace_small_camp", "trace_report", [
-      "mark_camp",
+    callTemplate("fixture_normal_discovery.call.report", "fixture_events", "fixture_normal_discovery", "trace_report", [
+      "acknowledge_signal",
     ]),
-    callTemplate("forest_beast_emergency.call.report", "fixture_forest", "forest_beast_emergency", "beast_emergency_call", [
-      "evacuate",
+    callTemplate("fixture_emergency_call.call.report", "fixture_events", "fixture_emergency_call", "emergency_call", [
+      "stabilize",
     ]),
-    callTemplate("volcanic_ash_trace.call.briefing", "fixture_desert", "volcanic_ash_trace", "ash_trace_call", [
-      "assign_probe",
+    callTemplate("fixture_cross_crew_objective.call.briefing", "fixture_events", "fixture_cross_crew_objective", "objective_call", [
+      "assign_helper",
     ]),
   ];
 }
@@ -260,9 +260,9 @@ function callToEndDefinition({
 function objectiveDefinition(): EventDefinition {
   return {
     schema_version: "event-program-model-v1",
-    id: "volcanic_ash_trace",
+    id: "fixture_cross_crew_objective",
     version: 1,
-    domain: "fixture_desert",
+    domain: "fixture_events",
     title: "Fixture cross-crew objective",
     summary: "A crew member asks another crew member to inspect a trace.",
     tags: ["sample_fixture", "cross_crew_objective"],
@@ -270,7 +270,7 @@ function objectiveDefinition(): EventDefinition {
     trigger: {
       type: "action_complete",
       required_context: ["crew_id", "tile_id", "action_id"],
-      conditions: [{ type: "has_tag", target: { type: "event_tile" }, field: "tags", value: "volcanic" }],
+      conditions: [{ type: "has_tag", target: { type: "event_tile" }, field: "tags", value: "objective_signal" }],
     },
     candidate_selection: {
       priority: 35,
@@ -283,27 +283,27 @@ function objectiveDefinition(): EventDefinition {
       scope: "tile",
       max_trigger_count: 1,
       cooldown_seconds: 0,
-      history_key_template: "event:volcanic_ash_trace:{tile_id}",
+      history_key_template: "event:fixture_cross_crew_objective:{tile_id}",
       allow_while_active: false,
     },
     event_graph: {
-      entry_node_id: "ash_trace_call",
+      entry_node_id: "objective_call",
       nodes: [
         {
-          id: "ash_trace_call",
+          id: "objective_call",
           type: "call",
           title: "Report trace",
-          call_template_id: "volcanic_ash_trace.call.briefing",
+          call_template_id: "fixture_cross_crew_objective.call.briefing",
           speaker_crew_ref: { type: "primary_crew" },
           urgency: "normal",
           delivery: "queued_message",
-          options: [{ id: "assign_probe", is_default: true }],
-          option_node_mapping: { assign_probe: "ash_cross_crew_objective" },
+          options: [{ id: "assign_helper", is_default: true }],
+          option_node_mapping: { assign_helper: "cross_crew_objective" },
           blocking: communicationBlocking(),
           expires_in_seconds: 180,
         },
         {
-          id: "ash_cross_crew_objective",
+          id: "cross_crew_objective",
           type: "objective",
           title: "Inspect trace",
           objective_template: {
@@ -314,21 +314,21 @@ function objectiveDefinition(): EventDefinition {
             required_action_params: { duration_seconds: 45, can_interrupt: true },
           },
           mode: "create_and_wait",
-          on_completed_node_id: "ash_mapped_end",
-          on_failed_node_id: "ash_failed_end",
+          on_completed_node_id: "objective_completed_end",
+          on_failed_node_id: "objective_failed_end",
           expires_in_seconds: 600,
           parent_event_link: true,
           blocking: nonBlocking(),
         },
-        endNode("ash_mapped_end", "ash_trace_mapped"),
-        endNode("ash_failed_end", "ash_trace_lost", "failed"),
+        endNode("objective_completed_end", "objective_completed"),
+        endNode("objective_failed_end", "objective_failed", "failed"),
       ],
       edges: [],
-      terminal_node_ids: ["ash_mapped_end", "ash_failed_end"],
+      terminal_node_ids: ["objective_completed_end", "objective_failed_end"],
       graph_rules: { acyclic: true, max_active_nodes: 1, allow_parallel_nodes: false },
     },
-    log_templates: [logTemplate("volcanic_ash_trace.log")],
-    content_refs: { call_template_ids: ["volcanic_ash_trace.call.briefing"] },
+    log_templates: [logTemplate("fixture_cross_crew_objective.log")],
+    content_refs: { call_template_ids: ["fixture_cross_crew_objective.call.briefing"] },
     sample_contexts: [
       {
         trigger_type: "action_complete",
@@ -549,8 +549,8 @@ function createSampleState(context: TriggerContext): GraphRunnerGameState {
     elapsed_game_seconds: context.occurred_at,
     crew,
     tiles: {
-      "2-3": tileState("2-3", { x: 2, y: 3 }, "forest", ["forest", "woods"], ["beast_tracks"], ["amy"]),
-      "4-3": tileState("4-3", { x: 4, y: 3 }, "desert_volcanic", ["desert", "volcanic"], [], ["garry"]),
+      "2-3": tileState("2-3", { x: 2, y: 3 }, "fixture_field", ["fixture_signal"], ["urgent_signal"], ["amy"]),
+      "4-3": tileState("4-3", { x: 4, y: 3 }, "fixture_ridge", ["objective_signal"], [], ["garry"]),
     },
     inventories: {
       inv_amy: inventory("inv_amy", "crew", "amy"),

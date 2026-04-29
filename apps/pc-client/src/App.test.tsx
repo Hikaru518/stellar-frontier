@@ -297,7 +297,7 @@ describe("App", () => {
     expect(screen.getByText("x9")).toBeInTheDocument();
   });
 
-  it("does not create Garry's mine anomaly call when gathering lacks the mineral_deposit tag", () => {
+  it("creates only mainline runtime calls for gathering matches", () => {
     vi.useFakeTimers();
     const untaggedIronObject = mapObjectDefinitionById.get("iron-ridge-outcrop");
     expect(untaggedIronObject?.tags ?? []).not.toContain("mineral_deposit");
@@ -335,7 +335,11 @@ describe("App", () => {
     });
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(findRuntimeEvent(saved, "mine_anomaly_report")).toBeUndefined();
+    const eventDefinitionIds = Object.values(saved.active_events ?? {}).map(
+      (event) => (event as { event_definition_id?: string }).event_definition_id,
+    );
+    expect(eventDefinitionIds.length).toBeGreaterThan(0);
+    expect(eventDefinitionIds.every((eventId) => eventId?.startsWith("mainline_"))).toBe(true);
     expect(savedCrew(saved, "garry").inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
   });
 
@@ -546,7 +550,7 @@ describe("App", () => {
     );
   });
 
-  it("does not trigger Amy's forest beast emergency from standby alone", () => {
+  it("does not trigger a runtime event from standby alone", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -579,9 +583,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "原地待命" }));
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(Object.values(saved.active_events).map((event) => (event as { event_definition_id: string }).event_definition_id)).not.toContain(
-      "forest_beast_emergency",
-    );
+    expect(Object.values(saved.active_events ?? {})).toEqual([]);
   });
 
   it("runs stop through crew_actions without overwriting the interrupted runtime action", () => {
@@ -1825,102 +1827,3 @@ function runtimeLine(text: string, speakerCrewId: string) {
   };
 }
 
-function createVolcanicObjectiveState() {
-  const eventId = "volcanic_ash_trace:480";
-  const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
-  const actionId = "amy-ash-survey";
-
-  return {
-    eventId,
-    objectiveId,
-    actionId,
-    eventState: {
-      active_events: {
-        [eventId]: {
-          id: eventId,
-          event_definition_id: "volcanic_ash_trace",
-          event_definition_version: 1,
-          status: "waiting_objective",
-          current_node_id: "ash_cross_crew_objective",
-          primary_crew_id: "garry",
-          related_crew_ids: [],
-          primary_tile_id: "4-3",
-          related_tile_ids: [],
-          parent_event_id: null,
-          child_event_ids: [],
-          objective_ids: [objectiveId],
-          active_call_id: null,
-          selected_options: {
-            ash_trace_call: "assign_probe",
-          },
-          random_results: {},
-          blocking_claim_ids: [],
-          created_at: 480,
-          updated_at: 480,
-          deadline_at: null,
-          next_wakeup_at: null,
-          trigger_context_snapshot: {
-            trigger_type: "action_complete",
-            occurred_at: 480,
-            source: "crew_action",
-            crew_id: "garry",
-            tile_id: "4-3",
-            action_id: "garry-survey-4-3",
-            event_id: eventId,
-            event_definition_id: "volcanic_ash_trace",
-            node_id: null,
-            call_id: null,
-            objective_id: null,
-            selected_option_id: null,
-            world_flag_key: null,
-            proximity: null,
-            payload: {
-              action_type: "survey",
-            },
-          },
-          history_keys: [],
-          result_key: null,
-          result_summary: null,
-        },
-      },
-      objectives: {
-        [objectiveId]: {
-          id: objectiveId,
-          status: "assigned",
-          parent_event_id: eventId,
-          created_by_node_id: "ash_cross_crew_objective",
-          title: "Survey the volcanic ash trace",
-          summary: "Send another crew member to verify the ash line before it blows over.",
-          target_tile_id: "4-3",
-          eligible_crew_conditions: [],
-          required_action_type: "survey",
-          required_action_params: {
-            duration_seconds: 45,
-            can_interrupt: true,
-          },
-          assigned_crew_id: "amy",
-          action_id: actionId,
-          created_at: 481,
-          assigned_at: 482,
-          completed_at: null,
-          deadline_at: 1080,
-          completion_trigger_type: "objective_completed",
-          result_key: null,
-        },
-      },
-    },
-  };
-}
-
-function volcanicTiles() {
-  return initialTiles.map((tile) =>
-    tile.id === "4-3"
-      ? {
-          ...tile,
-          terrain: "火山灰沙漠",
-          crew: ["garry", "amy"],
-          status: "复核中",
-        }
-      : tile,
-  );
-}
