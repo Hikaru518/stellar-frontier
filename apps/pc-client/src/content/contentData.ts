@@ -3,8 +3,6 @@ import handlerRegistryContent from "../../../../content/events/handler_registry.
 import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
-import basicCallActionsContent from "../../../../content/call-actions/basic-actions.json";
-import objectCallActionsContent from "../../../../content/call-actions/object-actions.json";
 import type { EventContentLibrary } from "../events/contentIndex";
 import type { HandlerDefinition } from "../events/types";
 import {
@@ -24,11 +22,7 @@ export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted
 export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recovered";
 export type MapVisibility = "onDiscovered" | "onInvestigated" | "hidden";
 export type MapRadiationLevel = "none" | "low" | "medium" | "high" | "critical";
-export type MapObjectKind = "resourceNode" | "structure" | "signal" | "hazard" | "facility" | "ruin" | "landmark";
-export type MapCandidateAction = "move" | "survey" | "gather" | "build" | "standby" | "extract" | "scan";
 export type MapSpecialStateSeverity = "low" | "medium" | "high" | "critical";
-export type CallActionCategory = "universal" | "object_action";
-export type CallActionId = MapCandidateAction | "stop";
 
 export interface CrewAttributeMap {
   physical: number;
@@ -103,7 +97,6 @@ export interface EventChoiceDefinition {
   baseSuccessChance?: number;
   dangerStageModifier?: number;
   durationSeconds?: number;
-  usesItemTag?: string;
   unavailableHint?: string;
   successEffects?: EventEffectDefinition[];
   failureEffects?: EventEffectDefinition[];
@@ -198,19 +191,6 @@ export interface MapEnvironmentDefinition {
   notes?: string;
 }
 
-export interface MapObjectDefinition {
-  id: string;
-  kind: MapObjectKind;
-  name: string;
-  description?: string;
-  visibility: Exclude<MapVisibility, "hidden">;
-  tags?: string[];
-  legacyResource?: string;
-  legacyBuilding?: string;
-  legacyInstrument?: string;
-  candidateActions?: MapCandidateAction[];
-}
-
 export interface MapSpecialStateDefinition {
   id: string;
   name: string;
@@ -231,7 +211,8 @@ export interface MapTileDefinition {
   terrain: string;
   weather: string;
   environment: MapEnvironmentDefinition;
-  objects: MapObjectDefinition[];
+  /** Identifiers into `mapObjectDefinitionById` (the only authoritative pointer to map-object content). */
+  objectIds: string[];
   specialStates: MapSpecialStateDefinition[];
 }
 
@@ -249,18 +230,6 @@ export interface MapConfigDefinition {
   tiles: MapTileDefinition[];
 }
 
-export interface CallActionDef {
-  id: CallActionId;
-  category: CallActionCategory;
-  label: string;
-  tone: Tone;
-  availableWhenBusy: boolean;
-  applicableObjectKinds?: MapObjectKind[];
-  durationSeconds: number;
-  handler: string;
-  params?: Record<string, unknown>;
-}
-
 export const eventProgramDefinitions = generatedEventProgramDefinitions;
 export const callTemplates = generatedCallTemplates;
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
@@ -276,11 +245,8 @@ export const eventContentLibrary: EventContentLibrary = {
 export const eventDefinitions = eventsContent.events as unknown as EventDefinition[];
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
-export const defaultMapConfig = defaultMapJson as unknown as MapConfigDefinition;
-export const callActionsContent = [
-  ...basicCallActionsContent.call_actions,
-  ...objectCallActionsContent.call_actions,
-] as unknown as CallActionDef[];
+
+export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigDefinition);
 
 export const eventDefinitionById = new Map(eventDefinitions.map((event) => [event.eventId, event]));
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));
@@ -291,4 +257,20 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
     const name = item?.name ?? entry.itemId;
     return entry.quantity > 1 ? `${name} x${entry.quantity}` : name;
   });
+}
+
+/**
+ * Defensive normalization of the migrated map JSON: ensures every tile has an
+ * `objectIds` array (defaulting to `[]`). All consumers should now read
+ * `tile.objectIds` and resolve definitions via `mapObjectDefinitionById`; the
+ * legacy synthesised `tile.objects` projection has been removed.
+ */
+function normalizeMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
+  return {
+    ...rawConfig,
+    tiles: rawConfig.tiles.map((tile) => ({
+      ...tile,
+      objectIds: Array.isArray(tile.objectIds) ? tile.objectIds : [],
+    })),
+  };
 }

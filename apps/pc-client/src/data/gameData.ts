@@ -6,6 +6,7 @@ import {
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
 } from "../content/contentData";
+import { mapObjectDefinitionById, type RuntimeMapObjectsState } from "../content/mapObjects";
 import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 import { deriveLegacyTiles, getTileLocationLabel, type RuntimeMapState } from "../mapSystem";
@@ -233,7 +234,12 @@ export function createInitialMapState(): GameMapState {
         discovered: discoveredTileIds.includes(mapTile.id),
         investigated: discoveredTileIds.includes(mapTile.id),
         activeSpecialStateIds: mapTile.specialStates.filter((state) => state.startsActive).map((state) => state.id),
-        revealedObjectIds: mapTile.objects.filter((object) => object.visibility === "onDiscovered" && discoveredTileIds.includes(mapTile.id)).map((object) => object.id),
+        revealedObjectIds: mapTile.objectIds
+          .map((objectId) => mapObjectDefinitionById.get(objectId))
+          .filter((object): object is NonNullable<typeof object> =>
+            Boolean(object && object.visibility === "onDiscovered" && discoveredTileIds.includes(mapTile.id)),
+          )
+          .map((object) => object.id),
         revealedSpecialStateIds: mapTile.specialStates
           .filter((state) => state.visibility === "onDiscovered" && state.startsActive && discoveredTileIds.includes(mapTile.id))
           .map((state) => state.id),
@@ -250,7 +256,19 @@ export function createInitialMapState(): GameMapState {
     tilesById,
     discoveredTileIds,
     investigationReportsById: {},
+    mapObjects: createInitialMapObjectsState(),
   };
+}
+
+export function createInitialMapObjectsState(): RuntimeMapObjectsState {
+  const state: RuntimeMapObjectsState = {};
+  for (const definition of mapObjectDefinitionById.values()) {
+    state[definition.id] = {
+      id: definition.id,
+      status_enum: definition.initial_status,
+    };
+  }
+  return state;
 }
 
 export function deriveInitialLegacyTiles(map = createInitialMapState()) {

@@ -1,4 +1,5 @@
 import { appendDiaryEntryId } from "../diarySystem";
+import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "../content/mapObjects";
 import type {
   CrewActionState,
   CrewActionType,
@@ -33,6 +34,7 @@ export interface EffectGameState extends EventRuntimeState {
   resources?: Record<string, number>;
   map?: {
     tilesById?: Record<string, { revealedObjectIds?: string[] } | undefined>;
+    mapObjects?: RuntimeMapObjectsState;
   };
 }
 
@@ -229,9 +231,64 @@ function applyEffect(effect: Effect, context: EffectExecutionContext, path: stri
       return unlockEventDefinition(effect, context, path);
     case "handler_effect":
       return applyHandlerEffect(effect, context, target.target, path);
+    case "set_object_status":
+      return setObjectStatus(effect, context, path);
     default:
       return fail(context.state, effect, "invalid_effect", `${path}.type`, `Unsupported effect type: ${effect.type}`);
   }
+}
+
+// Test override hook: vitest specs can inject a fixture map by setting
+// `globalThis.__mapObjectDefinitionById`; production resolves through the real
+// `mapObjectDefinitionById` loaded from `content/map-objects/*.json`.
+function getMapObjectDefinition(objectId: string): MapObjectDefinition | undefined {
+  const override = (globalThis as { __mapObjectDefinitionById?: Map<string, MapObjectDefinition> }).__mapObjectDefinitionById;
+  if (override) {
+    return override.get(objectId);
+  }
+  return mapObjectDefinitionById.get(objectId);
+}
+
+function setObjectStatus(effect: Effect, context: EffectExecutionContext, path: string): ApplyResult {
+  const objectId = readString(effect, "object_id", path);
+  const status = readString(effect, "status", path);
+  if (objectId.errors.length > 0 || status.errors.length > 0) {
+    return { state: context.state, errors: [...objectId.errors, ...status.errors] };
+  }
+
+  const def = getMapObjectDefinition(objectId.value);
+  if (!def) {
+    console.warn(
+      `[set_object_status] Object definition for ${objectId.value} not found; writing status anyway.`,
+    );
+  } else if (!def.status_options.includes(status.value)) {
+    console.warn(
+      `[set_object_status] status ${status.value} not in options for ${objectId.value}.`,
+    );
+  }
+
+  const previousMap = context.state.map ?? {};
+  const previousObjects = previousMap.mapObjects ?? {};
+  const previousEntry = previousObjects[objectId.value];
+  const nextObjects: RuntimeMapObjectsState = {
+    ...previousObjects,
+    [objectId.value]: {
+      ...(previousEntry ?? { id: objectId.value, status_enum: status.value }),
+      id: objectId.value,
+      status_enum: status.value,
+    },
+  };
+
+  return {
+    state: {
+      ...context.state,
+      map: {
+        ...previousMap,
+        mapObjects: nextObjects,
+      },
+    },
+    errors: [],
+  };
 }
 
 function updateCrewArrayField(

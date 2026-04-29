@@ -15,8 +15,17 @@ const legacyPairs = [
   ["content/crew/crew.json", "content/schemas/crew.schema.json"],
   ["content/items/items.json", "content/schemas/items.schema.json"],
   ["content/maps/default-map.json", "content/schemas/maps.schema.json"],
-  ["content/call-actions/basic-actions.json", "content/schemas/call-actions.schema.json"],
-  ["content/call-actions/object-actions.json", "content/schemas/call-actions.schema.json"],
+];
+
+const contentAssetGroups = [
+  {
+    directoryPath: "content/map-objects",
+    schemaPath: "content/schemas/map-objects.schema.json",
+  },
+  {
+    directoryPath: "content/universal-actions",
+    schemaPath: "content/schemas/universal-actions.schema.json",
+  },
 ];
 
 const eventSchemaPaths = [
@@ -44,7 +53,11 @@ const eventAssetFiles = [
 ];
 
 const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
-const schemaPaths = new Set([...legacyPairs.map(([, schemaPath]) => schemaPath), ...eventSchemaPaths]);
+const schemaPaths = new Set([
+  ...legacyPairs.map(([, schemaPath]) => schemaPath),
+  ...contentAssetGroups.map(({ schemaPath }) => schemaPath),
+  ...eventSchemaPaths,
+]);
 const schemasByPath = Object.fromEntries([...schemaPaths].map((schemaPath) => [schemaPath, readJson(schemaPath)]));
 for (const schema of Object.values(schemasByPath)) {
   ajv.addSchema(schema);
@@ -72,6 +85,12 @@ for (const { directoryPath, schemaPath } of eventAssetGroups) {
     const fileFailed = validateJsonFile(dataPath, schemaPath);
     eventSchemaFailed = fileFailed || eventSchemaFailed;
     failed = fileFailed || failed;
+  }
+}
+
+for (const { directoryPath, schemaPath } of contentAssetGroups) {
+  for (const dataPath of listJsonFiles(directoryPath)) {
+    failed = validateJsonFile(dataPath, schemaPath) || failed;
   }
 }
 
@@ -284,17 +303,35 @@ function validateReferences(data) {
     }
   }
 
-  hasError = validateMap(defaultMap) || hasError;
+  const { ids: knownObjectIds, hasError: catalogFailed } = collectMapObjectIds();
+  hasError = catalogFailed || hasError;
+  hasError = validateMap(defaultMap, knownObjectIds) || hasError;
 
   return hasError;
 }
 
-function validateMap(map) {
+function collectMapObjectIds() {
+  const ids = new Set();
+  let hasError = false;
+  for (const filePath of listJsonFiles("content/map-objects")) {
+    const file = readJson(filePath);
+    for (const definition of file.map_objects ?? []) {
+      if (ids.has(definition.id)) {
+        hasError = report(`Duplicate map object id: ${definition.id}`) || hasError;
+      } else {
+        ids.add(definition.id);
+      }
+    }
+  }
+  return { ids, hasError };
+}
+
+function validateMap(map, knownObjectIds) {
   let hasError = false;
   const { rows, cols } = map.size;
   const tileIds = new Set();
   const tileById = new Map();
-  const objectIds = new Set();
+  const referencedObjectIds = new Map();
   const initialDiscoveredTileIds = new Set(map.initialDiscoveredTileIds);
 
   if (rows !== 8 || cols !== 8) {
@@ -322,9 +359,17 @@ function validateMap(map) {
       hasError = report(`Map tile coordinate out of bounds: ${tile.id} (${tile.row},${tile.col}) for ${rows} x ${cols}`) || hasError;
     }
 
-    for (const object of tile.objects) {
-      if (!addUnique(objectIds, object.id)) {
-        hasError = report(`Duplicate map object id: ${object.id}`) || hasError;
+    for (const objectId of tile.objectIds) {
+      if (!knownObjectIds.has(objectId)) {
+        hasError = report(`Unknown objectId in tile ${tile.id}: ${objectId}`) || hasError;
+      }
+      const previousTileId = referencedObjectIds.get(objectId);
+      if (previousTileId !== undefined) {
+        hasError = report(
+          `Map object ${objectId} referenced by multiple tiles: ${previousTileId}, ${tile.id}`,
+        ) || hasError;
+      } else {
+        referencedObjectIds.set(objectId, tile.id);
       }
     }
 

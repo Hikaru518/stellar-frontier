@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
-import { defaultMapConfig, type MapObjectDefinition, type MapSpecialStateDefinition } from "../content/contentData";
+import { defaultMapConfig, type MapSpecialStateDefinition } from "../content/contentData";
+import { mapObjectDefinitionById, type MapObjectDefinition } from "../content/mapObjects";
 import { createMovePreview, formatMoveRoute, getCrewActionTiming } from "../crewSystem";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
 import type { EventLog } from "../events/types";
@@ -249,7 +250,17 @@ function revealedObjects(cell: VisibleTileCell, runtimeTile: GameMapState["tiles
   }
 
   const revealedIds = new Set(runtimeTile?.revealedObjectIds ?? []);
-  return cell.tile.objects.filter((object) => object.visibility === "onDiscovered" || revealedIds.has(object.id));
+  const definitions: MapObjectDefinition[] = [];
+  for (const objectId of cell.tile.objectIds) {
+    const def = mapObjectDefinitionById.get(objectId);
+    if (!def) {
+      continue;
+    }
+    if (def.visibility === "onDiscovered" || revealedIds.has(def.id)) {
+      definitions.push(def);
+    }
+  }
+  return definitions;
 }
 
 function revealedSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapSpecialStateDefinition[] {

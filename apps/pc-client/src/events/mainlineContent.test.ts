@@ -5,7 +5,7 @@ import hiveContent from "../../../../content/events/definitions/mainline_hive.js
 import medicalContent from "../../../../content/events/definitions/mainline_medical.json";
 import resourcesContent from "../../../../content/events/definitions/mainline_resources.json";
 import villageContent from "../../../../content/events/definitions/mainline_village.json";
-import defaultMap from "../../../../content/maps/default-map.json";
+import { mapObjectDefinitionById } from "../content/mapObjects";
 
 type JsonRecord = Record<string, unknown>;
 type JsonDefinition = JsonRecord & {
@@ -36,7 +36,11 @@ describe("mainline event content", () => {
       "mainline-basic-radar",
       "mainline-dead-cockpit",
     ]) {
-      expect(findMapObject(objectId).candidateActions ?? []).not.toContain("scan");
+      // The new schema replaces `candidateActions: string[]` with inline
+      // `actions: ActionDef[]`; we assert that none of those actions encode
+      // the legacy `scan` verb (id suffix or event_id).
+      const definition = findMapObject(objectId);
+      expect(definition.actions.some((action) => action.id.endsWith(":scan") || action.event_id === "legacy.scan")).toBe(false);
     }
   });
 
@@ -363,8 +367,7 @@ function findCallOption(definition: ReturnType<typeof findDefinition>, id: strin
 }
 
 function findMapObject(id: string) {
-  const map = defaultMap as { tiles: Array<{ objects: Array<JsonRecord & { id?: string; candidateActions?: string[] }> }> };
-  const object = map.tiles.flatMap((tile) => tile.objects).find((item) => item.id === id);
+  const object = mapObjectDefinitionById.get(id);
   expect(object).toBeTruthy();
   return object!;
 }

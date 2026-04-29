@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { defaultMapConfig, type MapObjectDefinition } from "./content/contentData";
-import { buildCallView, loadCallActions } from "./callActions";
+import { defaultMapConfig } from "./content/contentData";
+import { mapObjectDefinitionById, universalActions } from "./content/mapObjects";
+import { buildCallView } from "./callActions";
 import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gameData";
-import type { RuntimeCall } from "./events/types";
+import type { ActionDef } from "./content/mapObjects";
+import type { Condition, RuntimeCall } from "./events/types";
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {
@@ -93,6 +95,7 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
       discoveredTileIds: [],
       investigationReportsById: {},
       tilesById: {},
+      mapObjects: {},
     },
     tiles: [],
     logs: [],
@@ -135,10 +138,16 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 }
 
 describe("buildCallView", () => {
-  it("groups universal actions with one revealed object's candidate actions for idle crew", () => {
+  it("groups universal actions first then revealed object actions for an idle crew member", () => {
+    // tile `2-3` exists in default-map.json and lists `black-pine-stand` as one
+    // of its objectIds. The black-pine-stand definition declares two object
+    // actions (survey/gather) with empty conditions, so they should always be
+    // visible once the object is revealed.
     const tile = createTile("2-3");
-    const object = defaultMapConfig.tiles.find((item) => item.id === "2-3")?.objects.find((item) => item.id === "black-pine-stand");
+    const blackPine = mapObjectDefinitionById.get("black-pine-stand");
+    expect(blackPine).toBeDefined();
     const gameState = createGameState({
+      crew: [createMember()],
       map: {
         ...createGameState().map,
         discoveredTileIds: ["2-3"],
@@ -154,45 +163,20 @@ describe("buildCallView", () => {
 
     const view = buildCallView({ member: createMember(), tile, gameState });
 
-    expect(view.groups).toHaveLength(2);
     expect(view.groups[0].title).toBe("基础行动");
-    expect(view.groups[1]).toMatchObject({ title: "黑松木材带" });
-    expect(view.groups[1].actions).toHaveLength(object?.candidateActions?.length ?? 0);
-    expect(view.groups[1].actions.map((action) => action.id)).toEqual(["survey:black-pine-stand", "gather:black-pine-stand"]);
+    expect(view.groups[0].actions.map((action) => action.id)).toEqual(universalActions.map((action) => action.id));
+
+    const blackPineGroup = view.groups.find((group) => group.title === blackPine!.name);
+    expect(blackPineGroup).toBeDefined();
+    expect(blackPineGroup!.actions.map((action) => action.id)).toEqual(["black-pine-stand:survey", "black-pine-stand:gather"]);
+    expect(blackPineGroup!.actions.every((action) => !action.disabled)).toBe(true);
   });
 
-  it("only shows universal actions available while busy for crew with an active action", () => {
-    const gameState = createGameState();
-
-    const view = buildCallView({
-      member: createMember({
-        activeAction: {
-          id: "amy-gather-2-3",
-          actionType: "gather",
-          status: "inProgress",
-          startTime: 0,
-          durationSeconds: 120,
-          finishTime: 120,
-          targetTile: "2-3",
-        },
-      }),
-      tile: createTile("2-3"),
-      gameState,
-    });
-
-    const expectedBusyIds = loadCallActions()
-      .filter((action) => action.category === "universal" && action.availableWhenBusy)
-      .map((action) => action.id);
-
-    expect(view.groups).toHaveLength(1);
-    expect(view.groups[0].actions.map((action) => action.defId)).toEqual(expectedBusyIds);
-    expect(view.groups[0].actions).toEqual(
-      expect.arrayContaining(expectedBusyIds.map((id) => expect.objectContaining({ id, defId: id }))),
-    );
-  });
-
-  it("does not show onInvestigated object actions before the tile is investigated", () => {
+  it("does not render an object's actions before its visibility is satisfied", () => {
+    // tile `5-3` carries `southwest-timber` with visibility=onInvestigated; the
+    // group should not appear until the tile is investigated.
     const gameState = createGameState({
+      crew: [createMember({ currentTile: "5-3" })],
       map: {
         ...createGameState().map,
         discoveredTileIds: ["5-3"],
@@ -206,14 +190,19 @@ describe("buildCallView", () => {
       },
     });
 
-    const view = buildCallView({ member: createMember({ currentTile: "5-3" }), tile: createTile("5-3", { investigated: false }), gameState });
+    const view = buildCallView({
+      member: createMember({ currentTile: "5-3" }),
+      tile: createTile("5-3", { investigated: false }),
+      gameState,
+    });
 
     expect(view.groups.map((group) => group.title)).not.toContain("潮湿木材");
   });
 
-  it("returns the member's active runtime call without adding runtime options to action groups", () => {
+  it("returns the member's active runtime call without injecting runtime options into action groups", () => {
     const runtimeCall = createRuntimeCall();
     const gameState = createGameState({
+      crew: [createMember()],
       active_calls: {
         [runtimeCall.id]: runtimeCall,
       },
@@ -225,37 +214,186 @@ describe("buildCallView", () => {
     expect(view.groups.flatMap((group) => group.actions).map((action) => action.id)).not.toContain("runtime-option");
   });
 
-  it("skips missing candidate action ids without throwing", () => {
-    const missingCandidateObject: MapObjectDefinition = {
-      id: "unknown-node",
-      kind: "resourceNode",
-      name: "未知资源点",
-      visibility: "onDiscovered",
-      candidateActions: ["gather", "scan"],
-    };
-    const tile = {
-      ...createTile("test-tile"),
-      discovered: true,
-      objects: [missingCandidateObject],
-    } as MapTile & { discovered: boolean; objects: MapObjectDefinition[] };
+  it("ignores object ids that have no definition in the by-id index without throwing", () => {
     const gameState = createGameState({
+      crew: [createMember({ currentTile: "2-3" })],
       map: {
         ...createGameState().map,
-        discoveredTileIds: ["test-tile"],
+        discoveredTileIds: ["2-3"],
         tilesById: {
-          "test-tile": {
+          "2-3": {
             discovered: true,
             investigated: false,
-            revealedObjectIds: ["unknown-node"],
+            // include a known good id plus an unknown id (e.g. removed content)
+            revealedObjectIds: ["black-pine-stand", "ghost-object"],
           },
         },
       },
     });
 
-    expect(() => buildCallView({ member: createMember({ currentTile: "test-tile" }), tile, gameState })).not.toThrow();
+    expect(() => buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState })).not.toThrow();
+    const view = buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState });
+    expect(view.groups.map((group) => group.title)).toContain("黑松木材带");
+    expect(view.groups.map((group) => group.title)).not.toContain("ghost-object");
+  });
 
-    const view = buildCallView({ member: createMember({ currentTile: "test-tile" }), tile, gameState });
+  it("hides actions whose conditions fail unless display_when_unavailable is set to disabled", () => {
+    const stubObjectId = "__test_inline_object__";
+    const passingAction = createTestAction("passing", []);
+    const hiddenAction = createTestAction("hidden", [
+      {
+        type: "inventory_has_item",
+        target: { type: "crew_inventory" },
+        value: "welder",
+      } as Condition,
+    ]);
+    const disabledAction = createTestAction(
+      "needs-welder",
+      [
+        {
+          type: "inventory_has_item",
+          target: { type: "crew_inventory" },
+          value: "welder",
+        } as Condition,
+      ],
+      { display_when_unavailable: "disabled" },
+    );
 
-    expect(view.groups.find((group) => group.title === "未知资源点")?.actions.map((action) => action.defId)).toEqual(["gather"]);
+    // Inject a synthetic definition into the by-id index for the duration of
+    // the test (clean up at the end).
+    mapObjectDefinitionById.set(stubObjectId, {
+      id: stubObjectId,
+      kind: "structure",
+      name: "测试舱门",
+      visibility: "onDiscovered",
+      status_options: ["locked", "unlocked"],
+      initial_status: "locked",
+      actions: [passingAction, hiddenAction, disabledAction],
+    });
+    try {
+      const tile = createTile("2-3");
+      const gameState = createGameState({
+        crew: [createMember()],
+        map: {
+          ...createGameState().map,
+          discoveredTileIds: ["2-3"],
+          tilesById: {
+            "2-3": {
+              discovered: true,
+              investigated: false,
+              revealedObjectIds: [stubObjectId],
+            },
+          },
+        },
+      });
+
+      const view = buildCallView({ member: createMember(), tile, gameState });
+      const group = view.groups.find((entry) => entry.title === "测试舱门");
+      expect(group).toBeDefined();
+      const actionIds = group!.actions.map((action) => action.id);
+      expect(actionIds).toContain(`${stubObjectId}:passing`);
+      expect(actionIds).not.toContain(`${stubObjectId}:hidden`);
+      expect(actionIds).toContain(`${stubObjectId}:needs-welder`);
+      const disabledView = group!.actions.find((action) => action.id === `${stubObjectId}:needs-welder`);
+      expect(disabledView?.disabled).toBe(true);
+      expect(disabledView?.disabledReason).toContain("welder");
+    } finally {
+      mapObjectDefinitionById.delete(stubObjectId);
+    }
+  });
+
+  it("evaluates object_status_equals via the runtime mapObjects table", () => {
+    const stubObjectId = "__test_door__";
+    const enterAction = createTestAction(
+      "enter",
+      [
+        {
+          type: "handler_condition",
+          handler_type: "object_status_equals",
+          params: { object_id: stubObjectId, status: "unlocked" },
+        } as Condition,
+      ],
+      { display_when_unavailable: "disabled", ownerId: stubObjectId },
+    );
+
+    mapObjectDefinitionById.set(stubObjectId, {
+      id: stubObjectId,
+      kind: "structure",
+      name: "实验舱门",
+      visibility: "onDiscovered",
+      status_options: ["locked", "unlocked"],
+      initial_status: "locked",
+      actions: [enterAction],
+    });
+    try {
+      const tile = createTile("2-3");
+      const baseGameState = createGameState({
+        crew: [createMember()],
+        map: {
+          ...createGameState().map,
+          discoveredTileIds: ["2-3"],
+          tilesById: {
+            "2-3": {
+              discovered: true,
+              investigated: false,
+              revealedObjectIds: [stubObjectId],
+            },
+          },
+        },
+      });
+
+      const lockedView = buildCallView({
+        member: createMember(),
+        tile,
+        gameState: {
+          ...baseGameState,
+          map: {
+            ...baseGameState.map,
+            mapObjects: { [stubObjectId]: { id: stubObjectId, status_enum: "locked" } },
+          },
+        },
+      });
+      const lockedGroup = lockedView.groups.find((group) => group.title === "实验舱门");
+      expect(lockedGroup?.actions[0].disabled).toBe(true);
+
+      const unlockedView = buildCallView({
+        member: createMember(),
+        tile,
+        gameState: {
+          ...baseGameState,
+          map: {
+            ...baseGameState.map,
+            mapObjects: { [stubObjectId]: { id: stubObjectId, status_enum: "unlocked" } },
+          },
+        },
+      });
+      const unlockedGroup = unlockedView.groups.find((group) => group.title === "实验舱门");
+      expect(unlockedGroup?.actions[0].disabled).toBeFalsy();
+    } finally {
+      mapObjectDefinitionById.delete(stubObjectId);
+    }
   });
 });
+
+function createTestAction(
+  verb: string,
+  conditions: Condition[],
+  extras: Partial<Pick<ActionDef, "display_when_unavailable" | "unavailable_hint">> & { ownerId?: string } = {},
+): ActionDef {
+  const ownerId = extras.ownerId ?? "__test_inline_object__";
+  const action: ActionDef = {
+    id: `${ownerId}:${verb}`,
+    category: "object",
+    label: `测试动作 ${verb}`,
+    tone: "neutral",
+    conditions,
+    event_id: `legacy.${verb}`,
+  };
+  if (extras.display_when_unavailable) {
+    action.display_when_unavailable = extras.display_when_unavailable;
+  }
+  if (extras.unavailable_hint) {
+    action.unavailable_hint = extras.unavailable_hint;
+  }
+  return action;
+}

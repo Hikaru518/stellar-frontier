@@ -1,0 +1,38 @@
+{
+  "$schema": "../schemas/map-objects.schema.json",
+  "map_objects": [
+    {
+      "id": "acidic-marsh",
+      "kind": "hazard",
+      "name": "酸性湿地",
+      "visibility": "onInvestigated",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": []
+    },
+    {
+      "id": "animal-tracks",
+      "kind": "hazard",
+      "name": "野生动物踪迹",
+      "visibility": "onInvestigated",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": []
+    },
+    {
+      "id": "fracture-vent",
+      "kind": "hazard",
+      "name": "裂缝喷口",
+      "visibility": "onInvestigated",
+      "status_options": [
+        "pristine"
+      ],
+      "initial_status": "pristine",
+      "actions": []
+    }
+  ]
+}

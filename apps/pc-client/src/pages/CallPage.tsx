@@ -5,13 +5,10 @@ import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, formatMoveRoute } from "../crewSystem";
 import type { ActionOption, CallContext, CrewMember, GameMapState, GameState, MapTile } from "../data/gameData";
 import type { RuntimeCall } from "../events/types";
-import { findUsableInventoryItemByTag, getItemTagLabel } from "../inventorySystem";
 import { getTileLocationLabel, getVisibleTileWindow, type VisibleTileCell } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 type CallActionOption = ActionOption & {
-  usesItemTag?: string;
-  unavailableHint?: string;
   disabled?: boolean;
   disabledReason?: string;
 };
@@ -41,6 +38,8 @@ interface CallPageProps {
   activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
+  /** Full game state — used to build the condition-evaluation context for action visibility. */
+  gameState: GameState;
   onDecision: (actionId: string) => void;
   onConfirmMove: () => void;
   onClearMoveTarget: () => void;
@@ -58,6 +57,7 @@ export function CallPage({
   activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
+  gameState,
   onDecision,
   onConfirmMove,
   onClearMoveTarget,
@@ -120,7 +120,7 @@ export function CallPage({
       ? buildCallView({
           member,
           tile: currentTile,
-          gameState: { map, active_calls: activeCalls } as GameState,
+          gameState,
         }).groups
       : [];
 
@@ -135,7 +135,7 @@ export function CallPage({
       badge: "普通通话",
       isRuntime: false,
     };
-  }, [activeCalls, call, elapsedGameSeconds, map, member, runtimeCall, tiles]);
+  }, [activeCalls, call, elapsedGameSeconds, gameState, map, member, runtimeCall, tiles]);
 
   if (!call || !member || !callView) {
     return (
@@ -276,9 +276,8 @@ export function CallPage({
   );
 }
 
-function renderActionButton(action: CallActionOption, member: CrewMember, callClosed: boolean, onDecision: (actionId: string) => void) {
-  const itemAvailability = getChoiceItemAvailability(action, member);
-  const disabled = callClosed || action.disabled || itemAvailability.disabled;
+function renderActionButton(action: CallActionOption, _member: CrewMember, callClosed: boolean, onDecision: (actionId: string) => void) {
+  const disabled = callClosed || Boolean(action.disabled);
 
   return (
     <button
@@ -291,7 +290,6 @@ function renderActionButton(action: CallActionOption, member: CrewMember, callCl
       <span>{action.label}</span>
       {action.hint ? <small>{action.hint}</small> : null}
       {action.disabledReason ? <small>{action.disabledReason}</small> : null}
-      {itemAvailability.description ? <small>{itemAvailability.description}</small> : null}
     </button>
   );
 }
@@ -466,26 +464,6 @@ function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMov
       return step.coord;
     })
     .join(" → ");
-}
-
-function getChoiceItemAvailability(action: CallActionOption, member: CrewMember) {
-  if (!action.usesItemTag) {
-    return { disabled: false, description: null };
-  }
-
-  const tagLabel = getItemTagLabel(action.usesItemTag);
-  const candidate = findUsableInventoryItemByTag(member.inventory, action.usesItemTag);
-  if (!candidate) {
-    return {
-      disabled: true,
-      description: action.unavailableHint ?? `需要可用的${tagLabel}道具。`,
-    };
-  }
-
-  return {
-    disabled: false,
-    description: `${tagLabel}道具：将使用${candidate.item.name}，${candidate.item.consumedOnUse ? "使用后消耗" : "不会消耗"}。`,
-  };
 }
 
 function getCallTiming(member: CrewMember, elapsedGameSeconds: number) {

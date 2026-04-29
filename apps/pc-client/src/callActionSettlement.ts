@@ -1,12 +1,120 @@
-import { callActionsContent, defaultMapConfig, type CallActionDef, type CallActionId, type MapObjectDefinition, type Tone } from "./content/contentData";
+import { defaultMapConfig, type Tone } from "./content/contentData";
+import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
 import type { ActiveAction, CrewId, CrewMember, GameMapState, GameState, MapTile, ResourceSummary, SystemLog } from "./data/gameData";
 import type { InventoryEntry } from "./inventorySystem";
 import { addInventoryItem } from "./inventorySystem";
 import { formatGameTime } from "./timeSystem";
 import type { TriggerContext } from "./events/types";
 
-type ScheduledActionType = Exclude<CallActionId, "move" | "standby" | "stop">;
-type ImmediateActionType = Extract<CallActionId, "standby" | "stop">;
+/**
+ * Legacy verb registry for the settlement layer. After Task 3 of the
+ * map-object-action-refactor we no longer load `content/call-actions/*.json`;
+ * the four universal actions (move/survey/standby/stop) and the four
+ * cross-object verbs (gather/build/extract/scan) keep their existing handlers
+ * and runtime semantics. The new schema's `event_id: "legacy.<verb>"` is
+ * translated by `App.handleDecision` to the legacy "verb[:objectId]" dispatch
+ * token consumed below.
+ *
+ * TODO(map-object-action-refactor): replace this table with proper
+ * EventDefinition entries so action selection becomes a graph trigger and
+ * `App.handleDecision` can drop the translator entirely.
+ */
+type LegacyVerb = "survey" | "move" | "standby" | "stop" | "gather" | "build" | "extract" | "scan";
+
+interface LegacyActionRecord {
+  id: LegacyVerb;
+  category: "universal" | "object_action";
+  label: string;
+  tone: Tone;
+  durationSeconds: number;
+  handler: string;
+  params?: Record<string, unknown>;
+}
+
+const LEGACY_UNIVERSAL_ACTIONS: Record<Extract<LegacyVerb, "survey" | "move" | "standby" | "stop">, LegacyActionRecord> = {
+  survey: {
+    id: "survey",
+    category: "universal",
+    label: "调查当前区域",
+    tone: "neutral",
+    durationSeconds: 120,
+    handler: "survey",
+    params: { surveyLevel: "standard" },
+  },
+  move: {
+    id: "move",
+    category: "universal",
+    label: "移动到指定区域",
+    tone: "neutral",
+    durationSeconds: 0,
+    handler: "move",
+  },
+  standby: {
+    id: "standby",
+    category: "universal",
+    label: "原地待命",
+    tone: "muted",
+    durationSeconds: 0,
+    handler: "standby",
+  },
+  stop: {
+    id: "stop",
+    category: "universal",
+    label: "停止当前行动",
+    tone: "danger",
+    durationSeconds: 10,
+    handler: "stop",
+  },
+};
+
+const LEGACY_OBJECT_ACTIONS: Record<Extract<LegacyVerb, "survey" | "gather" | "build" | "extract" | "scan">, LegacyActionRecord> = {
+  survey: {
+    id: "survey",
+    category: "object_action",
+    label: "调查 {objectName}",
+    tone: "neutral",
+    durationSeconds: 120,
+    handler: "surveyObject",
+    params: { surveyLevel: "standard" },
+  },
+  gather: {
+    id: "gather",
+    category: "object_action",
+    label: "采集 {objectName}",
+    tone: "accent",
+    durationSeconds: 180,
+    handler: "gather",
+    params: { perRoundYieldByResource: { iron_ore: 5, wood: 3 } },
+  },
+  build: {
+    id: "build",
+    category: "object_action",
+    label: "建设 {objectName}",
+    tone: "accent",
+    durationSeconds: 300,
+    handler: "build",
+  },
+  extract: {
+    id: "extract",
+    category: "object_action",
+    label: "回收 {objectName}",
+    tone: "accent",
+    durationSeconds: 180,
+    handler: "extract",
+  },
+  scan: {
+    id: "scan",
+    category: "object_action",
+    label: "扫描 {objectName}",
+    tone: "neutral",
+    durationSeconds: 90,
+    handler: "scan",
+    params: { scanDepth: "standard" },
+  },
+};
+
+type ScheduledActionType = Exclude<LegacyVerb, "move" | "standby" | "stop">;
+type ImmediateActionType = Extract<LegacyVerb, "standby" | "stop">;
 type SettlementActionType = ScheduledActionType | ImmediateActionType;
 type SettlementRuntimeActionType = SettlementActionType | ActiveAction["actionType"] | "extract" | "scan" | "stop";
 
@@ -15,7 +123,7 @@ export interface SettlementActiveAction extends Omit<ActiveAction, "actionType">
   objectId?: string;
   params: Record<string, unknown>;
   handler?: string;
-  actionDefId?: CallActionId;
+  actionDefId?: LegacyVerb;
 }
 
 export interface ActionSettlementPatch {
@@ -75,7 +183,6 @@ type ActionHandler = (ctx: HandlerContext) => ActionSettlementPatch;
 
 type TileWithContent = MapTile & {
   tags?: string[];
-  objects?: MapObjectDefinition[];
 };
 
 export const actionHandlers: Partial<Record<string, ActionHandler>> = {
@@ -110,14 +217,14 @@ export function applyImmediateOrCreateAction({ state, crewId, actionViewId, occu
   }
 
   const tile = findTile(state.tiles, member.currentTile);
-  const object = parsed.objectId ? findObjectForAction(tile, definition, parsed.objectId) : undefined;
+  const object = parsed.objectId ? findObjectForAction(parsed.objectId, definition.id) : undefined;
   if (parsed.objectId && !object) {
     const patch = createFailurePatch(state, member, `行动失败：${actionViewId} 不能用于当前位置对象。`, occurredAt);
     return { state: applyPatchToState(state, patch), patch, result: "动作目标不可用。", settled: false };
   }
 
   const action = createSettlementAction({
-    actionId: definition.id,
+    verb: definition.id,
     handler: definition.handler,
     objectId: parsed.objectId,
     occurredAt,
@@ -154,7 +261,7 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
   const handlerId = action.handler ?? action.actionType;
   const handler = actionHandlers[handlerId];
   const tile = findTile(args.tiles, action.targetTile ?? args.member.currentTile);
-  const object = action.objectId ? findObjectById(tile, action.objectId) : undefined;
+  const object = action.objectId ? mapObjectDefinitionById.get(action.objectId) : undefined;
 
   if (!handler) {
     return createPatch({
@@ -219,7 +326,7 @@ function settleStop(ctx: HandlerContext): ActionSettlementPatch {
 function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
   const tileId = ctx.action.targetTile ?? ctx.member.currentTile;
   const tile = ctx.tile;
-  const objects = getTileObjects(tile);
+  const objects = getTileObjectsForTile(tile);
   const revealedObjects = objects.filter((object) => object.visibility === "onInvestigated");
   const revealedObjectIds = revealedObjects.map((object) => object.id);
   const previous = ctx.map.tilesById[tileId] ?? {};
@@ -373,12 +480,16 @@ function parseActionViewId(actionViewId: string): ParsedActionViewId {
   };
 }
 
-function findActionDefinition({ actionId, objectId }: ParsedActionViewId): CallActionDef | undefined {
-  return callActionsContent.find((definition) => definition.id === actionId && definition.category === (objectId ? "object_action" : "universal"));
+function findActionDefinition({ actionId, objectId }: ParsedActionViewId): LegacyActionRecord | undefined {
+  if (objectId) {
+    const record = LEGACY_OBJECT_ACTIONS[actionId as keyof typeof LEGACY_OBJECT_ACTIONS];
+    return record;
+  }
+  return LEGACY_UNIVERSAL_ACTIONS[actionId as keyof typeof LEGACY_UNIVERSAL_ACTIONS];
 }
 
 function createSettlementAction(args: {
-  actionId: CallActionId;
+  verb: LegacyVerb;
   handler: string;
   objectId?: string;
   occurredAt: number;
@@ -387,8 +498,8 @@ function createSettlementAction(args: {
   params: Record<string, unknown>;
 }): SettlementActiveAction {
   return {
-    id: [args.actionId, args.objectId, args.targetTile, args.occurredAt].filter(Boolean).join(":"),
-    actionType: normalizeActionType(args.actionId),
+    id: [args.verb, args.objectId, args.targetTile, args.occurredAt].filter(Boolean).join(":"),
+    actionType: normalizeActionType(args.verb),
     status: "inProgress",
     startTime: args.occurredAt,
     durationSeconds: args.durationSeconds,
@@ -397,12 +508,12 @@ function createSettlementAction(args: {
     objectId: args.objectId,
     params: args.params,
     handler: args.handler,
-    actionDefId: args.actionId,
+    actionDefId: args.verb,
   };
 }
 
-function normalizeActionType(actionId: CallActionId): SettlementActionType {
-  return actionId === "move" ? "standby" : actionId;
+function normalizeActionType(verb: LegacyVerb): SettlementActionType {
+  return verb === "move" ? "standby" : verb;
 }
 
 function isImmediateAction(actionType: SettlementRuntimeActionType): actionType is ImmediateActionType {
@@ -421,8 +532,8 @@ function normalizeSettlementAction(action: ActiveAction | SettlementActiveAction
   };
 }
 
-function getInProgressStatus(actionId: CallActionId) {
-  switch (actionId) {
+function getInProgressStatus(verb: LegacyVerb) {
+  switch (verb) {
     case "gather":
       return "采集中。";
     case "build":
@@ -437,8 +548,8 @@ function getInProgressStatus(actionId: CallActionId) {
   }
 }
 
-function getInProgressTone(actionId: CallActionId): Tone {
-  return actionId === "gather" || actionId === "build" || actionId === "extract" ? "accent" : "neutral";
+function getInProgressTone(verb: LegacyVerb): Tone {
+  return verb === "gather" || verb === "build" || verb === "extract" ? "accent" : "neutral";
 }
 
 function findTile(tiles: MapTile[], tileId: string | undefined): TileWithContent | undefined {
@@ -469,37 +580,32 @@ function findTile(tiles: MapTile[], tileId: string | undefined): TileWithContent
     danger: "未发现即时危险",
     status: "已发现",
     investigated: false,
-    objects: configTile.objects,
   };
 }
 
-function findObjectForAction(tile: TileWithContent | undefined, definition: CallActionDef, objectId: string) {
-  const object = findObjectById(tile, objectId);
-  if (!object || !isMapCandidateAction(definition.id) || !object.candidateActions?.includes(definition.id)) {
+function findObjectForAction(objectId: string, verb: LegacyVerb): MapObjectDefinition | undefined {
+  const object = mapObjectDefinitionById.get(objectId);
+  if (!object) {
     return undefined;
   }
-
-  if (definition.applicableObjectKinds && !definition.applicableObjectKinds.includes(object.kind)) {
+  if (!object.actions.some((action) => action.id === `${objectId}:${verb}`)) {
     return undefined;
   }
-
   return object;
 }
 
-function findObjectById(tile: TileWithContent | undefined, objectId: string) {
-  return getTileObjects(tile).find((object) => object.id === objectId);
-}
-
-function getTileObjects(tile: TileWithContent | undefined): MapObjectDefinition[] {
+function getTileObjectsForTile(tile: TileWithContent | undefined): MapObjectDefinition[] {
   if (!tile) {
     return [];
   }
 
-  if (tile.objects) {
-    return tile.objects;
+  const configTile = defaultMapConfig.tiles.find((configItem) => configItem.id === tile.id);
+  if (!configTile) {
+    return [];
   }
-
-  return defaultMapConfig.tiles.find((configTile) => configTile.id === tile.id)?.objects ?? [];
+  return configTile.objectIds
+    .map((id) => mapObjectDefinitionById.get(id))
+    .filter((definition): definition is MapObjectDefinition => Boolean(definition));
 }
 
 function getPayloadObjects(ctx: HandlerContext, fallbackObjects: MapObjectDefinition[]) {
@@ -580,8 +686,4 @@ function mergeTags(...groups: Array<Array<string | undefined>>) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isMapCandidateAction(actionId: CallActionId): actionId is Exclude<CallActionId, "stop"> {
-  return actionId !== "stop";
 }

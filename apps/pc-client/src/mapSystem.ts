@@ -1,4 +1,5 @@
 import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
+import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport, MapTile } from "./data/gameData";
 
 export type VisibleTileStatus = "discovered" | "frontier" | "unknownHole";
@@ -33,6 +34,12 @@ export interface RuntimeMapState {
   discoveredTileIds: string[];
   investigationReportsById: Record<string, InvestigationReport>;
   tilesById: Record<string, RuntimeMapTileState | undefined>;
+  /**
+   * Flat by-id state for every map object, populated at game-start from
+   * `mapObjectDefinitionById`. Optional on the type so legacy test fixtures
+   * still compile; runtime always treats `undefined` as `{}`.
+   */
+  mapObjects?: RuntimeMapObjectsState;
 }
 
 export interface VisibleTileCell {
@@ -162,8 +169,13 @@ export function deriveLegacyTiles(config: MapConfigDefinition, runtimeMap: Runti
     const investigated = Boolean(state?.investigated);
     const revealedObjectIds = new Set(state?.revealedObjectIds ?? []);
     const revealedSpecialStateIds = new Set(state?.revealedSpecialStateIds ?? []);
-    const activeSpecialStateIds = new Set(state?.activeSpecialStateIds ?? tile.specialStates.filter((item) => item.startsActive).map((item) => item.id));
-    const visibleObjects = tile.objects.filter((object) => object.visibility === "onDiscovered" || investigated || revealedObjectIds.has(object.id));
+    const activeSpecialStateIds = new Set(
+      state?.activeSpecialStateIds ?? tile.specialStates.filter((item) => item.startsActive).map((item) => item.id),
+    );
+    const tileObjectDefinitions = resolveTileObjects(tile);
+    const visibleObjects = tileObjectDefinitions.filter(
+      (object) => object.visibility === "onDiscovered" || investigated || revealedObjectIds.has(object.id),
+    );
     const visibleSpecialStates = tile.specialStates.filter(
       (specialState) =>
         activeSpecialStateIds.has(specialState.id) &&
@@ -186,6 +198,28 @@ export function deriveLegacyTiles(config: MapConfigDefinition, runtimeMap: Runti
       investigated,
     };
   });
+}
+
+/**
+ * Look up the {@link MapObjectDefinition}s referenced by a tile's `objectIds`.
+ *
+ * The tile config carries only `string[]` ids — definitions live in
+ * `content/map-objects/*.json` and are indexed by `mapObjectDefinitionById`.
+ * Unknown ids are skipped silently (with a `console.warn`) so a stale tile
+ * reference cannot crash the map view; the migration script + JSON Schema
+ * enforce referential integrity at content build time.
+ */
+export function resolveTileObjects(tile: MapTileDefinition): MapObjectDefinition[] {
+  const result: MapObjectDefinition[] = [];
+  for (const objectId of tile.objectIds) {
+    const definition = mapObjectDefinitionById.get(objectId);
+    if (!definition) {
+      console.warn(`[mapSystem] tile ${tile.id} references unknown objectId ${objectId}`);
+      continue;
+    }
+    result.push(definition);
+  }
+  return result;
 }
 
 function getTile(config: MapConfigDefinition, tileId: string) {

@@ -8,7 +8,8 @@ import { MapPage } from "./pages/MapPage";
 import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
 import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, hydrateMoveActionRoute, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary, type MapCandidateAction, type MapObjectDefinition } from "./content/contentData";
+import { eventContentLibrary } from "./content/contentData";
+import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -159,7 +160,40 @@ function App() {
       return;
     }
 
-    if (actionId === "move") {
+    // Runtime calls dispatch the raw option_id from the EventDefinition; no
+    // translation. Handled before the legacy-dispatch translator so its
+    // unknown-id warning doesn't fire for valid event choice ids.
+    if (currentCall.runtimeCallId) {
+      if (currentCall.settled) {
+        return;
+      }
+      setGameState((state) =>
+        mergeEventRuntimeState(
+          state,
+          selectCallOption({
+            state: toEventEngineState(state),
+            index: eventContentIndex,
+            call_id: currentCall.runtimeCallId!,
+            option_id: actionId,
+            occurred_at: state.elapsedGameSeconds,
+          }).state,
+        ),
+      );
+      setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
+      return;
+    }
+
+    // Translate the new schema's action ids back to the legacy "verb[:objectId]"
+    // shape `applyImmediateOrCreateAction` understands. See
+    // `docs/plans/2026-04-29-01-40/technical-design.md` §7.2 — the migrated
+    // action defs intentionally keep `event_id: "legacy.<verb>"`, so the
+    // dispatch layer falls back to the existing handlers in `callActionSettlement.ts`.
+    // TODO(map-object-action-refactor): replace this translator with real
+    // EventDefinition entry points once universal/object events exist as
+    // proper graph nodes (Task 4 in the next round).
+    const legacyDispatch = translateActionIdToLegacyDispatch(actionId);
+
+    if (legacyDispatch === "move") {
       setCurrentCall((call) =>
         call
           ? {
@@ -178,29 +212,11 @@ function App() {
       return;
     }
 
-    if (currentCall.runtimeCallId) {
-      setGameState((state) =>
-        mergeEventRuntimeState(
-          state,
-          selectCallOption({
-            state: toEventEngineState(state),
-            index: eventContentIndex,
-            call_id: currentCall.runtimeCallId!,
-            option_id: actionId,
-            occurred_at: state.elapsedGameSeconds,
-          }).state,
-        ),
-      );
-      setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
-      return;
-    }
-
     setGameState((state) => {
-      const actionViewId = resolveActionViewIdForCurrentTile(state, currentCall.crewId, actionId);
       const applied = applyImmediateOrCreateAction({
         state,
         crewId: currentCall.crewId,
-        actionViewId,
+        actionViewId: legacyDispatch,
         occurredAt: state.elapsedGameSeconds,
       });
       const settledState = settleGameTime(applied.state);
@@ -341,6 +357,7 @@ function App() {
           activeCalls={gameState.active_calls}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
+          gameState={gameState}
           onDecision={handleDecision}
           onConfirmMove={confirmMove}
           onClearMoveTarget={clearMoveTarget}
@@ -564,15 +581,44 @@ function settleCrewAction(
   });
 }
 
-function resolveActionViewIdForCurrentTile(state: GameState, crewId: CrewId, actionId: string) {
-  if (actionId.includes(":") || actionId === "survey" || actionId === "standby" || actionId === "stop") {
+/**
+ * Translate a new-schema action id (`universal:<verb>` or `<objectId>:<verb>`)
+ * to the legacy "verb[:objectId]" dispatch token consumed by
+ * `callActionSettlement.ts`. Unknown ids fall through unchanged with a
+ * console warn (R7 defensive impl).
+ */
+function translateActionIdToLegacyDispatch(actionId: string): string {
+  if (actionId.startsWith("universal:")) {
+    return actionId.slice("universal:".length);
+  }
+
+  const colonIndex = actionId.lastIndexOf(":");
+  if (colonIndex > 0) {
+    const objectId = actionId.slice(0, colonIndex);
+    const verb = actionId.slice(colonIndex + 1);
+    if (verb.length > 0) {
+      return `${verb}:${objectId}`;
+    }
+  }
+
+  // Bare verb (legacy-style id) is accepted as-is for back-compat with any
+  // call sites that still synthesise the old shape (e.g. App.test.tsx
+  // pre-creates an active action with `id: "gather:iron-ridge-outcrop:..."`).
+  if (
+    actionId === "move" ||
+    actionId === "survey" ||
+    actionId === "standby" ||
+    actionId === "stop" ||
+    actionId === "gather" ||
+    actionId === "build" ||
+    actionId === "extract" ||
+    actionId === "scan"
+  ) {
     return actionId;
   }
 
-  const member = state.crew.find((item) => item.id === crewId);
-  const actionObject = member ? findCandidateObject(member.currentTile, actionId, state.map) : undefined;
-
-  return actionObject ? `${actionId}:${actionObject.id}` : actionId;
+  console.warn(`[App.handleDecision] unrecognized action id: ${actionId}`);
+  return actionId;
 }
 
 function enrichActionForSettlement(member: CrewMember, action: ActiveAction): ActiveAction | SettlementActiveAction {
@@ -581,7 +627,7 @@ function enrichActionForSettlement(member: CrewMember, action: ActiveAction): Ac
   }
 
   if (isObjectCandidateAction(action.actionType)) {
-    const object = findCandidateObject(action.targetTile ?? member.currentTile, action.actionType);
+    const object = findCandidateObject(action.targetTile ?? member.currentTile, action.actionType, undefined);
     return {
       ...action,
       objectId: object?.id,
@@ -610,25 +656,40 @@ function hasSettlementMetadata(action: ActiveAction): action is ActiveAction & S
   return "handler" in action && typeof action.handler === "string";
 }
 
-function isObjectCandidateAction(actionType: ActiveAction["actionType"]): actionType is Extract<MapCandidateAction, "gather" | "build"> {
+function isObjectCandidateAction(actionType: ActiveAction["actionType"]): actionType is "gather" | "build" {
   return actionType === "gather" || actionType === "build";
 }
 
-function findCandidateObject(tileId: string, actionId: string, map?: GameMapState): MapObjectDefinition | undefined {
+function findCandidateObject(tileId: string, verb: string, map: GameMapState | undefined): MapObjectDefinition | undefined {
   const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
-  return configTile?.objects.find((object) => object.candidateActions?.includes(actionId as MapCandidateAction) && isObjectVisible(tileId, object, map));
+  if (!configTile) {
+    return undefined;
+  }
+  for (const objectId of configTile.objectIds) {
+    const definition = mapObjectDefinitionById.get(objectId);
+    if (!definition) {
+      continue;
+    }
+    if (!isObjectVisible(tileId, definition, map)) {
+      continue;
+    }
+    if (definition.actions.some((action) => action.id === `${objectId}:${verb}`)) {
+      return definition;
+    }
+  }
+  return undefined;
 }
 
-function isObjectVisible(tileId: string, object: MapObjectDefinition, map?: GameMapState) {
+function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: GameMapState | undefined) {
   if (!map) {
     return true;
   }
 
   const runtimeTile = map.tilesById[tileId];
   return (
-    object.visibility === "onDiscovered" ||
-    runtimeTile?.revealedObjectIds?.includes(object.id) ||
-    (object.visibility === "onInvestigated" && runtimeTile?.investigated)
+    definition.visibility === "onDiscovered" ||
+    runtimeTile?.revealedObjectIds?.includes(definition.id) ||
+    (definition.visibility === "onInvestigated" && runtimeTile?.investigated)
   );
 }
 
@@ -1026,7 +1087,12 @@ function inferTileTags(tile: MapTile) {
   const text = [tile.terrain, tile.status, tile.danger, ...tile.resources, ...tile.buildings, ...tile.instruments].join(" ");
   const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
   const explicitTags = "tags" in tile && Array.isArray(tile.tags) ? tile.tags.filter((tag): tag is string => typeof tag === "string") : [];
-  const contentTags = configTile?.objects.flatMap((object) => object.tags?.filter((tag) => tag === "crash_site") ?? []) ?? [];
+  const contentTags = configTile
+    ? configTile.objectIds.flatMap((objectId) => {
+        const def = mapObjectDefinitionById.get(objectId);
+        return def?.tags?.filter((tag) => tag === "crash_site") ?? [];
+      })
+    : [];
   const tags = new Set<string>([...explicitTags, ...contentTags]);
 
   if (/森林|木材|野生动物/.test(text)) {
@@ -1087,6 +1153,7 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
     tilesById: { ...fresh.tilesById, ...(map.tilesById ?? {}) },
     discoveredTileIds,
     investigationReportsById: map.investigationReportsById ?? {},
+    mapObjects: { ...(fresh.mapObjects ?? {}), ...(map.mapObjects ?? {}) },
   };
 }
 
@@ -1118,7 +1185,13 @@ function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
       [tileId]: {
         ...previous,
         discovered: true,
-        revealedObjectIds: addUnique(previous.revealedObjectIds ?? [], ...configTile.objects.filter((object) => object.visibility === "onDiscovered").map((object) => object.id)),
+        revealedObjectIds: addUnique(
+          previous.revealedObjectIds ?? [],
+          ...configTile.objectIds.flatMap((objectId) => {
+            const def = mapObjectDefinitionById.get(objectId);
+            return def && def.visibility === "onDiscovered" ? [objectId] : [];
+          }),
+        ),
         revealedSpecialStateIds: addUnique(
           previous.revealedSpecialStateIds ?? [],
           ...configTile.specialStates.filter((state) => state.visibility === "onDiscovered" && (previous.activeSpecialStateIds ?? []).includes(state.id)).map((state) => state.id),

@@ -204,7 +204,7 @@
     "tile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "row", "col", "areaName", "terrain", "weather", "environment", "objects", "specialStates"],
+      "required": ["id", "row", "col", "areaName", "terrain", "weather", "environment", "objectIds", "specialStates"],
       "properties": {
         "id": {
           "$ref": "#/$defs/tileId"
@@ -231,11 +231,12 @@
         "environment": {
           "$ref": "#/$defs/environment"
         },
-        "objects": {
+        "objectIds": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/mapObject"
-          }
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
         },
         "specialStates": {
           "type": "array",
