@@ -1,6 +1,7 @@
 import type { CallTemplate, EventDefinition, HandlerDefinition, Id, PresetDefinition, TriggerType } from "./types";
 
 export interface EventContentLibrary {
+  domains: readonly string[];
   event_definitions: EventDefinition[];
   call_templates: CallTemplate[];
   handlers: HandlerDefinition[];

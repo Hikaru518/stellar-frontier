@@ -1,13 +1,15 @@
 ---
 topic: dual-device-play
 date: 2026-04-27
-status: draft
+status: merged
 scope: system
 source:
   initial: docs/plans/2026-04-27-22-52/initial.md
   research: docs/plans/2026-04-27-22-52/research.md
   interview: docs/plans/2026-04-27-22-52/dual-device-play-interview.md
 target_wiki: docs/gameplay/dual-device-play/dual-device-play.md
+merged_into: docs/gameplay/dual-device-play/dual-device-play.md
+merged_at: 2026-04-28T16:21:00+08:00
 ---
 
 # 双设备游玩策划案

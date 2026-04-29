@@ -10,9 +10,16 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "便携式武器，可在危险事件中提高对抗成功率。",
-      "tags": ["weapon", "combat"],
+      "tags": [
+        "weapo",
+        "combat"
+      ],
       "effects": [
-        { "type": "combatBonus", "target": "danger_event", "value": 0.15 }
+        {
+          "type": "combatBonus",
+          "target": "danger_event",
+          "value": 0.15
+        }
       ]
     },
     {
@@ -24,9 +31,16 @@
       "usableInResponse": true,
       "consumedOnUse": true,
       "description": "可在失联或救援相关事件中提供定位帮助。",
-      "tags": ["signal", "emergency"],
+      "tags": [
+        "signal",
+        "emergency"
+      ],
       "effects": [
-        { "type": "communicationBonus", "target": "lost_recovery", "value": 0.2 }
+        {
+          "type": "communicationBonus",
+          "target": "lost_recovery",
+          "value": 0.2
+        }
       ]
     },
     {
@@ -37,9 +51,16 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "不依赖电子信号的方向工具。",
-      "tags": ["navigation", "survey"],
+      "tags": [
+        "navigation",
+        "survey"
+      ],
       "effects": [
-        { "type": "chanceModifier", "target": "desert_lost", "value": -0.1 }
+        {
+          "type": "chanceModifier",
+          "target": "desert_lost",
+          "value": -0.1
+        }
       ]
     },
     {
@@ -51,9 +72,15 @@
       "usableInResponse": true,
       "consumedOnUse": true,
       "description": "基础口粮，可缓解饥饿或疲劳事件。",
-      "tags": ["food"],
+      "tags": [
+        "food"
+      ],
       "effects": [
-        { "type": "restoreCondition", "condition": "fatigued", "value": 1 }
+        {
+          "type": "restoreCondition",
+          "condition": "fatigued",
+          "value": 1
+        }
       ]
     },
     {
@@ -64,7 +91,10 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "在荒野中用途可疑，气味可能吸引或驱赶生物。",
-      "tags": ["social", "scent"],
+      "tags": [
+        "social",
+        "scent"
+      ],
       "effects": []
     },
     {
@@ -76,9 +106,15 @@
       "usableInResponse": true,
       "consumedOnUse": true,
       "description": "一次性急救用品，可处理轻伤。",
-      "tags": ["medical"],
+      "tags": [
+        "medical"
+      ],
       "effects": [
-        { "type": "restoreCondition", "condition": "light_wound", "value": 1 }
+        {
+          "type": "restoreCondition",
+          "condition": "light_wound",
+          "value": 1
+        }
       ]
     },
     {
@@ -89,9 +125,16 @@
       "usableInResponse": true,
       "consumedOnUse": false,
       "description": "低功率照明工具，可在洞穴、废墟等低能见度事件中提供稳定光源。",
-      "tags": ["light", "survey"],
+      "tags": [
+        "light",
+        "survey"
+      ],
       "effects": [
-        { "type": "chanceModifier", "target": "dark_area", "value": 0.2 }
+        {
+          "type": "chanceModifier",
+          "target": "dark_area",
+          "value": 0.2
+        }
       ]
     },
     {
@@ -103,7 +146,10 @@
       "usableInResponse": true,
       "consumedOnUse": true,
       "description": "少量补给，更多是心理安慰。",
-      "tags": ["food", "morale"],
+      "tags": [
+        "food",
+        "morale"
+      ],
       "effects": []
     },
     {
@@ -115,7 +161,9 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "带有旧殖民测绘标记的残片，作为线索词表样例保留。",
-      "tags": ["clue"],
+      "tags": [
+        "clue"
+      ],
       "effects": []
     },
     {
@@ -126,7 +174,10 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "总部发行的信用凭证，可能用于后续贸易或剧情。",
-      "tags": ["quest", "trade"],
+      "tags": [
+        "quest",
+        "trade"
+      ],
       "effects": []
     },
     {
@@ -137,9 +188,16 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "基础采矿工具。",
-      "tags": ["tool", "mining"],
+      "tags": [
+        "tool",
+        "mining"
+      ],
       "effects": [
-        { "type": "yieldModifier", "target": "iron_ore", "value": 0.25 }
+        {
+          "type": "yieldModifier",
+          "target": "iron_ore",
+          "value": 0.25
+        }
       ]
     },
     {
@@ -150,9 +208,16 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "旧式测温工具，可用于环境异常判断。",
-      "tags": ["tool", "survey"],
+      "tags": [
+        "tool",
+        "survey"
+      ],
       "effects": [
-        { "type": "chanceModifier", "target": "thermal_anomaly", "value": 0.1 }
+        {
+          "type": "chanceModifier",
+          "target": "thermal_anomaly",
+          "value": 0.1
+        }
       ]
     },
     {
@@ -163,7 +228,9 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "Garry 的旧物，目前没有明确玩法效果。",
-      "tags": ["personal"],
+      "tags": [
+        "personal"
+      ],
       "effects": []
     },
     {
@@ -175,7 +242,10 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "基础建设资源。",
-      "tags": ["resource", "mining"],
+      "tags": [
+        "resource",
+        "mining"
+      ],
       "effects": []
     },
     {
@@ -281,7 +351,10 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "基础建设资源，可通过森林调查或采集获得。",
-      "tags": ["resource", "building"],
+      "tags": [
+        "resource",
+        "building"
+      ],
       "effects": []
     },
     {
@@ -292,9 +365,17 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "通用工具包，可提高部分调查和建设事件的成功率。",
-      "tags": ["tool", "survey", "build"],
+      "tags": [
+        "tool",
+        "survey",
+        "build"
+      ],
       "effects": [
-        { "type": "chanceModifier", "target": "survey_minor_resource", "value": 0.05 }
+        {
+          "type": "chanceModifier",
+          "target": "survey_minor_resource",
+          "value": 0.05
+        }
       ]
     },
     {
@@ -305,9 +386,17 @@
       "usableInResponse": false,
       "consumedOnUse": false,
       "description": "用于发现隐藏资源和异常信号的工具。",
-      "tags": ["tool", "survey", "signal"],
+      "tags": [
+        "tool",
+        "survey",
+        "signal"
+      ],
       "effects": [
-        { "type": "chanceModifier", "target": "hidden_discovery", "value": 0.2 }
+        {
+          "type": "chanceModifier",
+          "target": "hidden_discovery",
+          "value": 0.2
+        }
       ]
     }
   ]

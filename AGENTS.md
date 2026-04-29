@@ -8,7 +8,7 @@
 - `docs/core-ideas.md` 是特殊的全局核心想法与设计原则页，保持短小、指导性，不使用普通子系统 wiki 的 10 章模板；任何对它的更新都必须先获得人类确认，agent 不得在未确认的情况下自动改写核心原则。
 - `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品/地图的具体配置写在 `content/`。
 - 仓库使用 Rush + pnpm monorepo；不要恢复 npm workspaces，也不要提交 root `package-lock.json`。
-- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
+- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src`、`apps/editor/src`、`apps/editor/helper` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
 
 ## docs/ 知识库结构
 
@@ -21,7 +21,7 @@
 | `docs/core-ideas.md` | 特殊全局原则页：简短说明核心想法与设计原则，不套用普通子系统 wiki 模板；任何更新都需要人类确认。 |
 | `docs/index.md` | 知识库索引，由 `audit-wiki` 根据现有 wiki 与文档入口重生成。 |
 | `docs/todo.md` | **设计 / 文档体系级**的有意搁置项；代码层面的 TODO 不写在这里。 |
-| `docs/gameplay/<system>/<system>.md` | 各子系统的 wiki，已生效的全量规则。当前包含 `crew`、`event-system`、`map-system`、`time-system` 四份。 |
+| `docs/gameplay/<system>/<system>.md` | 各子系统的 wiki，已生效的全量规则。当前包含 `communication-table`、`crew`、`dual-device-play`、`event-system`、`map-system`、`time-system` 六份。 |
 | `docs/game_model/<topic>.md` | 代码层数据契约：队员、事件、事件集成边界、地图等运行时模型与内容 schema 边界。 |
 | `docs/ui-designs/ui.md` | UI 总览：页面与职责、模块关系、跳转图。 |
 | `docs/ui-designs/ui-design-principles.md` | UI 风格与机制设计原则（低保真控制台美学）。 |
@@ -56,8 +56,9 @@
 - **事件触发**：抵达地块、调查完成、采集完成、建设完成、长时间待命、通话选项均可触发事件；事件依据队员属性 / 携带物 / 标签 / 概率结算；紧急事件以来电进入通讯台并形成倒计时。
 - **人物表达**：每名队员具备背景档案、通话语气、5 维轻量属性（体能 / 敏捷 / 智力 / 感知 / 运气，取值 `1-6`）、自由性格标签、专长标签与关键节点日记。
 - **日记可见性**：日记按 `已传回 / 未传回 / 失联锁定 / 找回解锁` 四态控制可见性。
-- **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，接收 PC 授权的私密信号并回传 typed events；共享 dual-device library 负责 room / token / Yuan message 映射，底层 Host / Terminal / WebRTC upgrade 交给外部 Yuan Host。
-- **存档**：以 `localStorage`（key `stellar-frontier-save-v1`）保存全量游戏状态；Debug toolbox 提供重置入口。
+- **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，PC 与手机都实例化真实 Yuan `Terminal(enable_WebRTC: true)`，通过 Yuan service 传输心跳、私密来电、已读和接听 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。
+- **Yuan 链路语义**：Yuan WSS 是稳定公网 baseline；WebRTC DataChannel 是机会性局域网升级。`enable_WebRTC: true` 只表示允许协商，不保证当前消息已经走 DataChannel；真实升级需要双方 terminal info 同步、对端消息触发 offer/answer、ICE 候选连通，并需要 Yuan tunnel metric / 调试钩子来确认。
+- **存档**：以 `localStorage`（key `stellar-frontier-save-v2`）保存全量游戏状态；Debug toolbox 提供重置入口。
 
 ### 内容数据
 
@@ -75,6 +76,7 @@
 - 程序生成角色 / 随机背景。
 - 控制中心中的研究台（科技树）、星际贸易、星际之门等模块的实质交互。
 - 完整的"经过每个移动地块"事件触发；MVP 仅在抵达 / 完成时检查。
+- Yuan WebRTC DataChannel 的 UI 实时可观测性、TURN/STUN 生产配置、Yuan Host 生产部署与鉴权 hardening。
 
 ## 明确不做（Out of Scope）
 
@@ -125,12 +127,13 @@
 │   │   ├── src/App.tsx                    # 页面流转、全局 GameState、游戏循环、事件结算汇总
 │   │   ├── src/*System.ts                 # crew / diary / event / time / inventory / map 系统
 │   │   └── tests/e2e/app.spec.ts          # Playwright 端到端流程测试
-│   └── mobile-client/                    # 手机 companion terminal 浏览器客户端
+│   ├── mobile-client/                    # 手机 companion terminal 浏览器客户端
+│   └── editor/                           # 本地 Game Editor / Event Editor 工具，含独立 Vite app、localhost helper 与 editor 专属脚本
 ├── packages/
-│   └── dual-device/                      # PC/mobile 共享的配对、Yuan message 映射、typed events 与 fallback 规则
+│   └── dual-device/                      # PC/mobile 共享的配对、真实 Yuan Terminal adapter、typed events 与 fallback 规则
 ├── common/config/rush/                   # Rush + pnpm 配置、command-line、pnpm lock、repo state
 ├── common/scripts/                       # Rush 生成的 install-run 脚本
 └── rush.json                             # Rush 项目拓扑与 pnpmVersion
 ```
 
-<!-- last-synced-by audit-wiki: 2026-04-27 -->
+<!-- last-synced-by audit-wiki: 2026-04-28 -->

@@ -1,30 +1,54 @@
 import { describe, expect, it } from "vitest";
-import type { eventContentLibrary } from "./contentData";
+import eventManifest from "../../../../content/events/manifest.json";
+import { buildEventContentIndex } from "../events/contentIndex";
 
-type JsonModule<T> = T | { default: T };
+describe("generated event content exports", () => {
+  const structuredDomains = [
+    "crash_site",
+    "crew_kael",
+    "desert",
+    "forest",
+    "mainline_crash_site",
+    "mainline_ending",
+    "mainline_hive",
+    "mainline_medical",
+    "mainline_resources",
+    "mainline_village",
+    "mine",
+    "mountain",
+  ];
 
-describe("event content exports", () => {
-  it("aggregates event definitions, call templates, and presets from content globs", async () => {
-    const contentData = (await import("./contentData")) as unknown as {
-      eventContentLibrary: typeof eventContentLibrary;
+  it("tracks every authored structured event domain in the manifest", () => {
+    expect(eventManifest.schema_version).toBe("event-manifest.v1");
+    expect(eventManifest.domains.map((domain) => domain.id).sort()).toEqual(structuredDomains);
+  });
+
+  it("exposes authored definitions, call templates, handlers, and presets through eventContentLibrary", async () => {
+    const contentData = await import("./contentData");
+    const generatedContent = await import("./generated/eventContentManifest");
+    const eventContentLibrary = contentData.eventContentLibrary as typeof contentData.eventContentLibrary & {
+      domains?: string[];
     };
-    const definitionModules = import.meta.glob("../../../../content/events/definitions/*.json", { eager: true }) as Record<
-      string,
-      JsonModule<{ event_definitions: unknown[] }>
-    >;
-    const callTemplateModules = import.meta.glob("../../../../content/events/call_templates/*.json", { eager: true }) as Record<
-      string,
-      JsonModule<{ call_templates: unknown[] }>
-    >;
-    const presetModules = import.meta.glob("../../../../content/events/presets/*.json", { eager: true }) as Record<
-      string,
-      JsonModule<{ presets: unknown[] }>
-    >;
+    const generatedDomains = generatedContent as typeof generatedContent & {
+      generatedEventDomains?: readonly string[];
+    };
 
-    expect(contentData.eventContentLibrary.event_definitions).toHaveLength(collectContentArray(definitionModules, "event_definitions").length);
-    expect(contentData.eventContentLibrary.call_templates).toHaveLength(collectContentArray(callTemplateModules, "call_templates").length);
-    expect(contentData.eventContentLibrary.presets).toHaveLength(collectContentArray(presetModules, "presets").length);
+    expect(contentData.eventProgramDefinitions).toBe(generatedContent.generatedEventProgramDefinitions);
+    expect(contentData.callTemplates).toBe(generatedContent.generatedCallTemplates);
+    expect(contentData.presetDefinitions).toBe(generatedContent.generatedPresetDefinitions);
+    expect(generatedDomains.generatedEventDomains).toEqual(structuredDomains);
+    expect(eventContentLibrary.domains).toEqual(structuredDomains);
+
+    expect(new Set(contentData.eventProgramDefinitions.map((definition) => definition.domain))).toEqual(
+      new Set(structuredDomains),
+    );
+    expect(new Set(contentData.callTemplates.map((template) => template.domain))).toEqual(new Set(structuredDomains));
     expect(contentData.eventContentLibrary.handlers.length).toBeGreaterThan(0);
+
+    const indexResult = buildEventContentIndex(contentData.eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    expect(indexResult.index.definitionsByDomain.size).toBe(structuredDomains.length);
+    expect(indexResult.index.presetsById.size).toBe(generatedContent.generatedPresetDefinitions.length);
   });
 });
 
@@ -39,7 +63,3 @@ describe("default map config", () => {
     }
   });
 });
-
-function collectContentArray<T extends string>(modules: Record<string, JsonModule<Record<T, unknown[]>>>, key: T) {
-  return Object.values(modules).flatMap((module) => ("default" in module ? module.default : module)[key]);
-}
