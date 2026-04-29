@@ -71,10 +71,6 @@ export interface MapObjectDefinition {
   actions: ActionDef[];
   /** Synonymous with the existing visibility — controls when the call page can see it. */
   visibility: MapVisibility;
-  /** Compatibility fields kept to minimise the `mapSystem.ts` change surface (read-only derived display). */
-  legacyResource?: string;
-  legacyBuilding?: string;
-  legacyInstrument?: string;
 }
 
 export interface MapObjectRuntime {

@@ -30,8 +30,7 @@
       ],
       "tags": [
         "forest"
-      ],
-      "legacyResource": "wood"
+      ]
     },
     {
       "id": "fallen-timber",
@@ -51,8 +50,7 @@
           "conditions": [],
           "event_id": "retired.map_object_gather"
         }
-      ],
-      "legacyResource": "wood"
+      ]
     },
     {
       "id": "needlewood-stand",
@@ -72,8 +70,7 @@
           "conditions": [],
           "event_id": "retired.map_object_gather"
         }
-      ],
-      "legacyResource": "wood"
+      ]
     },
     {
       "id": "southwest-timber",
@@ -101,8 +98,7 @@
           "conditions": [],
           "event_id": "retired.map_object_gather"
         }
-      ],
-      "legacyResource": "wood"
+      ]
     }
   ]
 }

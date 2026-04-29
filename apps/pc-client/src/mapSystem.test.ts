@@ -74,7 +74,7 @@ describe("mapSystem", () => {
     expect(canMoveToTile(defaultMapConfig, map, "not-a-tile")).toBe(false);
   });
 
-  it("derives legacy MapTile fields from config and runtime state", () => {
+  it("keeps legacy MapTile display lists empty after map legacy content removal", () => {
     const tiles = deriveLegacyTiles(
       defaultMapConfig,
       runtime(["3-3", "5-3", "1-7"], {
@@ -87,15 +87,15 @@ describe("mapSystem", () => {
     expect(tiles.find((tile) => tile.id === "3-3")).toMatchObject({
       coord: "(-1,1)",
       terrain: "丘陵",
-      resources: expect.arrayContaining(["iron_ore"]),
-      buildings: ["采矿厂：铁 #2"],
-      instruments: ["mercury_thermometer"],
+      resources: [],
+      buildings: [],
+      instruments: [],
       crew: ["garry"],
       danger: "未发现即时危险",
       status: "工作中",
       investigated: true,
     });
-    expect(tiles.find((tile) => tile.id === "5-3")?.resources).toEqual(["wood"]);
+    expect(tiles.find((tile) => tile.id === "5-3")?.resources).toEqual([]);
     expect(tiles.find((tile) => tile.id === "1-7")?.danger).toBe("未发现即时危险");
   });
 });

@@ -28,8 +28,8 @@ source:
 | 12 | T012 | 迁移调查当前区域到地点事件入口 | completed | 1 |
 | 13 | T013 | 重构基础行动 content 与 schema | completed | 1 |
 | 14 | T014 | 删除 legacy dispatch 与旧行动入口 | completed | 1 |
-| 15 | T015 | 建立地点剧情动作事件样例 | pending | 0 |
-| 16 | T016 | 删除地图 legacy content 字段与 schema | pending | 0 |
+| 15 | T015 | 建立地点剧情动作事件样例 | completed | 1 |
+| 16 | T016 | 删除地图 legacy content 字段与 schema | completed | 1 |
 | 17 | T017 | 删除 deriveLegacyTiles 与旧 MapTile 投影 | pending | 0 |
 | 18 | T018 | 清理 PC UI mock 文案 | pending | 0 |
 | 19 | T019 | 清理 mobile UI mock 文案 | pending | 0 |
@@ -147,3 +147,17 @@ source:
 - 完成时间: 2026-04-29 17:56
 - 尝试次数: 1
 - Monkey summary: 删除 `App.handleDecision` 中 legacy translator 与 `applyImmediateOrCreateAction` 入口，`settleAction` 改为只接受 `CrewActionState`，过滤退休 object actions，并将 map-object 中 `legacy.*` event id 改为 `retired.map_object_*` 占位。验证：`npm run validate:content` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T015: 建立地点剧情动作事件样例
+- 状态: completed
+- 开始时间: 2026-04-29 17:57
+- 完成时间: 2026-04-29 18:02
+- 尝试次数: 1
+- Monkey summary: 新增医疗文档地点剧情动作 `mainline-medical-docs:learn`，普通通话可触发结构化事件 runtime，真实接通并选择事件选项后结算 `knows_field_first_aid` 与事件日志；样例不依赖 gather/build/trade 通用按钮。验证：合并态 `npm run validate:content`、`npm --prefix apps/pc-client run lint`、`npm --prefix apps/pc-client run test` 通过。
+
+### T016: 删除地图 legacy content 字段与 schema
+- 状态: completed
+- 开始时间: 2026-04-29 17:57
+- 完成时间: 2026-04-29 18:02
+- 尝试次数: 1
+- Monkey summary: 删除 map content/schema/type 中的 `legacyResource`、`legacyBuilding`、`legacyInstrument`、`legacyDanger` 字段，清理 PC 端旧读取逻辑，`deriveLegacyTiles` 不再从对象派生旧展示列表。验证：合并态 `npm run validate:content`、`npm --prefix apps/pc-client run lint`、`npm --prefix apps/pc-client run test` 通过。

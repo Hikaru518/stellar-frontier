@@ -143,8 +143,7 @@
           "name": "静电锋面",
           "visibility": "hidden",
           "severity": "medium",
-          "startsActive": true,
-          "legacyDanger": "静电干扰"
+          "startsActive": true
         }
       ],
       "objectIds": []
@@ -231,8 +230,7 @@
           "dangerTags": [
             "beast_tracks"
           ],
-          "startsActive": true,
-          "legacyDanger": "大型野兽接近"
+          "startsActive": true
         }
       ],
       "objectIds": [
@@ -533,8 +531,7 @@
           "name": "未知回声",
           "visibility": "onDiscovered",
           "severity": "low",
-          "startsActive": true,
-          "legacyDanger": "未知回声"
+          "startsActive": true
         }
       ],
       "objectIds": [
@@ -829,8 +826,7 @@
           "name": "酸雨积水",
           "visibility": "onInvestigated",
           "severity": "medium",
-          "startsActive": true,
-          "legacyDanger": "酸性积水"
+          "startsActive": true
         }
       ],
       "objectIds": [

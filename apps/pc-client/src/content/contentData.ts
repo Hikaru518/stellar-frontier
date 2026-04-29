@@ -200,7 +200,6 @@ export interface MapSpecialStateDefinition {
   tags?: string[];
   startsActive: boolean;
   durationGameSeconds?: number;
-  legacyDanger?: string;
 }
 
 export interface MapTileDefinition {

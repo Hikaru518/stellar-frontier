@@ -1,9 +1,12 @@
 import Ajv2020 from "ajv/dist/2020";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import mapObjectsSchema from "../../../../content/schemas/map-objects.schema.json";
+import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import universalActionsSchema from "../../../../content/schemas/universal-actions.schema.json";
 import {
   getMapObjectDefinition,
   mapObjectDefinitionById,
+  type MapObjectDefinition,
   mapObjectDefinitions,
   universalActions,
 } from "./mapObjects";
@@ -28,6 +31,79 @@ describe("mapObjects content", () => {
       expect(definition.status_options.length).toBeGreaterThan(0);
       expect(definition.status_options).toContain(definition.initial_status);
     }
+  });
+
+  it("excludes legacy projection fields from the map object type", () => {
+    expectTypeOf<MapObjectDefinition>().not.toHaveProperty("legacyResource");
+    expectTypeOf<MapObjectDefinition>().not.toHaveProperty("legacyBuilding");
+    expectTypeOf<MapObjectDefinition>().not.toHaveProperty("legacyInstrument");
+  });
+
+  it("rejects legacy projection fields at the schema boundary", () => {
+    const ajv = new Ajv2020({ allErrors: true });
+    const validateMapObjects = ajv.compile(mapObjectsSchema);
+    const validateMaps = ajv.compile(mapsSchema);
+
+    expect(
+      validateMapObjects({
+        map_objects: [
+          {
+            id: "legacy_probe",
+            kind: "resourceNode",
+            name: "Legacy Probe",
+            visibility: "onDiscovered",
+            status_options: ["intact"],
+            initial_status: "intact",
+            actions: [],
+            legacyResource: "iron_ore",
+          },
+        ],
+      }),
+    ).toBe(false);
+
+    expect(
+      validateMaps({
+        id: "legacy-map",
+        name: "Legacy Map",
+        version: 1,
+        size: { rows: 1, cols: 1 },
+        originTileId: "1-1",
+        initialDiscoveredTileIds: ["1-1"],
+        tiles: [
+          {
+            id: "1-1",
+            row: 1,
+            col: 1,
+            areaName: "Landing Zone",
+            terrain: "平原",
+            weather: "晴朗",
+            environment: {
+              temperatureCelsius: 20,
+              humidityPercent: 50,
+              magneticFieldMicroTesla: 40,
+              radiationLevel: "low",
+            },
+            objectIds: [],
+            specialStates: [
+              {
+                id: "legacy_danger",
+                name: "Legacy Danger",
+                visibility: "onDiscovered",
+                severity: "low",
+                startsActive: true,
+                legacyDanger: "静电干扰",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe(false);
+
+    const serializedSchemas = JSON.stringify([mapObjectsSchema, mapsSchema]);
+    expect(serializedSchemas).not.toContain("legacyResource");
+    expect(serializedSchemas).not.toContain("legacyBuilding");
+    expect(serializedSchemas).not.toContain("legacyInstrument");
+    expect(serializedSchemas).not.toContain("legacyDanger");
   });
 
   it("loads exactly the four MVP universal actions", () => {

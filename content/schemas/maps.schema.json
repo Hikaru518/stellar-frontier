@@ -134,18 +134,6 @@
             "$ref": "#/$defs/tag"
           }
         },
-        "legacyResource": {
-          "type": "string",
-          "minLength": 1
-        },
-        "legacyBuilding": {
-          "type": "string",
-          "minLength": 1
-        },
-        "legacyInstrument": {
-          "type": "string",
-          "minLength": 1
-        },
         "candidateActions": {
           "type": "array",
           "items": {
@@ -194,10 +182,6 @@
         "durationGameSeconds": {
           "type": "integer",
           "minimum": 1
-        },
-        "legacyDanger": {
-          "type": "string",
-          "minLength": 1
         }
       }
     },

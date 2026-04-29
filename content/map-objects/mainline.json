@@ -24,8 +24,7 @@
         "mainline",
         "mainline_medical",
         "medical_pod"
-      ],
-      "legacyResource": "废弃医疗舱"
+      ]
     },
     {
       "id": "crash-site-wreckage",
@@ -50,8 +49,7 @@
         "crash_site",
         "mainline",
         "mainline_crash_site"
-      ],
-      "legacyBuilding": "坠毁残骸"
+      ]
     },
     {
       "id": "iron-ridge-deposit",
@@ -84,8 +82,7 @@
         "mineral_deposit",
         "mainline",
         "mainline_rare_ore_source"
-      ],
-      "legacyResource": "iron_ore"
+      ]
     },
     {
       "id": "iron-ridge-outcrop",
@@ -117,8 +114,7 @@
       "tags": [
         "mainline",
         "mainline_rare_ore_source"
-      ],
-      "legacyResource": "iron_ore"
+      ]
     },
     {
       "id": "mainline-alien-trader",
@@ -462,6 +458,32 @@
           "tone": "neutral",
           "conditions": [],
           "event_id": "retired.map_object_survey"
+        },
+        {
+          "id": "mainline-medical-docs:learn",
+          "category": "object",
+          "label": "学习野外急救",
+          "tone": "accent",
+          "conditions": [
+            {
+              "type": "world_flag_equals",
+              "field": "medical_docs_available",
+              "value": true
+            },
+            {
+              "type": "not",
+              "conditions": [
+                {
+                  "type": "has_condition",
+                  "target": {
+                    "type": "primary_crew"
+                  },
+                  "value": "knows_field_first_aid"
+                }
+              ]
+            }
+          ],
+          "event_id": "mainline_medical_docs_repeat_learning"
         }
       ],
       "description": "医疗舱内残存的野外急救流程，可供队员重复学习。",
@@ -549,8 +571,7 @@
         "mainline_resources",
         "mainline_rare_ore_source",
         "rare_ore"
-      ],
-      "legacyResource": "iron_ore"
+      ]
     },
     {
       "id": "mainline-repair-docs",

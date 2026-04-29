@@ -167,14 +167,9 @@ export function deriveLegacyTiles(config: MapConfigDefinition, runtimeMap: Runti
     const state = runtimeMap.tilesById[tile.id];
     const discovered = isDiscovered(runtimeMap, tile.id);
     const investigated = Boolean(state?.investigated);
-    const revealedObjectIds = new Set(state?.revealedObjectIds ?? []);
     const revealedSpecialStateIds = new Set(state?.revealedSpecialStateIds ?? []);
     const activeSpecialStateIds = new Set(
       state?.activeSpecialStateIds ?? tile.specialStates.filter((item) => item.startsActive).map((item) => item.id),
-    );
-    const tileObjectDefinitions = resolveTileObjects(tile);
-    const visibleObjects = tileObjectDefinitions.filter(
-      (object) => object.visibility === "onDiscovered" || investigated || revealedObjectIds.has(object.id),
     );
     const visibleSpecialStates = tile.specialStates.filter(
       (specialState) =>
@@ -189,11 +184,11 @@ export function deriveLegacyTiles(config: MapConfigDefinition, runtimeMap: Runti
       row: tile.row,
       col: tile.col,
       terrain: tile.terrain,
-      resources: visibleObjects.flatMap((object) => (object.legacyResource ? [object.legacyResource] : [])),
-      buildings: visibleObjects.flatMap((object) => (object.legacyBuilding ? [object.legacyBuilding] : [])),
-      instruments: visibleObjects.flatMap((object) => (object.legacyInstrument ? [object.legacyInstrument] : [])),
+      resources: [],
+      buildings: [],
+      instruments: [],
       crew: state?.crew ?? [],
-      danger: visibleSpecialStates.find((specialState) => specialState.legacyDanger)?.legacyDanger ?? "未发现即时危险",
+      danger: visibleSpecialStates[0]?.name ?? "未发现即时危险",
       status: state?.status ?? (discovered ? "已发现" : "未探索"),
       investigated,
     };

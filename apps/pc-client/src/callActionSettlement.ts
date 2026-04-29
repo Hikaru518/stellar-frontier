@@ -134,7 +134,7 @@ function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
 
 function settleGather(ctx: HandlerContext): ActionSettlementPatch {
   const object = ctx.object;
-  const resourceId = getGatherResourceId(ctx.action, object);
+  const resourceId = getGatherResourceId(ctx.action);
   const amount = resourceId ? getResourceYield(ctx.action, resourceId) : 0;
   const inventory = resourceId && amount > 0 ? addInventoryItem(ctx.member.inventory, resourceId, amount) : ctx.member.inventory;
   const member = {
@@ -277,11 +277,7 @@ function getTileTags(tile: TileWithContent | undefined) {
   return mergeTags(tile?.tags ?? [], tile?.dangerTags ?? []);
 }
 
-function getGatherResourceId(action: SettlementRuntimeAction, object: MapObjectDefinition | undefined) {
-  if (object?.legacyResource) {
-    return object.legacyResource;
-  }
-
+function getGatherResourceId(action: SettlementRuntimeAction) {
   const yields = readYieldMap(action);
   return yields ? Object.keys(yields)[0] : undefined;
 }

@@ -10,8 +10,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyInstrument": "损坏中继器"
+      "actions": []
     },
     {
       "id": "deep-rift-signal",
@@ -50,8 +49,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyResource": "断续信号"
+      "actions": []
     },
     {
       "id": "iron-mine-two",
@@ -62,8 +60,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyBuilding": "采矿厂：铁 #2"
+      "actions": []
     },
     {
       "id": "mercury-thermometer-cache",
@@ -74,8 +71,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyInstrument": "mercury_thermometer"
+      "actions": []
     },
     {
       "id": "reed-waterline",
@@ -86,8 +82,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyResource": "水域"
+      "actions": []
     },
     {
       "id": "scanner-residue",
@@ -98,8 +93,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyInstrument": "scanner"
+      "actions": []
     },
     {
       "id": "shallow-lake",
@@ -110,8 +104,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [],
-      "legacyResource": "水域"
+      "actions": []
     }
   ]
 }

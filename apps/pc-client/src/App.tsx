@@ -9,7 +9,8 @@ import { settleAction, type ActionSettlementPatch } from "./callActionSettlement
 import { advanceCrewMoveAction, createActiveActionFromCrewAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
-import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
+import { buildCallView } from "./callActions";
+import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -232,6 +233,22 @@ function App() {
               ...call,
               settled: true,
               result: "行动指令已提交。",
+            }
+          : call,
+      );
+      return;
+    }
+
+    const selectedStoryAction = findVisibleLocationStoryAction(gameState, currentCall.crewId, actionId);
+    if (selectedStoryAction) {
+      const applied = triggerLocationStoryAction(gameState, selectedStoryAction);
+      setGameState(applied.state);
+      setCurrentCall((call) =>
+        call
+          ? {
+              ...call,
+              settled: true,
+              result: applied.createdEvent ? "地点事件已进入通讯队列。" : "当前地点没有可触发的地点事件。",
             }
           : call,
       );
@@ -1094,6 +1111,79 @@ function triggerCurrentAreaSurvey(state: GameState, crewId: CrewId): { state: Ga
   return { state, createdEvent: false };
 }
 
+interface LocationStoryActionSelection {
+  member: CrewMember;
+  object: MapObjectDefinition;
+  action: ActionDef;
+}
+
+function findVisibleLocationStoryAction(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): LocationStoryActionSelection | undefined {
+  const member = state.crew.find((item) => item.id === crewId);
+  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
+  if (!member || !tile) {
+    return undefined;
+  }
+
+  const visibleEnabled = buildCallView({ member, tile, gameState: state }).groups.some((group) =>
+    group.actions.some((action) => action.id === actionId && !action.disabled),
+  );
+  if (!visibleEnabled) {
+    return undefined;
+  }
+
+  for (const object of getVisibleMapObjects(state, member.currentTile)) {
+    const action = object.actions.find((item) => item.id === actionId);
+    if (!action || action.event_id.startsWith("retired.")) {
+      continue;
+    }
+    return { member, object, action };
+  }
+
+  return undefined;
+}
+
+function triggerLocationStoryAction(
+  state: GameState,
+  selection: LocationStoryActionSelection,
+): { state: GameState; createdEvent: boolean } {
+  const context = createLocationStoryActionTriggerContext(state, selection);
+  const result = processTrigger({
+    state: toEventEngineState(state),
+    index: eventContentIndex,
+    context,
+  });
+
+  return {
+    state: mergeEventRuntimeState(state, result.state),
+    createdEvent: (result.candidate_report?.created_event_ids.length ?? 0) > 0,
+  };
+}
+
+function createLocationStoryActionTriggerContext(
+  state: GameState,
+  { member, object, action }: LocationStoryActionSelection,
+): TriggerContext {
+  return {
+    trigger_type: "action_complete",
+    occurred_at: state.elapsedGameSeconds,
+    source: "call",
+    crew_id: member.id,
+    tile_id: member.currentTile,
+    action_id: action.id,
+    event_definition_id: action.event_id,
+    payload: {
+      action_type: actionVerb(action.id),
+      action_def_id: action.id,
+      object_id: object.id,
+      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object.tags ?? []),
+    },
+  };
+}
+
 function createCurrentAreaSurveyTriggerContexts(state: GameState, member: CrewMember): TriggerContext[] {
   const tileId = member.currentTile;
   const objects = getVisibleSurveyObjects(state, tileId);
@@ -1134,9 +1224,25 @@ function getVisibleSurveyObjects(state: GameState, tileId: string): MapObjectDef
     .filter((definition) => definition.actions.some((action) => action.id === `${definition.id}:survey`));
 }
 
+function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  if (!configTile) {
+    return [];
+  }
+
+  return configTile.objectIds
+    .map((objectId) => mapObjectDefinitionById.get(objectId))
+    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)));
+}
+
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
   const tile = state.tiles.find((item) => item.id === tileId);
   return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile)) : [];
+}
+
+function actionVerb(actionId: string): string {
+  const parts = actionId.split(":");
+  return parts[parts.length - 1] || actionId;
 }
 
 function processObjectiveCompletions(state: GameState, contexts: TriggerContext[]): GameState {
@@ -1553,7 +1659,7 @@ function inferTileDangerTags(tile: MapTile) {
   const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
   const configDangerTags =
     configTile?.specialStates
-      .filter((state) => state.legacyDanger === tile.danger)
+      .filter((state) => state.name === tile.danger)
       .flatMap((state) => ("dangerTags" in state && Array.isArray(state.dangerTags) ? state.dangerTags : state.tags ?? [])) ?? [];
 
   return configDangerTags.length > 0 ? configDangerTags : [tile.danger];

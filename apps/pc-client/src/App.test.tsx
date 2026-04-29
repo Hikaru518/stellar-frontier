@@ -247,17 +247,10 @@ describe("App", () => {
 
   it("does not create Garry's mine anomaly call when gathering lacks the mineral_deposit tag", () => {
     vi.useFakeTimers();
-    const untaggedIronTile = defaultMapConfig.tiles.find((tile) =>
-      tile.objectIds.some((objectId) => {
-        const object = mapObjectDefinitionById.get(objectId);
-        return Boolean(
-          object &&
-            object.legacyResource === "iron_ore" &&
-            object.actions.some((action) => action.id === `${object.id}:gather`) &&
-            !object.tags?.includes("mineral_deposit"),
-        );
-      }),
-    );
+    const untaggedIronObject = mapObjectDefinitionById.get("iron-ridge-outcrop");
+    expect(untaggedIronObject?.actions.some((action) => action.id === "iron-ridge-outcrop:gather")).toBe(true);
+    expect(untaggedIronObject?.tags ?? []).not.toContain("mineral_deposit");
+    const untaggedIronTile = defaultMapConfig.tiles.find((tile) => tile.objectIds.includes("iron-ridge-outcrop"));
     expect(untaggedIronTile).toBeDefined();
 
     window.localStorage.setItem(
@@ -520,6 +513,89 @@ describe("App", () => {
     expect(saved.logs).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ text: "Garry 完成一轮调查。" }),
+      ]),
+    );
+  });
+
+  it("lets a medical docs story action enter and resolve a structured event from a call", () => {
+    const medicalTileId = "4-1";
+    const map = createMapWithDiscoveredTiles(medicalTileId);
+    map.tilesById[medicalTileId] = {
+      ...map.tilesById[medicalTileId],
+      investigated: true,
+      revealedObjectIds: ["mainline-medical-docs"],
+    };
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "amy",
+            currentTile: medicalTileId,
+            location: "旧医疗前哨",
+            coord: "(4,1)",
+            status: "医疗舱旁待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+            conditions: [],
+          },
+        ],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+        world_flags: {
+          medical_docs_available: {
+            key: "medical_docs_available",
+            value: true,
+            value_type: "boolean",
+            created_at: 0,
+            updated_at: 0,
+          },
+        },
+      })),
+    );
+
+    render(<App />);
+    expect(screen.queryByText("Amy 正在读取医疗舱保存的急救文档。")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByRole("button", { name: "学习野外急救" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /采集/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /交易/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "学习野外急救" }));
+
+    let saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const medicalEvent = findRuntimeEvent(saved, "mainline_medical_docs_repeat_learning");
+    expect(medicalEvent).toBeDefined();
+    expect(saved.active_calls[medicalEvent?.active_call_id ?? ""].status).toBe("awaiting_choice");
+    expect(savedCrew(saved, "amy").conditions ?? []).not.toContain("knows_field_first_aid");
+
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByText("Amy 正在读取医疗舱保存的急救文档。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "学习野外急救。" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "学习野外急救。" }));
+    saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+
+    expect(savedCrew(saved, "amy").conditions).toContain("knows_field_first_aid");
+    expect(saved.event_logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event_definition_id: "mainline_medical_docs_repeat_learning",
+          summary: "队员通过医疗文档补学了野外急救。",
+        }),
       ]),
     );
   });
