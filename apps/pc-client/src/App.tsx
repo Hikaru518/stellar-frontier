@@ -1077,7 +1077,7 @@ function createLocationStoryActionTriggerContext(
 
 function createCurrentAreaSurveyTriggerContexts(state: GameState, member: CrewMember): TriggerContext[] {
   const tileId = member.currentTile;
-  const objects = getVisibleSurveyObjects(state, tileId);
+  const objects = getSurveyTriggerObjects(tileId);
   const contexts = objects.map((object) => createCurrentAreaSurveyTriggerContext(state, member, object));
   contexts.push(createCurrentAreaSurveyTriggerContext(state, member));
   return contexts;
@@ -1103,7 +1103,7 @@ function createCurrentAreaSurveyTriggerContext(
   };
 }
 
-function getVisibleSurveyObjects(state: GameState, tileId: string): MapObjectDefinition[] {
+function getSurveyTriggerObjects(tileId: string): MapObjectDefinition[] {
   const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
   if (!configTile) {
     return [];
@@ -1111,8 +1111,7 @@ function getVisibleSurveyObjects(state: GameState, tileId: string): MapObjectDef
 
   return configTile.objectIds
     .map((objectId) => mapObjectDefinitionById.get(objectId))
-    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)))
-    .filter((definition) => definition.actions.some((action) => action.id === `${definition.id}:survey`));
+    .filter((definition): definition is MapObjectDefinition => Boolean(definition));
 }
 
 function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {

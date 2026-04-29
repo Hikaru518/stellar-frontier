@@ -157,6 +157,48 @@ describe("App", () => {
     expect(screen.getByText("暂无可分配目标。")).toBeInTheDocument();
   });
 
+  it("starts the crash-site mainline chain from the current-area survey action", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "mike",
+            currentTile: "4-4",
+            location: "坠毁区域",
+            coord: "(0,0)",
+            status: "残骸附近待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles("4-4"),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const mikeCard = screen.getByText("Mike，特战干员").closest("article");
+    expect(mikeCard).not.toBeNull();
+    fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
+
+    expect(screen.getByText("调查事件已进入通讯队列。")).toBeInTheDocument();
+    const saved = readSavedGameState();
+    const crashSiteEvent = findRuntimeEvent(saved, "mainline_crash_site_survey_chain");
+    expect(crashSiteEvent).toBeDefined();
+    expect(saved.active_calls[crashSiteEvent?.active_call_id ?? ""]).toMatchObject({
+      crew_id: "mike",
+      status: "awaiting_choice",
+    });
+  });
+
   it("does not render hard-coded PC prototype copy on current fact pages", () => {
     const forbiddenPcPrototypeCopy = new RegExp(
       [

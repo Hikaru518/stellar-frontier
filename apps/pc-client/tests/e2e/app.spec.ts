@@ -74,11 +74,11 @@ test("PS-002 keeps removed object actions hidden after current-area survey", asy
   await expect(page.getByRole("button", { name: "采集 潮湿木材" })).toHaveCount(0);
 });
 
-test("PS-003 resolves Mike's crash-site runtime call and reveals the wreckage object", async ({ page }) => {
+test("PS-003 resolves Mike's first crash-site mainline call and reveals the warp pod", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("mike", "4-4", { status: "残骸附近待命。" })],
-    map: createMapWithHiddenObject("4-4", "crash-site-wreckage"),
+    map: createMapWithHiddenObject("4-4", "mainline-damaged-warp-pod"),
     logs: initialLogs,
     resources: initialResources,
   });
@@ -92,17 +92,21 @@ test("PS-003 resolves Mike's crash-site runtime call and reveals the wreckage ob
 
   const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
   await expect(runtimeCallPanel).toBeVisible();
-  await expect(runtimeCallPanel.getByText("Mike 报告 4-4 的残骸内部仍有微弱信号。")).toBeVisible();
+  await expect(runtimeCallPanel.getByText("Mike 从坠毁残骸中恢复了基础物资，并确认折跃仓不是简单断电。")).toBeVisible();
   await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
 
-  await expect(page.getByText("信号像是从断裂舱段深处反射出来，无法确认是否还在移动。")).toBeVisible();
-  await page.getByRole("button", { name: "标记残骸内部信号。" }).click();
+  await expect(page.getByText("主目标已明确：小队必须修复损坏折跃仓、找到可用燃料和返航坐标。当前物资只够支撑前期探索。")).toBeVisible();
+  await page.getByRole("button", { name: "记录返航主目标，继续扩大调查。" }).click();
 
   const saved = await readSave(page);
-  expect(saved.map.tilesById["4-4"].revealedObjectIds).toContain("crash-site-wreckage");
+  const mikeInventory = findSavedCrew(saved, "mike").inventory as Array<{ itemId: string; quantity: number }>;
+  expect(saved.map.tilesById["4-4"].revealedObjectIds).toContain("mainline-damaged-warp-pod");
+  expect(saved.world_flags.main_objective_return_home_known.value).toBe(true);
+  expect(mikeInventory.find((item) => item.itemId === "ration")?.quantity).toBeGreaterThanOrEqual(3);
+  expect(mikeInventory.find((item) => item.itemId === "signal_flare")?.quantity).toBeGreaterThanOrEqual(1);
   expect(saved.event_logs).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ summary: "Mike 已标记坠毁残骸内部的微弱信号。" }),
+      expect.objectContaining({ summary: "坠毁点调查确认折跃仓受损，返航主目标建立：修复仓体、取得燃料与坐标。" }),
     ]),
   );
 });
@@ -301,7 +305,7 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await expect(grid.getByRole("button")).toHaveCount(12);
 });
 
-test("does not create non-mainline runtime calls from the default survey path", async ({ page }) => {
+test("creates only mainline runtime calls from the default survey path", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
@@ -323,8 +327,10 @@ test("does not create non-mainline runtime calls from the default survey path", 
   const eventDefinitionIds = Object.values(saved.active_events ?? {}).map(
     (event) => (event as { event_definition_id?: string }).event_definition_id,
   );
+  expect(eventDefinitionIds.length).toBeGreaterThan(0);
   expect(eventDefinitionIds.every((eventId) => eventId?.startsWith("mainline_"))).toBe(true);
-  await expect(page.getByText("当前地点没有可触发的调查事件。")).toBeVisible();
+  expect(eventDefinitionIds).toContain("mainline_rare_ore_gather_progress");
+  await expect(page.getByText("调查事件已进入通讯队列。")).toBeVisible();
 });
 
 test("opens an investigation report from the log with environment fields", async ({ page }) => {

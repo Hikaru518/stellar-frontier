@@ -152,6 +152,24 @@ describe("mainline event content", () => {
       ?.branches as Array<JsonRecord & { id: string }> | undefined;
     const guaranteedSample = sampleBranch?.find((branch) => branch.id === "guaranteed_sample");
 
+    expect(rareOre.trigger.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "any_of",
+          conditions: expect.arrayContaining([
+            expect.objectContaining({ type: "handler_condition", params: { field: "payload.action_type", value: "survey" } }),
+            expect.objectContaining({ type: "handler_condition", params: { field: "payload.action_type", value: "gather" } }),
+          ]),
+        }),
+        expect.objectContaining({
+          type: "any_of",
+          conditions: expect.arrayContaining([
+            expect.objectContaining({ type: "handler_condition", params: { field: "payload.object_id", value: "iron-ridge-deposit" } }),
+            expect.objectContaining({ type: "handler_condition", params: { field: "payload.object_id", value: "mainline-rare-ore-strata" } }),
+          ]),
+        }),
+      ]),
+    );
     expect(findEffect(rareOre, "rare_ore_gather_counter")).toMatchObject({
       type: "increment_world_counter",
       params: { key: "rare_ore_gather_count", amount: 1 },
@@ -379,6 +397,18 @@ describe("mainline event content", () => {
   it("covers warp-pod ending sequence and crew assembly requirement", () => {
     const ending = findDefinition(endingContent, "mainline_warp_pod_final_sequence");
 
+    expect(ending.trigger.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "any_of",
+          conditions: expect.arrayContaining([
+            expect.objectContaining({ type: "inventory_has_item", target: { type: "crew_inventory" }, value: "warp_pod_repair_kit" }),
+            expect.objectContaining({ type: "world_flag_equals", field: "warp_pod_hull_repaired", value: true }),
+            expect.objectContaining({ type: "world_flag_equals", field: "warp_pod_fueled", value: true }),
+          ]),
+        }),
+      ]),
+    );
     expect(findCallOption(ending, "repair_hull").requirements).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "has_condition", value: "knows_repair_tech" }),

@@ -13,6 +13,11 @@
         { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "4-4" } },
         { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-damaged-warp-pod" } },
         { "type": "any_of", "conditions": [
+          { "type": "inventory_has_item", "target": { "type": "crew_inventory" }, "value": "warp_pod_repair_kit", "params": { "min_quantity": 1 } },
+          { "type": "world_flag_equals", "field": "warp_pod_hull_repaired", "value": true },
+          { "type": "world_flag_equals", "field": "warp_pod_fueled", "value": true }
+        ] },
+        { "type": "any_of", "conditions": [
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "build" } },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "extract" } },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }

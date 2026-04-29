@@ -129,6 +129,8 @@ source:
 
 这些规则应保持在 `mainline_*.json`、地图 content、物品 content 和 handler registry 中。代码层只提供通用解释能力。
 
+T006 自动验收路径：通讯台发起“调查当前区域”，runtime 为当前地块的 mainline 对象生成带 `object_id` 的通用触发上下文；丘陵稀有矿石链允许现有调查行动推进计数。结构测试覆盖 15 步对应的 event content、地图对象、关键物品、知识标签和 `all_available_crew_at_tile` handler；集成测试覆盖坠毁点调查入队和 `return_home_completed` 进入 `EndingPage`；e2e 覆盖默认调查路径只生成 mainline runtime call。
+
 ## 4. 任务顺序
 
 任务详情见 `minimal-use-case-content-boundary-tasks.json`。数组顺序就是后续串行执行顺序。

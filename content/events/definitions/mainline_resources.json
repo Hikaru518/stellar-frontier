@@ -5,18 +5,22 @@
       "id": "mainline_rare_ore_gather_progress",
       "version": 1,
       "domain": "mainline_resources",
-      "title": "丘陵稀有矿石采集进度",
-      "summary": "丘陵铁矿床采集继续保留基础铁矿收益，同时递增稀有矿石采集计数；第 3 次起保底给当前队员稀有矿石样本。",
+      "title": "丘陵稀有矿石调查与采集进度",
+      "summary": "丘陵铁矿床调查或采集会递增稀有矿石采集计数；第 3 次起保底给当前队员稀有矿石样本。",
       "tags": ["mainline", "resources", "rare_ore", "gather"],
       "status": "approved",
       "trigger": {
         "type": "action_complete",
         "required_context": ["crew_id", "tile_id", "action_id"],
         "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "gather" } },
+          { "type": "any_of", "conditions": [
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "gather" } }
+          ] },
           {
             "type": "any_of",
             "conditions": [
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "iron-ridge-deposit" } },
               { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-rare-ore-strata" } },
               { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "iron-ridge-outcrop" } }
             ]

@@ -19,7 +19,7 @@ source:
 | 3 | T003 | 清理默认地图与旧地图对象 | completed | 1 |
 | 4 | T004 | 迁移事件系统测试样例到测试 fixture | completed | 1 |
 | 5 | T005 | 加强 content 校验防止非主线内容回流 | completed | 1 |
-| 6 | T006 | 验证主线 15 步闭环仍完整可玩 | pending | 0 |
+| 6 | T006 | 验证主线 15 步闭环仍完整可玩 | completed | 2 |
 | 7 | T007 | 同步正式文档中的当前内容边界 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -67,3 +67,14 @@ source:
 - 尝试次数: 1
 - Monkey summary: 为 content validator 增加主线 domain 白名单、未注册事件 / preset 检查、preset schema 校验、map-object event_id 引用校验和默认地图 objectIds 禁止 / 缺失检查。
 - 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 通过；`ReadLints` 未发现新增诊断。
+
+### T006: 验证主线 15 步闭环仍完整可玩
+- 状态: completed
+- 开始时间: 2026-04-30 01:18
+- 完成时间: 2026-04-30 01:21
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: Monkey 修复当前区域调查与稀有矿石链路，但未能运行质量检查；调度层复跑 `npm run validate:content` 与 `npm run lint` 通过，`npm run test` 失败在 `App > starts the crash-site mainline chain from the current-area survey action`，`findRuntimeEvent(saved, "mainline_crash_site")` 返回 `undefined`。
+  - 尝试 2: 修复终局折跃仓事件抢占开局坠毁点调查的问题，并更新 runtime call / e2e 断言。
+- Monkey summary: 给终局折跃仓事件增加内容侧门槛，补齐主线调查入口、稀有矿石链路、当前区域调查和 `EndingPage` 验收；更新 e2e 为当前主线文本。
+- 质量检查: `npm run validate:content`、`npm run lint`、`npm run test`、`npm run test:e2e` 通过；`ReadLints` 未发现新增诊断。
