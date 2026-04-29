@@ -6,27 +6,13 @@ import defaultMapJson from "../../../../content/maps/default-map.json";
 import basicCallActionsContent from "../../../../content/call-actions/basic-actions.json";
 import objectCallActionsContent from "../../../../content/call-actions/object-actions.json";
 import type { EventContentLibrary } from "../events/contentIndex";
-import type {
-  CallTemplate,
-  EventDefinition as ProgramEventDefinition,
-  HandlerDefinition,
-  PresetDefinition,
-} from "../events/types";
-
-type JsonModule<T> = T | { default: T };
-
-const eventDefinitionModules = import.meta.glob("../../../../content/events/definitions/*.json", { eager: true }) as Record<
-  string,
-  JsonModule<{ event_definitions: unknown[] }>
->;
-const callTemplateModules = import.meta.glob("../../../../content/events/call_templates/*.json", { eager: true }) as Record<
-  string,
-  JsonModule<{ call_templates: unknown[] }>
->;
-const presetModules = import.meta.glob("../../../../content/events/presets/*.json", { eager: true }) as Record<
-  string,
-  JsonModule<{ presets: unknown[] }>
->;
+import type { HandlerDefinition } from "../events/types";
+import {
+  generatedCallTemplates,
+  generatedEventDomains,
+  generatedEventProgramDefinitions,
+  generatedPresetDefinitions,
+} from "./generated/eventContentManifest";
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
 export type CrewStatus = "idle" | "moving" | "working" | "inEvent" | "lost" | "dead";
@@ -275,11 +261,12 @@ export interface CallActionDef {
   params?: Record<string, unknown>;
 }
 
-export const eventProgramDefinitions = collectContentArray(eventDefinitionModules, "event_definitions") as unknown as ProgramEventDefinition[];
-export const callTemplates = collectContentArray(callTemplateModules, "call_templates") as unknown as CallTemplate[];
+export const eventProgramDefinitions = generatedEventProgramDefinitions;
+export const callTemplates = generatedCallTemplates;
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
-export const presetDefinitions = collectContentArray(presetModules, "presets") as unknown as PresetDefinition[];
+export const presetDefinitions = generatedPresetDefinitions;
 export const eventContentLibrary: EventContentLibrary = {
+  domains: generatedEventDomains,
   event_definitions: eventProgramDefinitions,
   call_templates: callTemplates,
   handlers: handlerDefinitions,
@@ -304,14 +291,4 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
     const name = item?.name ?? entry.itemId;
     return entry.quantity > 1 ? `${name} x${entry.quantity}` : name;
   });
-}
-
-function collectContentArray<T extends string>(modules: Record<string, JsonModule<Record<T, unknown[]>>>, key: T) {
-  return Object.keys(modules)
-    .sort()
-    .flatMap((path) => unwrapJsonModule(modules[path])[key]);
-}
-
-function unwrapJsonModule<T extends object>(module: JsonModule<T>): T {
-  return "default" in module ? module.default : module;
 }

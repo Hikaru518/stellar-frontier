@@ -45,7 +45,7 @@
 
 **A8:** 解释一下 C,D。
 
-**Q8 解释:** C 是“在已有 domain 文件里新建事件”。例如你在 `mountain.json` 里点“New Event”，editor 用向导帮你填：`id`、`trigger`、基础 `graph`、关联的 `call_template`、`sample_contexts`。它不创建新的文件，只在已有 `definitions/mountain.json`、`call_templates/mountain.json` 里追加内容。D 是“创建一个新的事件领域 / 文件包”。例如新增 `desert` 事件域，editor 会创建：`content/events/definitions/desert.json`、`content/events/call_templates/desert.json`，可能还包括 `presets/desert.json`，并处理游戏加载清单或后续自动发现问题。D 更完整，但风险更大，因为现在 `src/content/contentData.ts` 是显式 import 文件；新建 domain 后，如果不处理加载清单，内容可能校验通过但游戏读不到。我的建议仍是 B 或 C，D 放 Later。
+**Q8 解释:** C 是“在已有 domain 文件里新建事件”。例如你在 `mountain.json` 里点“New Event”，editor 用向导帮你填：`id`、`trigger`、基础 `graph`、关联的 `call_template`、`sample_contexts`。它不创建新的文件，只在已有 `definitions/mountain.json`、`call_templates/mountain.json` 里追加内容。D 是“创建一个新的事件领域 / 文件包”。例如新增 `desert` 事件域，editor 会创建：`content/events/definitions/desert.json`、`content/events/call_templates/desert.json`，可能还包括 `presets/desert.json`，并处理游戏加载清单或后续自动发现问题。D 更完整，但风险更大，因为现在 `apps/pc-client/src/content/contentData.ts` 是显式 import 文件；新建 domain 后，如果不处理加载清单，内容可能校验通过但游戏读不到。我的建议仍是 B 或 C，D 放 Later。
 
 **A8 最终:** D。
 
@@ -53,7 +53,7 @@
 
 **A9:** B. 表单编辑 + 只读图预览：编辑仍在表单中完成，旁边显示 graph 结构图帮助理解。
 
-**Q10:** 根目录 `editor/` 的 Game Editor 入口，本轮要做到什么程度？我推荐 B：做一个轻量 Game Editor shell，只开放 Event Editor，同时把 Character/Map/Item/NPC 作为禁用入口展示未来方向。
+**Q10:** `apps/editor/` 的 Game Editor 入口，本轮要做到什么程度？我推荐 B：做一个轻量 Game Editor shell，只开放 Event Editor，同时把 Character/Map/Item/NPC 作为禁用入口展示未来方向。
 
 **A10:** B. 轻量 Game Editor shell：有总入口和导航，Event Editor 可用，其他 editor 显示为未来模块。
 

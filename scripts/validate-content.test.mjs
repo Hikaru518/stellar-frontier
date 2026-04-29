@@ -91,6 +91,49 @@ describe("validate-content", () => {
     expect(result.output).toContain("event_graph.nodes[0].call_template_id");
   });
 
+  it("rejects manifest entries that point to missing event files", () => {
+    const root = createContentRoot();
+    writeJson(root, "content/events/manifest.json", {
+      schema_version: "event-manifest.v1",
+      domains: [
+        {
+          id: "forest",
+          definitions: "definitions/missing.json",
+          call_templates: "call_templates/forest.json",
+          presets: null,
+        },
+      ],
+    });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Event manifest validation failed:");
+    expect(result.output).toContain("Missing definitions file listed in manifest: content/events/definitions/missing.json");
+  });
+
+  it("rejects event domain files missing from the manifest", () => {
+    const root = createContentRoot();
+    writeJson(root, "content/events/manifest.json", {
+      schema_version: "event-manifest.v1",
+      domains: [
+        {
+          id: "crash_site",
+          definitions: "definitions/crash_site.json",
+          call_templates: "call_templates/crash_site.json",
+          presets: null,
+        },
+      ],
+    });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Event manifest validation failed:");
+    expect(result.output).toContain("Unregistered event definition domain file: content/events/definitions/forest.json");
+    expect(result.output).toContain("Unregistered call template domain file: content/events/call_templates/forest.json");
+  });
+
   it("rejects map candidate actions missing from object call-actions", () => {
     const root = createContentRoot();
     writeJson(root, "content/call-actions/basic-actions.json", {
