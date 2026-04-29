@@ -65,6 +65,8 @@ node /Users/c1/Work/Yuan/apps/host/lib/cli.js
 
 然后分别启动 PC 与手机端。PC 通讯台会创建真实 Yuan `Terminal(enable_WebRTC: true)`；手机扫码打开 companion 页面后也会创建 Yuan Terminal，并通过 Yuan service 回传心跳、已读、接听事件。
 
+`enable_WebRTC: true` 表示允许 Yuan 尝试 WebRTC DataChannel 升级，不表示本地测试一定已经走上 DataChannel。Yuan 仍以 WSS 作为 baseline：双方要先通过 Yuan Host 同步 `terminalInfo.enable_WebRTC`，再由发往对端的消息触发 `WebRTC/Offer` / `WebRTC/Answer`，并且浏览器 ICE 候选必须连通。当前 UI 的“局域网升级 / 公网兜底”是产品语义展示，不是实时 DataChannel 诊断面板；真实 DataChannel 需要 Yuan tunnel metric、调试日志或后续测试钩子确认。
+
 真实手机扫码时，手机端 dev server 需要暴露到局域网，且 `VITE_MOBILE_TERMINAL_URL` 需要指向手机能访问到的地址，例如：
 
 ```bash
@@ -130,6 +132,7 @@ https://<用户名>.github.io/stellar-frontier/
 - **控制中心**：游戏主入口，展示资源状态、系统日志和可交互设施（窗户、中控台、咖啡机、唱片机、冰箱、研究台、星际贸易、星际之门等）。
 - **通讯台**：查看队员位置、状态、背包、通讯/失联状态和来电，并进入通话事件。
 - **手机私人终端**：PC 通讯台可生成 QR 码与短手输码；手机端作为 Yuan Terminal companion 接收 PC 授权的私密通讯，只回传 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。Stellar 仅维护共享 dual-device 业务库，不维护专属 relay server。
+- **Yuan 双端链路**：PC 与手机都实例化真实 Yuan `Terminal`，开启 `enable_WebRTC: true`，通过 Yuan service 传输心跳、私密来电、已读和接听事件；Yuan WSS 是稳定基线，WebRTC DataChannel 是机会性局域网升级。
 - **通话**：承载角色事件、普通行动（移动 / 调查 / 采集 / 建设 / 待命）和紧急决策；选择结果会更新队员、地图与系统日志。
 - **地图**：以可配置网格（默认 `8 x 8`）展示地形、自然资源、建筑、仪器、危险与队员位置。地图只读，不直接下达指令。
 - **人物详情**：展示背景档案、5 维轻量属性、自由性格标签、专长以及关键节点日记，并按通讯/失联/找回状态控制日记可见性。
@@ -174,7 +177,8 @@ https://<用户名>.github.io/stellar-frontier/
 
 - [UI 设计总览](docs/ui-designs/ui.md) / [UI 设计原则](docs/ui-designs/ui-design-principles.md)
 - 页面 PRD：[控制中心](docs/ui-designs/pages/控制中心.md) · [通讯台](docs/ui-designs/pages/通讯台.md) · [通话](docs/ui-designs/pages/通话.md) · [地图](docs/ui-designs/pages/地图.md)
-- 子系统 wiki：[队员系统](docs/gameplay/crew/crew.md) · [事件系统](docs/gameplay/event-system/event-system.md) · [地图系统](docs/gameplay/map-system/map-system.md) · [时间系统](docs/gameplay/time-system/time-system.md)
+- 子系统 wiki：[通讯台 Gameplay](docs/gameplay/communication-table/communication-table.md) · [队员系统](docs/gameplay/crew/crew.md) · [事件系统](docs/gameplay/event-system/event-system.md) · [地图系统](docs/gameplay/map-system/map-system.md) · [时间系统](docs/gameplay/time-system/time-system.md)
+- 双设备：[双设备游玩](docs/gameplay/dual-device-play/dual-device-play.md) · 增量策划案 [`docs/plans/2026-04-27-22-52/dual-device-play-design.md`](docs/plans/2026-04-27-22-52/dual-device-play-design.md)
 - 数据模型：[`docs/game_model/`](docs/game_model/)（crew / event / event-integration / map）
 - 设计 / 文档体系级 TODO：[`docs/todo.md`](docs/todo.md)
 
@@ -185,6 +189,6 @@ https://<用户名>.github.io/stellar-frontier/
 - Rush 由 `rush.json` 固定版本，pnpm 由 `pnpmVersion` 固定版本；不要新增 npm workspace 配置或提交 root `package-lock.json`。
 - 地图页面只负责展示信息；对队员的移动、建设、调查和停止工作等指令通过通讯台和通话页面完成。
 - 未实现的扩展模块（研究台、星际贸易、星际之门等）应给出明确反馈，避免玩家点击后没有响应。
-- 游戏存档以 `localStorage` 保存（key：`stellar-frontier-save-v1`）；Debug toolbox 提供"重置存档"按钮用于回到初始状态。
+- 游戏存档以 `localStorage` 保存（key：`stellar-frontier-save-v2`）；Debug toolbox 提供"重置存档"按钮用于回到初始状态。
 
-<!-- last-synced-by audit-wiki: 2026-04-27 -->
+<!-- last-synced-by audit-wiki: 2026-04-28 -->

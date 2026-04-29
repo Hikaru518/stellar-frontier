@@ -10,9 +10,11 @@ The PC client remains the authoritative `GameState` owner. Mobile clients send t
 
 ## Yuan-Backed Dual-Device Layer
 
-Stellar should not maintain a dedicated relay/server package for dual-device play. The correct boundary is `packages/dual-device`: a PC/mobile shared business abstraction over external Yuan Host/Protocol.
+Stellar should not maintain a dedicated relay/server package for dual-device play. The correct boundary is `packages/dual-device`: a PC/mobile shared business abstraction over external Yuan Host/Protocol. PC and mobile both instantiate real Yuan `Terminal`s; the shared package owns Terminal acquisition, service methods, typed events, pairing metadata, fallback helpers, and browser build shims for Yuan's node-only fallback imports.
 
 Yuan Host/Protocol owns terminal routing, WSS baseline, Host-mediated WebRTC offer/answer signaling, opportunistic DataChannel upgrade, and WebSocket fallback. Stellar owns room/tenant semantics, QR/manual payload, short token TTL, PC authority, first-phone policy, fallback UI, and the `DualDeviceMessage` product contract.
+
+`enable_WebRTC: true` is an enablement flag, not a guarantee that the current message is on DataChannel. DataChannel use requires terminal info sync, outbound messages that trigger offer/answer, ICE connectivity, and a connected peer before subsequent messages are sent. Current UI copy presents the intended transport semantics; it does not yet read Yuan tunnel metrics.
 
 ## Pairing Model
 

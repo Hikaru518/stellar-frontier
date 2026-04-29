@@ -24,8 +24,9 @@ maintained_by: audit-wiki
 
 | 文档 | 一句话概述 | 最近更新 | 状态 |
 | --- | --- | --- | --- |
-| [队员系统](./gameplay/crew/crew.md) | 队员系统负责管理队员作为行动执行者与真实伙伴的双重身份。 | 2026-04-27 | 已实现 |
 | [通讯台 Gameplay](./gameplay/communication-table/communication-table.md) | 通讯台 gameplay 是玩家与队员、地图、行动和事件系统之间的主要指令入口。 | 2026-04-28 | 已实现 |
+| [队员系统](./gameplay/crew/crew.md) | 队员系统负责管理队员作为行动执行者与真实伙伴的双重身份。 | 2026-04-27 | 已实现 |
+| [双设备游玩](./gameplay/dual-device-play/dual-device-play.md) | 双设备游玩让手机成为可选私人通讯终端，PC 保持唯一权威，Yuan WSS 提供基线连接，WebRTC DataChannel 作为机会性升级。 | 2026-04-28 | 已实现（DataChannel 可观测性待补） |
 | [事件系统](./gameplay/event-system/event-system.md) | 事件系统负责把队员行动、地块状态、时间推进和玩家通话选择转化为可验证、可推进、可结算的世界反馈。 | 2026-04-28 | 已实现 |
 | [可配置地图系统](./gameplay/map-system/map-system.md) | 地图系统是玩家通过雷达 / 地图理解星球现场态势的基础系统，由可配置尺寸的网格地图构成。 | 2026-04-28 | 已实现 |
 | [时间系统](./gameplay/time-system/time-system.md) | 时间系统是所有队员行动、资源产出、通讯事件和地图状态变化的基础系统。 | *（缺字段：frontmatter.last_updated）* | 已实现 |
@@ -72,6 +73,7 @@ flowchart LR
     coreIdeas -->|"高层原则"| eventSystem["事件系统"]
     coreIdeas -->|"高层原则"| mapSystem["可配置地图系统"]
     coreIdeas -->|"高层原则"| timeSystem["时间系统"]
+    coreIdeas -->|"高层原则"| dualDevice["双设备游玩"]
     timeSystem -->|"行动耗时/倒计时"| crewSystem
     timeSystem -->|"触发与结算时点"| eventSystem
     mapSystem -->|"地块/可见性"| crewSystem
@@ -80,8 +82,13 @@ flowchart LR
     communicationTable -->|"真实行动/通话选择"| crewSystem
     communicationTable -->|"arrival/action_complete/idle_time/call_choice"| eventSystem
     crewSystem -->|"位置/状态/属性"| eventSystem
+    communicationTable -->|"通话指令/对象行动"| crewSystem
+    communicationTable -->|"事实信号/来电入口"| eventSystem
     eventSystem -->|"来电/结果反馈"| communicationTable
     eventSystem -->|"紧急状态/行动请求"| crewSystem
+    eventSystem -->|"私密来电/消息"| dualDevice
+    dualDevice -->|"typed events / ack"| eventSystem
+    dualDevice -->|"PC fallback"| crewSystem
 ```
 
 边的来源：每个 wiki 章节 6「系统交互」中的「依赖于 / 被依赖于 / 事件 / 信号」字段，以及 `docs/game_model/event-integration.md` 中的事件集成状态边界。旧格式文档缺 frontmatter 时，边仍可作为临时索引信息保留。
