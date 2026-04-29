@@ -167,7 +167,7 @@ describe("map-object-action pipeline integration", () => {
           label: "切割舱门",
           tone: "danger",
           conditions: [inventoryCondition],
-          event_id: "legacy.gather",
+          event_id: "test.cut_door",
           display_when_unavailable: "disabled",
         },
       ],
@@ -238,7 +238,7 @@ describe("map-object-action pipeline integration", () => {
               params: { object_id: STUB_OBJECT_ID, status: "unlocked" },
             } as Condition,
           ],
-          event_id: "legacy.standby",
+          event_id: "test.enter_door",
         },
       ],
     });

@@ -5,7 +5,7 @@ import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
-import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
+import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createActiveActionFromCrewAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
@@ -161,9 +161,6 @@ function App() {
       return;
     }
 
-    // Runtime calls dispatch the raw option_id from the EventDefinition; no
-    // translation. Handled before the legacy-dispatch translator so its
-    // unknown-id warning doesn't fire for valid event choice ids.
     if (currentCall.runtimeCallId) {
       if (currentCall.settled) {
         return;
@@ -181,6 +178,21 @@ function App() {
         ),
       );
       setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
+      return;
+    }
+
+    if (actionId === "universal:move") {
+      setCurrentCall((call) =>
+        call
+          ? {
+              ...call,
+              selectingMoveTarget: true,
+              selectedTargetTileId: undefined,
+              result: "请在地图中标记候选目的地。移动指令仍需回到通话中确认。",
+            }
+          : call,
+      );
+      appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
       return;
     }
 
@@ -202,39 +214,14 @@ function App() {
       return;
     }
 
-    // Translate the new schema's action ids back to the legacy "verb[:objectId]"
-    // shape `applyImmediateOrCreateAction` understands. See
-    // `docs/plans/2026-04-29-01-40/technical-design.md` §7.2 — the migrated
-    // action defs intentionally keep `event_id: "legacy.<verb>"`, so the
-    // dispatch layer falls back to the existing handlers in `callActionSettlement.ts`.
-    // TODO(map-object-action-refactor): replace this translator with real
-    // EventDefinition entry points once universal/object events exist as
-    // proper graph nodes (Task 4 in the next round).
-    const legacyDispatch = translateActionIdToLegacyDispatch(actionId);
-
-    if (legacyDispatch === "move") {
-      setCurrentCall((call) =>
-        call
-          ? {
-              ...call,
-              selectingMoveTarget: true,
-              selectedTargetTileId: undefined,
-              result: "请在地图中标记候选目的地。移动指令仍需回到通话中确认。",
-            }
-          : call,
-      );
-      appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
-      return;
-    }
-
     if (currentCall.settled) {
       return;
     }
 
-    if (legacyDispatch === "standby" || legacyDispatch === "stop") {
+    if (actionId === "universal:standby" || actionId === "universal:stop") {
       setGameState((state) => {
         const nextState =
-          legacyDispatch === "standby"
+          actionId === "universal:standby"
             ? createStandbyCrewAction(state, currentCall.crewId, state.elapsedGameSeconds)
             : createStopCrewAction(state, currentCall.crewId, state.elapsedGameSeconds);
         return settleGameTime(nextState);
@@ -251,27 +238,7 @@ function App() {
       return;
     }
 
-    setGameState((state) => {
-      const applied = applyImmediateOrCreateAction({
-        state,
-        crewId: currentCall.crewId,
-        actionViewId: legacyDispatch,
-        occurredAt: state.elapsedGameSeconds,
-      });
-      const settledState = settleGameTime(applied.state);
-
-      return applied.patch.triggerContexts.reduce(processAppEventTrigger, settledState);
-    });
-
-    setCurrentCall((call) =>
-      call
-        ? {
-            ...call,
-            settled: true,
-            result: "行动指令已提交。",
-          }
-        : call,
-    );
+    appendLog(`通话选项未提交：${actionId} 不是可执行的基础行动或事件选项。`, "muted");
   }
 
   function selectMoveTarget(tileId: string) {
@@ -767,7 +734,7 @@ function settleGameTime(state: GameState): GameState {
   return processAppEventWakeups(nextState);
 }
 
-type LegacySettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" };
+type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" };
 
 function materializeLegacyActiveActions(state: GameState): Record<Id, CrewActionState> {
   let crewActions = state.crew_actions;
@@ -914,10 +881,10 @@ function settleCrewActionState(
     return settleStopCrewActionState(action, member, elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
   }
 
-  if (canSettleWithLegacyHandler(action)) {
+  if (canSettleWithRuntimeHandler(action)) {
     const settled = settleAction({
       member,
-      action: createSettlementActionFromCrewAction(member, action),
+      action,
       occurredAt: elapsedGameSeconds,
       resources,
       baseInventory,
@@ -1020,33 +987,10 @@ function settleStopCrewActionState(
   };
 }
 
-function canSettleWithLegacyHandler(
+function canSettleWithRuntimeHandler(
   action: CrewActionState,
-): action is LegacySettleableCrewAction {
+): action is RuntimeSettleableCrewAction {
   return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract";
-}
-
-function createSettlementActionFromCrewAction(member: CrewMember, action: LegacySettleableCrewAction): SettlementActiveAction {
-  const startedAt = action.started_at ?? 0;
-  const targetTile = action.target_tile_id ?? action.to_tile_id ?? member.currentTile;
-
-  return {
-    id: action.id,
-    actionType: action.type,
-    status: "inProgress",
-    startTime: startedAt,
-    durationSeconds: action.duration_seconds,
-    finishTime: action.ends_at ?? startedAt + action.duration_seconds,
-    fromTile: action.from_tile_id ?? member.currentTile,
-    targetTile,
-    route: action.path_tile_ids,
-    resource: stringParam(action.action_params.resource_id),
-    perRoundYield: numberParam(action.action_params.per_round_yield),
-    params: action.action_params,
-    objectId: stringParam(action.action_params.object_id),
-    handler: stringParam(action.action_params.handler),
-    actionDefId: action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract" ? action.type : undefined,
-  };
 }
 
 function createCrewActionCompleteTrigger(action: CrewActionState, member: CrewMember, elapsedGameSeconds: number): TriggerContext {
@@ -1072,117 +1016,8 @@ function stringParam(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function numberParam(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
-
-function settleCrewAction(
-  member: CrewMember,
-  elapsedGameSeconds: number,
-  resources: ResourceSummary,
-  baseInventory: GameState["baseInventory"],
-  tiles: MapTile[],
-  logs: SystemLog[],
-  map: GameMapState,
-): ActionSettlementPatch {
-  const action = member.activeAction;
-  if (!action) {
-    return { member, resources, baseInventory, tiles, logs, map, triggerContexts: [] };
-  }
-
-  return settleAction({
-    member,
-    action: enrichActionForSettlement(member, action),
-    occurredAt: elapsedGameSeconds,
-    resources,
-    baseInventory,
-    tiles,
-    map,
-    logs,
-  });
-}
-
-/**
- * Translate a new-schema action id (`universal:<verb>` or `<objectId>:<verb>`)
- * to the legacy "verb[:objectId]" dispatch token consumed by
- * `callActionSettlement.ts`. Unknown ids fall through unchanged with a
- * console warn (R7 defensive impl).
- */
-function translateActionIdToLegacyDispatch(actionId: string): string {
-  if (actionId.startsWith("universal:")) {
-    return actionId.slice("universal:".length);
-  }
-
-  const colonIndex = actionId.lastIndexOf(":");
-  if (colonIndex > 0) {
-    const objectId = actionId.slice(0, colonIndex);
-    const verb = actionId.slice(colonIndex + 1);
-    if (verb.length > 0) {
-      return `${verb}:${objectId}`;
-    }
-  }
-
-  // Bare verb (legacy-style id) is accepted as-is for back-compat with any
-  // call sites that still synthesise the old shape (e.g. App.test.tsx
-  // pre-creates an active action with `id: "gather:iron-ridge-outcrop:..."`).
-  if (
-    actionId === "move" ||
-    actionId === "survey" ||
-    actionId === "standby" ||
-    actionId === "stop" ||
-    actionId === "gather" ||
-    actionId === "build" ||
-    actionId === "extract" ||
-    actionId === "scan"
-  ) {
-    return actionId;
-  }
-
-  console.warn(`[App.handleDecision] unrecognized action id: ${actionId}`);
-  return actionId;
-}
-
-function enrichActionForSettlement(member: CrewMember, action: ActiveAction): ActiveAction | SettlementActiveAction {
-  if (hasSettlementMetadata(action)) {
-    return action;
-  }
-
-  if (isObjectCandidateAction(action.actionType)) {
-    const object = findCandidateObject(action.targetTile ?? member.currentTile, action.actionType, undefined);
-    return {
-      ...action,
-      objectId: object?.id,
-      params: {
-        ...createLegacyYieldParams(action, object),
-        ...action.params,
-      },
-      handler: action.actionType,
-      actionDefId: action.actionType,
-    };
-  }
-
-  if (action.actionType === "survey" || action.actionType === "standby") {
-    return {
-      ...action,
-      params: action.params ?? {},
-      handler: action.actionType,
-      actionDefId: action.actionType,
-    };
-  }
-
-  return action;
-}
-
-function hasSettlementMetadata(action: ActiveAction): action is ActiveAction & SettlementActiveAction {
-  return "handler" in action && typeof action.handler === "string";
-}
-
-function isObjectCandidateAction(actionType: ActiveAction["actionType"]): actionType is "gather" | "build" {
-  return actionType === "gather" || actionType === "build";
 }
 
 function findCandidateObject(tileId: string, verb: string, map: GameMapState | undefined): MapObjectDefinition | undefined {
@@ -1216,19 +1051,6 @@ function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: G
     runtimeTile?.revealedObjectIds?.includes(definition.id) ||
     (definition.visibility === "onInvestigated" && runtimeTile?.investigated)
   );
-}
-
-function createLegacyYieldParams(action: ActiveAction, object: MapObjectDefinition | undefined) {
-  const resourceId = action.resource ?? object?.legacyResource;
-  if (action.actionType !== "gather" || !resourceId) {
-    return {};
-  }
-
-  return {
-    perRoundYieldByResource: {
-      [resourceId]: action.perRoundYield ?? 1,
-    },
-  };
 }
 
 function processAppEventTrigger(state: GameState, context: TriggerContext): GameState {

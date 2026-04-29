@@ -1,129 +1,20 @@
 import { defaultMapConfig, type Tone } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
-import type { ActiveAction, CrewId, CrewMember, GameMapState, GameState, MapTile, ResourceSummary, SystemLog } from "./data/gameData";
+import type { CrewMember, GameMapState, MapTile, ResourceSummary, SystemLog } from "./data/gameData";
 import type { InventoryEntry } from "./inventorySystem";
 import { addInventoryItem } from "./inventorySystem";
 import { formatGameTime } from "./timeSystem";
-import type { TriggerContext } from "./events/types";
+import type { CrewActionState, TriggerContext } from "./events/types";
 
-/**
- * Legacy verb registry for the settlement layer. After Task 3 of the
- * map-object-action-refactor we no longer load `content/call-actions/*.json`;
- * the four universal actions (move/survey/standby/stop) and the four
- * cross-object verbs (gather/build/extract/scan) keep their existing handlers
- * and runtime semantics. The new schema's `event_id: "legacy.<verb>"` is
- * translated by `App.handleDecision` to the legacy "verb[:objectId]" dispatch
- * token consumed below.
- *
- * TODO(map-object-action-refactor): replace this table with proper
- * EventDefinition entries so action selection becomes a graph trigger and
- * `App.handleDecision` can drop the translator entirely.
- */
-type LegacyVerb = "survey" | "move" | "standby" | "stop" | "gather" | "build" | "extract" | "scan";
+type SettlementRuntimeActionType = Extract<CrewActionState["type"], "survey" | "gather" | "build" | "extract">;
 
-interface LegacyActionRecord {
-  id: LegacyVerb;
-  category: "universal" | "object_action";
-  label: string;
-  tone: Tone;
-  durationSeconds: number;
-  handler: string;
-  params?: Record<string, unknown>;
-}
-
-const LEGACY_UNIVERSAL_ACTIONS: Record<Extract<LegacyVerb, "survey" | "move" | "standby" | "stop">, LegacyActionRecord> = {
-  survey: {
-    id: "survey",
-    category: "universal",
-    label: "调查当前区域",
-    tone: "neutral",
-    durationSeconds: 120,
-    handler: "survey",
-    params: { surveyLevel: "standard" },
-  },
-  move: {
-    id: "move",
-    category: "universal",
-    label: "移动到指定区域",
-    tone: "neutral",
-    durationSeconds: 0,
-    handler: "move",
-  },
-  standby: {
-    id: "standby",
-    category: "universal",
-    label: "原地待命",
-    tone: "muted",
-    durationSeconds: 0,
-    handler: "standby",
-  },
-  stop: {
-    id: "stop",
-    category: "universal",
-    label: "停止当前行动",
-    tone: "danger",
-    durationSeconds: 10,
-    handler: "stop",
-  },
-};
-
-const LEGACY_OBJECT_ACTIONS: Record<Extract<LegacyVerb, "survey" | "gather" | "build" | "extract" | "scan">, LegacyActionRecord> = {
-  survey: {
-    id: "survey",
-    category: "object_action",
-    label: "调查 {objectName}",
-    tone: "neutral",
-    durationSeconds: 120,
-    handler: "surveyObject",
-    params: { surveyLevel: "standard" },
-  },
-  gather: {
-    id: "gather",
-    category: "object_action",
-    label: "采集 {objectName}",
-    tone: "accent",
-    durationSeconds: 180,
-    handler: "gather",
-    params: { perRoundYieldByResource: { iron_ore: 5, wood: 3 } },
-  },
-  build: {
-    id: "build",
-    category: "object_action",
-    label: "建设 {objectName}",
-    tone: "accent",
-    durationSeconds: 300,
-    handler: "build",
-  },
-  extract: {
-    id: "extract",
-    category: "object_action",
-    label: "回收 {objectName}",
-    tone: "accent",
-    durationSeconds: 180,
-    handler: "extract",
-  },
-  scan: {
-    id: "scan",
-    category: "object_action",
-    label: "扫描 {objectName}",
-    tone: "neutral",
-    durationSeconds: 90,
-    handler: "scan",
-    params: { scanDepth: "standard" },
-  },
-};
-
-type ScheduledActionType = Exclude<LegacyVerb, "move" | "standby" | "stop">;
-type ImmediateActionType = Extract<LegacyVerb, "standby" | "stop">;
-type SettlementActionType = ScheduledActionType | ImmediateActionType;
-type SettlementRuntimeActionType = SettlementActionType | ActiveAction["actionType"] | "extract" | "scan" | "stop";
-
-export interface SettlementActiveAction extends Omit<ActiveAction, "actionType"> {
+interface SettlementRuntimeAction {
+  id: string;
   actionType: SettlementRuntimeActionType;
+  targetTile?: string | null;
   objectId?: string;
   params: Record<string, unknown>;
   handler?: string;
-  actionDefId?: LegacyVerb;
 }
 
 export interface ActionSettlementPatch {
@@ -136,23 +27,9 @@ export interface ActionSettlementPatch {
   triggerContexts: TriggerContext[];
 }
 
-export interface ApplyActionResult {
-  state: GameState;
-  patch: ActionSettlementPatch;
-  result: string;
-  settled: boolean;
-}
-
-interface ApplyImmediateOrCreateActionArgs {
-  state: GameState;
-  crewId: CrewId;
-  actionViewId: string;
-  occurredAt: number;
-}
-
 interface SettleActionArgs {
   member: CrewMember;
-  action: ActiveAction | SettlementActiveAction;
+  action: CrewActionState;
   occurredAt: number;
   resources: ResourceSummary;
   baseInventory?: InventoryEntry[];
@@ -161,14 +38,9 @@ interface SettleActionArgs {
   logs: SystemLog[];
 }
 
-interface ParsedActionViewId {
-  actionId: string;
-  objectId?: string;
-}
-
 interface HandlerContext {
   member: CrewMember;
-  action: SettlementActiveAction;
+  action: SettlementRuntimeAction;
   occurredAt: number;
   resources: ResourceSummary;
   baseInventory?: InventoryEntry[];
@@ -185,76 +57,12 @@ type TileWithContent = MapTile & {
   tags?: string[];
 };
 
-export const actionHandlers: Partial<Record<string, ActionHandler>> = {
+const actionHandlers: Partial<Record<string, ActionHandler>> = {
   survey: settleSurvey,
-  surveyObject: settleSurvey,
   gather: settleGather,
   build: settleGenericCompletion,
-  standby: settleStandby,
   extract: settleGenericCompletion,
-  scan: settleGenericCompletion,
-  stop: settleStop,
 };
-
-export function applyImmediateOrCreateAction({ state, crewId, actionViewId, occurredAt }: ApplyImmediateOrCreateActionArgs): ApplyActionResult {
-  const member = state.crew.find((item) => item.id === crewId);
-  if (!member) {
-    const patch = createFailurePatch(state, undefined, `行动失败：找不到队员 ${crewId}。`, occurredAt);
-    return { state: applyPatchToState(state, patch), patch, result: "找不到队员。", settled: false };
-  }
-
-  const parsed = parseActionViewId(actionViewId);
-  const definition = findActionDefinition(parsed);
-  if (!definition) {
-    const patch = createFailurePatch(state, member, `行动失败：未知行动 ${actionViewId}。`, occurredAt);
-    return { state: applyPatchToState(state, patch), patch, result: "动作未定义。", settled: false };
-  }
-
-  const handler = actionHandlers[definition.handler];
-  if (!handler) {
-    const patch = createFailurePatch(state, member, `行动失败：动作处理器 ${definition.handler} 未注册。`, occurredAt);
-    return { state: applyPatchToState(state, patch), patch, result: "动作未实现。", settled: false };
-  }
-
-  const tile = findTile(state.tiles, member.currentTile);
-  const object = parsed.objectId ? findObjectForAction(parsed.objectId, definition.id) : undefined;
-  if (parsed.objectId && !object) {
-    const patch = createFailurePatch(state, member, `行动失败：${actionViewId} 不能用于当前位置对象。`, occurredAt);
-    return { state: applyPatchToState(state, patch), patch, result: "动作目标不可用。", settled: false };
-  }
-
-  const action = createSettlementAction({
-    verb: definition.id,
-    handler: definition.handler,
-    objectId: parsed.objectId,
-    occurredAt,
-    durationSeconds: definition.durationSeconds,
-    targetTile: member.currentTile,
-    params: definition.params ?? {},
-  });
-
-  if (isImmediateAction(action.actionType)) {
-    const patch = handler(createHandlerContext({ state, member, action, occurredAt, tile, object }));
-    return { state: applyPatchToState(state, patch), patch, result: "动作已结算。", settled: true };
-  }
-
-  const nextMember: CrewMember = {
-    ...member,
-    status: getInProgressStatus(definition.id),
-    statusTone: getInProgressTone(definition.id),
-    activeAction: action as unknown as ActiveAction,
-  };
-  const patch = createPatch({
-    member: nextMember,
-    resources: state.resources,
-    tiles: state.tiles,
-    map: state.map,
-    logs: appendLogEntry(state.logs, `${member.name} 开始执行${definition.label.replace(/\s*\{objectName\}\s*/g, "")}。`, definition.tone, occurredAt),
-    baseInventory: state.baseInventory,
-  });
-
-  return { state: applyPatchToState(state, patch), patch, result: "动作已开始。", settled: false };
-}
 
 export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
   const action = normalizeSettlementAction(args.action);
@@ -282,44 +90,6 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
     logs: args.logs,
     tile,
     object,
-  });
-}
-
-function settleStandby(ctx: HandlerContext): ActionSettlementPatch {
-  const member = {
-    ...ctx.member,
-    status: "待命中。",
-    statusTone: "muted" as Tone,
-    activeAction: undefined,
-  };
-
-  return createPatch({
-    ...ctx,
-    member,
-    logs: appendLogEntry(ctx.logs, `${ctx.member.name} 原地待命。`, "muted", ctx.occurredAt),
-    triggerContexts: [
-      {
-        trigger_type: "idle_time",
-        occurred_at: ctx.occurredAt,
-        source: "crew_action",
-        crew_id: ctx.member.id,
-        tile_id: ctx.member.currentTile,
-        action_id: "standby",
-      },
-    ],
-  });
-}
-
-function settleStop(ctx: HandlerContext): ActionSettlementPatch {
-  return createPatch({
-    ...ctx,
-    member: {
-      ...ctx.member,
-      status: "行动已停止，待命中。",
-      statusTone: "muted",
-      activeAction: undefined,
-    },
-    logs: appendLogEntry(ctx.logs, `${ctx.member.name} 停止当前行动。`, "danger", ctx.occurredAt),
   });
 }
 
@@ -403,28 +173,6 @@ function settleGenericCompletion(ctx: HandlerContext): ActionSettlementPatch {
   });
 }
 
-function createHandlerContext(args: {
-  state: GameState;
-  member: CrewMember;
-  action: SettlementActiveAction;
-  occurredAt: number;
-  tile?: TileWithContent;
-  object?: MapObjectDefinition;
-}): HandlerContext {
-  return {
-    member: args.member,
-    action: args.action,
-    occurredAt: args.occurredAt,
-    resources: args.state.resources,
-    baseInventory: args.state.baseInventory,
-    tiles: args.state.tiles,
-    map: args.state.map,
-    logs: args.state.logs,
-    tile: args.tile,
-    object: args.object,
-  };
-}
-
 function createPatch(args: {
   member: CrewMember;
   resources: ResourceSummary;
@@ -445,111 +193,15 @@ function createPatch(args: {
   };
 }
 
-function createFailurePatch(state: GameState, member: CrewMember | undefined, text: string, occurredAt: number): ActionSettlementPatch {
-  return createPatch({
-    member: member ?? state.crew[0],
-    resources: state.resources,
-    tiles: state.tiles,
-    map: state.map,
-    logs: appendLogEntry(state.logs, text, "danger", occurredAt),
-    baseInventory: state.baseInventory,
-  });
-}
-
-function applyPatchToState(state: GameState, patch: ActionSettlementPatch): GameState {
+function normalizeSettlementAction(action: CrewActionState): SettlementRuntimeAction {
   return {
-    ...state,
-    crew: state.crew.map((member) => (member.id === patch.member.id ? patch.member : member)),
-    resources: patch.resources,
-    tiles: patch.tiles,
-    map: patch.map,
-    logs: patch.logs,
-    baseInventory: patch.baseInventory ?? state.baseInventory,
+    id: action.id,
+    actionType: action.type as SettlementRuntimeActionType,
+    targetTile: action.target_tile_id ?? action.to_tile_id,
+    objectId: stringParam(action.action_params.object_id),
+    params: action.action_params,
+    handler: stringParam(action.action_params.handler),
   };
-}
-
-function parseActionViewId(actionViewId: string): ParsedActionViewId {
-  const separatorIndex = actionViewId.indexOf(":");
-  if (separatorIndex < 0) {
-    return { actionId: actionViewId };
-  }
-
-  return {
-    actionId: actionViewId.slice(0, separatorIndex),
-    objectId: actionViewId.slice(separatorIndex + 1),
-  };
-}
-
-function findActionDefinition({ actionId, objectId }: ParsedActionViewId): LegacyActionRecord | undefined {
-  if (objectId) {
-    const record = LEGACY_OBJECT_ACTIONS[actionId as keyof typeof LEGACY_OBJECT_ACTIONS];
-    return record;
-  }
-  return LEGACY_UNIVERSAL_ACTIONS[actionId as keyof typeof LEGACY_UNIVERSAL_ACTIONS];
-}
-
-function createSettlementAction(args: {
-  verb: LegacyVerb;
-  handler: string;
-  objectId?: string;
-  occurredAt: number;
-  durationSeconds: number;
-  targetTile: string;
-  params: Record<string, unknown>;
-}): SettlementActiveAction {
-  return {
-    id: [args.verb, args.objectId, args.targetTile, args.occurredAt].filter(Boolean).join(":"),
-    actionType: normalizeActionType(args.verb),
-    status: "inProgress",
-    startTime: args.occurredAt,
-    durationSeconds: args.durationSeconds,
-    finishTime: args.occurredAt + args.durationSeconds,
-    targetTile: args.targetTile,
-    objectId: args.objectId,
-    params: args.params,
-    handler: args.handler,
-    actionDefId: args.verb,
-  };
-}
-
-function normalizeActionType(verb: LegacyVerb): SettlementActionType {
-  return verb === "move" ? "standby" : verb;
-}
-
-function isImmediateAction(actionType: SettlementRuntimeActionType): actionType is ImmediateActionType {
-  return actionType === "standby" || actionType === "stop";
-}
-
-function normalizeSettlementAction(action: ActiveAction | SettlementActiveAction): SettlementActiveAction {
-  const maybeSettlementAction = action as Partial<SettlementActiveAction>;
-  return {
-    ...action,
-    actionType: action.actionType,
-    objectId: typeof maybeSettlementAction.objectId === "string" ? maybeSettlementAction.objectId : undefined,
-    params: isRecord(maybeSettlementAction.params) ? maybeSettlementAction.params : {},
-    handler: typeof maybeSettlementAction.handler === "string" ? maybeSettlementAction.handler : undefined,
-    actionDefId: maybeSettlementAction.actionDefId,
-  };
-}
-
-function getInProgressStatus(verb: LegacyVerb) {
-  switch (verb) {
-    case "gather":
-      return "采集中。";
-    case "build":
-      return "建设中。";
-    case "extract":
-      return "回收中。";
-    case "scan":
-      return "扫描中。";
-    case "survey":
-    default:
-      return "调查中。";
-  }
-}
-
-function getInProgressTone(verb: LegacyVerb): Tone {
-  return verb === "gather" || verb === "build" || verb === "extract" ? "accent" : "neutral";
 }
 
 function findTile(tiles: MapTile[], tileId: string | undefined): TileWithContent | undefined {
@@ -581,17 +233,6 @@ function findTile(tiles: MapTile[], tileId: string | undefined): TileWithContent
     status: "已发现",
     investigated: false,
   };
-}
-
-function findObjectForAction(objectId: string, verb: LegacyVerb): MapObjectDefinition | undefined {
-  const object = mapObjectDefinitionById.get(objectId);
-  if (!object) {
-    return undefined;
-  }
-  if (!object.actions.some((action) => action.id === `${objectId}:${verb}`)) {
-    return undefined;
-  }
-  return object;
 }
 
 function getTileObjectsForTile(tile: TileWithContent | undefined): MapObjectDefinition[] {
@@ -636,7 +277,7 @@ function getTileTags(tile: TileWithContent | undefined) {
   return mergeTags(tile?.tags ?? [], tile?.dangerTags ?? []);
 }
 
-function getGatherResourceId(action: SettlementActiveAction, object: MapObjectDefinition | undefined) {
+function getGatherResourceId(action: SettlementRuntimeAction, object: MapObjectDefinition | undefined) {
   if (object?.legacyResource) {
     return object.legacyResource;
   }
@@ -645,11 +286,11 @@ function getGatherResourceId(action: SettlementActiveAction, object: MapObjectDe
   return yields ? Object.keys(yields)[0] : undefined;
 }
 
-function getResourceYield(action: SettlementActiveAction, resourceId: string) {
+function getResourceYield(action: SettlementRuntimeAction, resourceId: string) {
   return readYieldMap(action)?.[resourceId] ?? 0;
 }
 
-function readYieldMap(action: SettlementActiveAction): Record<string, number> | undefined {
+function readYieldMap(action: SettlementRuntimeAction): Record<string, number> | undefined {
   const value = action.params.perRoundYieldByResource;
   if (!isRecord(value)) {
     return undefined;
@@ -686,4 +327,8 @@ function mergeTags(...groups: Array<Array<string | undefined>>) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringParam(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

@@ -40,7 +40,7 @@ describe("mainline event content", () => {
       // `actions: ActionDef[]`; we assert that none of those actions encode
       // the legacy `scan` verb (id suffix or event_id).
       const definition = findMapObject(objectId);
-      expect(definition.actions.some((action) => action.id.endsWith(":scan") || action.event_id === "legacy.scan")).toBe(false);
+      expect(definition.actions.some((action) => action.id.endsWith(":scan") || action.event_id === "retired.map_object_scan")).toBe(false);
     }
   });
 

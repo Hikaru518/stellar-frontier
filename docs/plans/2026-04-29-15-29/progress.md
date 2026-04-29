@@ -27,7 +27,7 @@ source:
 | 11 | T011 | 迁移停止与待命行动到事件 runtime | completed | 1 |
 | 12 | T012 | 迁移调查当前区域到地点事件入口 | completed | 1 |
 | 13 | T013 | 重构基础行动 content 与 schema | completed | 1 |
-| 14 | T014 | 删除 legacy dispatch 与旧行动入口 | pending | 0 |
+| 14 | T014 | 删除 legacy dispatch 与旧行动入口 | completed | 1 |
 | 15 | T015 | 建立地点剧情动作事件样例 | pending | 0 |
 | 16 | T016 | 删除地图 legacy content 字段与 schema | pending | 0 |
 | 17 | T017 | 删除 deriveLegacyTiles 与旧 MapTile 投影 | pending | 0 |
@@ -140,3 +140,10 @@ source:
 - 完成时间: 2026-04-29 17:47
 - 尝试次数: 1
 - Monkey summary: `universal-actions` 收紧为四类基础行动，`move/standby/stop` 的 `event_id` 改为 `crew_actions.*`，schema 限定 action id/category 并拒绝 `legacy.*`；通话页过滤旧通用对象动作 `gather/build/extract/scan`。验证：`npm run validate:content` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T014: 删除 legacy dispatch 与旧行动入口
+- 状态: completed
+- 开始时间: 2026-04-29 17:48
+- 完成时间: 2026-04-29 17:56
+- 尝试次数: 1
+- Monkey summary: 删除 `App.handleDecision` 中 legacy translator 与 `applyImmediateOrCreateAction` 入口，`settleAction` 改为只接受 `CrewActionState`，过滤退休 object actions，并将 map-object 中 `legacy.*` event id 改为 `retired.map_object_*` 占位。验证：`npm run validate:content` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。

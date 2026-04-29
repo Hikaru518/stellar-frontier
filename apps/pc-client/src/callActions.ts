@@ -35,15 +35,15 @@ interface ActionCandidate {
   object?: MapObjectDefinition;
 }
 
-const RETIRED_GENERIC_OBJECT_ACTION_VERBS = new Set(["gather", "build", "extract", "scan"]);
+const RETIRED_GENERIC_OBJECT_ACTION_VERBS = new Set(["survey", "gather", "build", "extract", "scan"]);
 
 /**
  * Builds the call-page action view for a member at a tile.
  *
  * The pipeline (see `docs/plans/2026-04-29-01-40/technical-design.md` §4):
  *
- * 1. Collect candidates: every universal action plus every revealed object's
- *    `actions[]`.
+ * 1. Collect candidates: every universal action plus revealed object actions
+ *    that already point at structured event content.
  * 2. Build a single `ConditionEvaluationContext` via `buildCallActionContext`.
  * 3. Evaluate each candidate's `conditions[]`. The decision matrix:
  *    - all pass               → visible + enabled.

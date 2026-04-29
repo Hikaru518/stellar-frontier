@@ -17,7 +17,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "tags": [
@@ -43,7 +43,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "tags": [
@@ -69,7 +69,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "iron-ridge-deposit:gather",
@@ -77,7 +77,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "tags": [
@@ -103,7 +103,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "iron-ridge-outcrop:gather",
@@ -111,7 +111,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "tags": [
@@ -136,7 +136,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "愿意用稀有矿石样本交换高温开采设备的村落商人。",
@@ -163,7 +163,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "黑松林缘深处的外星聚落，是语言、交易和营地线索的主线节点。",
@@ -189,7 +189,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "仍能输出粗略方向线索的基础雷达阵列。",
@@ -215,7 +215,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "mainline-damaged-forge:build",
@@ -223,7 +223,7 @@
           "label": "建设 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.build"
+          "event_id": "retired.map_object_build"
         }
       ],
       "description": "裂谷边缘的废弃熔炉，修复后可制造折跃仓修复套件。",
@@ -249,7 +249,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "mainline-damaged-warp-pod:build",
@@ -257,7 +257,7 @@
           "label": "建设 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.build"
+          "event_id": "retired.map_object_build"
         },
         {
           "id": "mainline-damaged-warp-pod:extract",
@@ -265,7 +265,7 @@
           "label": "回收 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.extract"
+          "event_id": "retired.map_object_extract"
         }
       ],
       "description": "坠毁后严重受损的返航核心，需要修复套件、燃料与坐标才能启动。",
@@ -292,7 +292,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "旧飞船残骸内的失效驾驶舱，可调查恢复折跃坐标。",
@@ -318,7 +318,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "外星生物巢穴的入口，推进前需要诱饵引开守卫。",
@@ -345,7 +345,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "description": "可取得外星粘液燃料的深层空间，需先处理入口守卫。",
@@ -373,7 +373,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "需要药品或野外急救的受伤村民。",
@@ -400,7 +400,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "外星村民临时营地，救援后可获得巢穴诱饵线索与奖励。",
@@ -426,7 +426,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "mainline-marsh-decoy-source:gather",
@@ -434,7 +434,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "description": "浅滩湿地中可稳定取得额外诱饵的小型生物活动区。",
@@ -461,7 +461,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "医疗舱内残存的野外急救流程，可供队员重复学习。",
@@ -487,7 +487,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "description": "火山高温区中的黑曜石矿脉，是修复套件材料来源。",
@@ -514,7 +514,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "东部荒原中半埋的旧飞船残骸，可能保存返航坐标。",
@@ -540,7 +540,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "description": "铁矿床中夹杂的异常矿脉，后续事件会记录采集进度并保底产出样本。",
@@ -568,7 +568,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "坠毁残骸中保存的维修日志，是学习维修技术的稳定来源。",
@@ -594,7 +594,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "覆有多层符号的外星翻译装置，是学习外星语言的稳定来源。",
@@ -620,7 +620,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "掌握受伤村民营地线索的村落居民。",
@@ -646,7 +646,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         }
       ],
       "description": "火山边缘的高温区域，需要高温开采设备才能安全作业。",

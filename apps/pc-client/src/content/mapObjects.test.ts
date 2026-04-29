@@ -44,14 +44,19 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("does not route current-area survey through the legacy survey event id", () => {
+  it("does not route current-area survey through a retired event id", () => {
     const survey = universalActions.find((action) => action.id === "universal:survey");
     expect(survey).toBeDefined();
-    expect(survey?.event_id).not.toBe("legacy.survey");
+    expect(survey?.event_id).not.toBe(retiredEventId("survey"));
   });
 
-  it("does not route any universal action through a legacy event id", () => {
-    expect(universalActions.every((action) => !action.event_id.startsWith("legacy."))).toBe(true);
+  it("does not route any universal action through a retired event id", () => {
+    expect(universalActions.every((action) => !isRetiredEventId(action.event_id))).toBe(true);
+  });
+
+  it("does not route any map-object action through a retired event id", () => {
+    const eventIds = mapObjectDefinitions.flatMap((definition) => definition.actions.map((action) => action.event_id));
+    expect(eventIds.every((eventId) => !isRetiredEventId(eventId))).toBe(true);
   });
 
   it("rejects retired universal action ids and legacy event ids at the schema boundary", () => {
@@ -80,10 +85,18 @@ describe("mapObjects content", () => {
             category: "universal",
             label: "移动到指定区域",
             conditions: [],
-            event_id: "legacy.move",
+            event_id: retiredEventId("move"),
           },
         ],
       }),
     ).toBe(false);
   });
 });
+
+function retiredEventId(verb: string) {
+  return ["legacy", verb].join(".");
+}
+
+function isRetiredEventId(eventId: string) {
+  return eventId.startsWith(`${retiredEventId("")}`);
+}

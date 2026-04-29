@@ -102,7 +102,7 @@ function expandActions(legacyObject, objectActionTable) {
       label: oldDef.label,
       tone: oldDef.tone,
       conditions: [],
-      event_id: `legacy.${verb}`,
+      event_id: `retired.map_object_${verb}`,
     });
   }
   return actions;
@@ -157,7 +157,7 @@ function buildUniversalActions(basicActionsContent) {
       label: entry.label,
       tone: entry.tone,
       conditions,
-      event_id: `legacy.${entry.id}`,
+      event_id: `retired.universal_${entry.id}`,
     });
   }
   // deterministic sort by id

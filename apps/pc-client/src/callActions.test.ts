@@ -137,10 +137,10 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 }
 
 describe("buildCallView", () => {
-  it("groups universal actions first then revealed object actions for an idle crew member", () => {
+  it("groups universal actions without exposing retired legacy object actions", () => {
     // tile `2-3` exists in default-map.json and lists `black-pine-stand` as one
-    // of its objectIds. The call page should keep object investigation
-    // available without exposing generic gather/build/extract/scan buttons.
+    // of its objectIds. Its old object actions are intentionally no longer
+    // call decisions; current-area survey owns the structured investigation path.
     const tile = createTile("2-3");
     const blackPine = mapObjectDefinitionById.get("black-pine-stand");
     expect(blackPine).toBeDefined();
@@ -166,10 +166,7 @@ describe("buildCallView", () => {
       universalActions.filter((action) => action.id !== "universal:stop").map((action) => action.id),
     );
 
-    const blackPineGroup = view.groups.find((group) => group.title === blackPine!.name);
-    expect(blackPineGroup).toBeDefined();
-    expect(blackPineGroup!.actions.map((action) => action.id)).toEqual(["black-pine-stand:survey"]);
-    expect(blackPineGroup!.actions.every((action) => !action.disabled)).toBe(true);
+    expect(view.groups.find((group) => group.title === blackPine!.name)).toBeUndefined();
   });
 
   it("does not render retired generic object action buttons", () => {
@@ -192,7 +189,7 @@ describe("buildCallView", () => {
     const view = buildCallView({ member: createMember({ currentTile: "3-2" }), tile, gameState });
     const actionIds = view.groups.flatMap((group) => group.actions.map((action) => action.id));
 
-    expect(actionIds.some((id) => /:(gather|build|extract|scan)$/.test(id))).toBe(false);
+    expect(actionIds.some((id) => !id.startsWith("universal:") && /:(survey|gather|build|extract|scan)$/.test(id))).toBe(false);
   });
 
   it("does not render an object's actions before its visibility is satisfied", () => {
@@ -256,7 +253,7 @@ describe("buildCallView", () => {
 
     expect(() => buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState })).not.toThrow();
     const view = buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState });
-    expect(view.groups.map((group) => group.title)).toContain("黑松木材带");
+    expect(view.groups.map((group) => group.title)).not.toContain("黑松木材带");
     expect(view.groups.map((group) => group.title)).not.toContain("ghost-object");
   });
 
@@ -410,7 +407,7 @@ function createTestAction(
     label: `测试动作 ${verb}`,
     tone: "neutral",
     conditions,
-    event_id: `legacy.${verb}`,
+    event_id: `test.${verb}`,
   };
   if (extras.display_when_unavailable) {
     action.display_when_unavailable = extras.display_when_unavailable;

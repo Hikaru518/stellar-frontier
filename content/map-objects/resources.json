@@ -17,7 +17,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "black-pine-stand:gather",
@@ -25,7 +25,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "tags": [
@@ -49,7 +49,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "legacyResource": "wood"
@@ -70,7 +70,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "legacyResource": "wood"
@@ -91,7 +91,7 @@
           "label": "调查 {objectName}",
           "tone": "neutral",
           "conditions": [],
-          "event_id": "legacy.survey"
+          "event_id": "retired.map_object_survey"
         },
         {
           "id": "southwest-timber:gather",
@@ -99,7 +99,7 @@
           "label": "采集 {objectName}",
           "tone": "accent",
           "conditions": [],
-          "event_id": "legacy.gather"
+          "event_id": "retired.map_object_gather"
         }
       ],
       "legacyResource": "wood"

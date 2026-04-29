@@ -310,7 +310,7 @@ describe("App", () => {
     expect(savedCrew(saved, "garry").inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
   });
 
-  it("settles Garry survey on the current mineral_deposit tile through content action metadata", () => {
+  it("does not expose legacy object survey as a call decision", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
@@ -342,29 +342,8 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: "调查 铁矿床" }));
 
-    const actionStarted = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(savedCrew(actionStarted, "garry").activeAction).toMatchObject({
-      actionType: "survey",
-      targetTile: mineralTile.id,
-      durationSeconds: 120,
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(120_000);
-    });
-
-    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const garry = savedCrew(saved, "garry");
-    expect(garry.activeAction).toBeUndefined();
-    expect(saved.map.tilesById[mineralTile.id].investigated).toBe(true);
-    expect(saved.resources.iron).toBe(1240);
-    expect(saved.logs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ text: "Garry 完成一轮调查。" }),
-      ]),
-    );
+    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
   });
 
   it("does not reveal investigated map objects through current-area survey without an event effect", () => {
@@ -1648,7 +1627,7 @@ describe("App", () => {
     expect(saved.map.tilesById["2-3"].discovered).toBe(false);
   });
 
-  it("renders grouped base and revealed object actions for an idle crew member", () => {
+  it("renders base actions without retired revealed object actions for an idle crew member", () => {
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -1685,8 +1664,8 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "移动到指定区域" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "原地待命" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "停止当前行动" })).not.toBeInTheDocument();
-    expect(screen.getByText("铁矿床")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "调查 铁矿床" })).toBeInTheDocument();
+    expect(screen.queryByText("铁矿床")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "采集 铁矿床" })).not.toBeInTheDocument();
   });
 
