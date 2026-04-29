@@ -30,7 +30,7 @@ source:
 | 14 | T014 | 删除 legacy dispatch 与旧行动入口 | completed | 1 |
 | 15 | T015 | 建立地点剧情动作事件样例 | completed | 1 |
 | 16 | T016 | 删除地图 legacy content 字段与 schema | completed | 1 |
-| 17 | T017 | 删除 deriveLegacyTiles 与旧 MapTile 投影 | pending | 0 |
+| 17 | T017 | 删除 deriveLegacyTiles 与旧 MapTile 投影 | completed | 1 |
 | 18 | T018 | 清理 PC UI mock 文案 | pending | 0 |
 | 19 | T019 | 清理 mobile UI mock 文案 | pending | 0 |
 | 20 | T020 | 更新正式项目文档 | pending | 0 |
@@ -161,3 +161,10 @@ source:
 - 完成时间: 2026-04-29 18:02
 - 尝试次数: 1
 - Monkey summary: 删除 map content/schema/type 中的 `legacyResource`、`legacyBuilding`、`legacyInstrument`、`legacyDanger` 字段，清理 PC 端旧读取逻辑，`deriveLegacyTiles` 不再从对象派生旧展示列表。验证：合并态 `npm run validate:content`、`npm --prefix apps/pc-client run lint`、`npm --prefix apps/pc-client run test` 通过。
+
+### T017: 删除 deriveLegacyTiles 与旧 MapTile 投影
+- 状态: completed
+- 开始时间: 2026-04-29 18:03
+- 完成时间: 2026-04-29 18:10
+- 尝试次数: 1
+- Monkey summary: 删除 PC runtime 中的 `deriveLegacyTiles`，从 saved tile views 清理旧 `resources/buildings/instruments/danger` 投影字段，地图页改从 map config、runtime map state、objects 与 special states 展示信息，并使用中性未知格文案。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。

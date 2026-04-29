@@ -116,6 +116,13 @@ describe("App", () => {
     expect(saved.map.tilesById["4-4"].discovered).toBe(true);
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "amy", "garry"]);
     expect(saved.tiles.flatMap((tile: { crew?: string[] }) => tile.crew ?? []).sort()).toEqual(["amy", "garry", "mike"]);
+    expect(saved.tiles).toHaveLength(defaultMapConfig.tiles.length);
+    expect(
+      saved.tiles.every(
+        (tile: Record<string, unknown>) =>
+          !("resources" in tile) && !("buildings" in tile) && !("instruments" in tile) && !("danger" in tile),
+      ),
+    ).toBe(true);
   });
 
   it("ignores old v1 saves when starting a v2 game", () => {
@@ -1683,14 +1690,14 @@ describe("App", () => {
 
     const grid = screen.getByLabelText(/雷达可见矩形/);
     const amyTile = within(grid).getByRole("button", { name: /\(-1,2\)/ });
-    expect(within(amyTile).getByText("未探索信号")).toBeInTheDocument();
+    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
     expect(within(amyTile).getByText("地形：森林 / 山")).toBeInTheDocument();
     expect(within(amyTile).getByText("天气：薄雾")).toBeInTheDocument();
     expect(within(amyTile).getByText("Amy：等待指令。")).toBeInTheDocument();
     expect(within(amyTile).queryByText("黑松木材带")).not.toBeInTheDocument();
 
     fireEvent.click(amyTile);
-    expect(screen.getByText("队员回传")).toBeInTheDocument();
+    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
     expect(screen.getByText("地形")).toBeInTheDocument();
     expect(screen.getAllByText("森林 / 山").length).toBeGreaterThan(0);
     expect(screen.getByText("天气")).toBeInTheDocument();
@@ -2001,11 +2008,13 @@ describe("App", () => {
 
     const grid = screen.getByLabelText(/雷达可见矩形/);
     expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
-    expect(screen.getAllByRole("button", { name: /未探索信号/ })).toHaveLength(8);
+    expect(screen.getAllByRole("button", { name: /未探索区域/ })).toHaveLength(7);
+    expect(screen.getByRole("button", { name: /\(-1,1\).*队员回传/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
     expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("天气：阴天");
     expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("对象：坠毁残骸");
     expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+    expect(screen.queryByText("未发现即时危险")).not.toBeInTheDocument();
   });
 
   it("keeps frontier and unknown-hole map cells redacted", () => {
@@ -2032,13 +2041,14 @@ describe("App", () => {
     const grid = screen.getByLabelText(/雷达可见矩形/);
     expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" });
     expect(screen.queryByText("东侧砾原")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /未探索信号/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /未探索区域/ }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索信号/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索区域/ }));
     const detailPanel = screen.getByRole("heading", { name: "坐标详情：(2,0)" }).closest("section");
     expect(detailPanel).not.toBeNull();
-    expect(within(detailPanel as HTMLElement).getByText("信号未确认")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("暂无已确认信息")).toBeInTheDocument();
     expect(within(detailPanel as HTMLElement).getByText("需通过通讯台联系队员前往或调查后确认详情")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).queryByText("信号未确认")).not.toBeInTheDocument();
     expect(screen.queryByText("强风")).not.toBeInTheDocument();
   });
 
@@ -2512,9 +2522,7 @@ function volcanicTiles() {
       ? {
           ...tile,
           terrain: "火山灰沙漠",
-          resources: ["火山灰"],
           crew: ["garry", "amy"],
-          danger: "灰线不稳定",
           status: "复核中",
         }
       : tile,

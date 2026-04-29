@@ -391,11 +391,7 @@ function tile(id: string, terrain: string): MapTile {
     row,
     col,
     terrain,
-    resources: [],
-    buildings: [],
-    instruments: [],
     crew: [],
-    danger: "未发现即时危险",
     status: "已发现",
     investigated: true,
   };

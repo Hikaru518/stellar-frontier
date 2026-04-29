@@ -9,7 +9,7 @@ import {
 import { mapObjectDefinitionById, type RuntimeMapObjectsState } from "../content/mapObjects";
 import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
-import { deriveLegacyTiles, getTileLocationLabel, type RuntimeMapState } from "../mapSystem";
+import { getDisplayCoord, getTileLocationLabel, parseTileId, type RuntimeMapState } from "../mapSystem";
 
 export type PageId = "control" | "station" | "call" | "map" | "ending";
 
@@ -113,11 +113,7 @@ export interface MapTile {
   row: number;
   col: number;
   terrain: string;
-  resources: string[];
-  buildings: string[];
-  instruments: string[];
   crew: CrewId[];
-  danger: string;
   status: string;
   investigated: boolean;
   eventMarks?: EventMark[];
@@ -205,25 +201,6 @@ export function createBaseInventoryFromResources(resourceSummary: Pick<ResourceS
   return inventory;
 }
 
-export const initialTiles: MapTile[] = [
-  tile("1-1", "(1,1)", 1, 1, "平原"),
-  tile("1-2", "(1,2)", 1, 2, "平原"),
-  tile("1-3", "(1,3)", 1, 3, "平原"),
-  tile("1-4", "(1,4)", 1, 4, "平原"),
-  tile("2-1", "(2,1)", 2, 1, "水", ["水域"], [], [], ["mike"], "未发现即时危险", "行进路径"),
-  tile("2-2", "(2,2)", 2, 2, "水", ["水域"]),
-  tile("2-3", "(2,3)", 2, 3, "森林 / 山", ["木材", "野生动物踪迹"], [], [], ["amy"], "大型野兽接近", "危险"),
-  tile("2-4", "(2,4)", 2, 4, "森林 / 山", ["木材"]),
-  tile("3-1", "(3,1)", 3, 1, "平原"),
-  tile("3-2", "(3,2)", 3, 2, "平原"),
-  tile("3-3", "(3,3)", 3, 3, "丘陵", ["铁矿床"], ["采矿厂：铁 #2"], ["水银温度计"], ["garry"], "未发现即时危险", "工作中"),
-  tile("3-4", "(3,4)", 3, 4, "丘陵", ["铁矿床"]),
-  tile("4-1", "(4,1)", 4, 1, "旧医疗前哨", ["废弃医疗舱"], [], ["扫描器残留信号"], [], "未发现即时危险", "待命"),
-  tile("4-2", "(4,2)", 4, 2, "坠落广播塔", ["断续信号"], [], ["损坏中继器"], [], "未知回声", "待命"),
-  tile("4-3", "(4,3)", 4, 3, "沙漠"),
-  tile("4-4", "(4,4)", 4, 4, "沙漠"),
-];
-
 export function createInitialMapState(): GameMapState {
   const discoveredTileIds = [...defaultMapConfig.initialDiscoveredTileIds];
   const tilesById: GameMapState["tilesById"] = Object.fromEntries(
@@ -270,9 +247,36 @@ export function createInitialMapObjectsState(): RuntimeMapObjectsState {
   return state;
 }
 
-export function deriveInitialLegacyTiles(map = createInitialMapState()) {
-  return deriveLegacyTiles(defaultMapConfig, map);
+export function createMapTilesFromConfig(map: GameMapState, previousTiles: Array<Partial<MapTile> & { id?: string }> = []): MapTile[] {
+  const previousTileById = new Map(previousTiles.filter((tile): tile is Partial<MapTile> & { id: string } => typeof tile.id === "string").map((tile) => [tile.id, tile]));
+
+  return defaultMapConfig.tiles.map((mapTile) => {
+    const state = map.tilesById[mapTile.id];
+    const previousTile = previousTileById.get(mapTile.id);
+    const discovered = map.discoveredTileIds.includes(mapTile.id) || Boolean(state?.discovered);
+    const tile: MapTile = {
+      id: mapTile.id,
+      coord: getMapTileDisplayCoord(mapTile.id),
+      row: mapTile.row,
+      col: mapTile.col,
+      terrain: mapTile.terrain,
+      crew: state?.crew ?? [],
+      status: state?.status ?? previousTile?.status ?? (discovered ? "已发现" : "未探索"),
+      investigated: Boolean(state?.investigated),
+    };
+
+    if (previousTile?.eventMarks?.length) {
+      tile.eventMarks = previousTile.eventMarks;
+    }
+    if (previousTile?.dangerTags?.length) {
+      tile.dangerTags = previousTile.dangerTags;
+    }
+
+    return tile;
+  });
 }
+
+export const initialTiles: MapTile[] = createMapTilesFromConfig(createInitialMapState());
 
 export const initialCrew: CrewMember[] = crewDefinitions.map((member) => createInitialCrewMember(member));
 
@@ -302,38 +306,7 @@ export const garryActions: ActionOption[] = [
   { id: "survey", label: "开展调查", hint: "可能发现异常，也可能发现更多问题。" },
 ];
 
-function tile(
-  id: string,
-  coord: string,
-  row: number,
-  col: number,
-  terrain: string,
-  resources: string[] = [],
-  buildings: string[] = [],
-  instruments: string[] = [],
-  crew: CrewId[] = [],
-  danger = "未发现即时危险",
-  status = "已发现",
-  investigated = true,
-): MapTile {
-  return {
-    id,
-    coord,
-    row,
-    col,
-    terrain,
-    resources,
-    buildings,
-    instruments,
-    crew,
-    danger,
-    status,
-    investigated,
-  };
-}
-
 function createInitialCrewMember(member: CrewDefinition): CrewMember {
-  const tile = deriveInitialLegacyTiles().find((item) => item.id === member.currentTile);
   const activeAction = member.activeAction ? createInitialAction(member, member.activeAction) : undefined;
 
   return {
@@ -341,8 +314,8 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     name: member.name,
     role: member.role,
     currentTile: member.currentTile,
-    location: tile ? getTileLocationLabel(defaultMapConfig, tile.id) : member.currentTile,
-    coord: tile?.coord ?? member.currentTile,
+    location: getTileLocationLabel(defaultMapConfig, member.currentTile),
+    coord: getMapTileDisplayCoord(member.currentTile),
     status: getInitialStatus(member),
     statusTone: member.statusTone,
     attributes: member.attributes,
@@ -360,6 +333,17 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     activeAction,
     unavailable: member.unavailable,
   };
+}
+
+function getMapTileDisplayCoord(tileId: string) {
+  const tile = defaultMapConfig.tiles.find((item) => item.id === tileId);
+  const origin = parseTileId(defaultMapConfig.originTileId);
+  if (!tile || !origin) {
+    return tileId;
+  }
+
+  const coord = getDisplayCoord(tile, origin);
+  return `(${coord.displayX},${coord.displayY})`;
 }
 
 function createInitialAction(member: CrewDefinition, action: NonNullable<CrewDefinition["activeAction"]>): ActiveAction {

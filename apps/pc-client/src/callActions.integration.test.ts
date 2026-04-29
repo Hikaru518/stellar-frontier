@@ -71,11 +71,7 @@ function createTile(): MapTile {
     row: configTile.row,
     col: configTile.col,
     terrain: configTile.terrain,
-    resources: [],
-    buildings: [],
-    instruments: [],
     crew: [],
-    danger: "未发现即时危险",
     status: "已发现",
     investigated: false,
   };

@@ -27,10 +27,11 @@ import {
   type WorldFlag,
 } from "./events/types";
 import { defaultMapConfig } from "./content/contentData";
-import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
+import { canMoveToTile, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
+  createMapTilesFromConfig,
   initialCrew,
   initialLogs,
   resources as initialResources,
@@ -335,7 +336,7 @@ function App() {
           [startedMove.action.id]: startedMove.action,
         },
         map: nextMap,
-        tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, nextMap), updatedCrew),
+        tiles: syncTileCrew(createMapTilesFromConfig(nextMap, state.tiles), updatedCrew),
         logs: appendLogEntry(
           state.logs,
           `${member.name} 开始前往 ${targetTile?.coord ?? preview.targetTileId}，预计 ${formatDuration(preview.totalDurationSeconds)}。`,
@@ -486,7 +487,7 @@ function createInitialGameState(): GameState {
         ? saved.baseInventory
         : createBaseInventoryFromResources(saved.resources),
       map: syncedMap,
-      tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, syncedMap), crewWithNewDefaults),
+      tiles: syncTileCrew(createMapTilesFromConfig(syncedMap, saved.tiles), crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
       active_events: saved.active_events ?? emptyEventState.active_events,
       active_calls: saved.active_calls ?? emptyEventState.active_calls,
@@ -509,7 +510,7 @@ function createInitialGameState(): GameState {
     crew: initialCrew,
     baseInventory: createBaseInventoryFromResources(initialResources),
     map,
-    tiles: deriveLegacyTiles(defaultMapConfig, map),
+    tiles: createMapTilesFromConfig(map),
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
@@ -702,7 +703,7 @@ function settleGameTime(state: GameState): GameState {
 
       if (settled.changed && nextMember.currentTile !== member.currentTile) {
         map = discoverMapTile(map, nextMember.currentTile);
-        tiles = syncTileCrew(deriveLegacyTiles(defaultMapConfig, map), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
+        tiles = syncTileCrew(createMapTilesFromConfig(map, tiles), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
       }
 
       if (settled.arrived) {
@@ -1237,7 +1238,7 @@ function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefini
 
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
   const tile = state.tiles.find((item) => item.id === tileId);
-  return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile)) : [];
+  return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile, state.map)) : [];
 }
 
 function actionVerb(actionId: string): string {
@@ -1287,7 +1288,7 @@ export function toEventEngineState(state: GameState): GraphRunnerGameState {
     ...state,
     elapsed_game_seconds: state.elapsedGameSeconds,
     crew: Object.fromEntries(state.crew.map((member) => [member.id, toCrewState(member, state.crew_actions)])),
-    tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile)])),
+    tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile, state.map)])),
     resources: numericResources(state.resources),
     inventories: {
       ...state.inventories,
@@ -1519,7 +1520,7 @@ function toCrewState(member: CrewMember, crewActions: Record<Id, CrewActionState
   };
 }
 
-function toTileState(tile: MapTile): TileState {
+function toTileState(tile: MapTile, map: GameMapState): TileState {
   return {
     id: tile.id,
     coordinates: {
@@ -1528,19 +1529,14 @@ function toTileState(tile: MapTile): TileState {
     },
     terrain_type: tile.terrain,
     tags: inferTileTags(tile),
-    danger_tags: inferTileDangerTags(tile),
+    danger_tags: inferTileDangerTags(tile, map),
     discovery_state: tile.investigated ? "mapped" : "known",
     survey_state: tile.investigated ? "surveyed" : "unsurveyed",
     visibility: "visible",
     current_crew_ids: tile.crew,
-    resource_nodes: tile.resources.map((resource) => ({
-      id: `${tile.id}:${resource}`,
-      resource_id: resource,
-      amount: 1,
-      state: "discovered" as const,
-    })),
-    site_objects: tile.instruments.map((instrument) => ({ id: `${tile.id}:${instrument}`, object_type: instrument, tags: [] })),
-    buildings: tile.buildings.map((building) => ({ id: `${tile.id}:${building}`, building_type: building, status: "active" })),
+    resource_nodes: [],
+    site_objects: getConfigTileObjects(tile).map((object) => ({ id: object.id, object_type: object.kind, tags: object.tags ?? [] })),
+    buildings: [],
     event_marks: tile.eventMarks ?? [],
     history_keys: [],
   };
@@ -1617,16 +1613,10 @@ function crewInventoryId(crewId: CrewId) {
 }
 
 function inferTileTags(tile: MapTile) {
-  const text = [tile.terrain, tile.status, tile.danger, ...tile.resources, ...tile.buildings, ...tile.instruments].join(" ");
-  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const configObjects = getConfigTileObjects(tile);
+  const text = [tile.terrain, tile.status, ...configObjects.flatMap((object) => [object.name, object.kind, ...(object.tags ?? [])])].join(" ");
   const explicitTags = "tags" in tile && Array.isArray(tile.tags) ? tile.tags.filter((tag): tag is string => typeof tag === "string") : [];
-  const contentTags = configTile
-    ? configTile.objectIds.flatMap((objectId) => {
-        const def = mapObjectDefinitionById.get(objectId);
-        return def?.tags?.filter((tag) => tag === "crash_site") ?? [];
-      })
-    : [];
-  const tags = new Set<string>([...explicitTags, ...contentTags]);
+  const tags = new Set<string>([...explicitTags, ...configObjects.flatMap((object) => object.tags ?? [])]);
 
   if (/森林|木材|野生动物/.test(text)) {
     tags.add("forest");
@@ -1647,22 +1637,32 @@ function inferTileTags(tile: MapTile) {
   return Array.from(tags);
 }
 
-function inferTileDangerTags(tile: MapTile) {
+function inferTileDangerTags(tile: MapTile, map: GameMapState) {
   if (tile.dangerTags) {
     return tile.dangerTags;
   }
 
-  if (tile.danger === "未发现即时危险") {
-    return [];
-  }
-
   const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const runtimeTile = map.tilesById[tile.id];
+  const activeSpecialStateIds = new Set(runtimeTile?.activeSpecialStateIds ?? configTile?.specialStates.filter((state) => state.startsActive).map((state) => state.id) ?? []);
   const configDangerTags =
     configTile?.specialStates
-      .filter((state) => state.name === tile.danger)
-      .flatMap((state) => ("dangerTags" in state && Array.isArray(state.dangerTags) ? state.dangerTags : state.tags ?? [])) ?? [];
+      .filter((state) => activeSpecialStateIds.has(state.id))
+      .flatMap((state) => {
+        const dangerTags = "dangerTags" in state && Array.isArray(state.dangerTags) ? state.dangerTags.filter((tag): tag is string => typeof tag === "string") : [];
+        return dangerTags.length ? dangerTags : (state.tags ?? []);
+      }) ?? [];
 
-  return configDangerTags.length > 0 ? configDangerTags : [tile.danger];
+  return configDangerTags;
+}
+
+function getConfigTileObjects(tile: Pick<MapTile, "id">): MapObjectDefinition[] {
+  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  return (
+    configTile?.objectIds
+      .map((objectId) => mapObjectDefinitionById.get(objectId))
+      .filter((object): object is MapObjectDefinition => Boolean(object)) ?? []
+  );
 }
 
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {

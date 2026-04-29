@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { defaultMapConfig } from "./content/contentData";
 import {
   canMoveToTile,
-  deriveLegacyTiles,
   getDisplayCoord,
   getTileAreaName,
   getTileId,
@@ -74,28 +73,4 @@ describe("mapSystem", () => {
     expect(canMoveToTile(defaultMapConfig, map, "not-a-tile")).toBe(false);
   });
 
-  it("keeps legacy MapTile display lists empty after map legacy content removal", () => {
-    const tiles = deriveLegacyTiles(
-      defaultMapConfig,
-      runtime(["3-3", "5-3", "1-7"], {
-        "3-3": { discovered: true, investigated: true, crew: ["garry"], status: "工作中" },
-        "5-3": { discovered: true, revealedObjectIds: ["southwest-timber"] },
-        "1-7": { discovered: true },
-      }),
-    );
-
-    expect(tiles.find((tile) => tile.id === "3-3")).toMatchObject({
-      coord: "(-1,1)",
-      terrain: "丘陵",
-      resources: [],
-      buildings: [],
-      instruments: [],
-      crew: ["garry"],
-      danger: "未发现即时危险",
-      status: "工作中",
-      investigated: true,
-    });
-    expect(tiles.find((tile) => tile.id === "5-3")?.resources).toEqual([]);
-    expect(tiles.find((tile) => tile.id === "1-7")?.danger).toBe("未发现即时危险");
-  });
 });

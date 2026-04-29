@@ -1,6 +1,6 @@
 import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "./content/mapObjects";
-import type { CrewId, InvestigationReport, MapTile } from "./data/gameData";
+import type { CrewId, InvestigationReport } from "./data/gameData";
 
 export type VisibleTileStatus = "discovered" | "frontier" | "unknownHole";
 
@@ -159,40 +159,6 @@ export function canMoveToTile(config: MapConfigDefinition, runtimeMap: RuntimeMa
 
   const cell = getVisibleTileWindow(config, runtimeMap).cells.find((item) => item.id === tileId);
   return cell?.status === "discovered" || cell?.status === "frontier";
-}
-
-export function deriveLegacyTiles(config: MapConfigDefinition, runtimeMap: RuntimeMapState): MapTile[] {
-  const origin = getOrigin(config);
-  return config.tiles.map((tile) => {
-    const state = runtimeMap.tilesById[tile.id];
-    const discovered = isDiscovered(runtimeMap, tile.id);
-    const investigated = Boolean(state?.investigated);
-    const revealedSpecialStateIds = new Set(state?.revealedSpecialStateIds ?? []);
-    const activeSpecialStateIds = new Set(
-      state?.activeSpecialStateIds ?? tile.specialStates.filter((item) => item.startsActive).map((item) => item.id),
-    );
-    const visibleSpecialStates = tile.specialStates.filter(
-      (specialState) =>
-        activeSpecialStateIds.has(specialState.id) &&
-        (specialState.visibility === "onDiscovered" || investigated || revealedSpecialStateIds.has(specialState.id)),
-    );
-    const displayCoord = origin ? formatDisplayCoord(getDisplayCoord(tile, origin)) : `(${tile.row},${tile.col})`;
-
-    return {
-      id: tile.id,
-      coord: displayCoord,
-      row: tile.row,
-      col: tile.col,
-      terrain: tile.terrain,
-      resources: [],
-      buildings: [],
-      instruments: [],
-      crew: state?.crew ?? [],
-      danger: visibleSpecialStates[0]?.name ?? "未发现即时危险",
-      status: state?.status ?? (discovered ? "已发现" : "未探索"),
-      investigated,
-    };
-  });
 }
 
 /**

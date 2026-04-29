@@ -210,7 +210,7 @@ export function executeEventEffects({
 
     if (effect.type === "discoverResource" && effect.resource) {
       const resourceName = getResourceName(effect.resource);
-      nextTiles = patchTile(nextTiles, tile.id, { resources: addUnique(tile.resources, resourceName), status: `发现${resourceName}` });
+      nextTiles = patchTile(nextTiles, tile.id, { status: `发现${resourceName}` });
     }
 
     if (effect.type === "updateTile" && effect.field) {
@@ -346,13 +346,13 @@ function resolveValue(path: string, event: EventDefinition, member: CrewMember, 
     return member.attributes[path.slice("crew.attributes.".length) as keyof CrewMember["attributes"]];
   }
   if (path === "tile.dangerLevel") {
-    return tile.danger === "未发现即时危险" || tile.danger === "未知详情" ? 0 : 2;
+    return tile.dangerTags?.length ? 2 : 0;
   }
   if (path === "tile.resourceRemaining.wood") {
-    return tile.resources.includes("木材") ? 1 : 0;
+    return getTileTags(tile).has("forest") ? 1 : 0;
   }
   if (path === "tile.discoveredResources.water") {
-    return tile.resources.includes("水") || tile.resources.includes("水域");
+    return getTileTags(tile).has("water");
   }
   if (path === "event.eventId") {
     return event.eventId;
@@ -469,7 +469,7 @@ function getCrewRuleStatus(member: CrewMember) {
 
 function createTilePatch(effect: EventEffectDefinition): Partial<MapTile> {
   if (effect.field === "danger_hint") {
-    return { danger: String(effect.value ?? "发现危险迹象") };
+    return { status: String(effect.value ?? "发现危险迹象") };
   }
   if (effect.field === "survey_note" || effect.field === "lore_note") {
     return { status: String(effect.value ?? "已记录") };
@@ -478,7 +478,7 @@ function createTilePatch(effect: EventEffectDefinition): Partial<MapTile> {
     return { status: String(effect.value ?? "已更新") };
   }
   if (effect.field === "danger") {
-    return { danger: String(effect.value ?? "已更新") };
+    return { status: String(effect.value ?? "已更新") };
   }
   return { status: String(effect.value ?? "已更新") };
 }
