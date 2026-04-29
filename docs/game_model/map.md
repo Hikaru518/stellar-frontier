@@ -10,7 +10,7 @@
 | --- | --- |
 | `scope` | 覆盖静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换、可见窗口、调查报告和存档 reset 边界。 |
 | `out_of_scope` | 不定义地图编辑器 UI，不定义随机地图生成，不实现天气模拟，不定义对象级通用行动菜单，不重构事件系统语义。 |
-| `content_source_of_truth` | 地图静态内容来自 `content/maps/default-map.json`。地形、区域名、天气、环境属性、地块对象与特殊状态定义不保存在运行时状态里。 |
+| `content_source_of_truth` | 地图静态内容来自 `content/maps/default-map.json` 和 `content/map-objects/*.json`。当前正式地图对象只来自 `content/map-objects/mainline.json`；地形、区域名、天气、环境属性、地块对象与特殊状态定义不保存在运行时状态里。 |
 | `runtime_source_of_truth` | 玩家发现、调查、揭示对象、揭示状态、活跃状态和调查报告索引来自 `GameState.map`。 |
 | `compatibility_policy` | 研发期不迁移旧地图视图或旧存档；当前事实源统一为地图配置和 `GameState.map`。 |
 | `save_policy` | 固定 `4 x 4` 旧存档与配置驱动地图不兼容；读取时应 reset 或使用新的 save 版本 / save key。 |
@@ -20,6 +20,7 @@
 ```mermaid
 flowchart TD
   MapJson["content/maps/default-map.json"] --> MapConfig["MapConfig"]
+  ObjectJson["content/map-objects/mainline.json"] --> MapConfig
   MapConfig --> InitialMap["initial GameState.map"]
   InitialMap --> GameMapState["GameMapState"]
   GameMapState --> VisibleWindow["visible tile window"]
@@ -31,6 +32,7 @@ flowchart TD
 | 模型 | 代码名称 | 中文名 | 来源 | 介绍 |
 | --- | --- | --- | --- | --- |
 | 内容文件 | `content/maps/default-map.json` | 默认地图内容配置 | JSON | 地图编辑 / 内容生产应读写的文件，包含尺寸、origin、初始发现地块和完整地图块定义。 |
+| 地图对象文件 | `content/map-objects/mainline.json` | 主线地图对象配置 | JSON | 当前 runtime 加载的正式地图对象，包含坠毁点、矿床、村落、医疗、巢穴、火山、旧飞船和折跃仓等主线对象。 |
 | 内容定义 | `MapConfig` | 地图配置 | `src/content/contentData.ts` | TypeScript 对地图内容的描述，运行时初始化和查询 helper 读取它。 |
 | 运行时状态 | `GameMapState` | 地图运行时状态 | `GameState.map` | 保存玩家探索进度、调查状态、对象 / 状态揭示和调查报告索引。 |
 
@@ -104,6 +106,14 @@ flowchart TD
 | `toxicityLevel` | `string | null` | 毒性等级，可选。 |
 | `atmosphericPressureKpa` | `number | null` | 气压，可选。 |
 | `notes` | `string | null` | 设计备注或叙事短句，可选。 |
+
+### 3.6 当前默认地图内容边界
+
+当前默认地图服务回家主线。`content/maps/default-map.json` 的 `objectIds` 只引用 `content/map-objects/mainline.json` 中的对象；`content/map-objects/resources.json` 和 `content/map-objects/hazards.json` 当前为空，不承载旧演示对象。
+
+当前主线对象包括坠毁残骸、维修日志、基础雷达、损坏折跃仓、铁矿床、稀有矿石夹层、村落、商人、罗塞塔装置、医疗舱、医疗文档、受伤村民营地、湿地诱饵来源、巢穴入口、巢穴孵化室、高温采集点、黑曜石矿脉、损坏熔炉和旧飞船残骸等。默认地图可以保留森林、沙漠、山地等地形和环境读数作为氛围与移动规则输入，但这些地形本身不代表旧森林野兽、矿洞异常、沙漠 / 山地样例事件仍是当前可玩内容。
+
+新增正式地图对象前，需要先确认它服务当前主线或新的已批准内容边界，再更新 map-object 文件、默认地图引用和 content validator。测试 fixture 可以构造抽象地图对象验证系统能力，但 fixture 不应放入 `content/map-objects/` 或 `content/maps/`。
 
 ## 4. 运行时模型
 
@@ -285,6 +295,8 @@ type InvestigationReport = {
 - 每个 tile 的 `id` 必须等于 `${row}-${col}`。
 - tile `row`、`col` 必须在地图边界内。
 - 默认地图 `tiles` 覆盖所有合法格；如果未来允许稀疏地图，需要先定义 blocked / void 规则。
+- 默认地图 `objectIds` 必须能解析到已加载地图对象。
+- 当前默认地图不得引用旧演示对象，例如森林野兽、矿洞异常、沙漠 / 山地样例对象。
 - 地块对象 `id` 在地图内唯一。
 - 特殊状态 `id` 在单 tile 内唯一。
 
@@ -303,3 +315,4 @@ type InvestigationReport = {
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/configurable-map-system-design.md` |
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/technical-design.md` |
 | 2026-04-28 | `docs/plans/2026-04-27-22-56/communication-table-gameplay-design.md` |
+| 2026-04-30 | `docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-design.md` |

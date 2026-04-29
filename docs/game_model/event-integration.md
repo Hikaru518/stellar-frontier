@@ -89,7 +89,7 @@
 | `area_name` | `string` | 区域名。未配置时由地图系统提供“野外”等 fallback。 |
 | `weather` | `string` | 已发现地块可见的天气。当前事件投影可读取，但天气是否参与结算由事件定义决定。 |
 | `tags` | `string[]` | 地形、生态、剧情、对象和状态标签。 |
-| `danger_tags` | `string[]` | 已揭示且 active 的危险来源标签，例如 `large_beast_activity`、`volcanic_activity`。 |
+| `danger_tags` | `string[]` | 已揭示且 active 的危险来源标签，例如 `hive_guard_activity`、`volcanic_activity`。 |
 | `discovery_state` | `unknown` / `frontier` / `discovered` | 发现状态。 |
 | `survey_state` | `unsurveyed` / `surveyed` | 调查状态。 |
 | `visibility` | `hidden` / `frontier` / `visible` | 地块可见性。 |
@@ -257,3 +257,4 @@
 | 2026-04-27 | `docs/plans/2026-04-27-15-33/event-program-model-player-journey-game-model-spec.md` |
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/configurable-map-system-design.md` |
 | 2026-04-28 | `docs/plans/2026-04-27-22-56/communication-table-gameplay-design.md` |
+| 2026-04-30 | `docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-design.md` |

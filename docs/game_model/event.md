@@ -11,8 +11,8 @@
 | `scope` | 覆盖静态内容资产、runtime `event`、runtime `call`、`objective`、`trigger_context`、候选选择、事件图、节点、condition、effect、handler registry、校验和样例 dry-run。 |
 | `out_of_scope` | 不定义事件编辑器 UI，不定义编辑器元数据文件格式，不保存完整长期通话记录，不设计完整 quest system，不兼容旧事件 JSON 或旧 `localStorage` 存档。 |
 | `field_naming` | JSON / TypeScript 字段使用英文 `snake_case`；文档用中文解释字段语义。 |
-| `id_naming` | 全局资产 ID 使用稳定字符串，例如 `forest_beast_encounter`；运行时实例 ID 使用带类型前缀的生成 ID，例如 `evt_...`、`call_...`、`obj_...`。 |
-| `content_source_of_truth` | 静态内容资产来自 `content/` 下的全局资产库；运行时实例不复制完整静态定义，只保存 ID、版本和运行时状态。 |
+| `id_naming` | 全局资产 ID 使用稳定字符串，例如 `mainline_return_home`；运行时实例 ID 使用带类型前缀的生成 ID，例如 `evt_...`、`call_...`、`obj_...`。 |
+| `content_source_of_truth` | 静态内容资产来自 `content/` 下的全局资产库；当前 runtime 只加载 `content/events/manifest.json` 注册的主线事件 domain。运行时实例不复制完整静态定义，只保存 ID、版本和运行时状态。 |
 | `runtime_source_of_truth` | 运行时状态来自 `GameState` / `save_state`；事件引擎只通过结构化 condition/effect 读写这些状态。 |
 | `editor_metadata_policy` | 运行时资产禁止包含 `editor_layout`、`editor_notes`、`review_status`、`preview_cases`、节点坐标、折叠状态等编辑器字段。 |
 | `compatibility_policy` | 项目仍处研发期，不要求旧内容和旧存档兼容；旧 `localStorage` save 遇到新模型可以硬失败。 |
@@ -27,6 +27,7 @@
 | --- | --- |
 | `content/events/definitions/<domain>.json` | 保存 `event_definition`。`<domain>` 可按地形、章节、剧情线、队员或系统拆分。 |
 | `content/events/call_templates/<domain>.json` | 保存 `call_template`。模板通过 ID 被事件节点引用，不能反向决定事件逻辑。 |
+| `content/events/manifest.json` | 保存当前 runtime 允许加载的事件 domain 白名单。当前只注册回家主线。 |
 | `content/events/handler_registry.json` | 保存白名单 `handler_type`、用途、参数 schema 引用和测试样例。 |
 | `content/events/presets/<domain>.json` | 保存可复用 condition/effect/handler preset；加载后仍展开为受 schema 约束的结构化字段。 |
 | `content/schemas/events/*.schema.json` | 保存事件定义、事件图、节点、condition、effect、call template、handler params 等 schema。 |
@@ -40,6 +41,8 @@
 - 运行时加载时建立全局索引：`by_event_definition_id`、`by_call_template_id`、`by_trigger_type`、`by_domain`、`by_tag`、`by_mutex_group`。
 - 静态资产不得保存运行时实例字段，例如 `current_node_id`、`selected_options`、`active_call_id`。
 - 静态资产不得保存编辑器字段，例如节点坐标、注释、review 状态、覆盖率报告。
+- 当前 runtime 只加载 `mainline_crash_site`、`mainline_resources`、`mainline_village`、`mainline_medical`、`mainline_hive`、`mainline_ending` 六个 domain。
+- `crash_site`、`desert`、`forest`、`mine`、`mountain` 等旧演示 domain 不属于当前 runtime content。事件系统测试可以使用 fixture 或 sample context 验证通用能力，但 fixture 不放在 `content/` 下，也不进入 manifest。
 
 ## 3. 静态内容模型
 
@@ -52,7 +55,7 @@
 | `schema_version` | `string` | 内容结构版本；校验器用它选择 schema。 |
 | `id` | `string` | 全局唯一事件定义 ID。 |
 | `version` | `number` | 事件定义版本；runtime event 记录创建时使用的版本。 |
-| `domain` | `string` | 资产所属 domain，例如 `forest`、`volcano`、`crew_mike`。 |
+| `domain` | `string` | 资产所属 domain。当前正式内容使用 `mainline_*` domain；未来新增支线前需要先更新 manifest 策略和内容边界。 |
 | `title` | `string` | 内部与内容生产可读标题；是否展示给玩家由 UI 决定。 |
 | `summary` | `string` | 事件意图摘要，用于 review、日志模板选择和 dry-run 说明。 |
 | `tags` | `string[]` | 搜索、筛选、触发索引用标签。 |
@@ -379,21 +382,22 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 - dry-run 必须验证 effect target、handler params、history writes 和 event_log 输出。
 - dry-run 不要求覆盖所有 variant；variant 覆盖率报告属于编辑器级后续扩展。
 
-## 7. 五个样例事件覆盖矩阵
+## 7. 当前主线内容覆盖矩阵
 
-五个样例事件用于验证模型覆盖面，不要求在本文写成完整 JSON。
+当前 runtime content 只表达回家主线。下面矩阵说明主线资产如何覆盖事件模型能力；旧演示事件若仍有测试价值，只能作为测试 fixture 保留。
 
-| 样例 | 触发与节点 | 覆盖模型 | 验证点 |
+| 主线域 | 触发与节点 | 覆盖模型 | 验证点 |
 | --- | --- | --- | --- |
-| `forest_trace_small_camp` 普通发现不打断 | `action_complete`；`log_only -> end`，可选非阻塞 `call` 作为自动回报。 | `tile_state.event_marks`、`event_log`、`world_history`、非 blocking event。 | 事件可作为世界反馈存在，不抢占队员行动或通讯。 |
-| `forest_beast_encounter` 紧急多通话 | `action_complete` 或 `proximity`；`call -> wait -> call -> random -> end`。 | blocking event、blocking call、`selected_options`、`random_results`、`crew_state.condition_tags`、`tile_state.danger_tags`。 | 一个 event 可生成多次 call；call 文案不决定分支，`option_id` 决定分支。 |
-| `mountain_signal_probe` 等待节点与时间压力 | `arrival` 或 `action_complete`；`call -> wait -> check/random -> call -> end`。 | `next_wakeup_at`、`time_wakeup`、`event_node_finished`、`crew_action_state.event_waiting`。 | 等待是事件图一等节点，时间系统能推进事件。 |
-| `volcanic_ash_trace` 跨队员 objective | `action_complete`；`call -> objective -> wait/waiting_objective -> end`。 | runtime `objective`、任意符合条件队员执行、`objective_completed`、parent event 回写。 | 事件能生成独立目标；Mike、Amy 或 Garry 完成行动后推进 parent event。 |
-| `lost_relic_argument` 长期角色和世界后果 | `arrival` 或 `action_complete`；`call -> wait -> call -> check -> 多个 end`。 | `call_template` 变体、`personality_tags` 改变、`site_objects` 删除、`world_flags`、`spawn_event` / `unlock_event_definition`、日记追加。 | 最终选项能改变角色、地图、后续事件池和玩家可见摘要。 |
+| `mainline_crash_site` 坠毁点起点 | 调查当前区域后进入主线；`call`、`check`、`end` 组合推进维修日志、雷达和折跃仓线索。 | `call_template`、`world_flags`、`event_log`、队员状态和主线地图对象。 | 当前区域调查可以进入坠毁点主线，且终局折跃仓事件不会抢占开局调查。 |
+| `mainline_resources` 稀有矿石与修复套件 | 丘陵矿床、火山采集点和熔炉对象驱动资源链；事件通过选项、条件和效果记录材料进度。 | inventory、world flags、地图对象、物品和资源条件。 | 稀有矿石链路可推进，并能支撑后续修复套件制作。 |
+| `mainline_village` 村落与语言 / 交易 | 村落、罗塞塔装置和商人对象提供语言学习、交易和后续地点线索。 | `selected_options`、条件分支、跨事件 world history。 | 玩家通过主线事件取得交易与村民线索，而不是通过旧演示地点事件推进。 |
+| `mainline_medical` 医疗舱与救援 | 医疗舱、医疗文档、受伤村民营地和湿地诱饵来源组成救援链。 | 队员标签、物品条件、地图对象和可重复对象行动。 | 医疗文档对象行动引用正式事件，validator 会阻止错误 `event_id` 引用。 |
+| `mainline_hive` 巢穴燃料 | 巢穴入口和孵化室对象提供高风险燃料节点。 | 危险标签、物品 / world flag 条件和主线资源结算。 | 入口守卫、诱饵和燃料获取都来自主线对象与主线事件。 |
+| `mainline_ending` 返航完成 | 折跃仓修复条件满足后推进终局。 | `world_flags`、关键物品、终局页面状态。 | `return_home_completed` 会进入 `EndingPage`。 |
 
 ## 8. 模型边界与后续扩展
 
-运行时事件资产不包含事件编辑器 web route、图编辑 UI、预览面板、资产管理页面、编辑器元数据文件格式、玩家长期完整通讯档案、完整 debug trace、隐藏选项原因回放、旧事件 JSON 兼容层、旧 `localStorage` 迁移、完整 quest system、奖励系统、任务优先级 UI、关系/士气/天气/昼夜/生态扩散/势力控制等更大模拟系统。
+运行时事件资产不包含事件编辑器 web route、图编辑 UI、预览面板、资产管理页面、编辑器元数据文件格式、玩家长期完整通讯档案、完整 debug trace、隐藏选项原因回放、测试 fixture、旧事件 JSON 兼容层、旧 `localStorage` 迁移、完整 quest system、奖励系统、任务优先级 UI、关系/士气/天气/昼夜/生态扩散/势力控制等更大模拟系统。
 
 后续模型扩展记录：
 
@@ -405,3 +409,4 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 | 日期 | 来源 |
 | --- | --- |
 | 2026-04-27 | `docs/plans/2026-04-27-15-33/event-program-model-player-journey-game-model-spec.md` |
+| 2026-04-30 | `docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-design.md` |

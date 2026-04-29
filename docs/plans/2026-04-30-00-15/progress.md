@@ -20,7 +20,7 @@ source:
 | 4 | T004 | 迁移事件系统测试样例到测试 fixture | completed | 1 |
 | 5 | T005 | 加强 content 校验防止非主线内容回流 | completed | 1 |
 | 6 | T006 | 验证主线 15 步闭环仍完整可玩 | completed | 2 |
-| 7 | T007 | 同步正式文档中的当前内容边界 | pending | 0 |
+| 7 | T007 | 同步正式文档中的当前内容边界 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -78,3 +78,11 @@ source:
   - 尝试 2: 修复终局折跃仓事件抢占开局坠毁点调查的问题，并更新 runtime call / e2e 断言。
 - Monkey summary: 给终局折跃仓事件增加内容侧门槛，补齐主线调查入口、稀有矿石链路、当前区域调查和 `EndingPage` 验收；更新 e2e 为当前主线文本。
 - 质量检查: `npm run validate:content`、`npm run lint`、`npm run test`、`npm run test:e2e` 通过；`ReadLints` 未发现新增诊断。
+
+### T007: 同步正式文档中的当前内容边界
+- 状态: completed
+- 开始时间: 2026-04-30 01:22
+- 完成时间: 2026-04-30 01:23
+- 尝试次数: 1
+- Monkey summary: 正式文档明确 runtime 只加载 `mainline_*` 回家主线 content，区分 runtime assets 与测试 fixture，并移除旧演示内容作为当前可玩内容的描述。
+- 质量检查: `git diff --check` 通过；确认未修改 `docs/core-ideas.md`。未运行 npm 命令，因为本任务只修改 Markdown。
