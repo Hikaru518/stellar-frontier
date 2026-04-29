@@ -133,7 +133,7 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 }
 
 describe("buildCallView", () => {
-  it("groups universal actions without exposing retired legacy object actions", () => {
+  it("groups universal actions without exposing retired object actions", () => {
     // tile `2-3` exists in default-map.json and lists `black-pine-stand` as one
     // of its objectIds. Its old object actions are intentionally no longer
     // call decisions; current-area survey owns the structured investigation path.

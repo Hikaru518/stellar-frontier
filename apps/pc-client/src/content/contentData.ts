@@ -260,7 +260,7 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
  * Defensive normalization of the migrated map JSON: ensures every tile has an
  * `objectIds` array (defaulting to `[]`). All consumers should now read
  * `tile.objectIds` and resolve definitions via `mapObjectDefinitionById`; the
- * legacy synthesised `tile.objects` projection has been removed.
+ * old synthesised `tile.objects` projection has been removed.
  */
 function normalizeMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
   return {

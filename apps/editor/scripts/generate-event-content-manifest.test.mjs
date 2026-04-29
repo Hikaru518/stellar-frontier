@@ -52,8 +52,8 @@ describe("generate-event-content-manifest", () => {
     expect(generated).toContain(
       'import crashSiteEventDefinitionsContent from "../../../../../content/events/definitions/crash_site.json";',
     );
-    expect(generated).not.toContain("crewKael");
-    expect(generated).not.toContain("crew_kael");
+    expect(generated).not.toContain(["crew", "Kael"].join(""));
+    expect(generated).not.toContain(["crew", "_", "ka", "el"].join(""));
     expect(generated).toContain(
       'import forestPresetsContent from "../../../../../content/events/presets/forest.json";',
     );

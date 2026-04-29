@@ -45,7 +45,7 @@ describe("eventSystem inventory effects", () => {
     expect(result.baseInventory).toEqual([]);
   });
 
-  it("adds items to base inventory and syncs legacy resource counters for iron and wood", () => {
+  it("adds items to base inventory and syncs resource counters for iron and wood", () => {
     const result = executeEventEffects({
       event: baseEvent,
       effects: [{ type: "addItem", itemId: "iron_ore", target: "baseInventory", amount: 3 }],

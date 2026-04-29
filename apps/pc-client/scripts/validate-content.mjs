@@ -98,7 +98,7 @@ for (const [dataPath, schemaPath] of eventAssetFiles) {
 }
 
 if (!eventSchemaFailed) {
-  failed = validateStructuredEventRetiredCrewReferences() || failed;
+  failed = validateStructuredEventCrewReferences() || failed;
   failed = validateEventProgramReferences() || failed;
 }
 
@@ -174,42 +174,62 @@ function loadArrayFromFiles(relativeDirectory, propertyName) {
   return listJsonFiles(relativeDirectory).flatMap((dataPath) => readJson(dataPath)[propertyName] ?? []);
 }
 
-function validateStructuredEventRetiredCrewReferences() {
+function validateStructuredEventCrewReferences() {
   let hasError = false;
-  const retiredCrewIds = new Set(["lin_xia", "kael", "crew_kael"]);
+  const crewIds = new Set(loaded["content/crew/crew.json"].crew.map((member) => member.crewId));
   for (const { directoryPath } of eventAssetGroups) {
     for (const dataPath of listJsonFiles(directoryPath)) {
-      hasError = validateRetiredCrewReferencesInValue(readJson(dataPath), dataPath, [], retiredCrewIds) || hasError;
+      hasError = validateCrewReferencesInValue(readJson(dataPath), dataPath, [], crewIds) || hasError;
     }
   }
   return hasError;
 }
 
-function validateRetiredCrewReferencesInValue(value, dataPath, segments, retiredCrewIds) {
-  if (typeof value === "string") {
-    if (retiredCrewIds.has(value)) {
-      return report(`Retired crew id in structured event content: ${value} at ${dataPath}${formatJsonPath(segments)}`);
-    }
+function validateCrewReferencesInValue(value, dataPath, segments, crewIds) {
+  if (Array.isArray(value)) {
+    return value.reduce(
+      (hasError, item, index) => validateCrewReferencesInValue(item, dataPath, [...segments, index], crewIds) || hasError,
+      false,
+    );
+  }
+
+  if (!value || typeof value !== "object") {
     return false;
   }
 
-  if (Array.isArray(value)) {
-    return value.reduce(
-      (hasError, item, index) =>
-        validateRetiredCrewReferencesInValue(item, dataPath, [...segments, index], retiredCrewIds) || hasError,
-      false,
-    );
-  }
+  let hasError = false;
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "crew_id" && typeof child === "string") {
+      hasError = validateKnownCrewId(child, dataPath, [...segments, key], crewIds) || hasError;
+      continue;
+    }
 
-  if (value && typeof value === "object") {
-    return Object.entries(value).reduce(
-      (hasError, [key, child]) =>
-        validateRetiredCrewReferencesInValue(child, dataPath, [...segments, key], retiredCrewIds) || hasError,
-      false,
-    );
-  }
+    if (key === "crew_ids" && Array.isArray(child)) {
+      hasError =
+        child.reduce(
+          (childHasError, crewId, index) =>
+            (typeof crewId === "string" && validateKnownCrewId(crewId, dataPath, [...segments, key, index], crewIds)) ||
+            childHasError,
+          false,
+        ) || hasError;
+      continue;
+    }
 
-  return false;
+    if (key === "id" && typeof child === "string" && value.type === "crew_id") {
+      hasError = validateKnownCrewId(child, dataPath, [...segments, key], crewIds) || hasError;
+      continue;
+    }
+
+    hasError = validateCrewReferencesInValue(child, dataPath, [...segments, key], crewIds) || hasError;
+  }
+  return hasError;
+}
+
+function validateKnownCrewId(crewId, dataPath, segments, crewIds) {
+  if (crewIds.has(crewId) || crewId.includes("{")) {
+    return false;
+  }
+  return report(`Unknown crew id in structured event content: ${crewId} at ${dataPath}${formatJsonPath(segments)}`);
 }
 
 function formatJsonPath(segments) {

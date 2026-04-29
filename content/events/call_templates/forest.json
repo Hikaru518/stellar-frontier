@@ -103,7 +103,7 @@
           "variants": [
             {
               "id": "beast_engage_default",
-              "text": "用随身武器和噪声驱赶它。",
+              "text": "用随身武器和声响驱赶它。",
               "priority": 0
             }
           ]

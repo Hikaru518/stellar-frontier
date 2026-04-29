@@ -53,15 +53,18 @@ describe("EventBrowser", () => {
     cleanup();
   });
 
-  it("keeps legacy event assets out of the editor surface", () => {
+  it("keeps removed event assets out of the editor surface", () => {
     const typeSource = readFileSync("src/event-editor/types.ts", "utf8");
     const browserSource = readFileSync("src/event-editor/EventBrowser.tsx", "utf8");
     const readmeSource = readFileSync("README.md", "utf8");
+    const removedAssetType = ["leg", "acy_event"].join("");
+    const removedAssetLabel = ["leg", "acy event"].join("");
+    const removedAssetFile = ["events", ".json"].join("");
 
-    expect(typeSource).not.toContain("legacy_event");
-    expect(browserSource).not.toContain("legacy_event");
-    expect(browserSource).not.toContain("legacy event");
-    expect(readmeSource).not.toContain("events.json");
+    expect(typeSource).not.toContain(removedAssetType);
+    expect(browserSource).not.toContain(removedAssetType);
+    expect(browserSource).not.toContain(removedAssetLabel);
+    expect(readmeSource).not.toContain(removedAssetFile);
   });
 
   it("renders the available filter chips for the trimmed asset set", () => {

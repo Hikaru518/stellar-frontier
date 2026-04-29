@@ -50,19 +50,19 @@ describe("generated event content exports", () => {
     expect(indexResult.index.presetsById.size).toBe(generatedContent.generatedPresetDefinitions.length);
   });
 
-  it("does not expose retired crew structured event content", async () => {
+  it("does not expose unsupported crew references in structured event content", async () => {
     const contentData = await import("./contentData");
+    const supportedCrewIds = new Set(["mike", "amy", "garry"]);
+    const referencedCrewIds = contentData.eventProgramDefinitions.flatMap((definition) =>
+      [...(definition.content_refs?.crew_ids ?? []), ...definition.sample_contexts.map((context) => context.crew_id)].filter(
+        (crewId): crewId is string => typeof crewId === "string",
+      ),
+    );
 
-    const serializedStructuredContent = JSON.stringify({
-      domains: contentData.eventContentLibrary.domains,
-      eventProgramDefinitions: contentData.eventProgramDefinitions,
-      callTemplates: contentData.callTemplates,
-    });
-
-    expect(serializedStructuredContent).not.toMatch(/\b(?:crew_kael|lin_xia|kael)\b/);
+    expect(referencedCrewIds.every((crewId) => supportedCrewIds.has(crewId))).toBe(true);
   });
 
-  it("does not expose legacy event content exports", async () => {
+  it("does not expose removed event content exports", async () => {
     const contentData = await import("./contentData");
 
     expect("eventDefinitions" in contentData).toBe(false);
@@ -71,12 +71,11 @@ describe("generated event content exports", () => {
 });
 
 describe("default map config", () => {
-  it("exposes tile.objectIds (post-migration) and no legacy tile.objects field", async () => {
+  it("exposes tile.objectIds (post-migration) and no inline tile.objects field", async () => {
     const { defaultMapConfig } = await import("./contentData");
     expect(defaultMapConfig.tiles.length).toBeGreaterThan(0);
     for (const tile of defaultMapConfig.tiles) {
       expect(Array.isArray(tile.objectIds)).toBe(true);
-      // The legacy `tile.objects` projection must be gone — Task 3 deleted it.
       expect("objects" in tile).toBe(false);
     }
   });

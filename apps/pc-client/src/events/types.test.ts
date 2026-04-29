@@ -43,7 +43,7 @@ describe("event program model contracts", () => {
     expectTypeOf<GameState["rng_state"]>().toEqualTypeOf<object | null>();
   });
 
-  it("rejects legacy saves instead of returning a partial old state", () => {
+  it("rejects obsolete saves instead of returning a partial old state", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify({

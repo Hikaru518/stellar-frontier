@@ -138,7 +138,7 @@ describe("deriveCrewActionViewModel", () => {
       crew_id: "amy",
       status: "incoming",
       expires_at: 130,
-      rendered_lines: [{ template_variant_id: "line-1", text: "森林频道请求接入。", speaker_crew_id: "amy" }],
+      rendered_lines: [{ template_variant_id: "line-1", text: "森林通讯请求接入。", speaker_crew_id: "amy" }],
     });
 
     const view = deriveCrewActionViewModel({
@@ -152,7 +152,7 @@ describe("deriveCrewActionViewModel", () => {
     expect(view).toMatchObject({
       actionStatus: "waiting_call",
       actionTitle: "等待通讯接入",
-      statusText: "森林频道请求接入。",
+      statusText: "森林通讯请求接入。",
       timingText: "事件通话剩余 00:30",
       progressPercent: null,
       canCommunicate: true,

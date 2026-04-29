@@ -180,7 +180,7 @@ test("PS-003 resolves Garry's mine anomaly call and records the anomaly log", as
   );
 });
 
-test("loads the app and opens the incoming Amy channel without legacy emergency choices", async ({ page }) => {
+test("loads the app and opens the incoming Amy call without saved emergency choices", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
@@ -213,14 +213,14 @@ test("opens the communication station and shows a crew inventory", async ({ page
   await expect(page.getByText("可在失联或救援相关事件中提供定位帮助。")).toBeVisible();
 });
 
-test("shows the Yuan realtime link demo with WebRTC as LAN upgrade and WSS fallback", async ({ page }) => {
+test("shows the Yuan realtime link with WebRTC as LAN upgrade and WSS fallback", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
 
   const phonePanel = page.getByText("手机私人终端").locator("xpath=ancestor::section[1]");
   await expect(phonePanel).toBeVisible();
-  await expect(phonePanel.getByLabel("实时连接演示")).toBeVisible();
+  await expect(phonePanel.getByLabel("实时连接说明")).toBeVisible();
   await expect(phonePanel.getByText("局域网升级")).toBeVisible();
   await expect(phonePanel.getByText(/yuan-webrtc-datachannel/)).toBeVisible();
   await expect(phonePanel.getByText("公网兜底")).toBeVisible();

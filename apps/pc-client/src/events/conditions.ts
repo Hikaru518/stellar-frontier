@@ -698,9 +698,9 @@ function resolveCrewInventory(
     return passWithTarget({ type: target.type, id: inventoryId, value: context.state.inventories[inventoryId] });
   }
 
-  const legacyInventory = crew && readFieldValue(crew, "inventory");
-  if (Array.isArray(legacyInventory)) {
-    return passWithTarget({ type: target.type, id: crewId, value: legacyInventory });
+  const inlineInventory = crew && readFieldValue(crew, "inventory");
+  if (Array.isArray(inlineInventory)) {
+    return passWithTarget({ type: target.type, id: crewId, value: inlineInventory });
   }
 
   return failWithTarget("missing_target", `${path}.target`, `Crew inventory ${target.id ?? crewId ?? "<missing>"} does not exist.`);
@@ -934,9 +934,9 @@ function resourceAmount(value: unknown, resourceId: string): number {
     }, 0);
   }
 
-  const legacyResources = readFieldValue(value, "resources");
-  if (Array.isArray(legacyResources)) {
-    return legacyResources.includes(resourceId) ? 1 : 0;
+  const resourceList = readFieldValue(value, "resources");
+  if (Array.isArray(resourceList)) {
+    return resourceList.includes(resourceId) ? 1 : 0;
   }
 
   return 0;

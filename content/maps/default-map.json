@@ -528,7 +528,7 @@
       "specialStates": [
         {
           "id": "unknown-echo",
-          "name": "未知回声",
+          "name": "异常回波",
           "visibility": "onDiscovered",
           "severity": "low",
           "startsActive": true

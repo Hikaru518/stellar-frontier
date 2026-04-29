@@ -36,7 +36,7 @@ export interface RuntimeMapState {
   tilesById: Record<string, RuntimeMapTileState | undefined>;
   /**
    * Flat by-id state for every map object, populated at game-start from
-   * `mapObjectDefinitionById`. Optional on the type so legacy test fixtures
+   * `mapObjectDefinitionById`. Optional on the type so narrow test fixtures
    * still compile; runtime always treats `undefined` as `{}`.
    */
   mapObjects?: RuntimeMapObjectsState;

@@ -119,7 +119,7 @@
       "diaryEntries": [
         {
           "entryId": "amy_init_forest",
-          "triggerNode": "森林求救前",
+          "triggerNode": "森林紧急来电前",
           "gameSecond": 0,
           "text": "森林里没有路，只有一堆互相假装不是树枝的障碍物。我开始理解为什么地图没有写“令人讨厌”。",
           "availability": "delivered"

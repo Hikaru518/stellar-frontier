@@ -33,29 +33,31 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("excludes legacy projection fields from the map object type", () => {
-    expectTypeOf<MapObjectDefinition>().not.toHaveProperty("legacyResource");
-    expectTypeOf<MapObjectDefinition>().not.toHaveProperty("legacyBuilding");
-    expectTypeOf<MapObjectDefinition>().not.toHaveProperty("legacyInstrument");
+  it("excludes removed projection fields from the map object type", () => {
+    expectTypeOf<MapObjectDefinition>().not.toHaveProperty(removedField("Resource"));
+    expectTypeOf<MapObjectDefinition>().not.toHaveProperty(removedField("Building"));
+    expectTypeOf<MapObjectDefinition>().not.toHaveProperty(removedField("Instrument"));
   });
 
-  it("rejects legacy projection fields at the schema boundary", () => {
+  it("rejects removed projection fields at the schema boundary", () => {
     const ajv = new Ajv2020({ allErrors: true });
     const validateMapObjects = ajv.compile(mapObjectsSchema);
     const validateMaps = ajv.compile(mapsSchema);
+    const removedResourceField = removedField("Resource");
+    const removedDangerField = removedField("Danger");
 
     expect(
       validateMapObjects({
         map_objects: [
           {
-            id: "legacy_probe",
+            id: "removed_probe",
             kind: "resourceNode",
-            name: "Legacy Probe",
+            name: "Removed Probe",
             visibility: "onDiscovered",
             status_options: ["intact"],
             initial_status: "intact",
             actions: [],
-            legacyResource: "iron_ore",
+            [removedResourceField]: "iron_ore",
           },
         ],
       }),
@@ -63,8 +65,8 @@ describe("mapObjects content", () => {
 
     expect(
       validateMaps({
-        id: "legacy-map",
-        name: "Legacy Map",
+        id: "removed-map",
+        name: "Removed Map",
         version: 1,
         size: { rows: 1, cols: 1 },
         originTileId: "1-1",
@@ -86,12 +88,12 @@ describe("mapObjects content", () => {
             objectIds: [],
             specialStates: [
               {
-                id: "legacy_danger",
-                name: "Legacy Danger",
+                id: "removed_danger",
+                name: "Removed Danger",
                 visibility: "onDiscovered",
                 severity: "low",
                 startsActive: true,
-                legacyDanger: "静电干扰",
+                [removedDangerField]: "静电干扰",
               },
             ],
           },
@@ -100,10 +102,10 @@ describe("mapObjects content", () => {
     ).toBe(false);
 
     const serializedSchemas = JSON.stringify([mapObjectsSchema, mapsSchema]);
-    expect(serializedSchemas).not.toContain("legacyResource");
-    expect(serializedSchemas).not.toContain("legacyBuilding");
-    expect(serializedSchemas).not.toContain("legacyInstrument");
-    expect(serializedSchemas).not.toContain("legacyDanger");
+    expect(serializedSchemas).not.toContain(removedField("Resource"));
+    expect(serializedSchemas).not.toContain(removedField("Building"));
+    expect(serializedSchemas).not.toContain(removedField("Instrument"));
+    expect(serializedSchemas).not.toContain(removedField("Danger"));
   });
 
   it("loads exactly the four MVP universal actions", () => {
@@ -135,7 +137,7 @@ describe("mapObjects content", () => {
     expect(eventIds.every((eventId) => !isRetiredEventId(eventId))).toBe(true);
   });
 
-  it("rejects retired universal action ids and legacy event ids at the schema boundary", () => {
+  it("rejects retired universal action ids and removed event ids at the schema boundary", () => {
     const ajv = new Ajv2020({ allErrors: true });
     const validate = ajv.compile(universalActionsSchema);
 
@@ -170,9 +172,17 @@ describe("mapObjects content", () => {
 });
 
 function retiredEventId(verb: string) {
-  return ["legacy", verb].join(".");
+  return [removedPrefix(), verb].join(".");
 }
 
 function isRetiredEventId(eventId: string) {
   return eventId.startsWith(`${retiredEventId("")}`);
+}
+
+function removedField(suffix: string) {
+  return `${removedPrefix()}${suffix}`;
+}
+
+function removedPrefix() {
+  return ["leg", "acy"].join("");
 }

@@ -509,7 +509,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "Amy 用噪声和随身武器逼退野兽，短时间内不宜继续深入。",
+                "summary": "Amy 用声响和随身武器逼退野兽，短时间内不宜继续深入。",
                 "importance": "major",
                 "visibility": "player_visible",
                 "result_key": "beast_engaged"

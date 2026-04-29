@@ -8,9 +8,7 @@ import type { CrewMember, GameState, MapTile } from "../data/gameData";
  * object actions both go through `events/conditions.ts:evaluateConditions`, so
  * we expose:
  *
- * - the crew array (so `primary_crew` / `crew_id` targets resolve and
- *   `inventory_has_item` can find a crew inventory via the legacy `inventory`
- *   field),
+ * - the crew array (so `primary_crew` / `crew_id` targets resolve),
  * - at minimum the current tile under `state.tiles`,
  * - the runtime map-objects table under `state.map.mapObjects`, so the
  *   `object_status_equals` handler condition can read `status_enum`,

@@ -129,7 +129,7 @@ https://<用户名>.github.io/stellar-frontier/
 
 ## 功能概览
 
-- **控制中心**：游戏主入口，展示资源状态、系统日志和可交互设施（窗户、中控台、咖啡机、唱片机、冰箱、研究台、星际贸易、星际之门等）。
+- **控制中心**：游戏主入口，展示资源状态、系统日志和可交互设施（窗户、中控台、咖啡机、音频终端、冰箱、研究台、星际贸易、星际之门等）。
 - **通讯台**：查看队员位置、状态、背包、通讯/失联状态和来电，并进入通话事件。
 - **手机私人终端**：PC 通讯台可生成 QR 码与短手输码；手机端作为 Yuan Terminal companion 接收 PC 授权的私密通讯，只回传 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。Stellar 仅维护共享 dual-device 业务库，不维护专属 relay server。
 - **Yuan 双端链路**：PC 与手机都实例化真实 Yuan `Terminal`，开启 `enable_WebRTC: true`，通过 Yuan service 传输心跳、私密来电、已读和接听事件；Yuan WSS 是稳定基线，WebRTC DataChannel 是机会性局域网升级。

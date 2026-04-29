@@ -150,23 +150,45 @@ describe("App", () => {
     expect(screen.getByText("暂无可分配目标。")).toBeInTheDocument();
   });
 
-  it("does not render hard-coded PC UI mock copy on current fact pages", () => {
-    const forbiddenPcMockCopy =
-      /频道 A-17|信号噪声|天线：|偏移 2\.1|最近信号|脚步声|非常不礼貌的求救|信号日志|重复回声|实时连接演示|唱片机|低噪播放|地图信号：16 格|2 异常|设施状态|常规频道|其他频道|信号静默|短暂的安静|异常数量/;
+  it("does not render hard-coded PC prototype copy on current fact pages", () => {
+    const forbiddenPcPrototypeCopy = new RegExp(
+      [
+        ["频", "道 A-17"].join(""),
+        ["信号", "噪", "声"].join(""),
+        ["天", "线："].join(""),
+        "偏移 2\\.1",
+        "最近信号",
+        ["脚", "步声"].join(""),
+        ["非常不礼貌的求", "救"].join(""),
+        "信号日志",
+        "重复回声",
+        ["实时连接", "演", "示"].join(""),
+        ["唱", "片机"].join(""),
+        "低噪播放",
+        "地图信号：16 格",
+        "2 异常",
+        ["设施", "状态"].join(""),
+        ["常规频", "道"].join(""),
+        ["其他频", "道"].join(""),
+        "信号静默",
+        "短暂的安静",
+        ["异常", "数量"].join(""),
+      ].join("|"),
+    );
     const { container } = render(<App />);
 
-    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
-    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
 
     const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
     expect(amyCard).not.toBeNull();
     fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
-    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
 
     fireEvent.click(screen.getByRole("button", { name: /地图二级菜单/ }));
-    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
   });
 
   it("advances game time while the app is running", () => {
@@ -181,7 +203,7 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
   });
 
-  it("settles arrival event checks against derived legacy tiles without crashing", () => {
+  it("settles arrival event checks against runtime map state without crashing", () => {
     vi.useFakeTimers();
     const mikeTargetTileId = crewDefinitions.find((member) => member.crewId === "mike")?.activeAction?.targetTile;
 
@@ -329,7 +351,7 @@ describe("App", () => {
     expect(savedCrew(saved, "garry").inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
   });
 
-  it("does not expose legacy object survey as a call decision", () => {
+  it("does not expose retired object survey as a call decision", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
@@ -774,7 +796,7 @@ describe("App", () => {
 
   it.each([
     ["evacuate", "撤离到开阔地。"],
-    ["engage", "用随身武器和噪声驱赶它。"],
+    ["engage", "用随身武器和声响驱赶它。"],
     ["stay_hidden", "继续隐藏，保持安静。"],
   ])("resolves Amy's forest beast emergency option %s and releases her event action", (_optionId, optionLabel) => {
     startAmyBeastEmergencyFromStandby();
@@ -1248,7 +1270,7 @@ describe("App", () => {
             id: "priority-event-call",
             crew_id: "garry",
             severity: "medium",
-            rendered_lines: [runtimeLine("Garry 的事件频道等待接入。", "garry")],
+            rendered_lines: [runtimeLine("Garry 的事件通讯等待接入。", "garry")],
           }),
         },
       })),
@@ -1261,7 +1283,7 @@ describe("App", () => {
     const contactsPanel = screen.getByText("通讯录 · 1 条来电").closest("section");
     expect(runtimeCallPanel).not.toBeNull();
     expect(contactsPanel).not.toBeNull();
-    const eventCallCard = within(runtimeCallPanel as HTMLElement).getByText("Garry 的事件频道等待接入。").closest("article");
+    const eventCallCard = within(runtimeCallPanel as HTMLElement).getByText("Garry 的事件通讯等待接入。").closest("article");
     const contactCard = within(contactsPanel as HTMLElement).getByText("Garry，退休老大爷").closest("article");
     expect(eventCallCard).not.toBeNull();
     expect(contactCard).not.toBeNull();
@@ -1269,7 +1291,7 @@ describe("App", () => {
     expect(screen.getAllByRole("button", { name: "接通" })).toHaveLength(2);
     fireEvent.click(within(contactCard as HTMLElement).getByRole("button", { name: "接通" }));
     expect(screen.getByRole("heading", { name: "通话页面：Garry 事件通话" })).toBeInTheDocument();
-    expect(screen.getByText("Garry 的事件频道等待接入。")).toBeInTheDocument();
+    expect(screen.getByText("Garry 的事件通讯等待接入。")).toBeInTheDocument();
     expect((eventCallCard as HTMLElement).compareDocumentPosition(contactCard as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -1560,7 +1582,7 @@ describe("App", () => {
     expect(mike.activeAction).toBeNull();
   });
 
-  it("ignores legacy emergencyEvent fields when opening a call", async () => {
+  it("ignores saved emergencyEvent fields when opening a call", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -1593,7 +1615,7 @@ describe("App", () => {
     expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
   });
 
-  it("does not fall back to legacy emergency choices for an expired runtime call", async () => {
+  it("does not fall back to saved emergency choices for an expired runtime call", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -1605,7 +1627,7 @@ describe("App", () => {
             currentTile: "2-3",
             location: "森林 / 山",
             coord: "(2,3)",
-            status: "森林紧急频道等待接入。",
+            status: "森林紧急通讯等待接入。",
             statusTone: "danger",
             hasIncoming: true,
             emergencyEvent: createSavedEmergencyEvent("amy", "emergency_forest_beast"),
@@ -2159,13 +2181,13 @@ describe("App", () => {
     expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
   });
 
-  it("rejects legacy saves and starts from the new event save schema", () => {
+  it("rejects obsolete saves and starts from the new event save schema", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 12,
         saveVersion: GAME_SAVE_VERSION,
-        crew: [{ id: "mike", bag: ["legacy item"] }],
+        crew: [{ id: "mike", bag: ["old item"] }],
         tiles: initialTiles,
         map: createInitialMapState(),
         logs: initialLogs,

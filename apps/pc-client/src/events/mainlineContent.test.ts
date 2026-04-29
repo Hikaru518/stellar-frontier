@@ -37,8 +37,8 @@ describe("mainline event content", () => {
       "mainline-dead-cockpit",
     ]) {
       // The new schema replaces `candidateActions: string[]` with inline
-      // `actions: ActionDef[]`; we assert that none of those actions encode
-      // the legacy `scan` verb (id suffix or event_id).
+      // `actions: ActionDef[]`; none of those actions should encode the
+      // retired `scan` verb (id suffix or event_id).
       const definition = findMapObject(objectId);
       expect(definition.actions.some((action) => action.id.endsWith(":scan") || action.event_id === "retired.map_object_scan")).toBe(false);
     }
