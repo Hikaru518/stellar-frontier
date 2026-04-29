@@ -135,14 +135,15 @@ export interface EventDefinition {
   tags: string[];
 }
 
+export type CrewDefinitionId = "mike" | "amy" | "garry";
+
 export interface CrewDefinition {
-  crewId: string;
+  crewId: CrewDefinitionId;
   name: string;
   role: string;
   currentTile: string;
   status: CrewStatus;
   statusTone: Tone;
-  summary: string;
   attributes: CrewAttributeMap;
   skills: string[];
   inventory: Array<{ itemId: string; quantity: number }>;

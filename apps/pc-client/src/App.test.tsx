@@ -586,10 +586,10 @@ describe("App", () => {
   });
 
   it("keeps items and approved event program samples wired through content data", () => {
-    const lightItem = itemDefinitions.find((item) => item.tags.includes("light") && item.usableInResponse);
-    expect(lightItem).toBeDefined();
+    const usableResponseItem = itemDefinitions.find((item) => item.itemId === "signal_flare" && item.usableInResponse);
+    expect(usableResponseItem).toBeDefined();
     expect(
-      crewDefinitions.some((member) => member.inventory.some((entry) => entry.itemId === lightItem?.itemId && entry.quantity > 0)),
+      crewDefinitions.some((member) => member.inventory.some((entry) => entry.itemId === usableResponseItem?.itemId && entry.quantity > 0)),
     ).toBe(true);
 
     expect(itemDefinitions.some((item) => item.tags.includes("clue"))).toBe(true);
@@ -601,7 +601,6 @@ describe("App", () => {
         "mine_anomaly_report",
         "mountain_signal_probe",
         "volcanic_ash_trace",
-        "lost_relic_argument",
       ]),
     );
     expect(
@@ -1103,48 +1102,6 @@ describe("App", () => {
     expect(screen.getByText("一处森林小型营地痕迹已标记，等待后续复核。")).toBeInTheDocument();
   });
 
-  it("shows seeded lost relic argument effects in Kael's crew detail", () => {
-    const { eventState } = createLostRelicArgumentState();
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 600,
-        crew: [
-          {
-            id: "kael",
-            hasIncoming: true,
-            personalityTags: ["relic_sensitive"],
-          },
-        ],
-        tiles: initialTiles,
-        map: createInitialMapState(),
-        logs: initialLogs,
-        resources: initialResources,
-        active_events: eventState.active_events,
-        active_calls: eventState.active_calls,
-      })),
-    );
-
-    render(<App />);
-
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
-    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
-    expect(runtimeCallPanel).not.toBeNull();
-    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
-    fireEvent.click(screen.getByRole("button", { name: "信任 Kael，让他继续追查线索。" }));
-    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
-
-    const kaelCard = screen
-      .getAllByText("Kael，轨道城邦祭司学徒")
-      .map((node) => node.closest("article"))
-      .find((article) => article && within(article as HTMLElement).queryByRole("button", { name: "查看档案" }));
-    expect(kaelCard).not.toBeNull();
-    fireEvent.click(within(kaelCard as HTMLElement).getByRole("button", { name: "查看档案" }));
-
-    expect(screen.getByText("relic_burdened")).toBeInTheDocument();
-    expect(screen.getAllByText("Kael 保留了遗物线索，他的长期态度发生变化。").length).toBeGreaterThan(0);
-  });
-
   it("completes a seeded volcanic runtime objective when its crew action finishes", () => {
     vi.useFakeTimers();
     const { eventId, objectiveId, actionId, eventState } = createVolcanicObjectiveState();
@@ -1164,7 +1121,7 @@ describe("App", () => {
             activeAction: null,
           },
           {
-            id: "lin_xia",
+            id: "amy",
             currentTile: "4-3",
             location: "火山灰沙漠",
             coord: "(4,3)",
@@ -1380,11 +1337,11 @@ describe("App", () => {
         elapsedGameSeconds: 0,
         crew: [
           {
-            id: "lin_xia",
+            id: "garry",
             status: "洞穴低光区域，等待指令。",
             statusTone: "danger",
             hasIncoming: true,
-            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
+            emergencyEvent: createSavedEmergencyEvent("garry", "emergency_mountain_cave_darkness"),
           },
         ],
         tiles: initialTiles,
@@ -1396,11 +1353,11 @@ describe("App", () => {
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: /通讯台/ }));
-    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
-    expect(linCard).not.toBeNull();
-    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "通话" }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    await user.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
 
-    expect(screen.getByRole("heading", { name: "通话页面：林夏 状态确认" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "通话页面：Garry 状态确认" })).toBeInTheDocument();
     expect(screen.queryByText(/使用照明道具继续确认洞内路径/)).not.toBeInTheDocument();
     expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
   });
@@ -2230,121 +2187,10 @@ function runtimeLine(text: string, speakerCrewId: string) {
   };
 }
 
-function createLostRelicArgumentState() {
-  const eventId = "lost_relic_argument:600";
-  const callId = `${eventId}:relic_argument_call:call`;
-
-  return {
-    eventId,
-    callId,
-    eventState: {
-      active_events: {
-        [eventId]: {
-          id: eventId,
-          event_definition_id: "lost_relic_argument",
-          event_definition_version: 1,
-          status: "waiting_call",
-          current_node_id: "relic_argument_call",
-          primary_crew_id: "kael",
-          related_crew_ids: [],
-          primary_tile_id: "4-2",
-          related_tile_ids: [],
-          parent_event_id: null,
-          child_event_ids: [],
-          objective_ids: [],
-          active_call_id: callId,
-          selected_options: {},
-          random_results: {},
-          blocking_claim_ids: [],
-          created_at: 600,
-          updated_at: 600,
-          deadline_at: 780,
-          next_wakeup_at: null,
-          trigger_context_snapshot: {
-            trigger_type: "proximity",
-            occurred_at: 600,
-            source: "tile_system",
-            crew_id: "kael",
-            tile_id: "4-2",
-            action_id: null,
-            event_id: eventId,
-            event_definition_id: "lost_relic_argument",
-            node_id: null,
-            call_id: null,
-            objective_id: null,
-            selected_option_id: null,
-            world_flag_key: null,
-            proximity: {
-              origin_tile_id: "4-2",
-              nearby_tile_ids: ["4-1", "4-3"],
-              distance: 1,
-            },
-            payload: {
-              relic_id: "lost_relic_alpha",
-            },
-          },
-          history_keys: [],
-          result_key: null,
-          result_summary: null,
-        },
-      },
-      active_calls: {
-        [callId]: {
-          id: callId,
-          event_id: eventId,
-          event_node_id: "relic_argument_call",
-          call_template_id: "lost_relic_argument.call.argument",
-          crew_id: "kael",
-          status: "awaiting_choice",
-          created_at: 600,
-          connected_at: null,
-          ended_at: null,
-          expires_at: 780,
-          render_context_snapshot: {
-            crew_id: "kael",
-            crew_display_name: "Kael",
-            tile_id: "4-2",
-            event_pressure: "urgent",
-            personality_tags: ["relic_sensitive"],
-          },
-          rendered_lines: [
-            {
-              template_variant_id: "relic_opening_default",
-              text: "Kael 拒绝把遗物装袋，除非基地先给出承诺。",
-              speaker_crew_id: "kael",
-            },
-            {
-              template_variant_id: "relic_body_default",
-              text: "他说那东西属于一个再也没能回家的人。",
-              speaker_crew_id: "kael",
-            },
-          ],
-          available_options: [
-            {
-              option_id: "trust_kael",
-              template_variant_id: "relic_trust_default",
-              text: "信任 Kael，让他继续追查线索。",
-              is_default: true,
-            },
-            {
-              option_id: "secure_relic",
-              template_variant_id: "relic_secure_default",
-              text: "按基地规程封存遗物。",
-              is_default: false,
-            },
-          ],
-          selected_option_id: null,
-          blocking_claim_id: null,
-        },
-      },
-    },
-  };
-}
-
 function createVolcanicObjectiveState() {
   const eventId = "volcanic_ash_trace:480";
   const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
-  const actionId = "lin-xia-ash-survey";
+  const actionId = "amy-ash-survey";
 
   return {
     eventId,
@@ -2414,7 +2260,7 @@ function createVolcanicObjectiveState() {
             duration_seconds: 45,
             can_interrupt: true,
           },
-          assigned_crew_id: "lin_xia",
+          assigned_crew_id: "amy",
           action_id: actionId,
           created_at: 481,
           assigned_at: 482,
@@ -2435,7 +2281,7 @@ function volcanicTiles() {
           ...tile,
           terrain: "火山灰沙漠",
           resources: ["火山灰"],
-          crew: ["garry", "lin_xia"],
+          crew: ["garry", "amy"],
           danger: "灰线不稳定",
           status: "复核中",
         }

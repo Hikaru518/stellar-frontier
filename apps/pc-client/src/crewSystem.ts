@@ -107,7 +107,6 @@ export function startCrewMove(member: CrewMember, preview: MovePreview, tiles: M
     ...member,
     status: `位于 ${member.coord}，正在前往 ${targetTile.coord}，剩余 ${formatDuration(preview.totalDurationSeconds)}。`,
     statusTone: "muted" as Tone,
-    summary: `${member.name} 已接收移动请求。抵达后将原地待命。`,
     activeAction: action,
     hasIncoming: false,
     lastContactTime: elapsedGameSeconds,
@@ -186,7 +185,6 @@ export function advanceCrewMovement(
         ...nextMember,
         status: `位于 ${targetCoord}，待命中。`,
         statusTone: "neutral" as Tone,
-        summary: `${nextMember.name} 抵达 ${targetCoord}，原地待命。`,
         activeAction: undefined,
       };
       nextLogs = appendMovementLog(nextLogs, `${nextMember.name} 抵达 ${targetCoord}，移动行动完成。`, "neutral", elapsedGameSeconds);

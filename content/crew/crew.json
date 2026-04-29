@@ -9,7 +9,6 @@
       "currentTile": "1-1",
       "status": "moving",
       "statusTone": "muted",
-      "summary": "上次回报：水面比地图记录近了 19 米。",
       "attributes": {
         "physical": 5,
         "agility": 5,
@@ -83,7 +82,6 @@
       "currentTile": "2-3",
       "status": "inEvent",
       "statusTone": "danger",
-      "summary": "最近一次通讯：非常不礼貌的求救。",
       "attributes": {
         "physical": 2,
         "agility": 3,
@@ -142,7 +140,6 @@
       "currentTile": "3-3",
       "status": "working",
       "statusTone": "muted",
-      "summary": "上次回报：铁矿产出稳定，抱怨也稳定。",
       "attributes": {
         "physical": 3,
         "agility": 2,
@@ -203,113 +200,6 @@
         "durationSeconds": 300,
         "resourceId": "iron_ore"
       }
-    },
-    {
-      "crewId": "lin_xia",
-      "name": "林夏",
-      "role": "前轨道麻醉医师",
-      "currentTile": "4-1",
-      "status": "idle",
-      "statusTone": "neutral",
-      "summary": "最近一次回报：她把沙尘噪声标成了“低级疼痛”。",
-      "attributes": {
-        "physical": 2,
-        "agility": 3,
-        "intellect": 5,
-        "perception": 5,
-        "luck": 2
-      },
-      "skills": ["clinical_eye", "triage_memory"],
-      "inventory": [
-        { "itemId": "medical_injector", "quantity": 1 },
-        { "itemId": "hand_lamp", "quantity": 1 },
-        { "itemId": "scanner", "quantity": 1 },
-        { "itemId": "ration", "quantity": 1 }
-      ],
-      "profile": {
-        "originWorld": "联邦旧殖民地 / 阿瑞斯轨道医院",
-        "originProfession": "麻醉医师，事故后转入灾害分诊",
-        "experience": "她习惯用剂量、脉搏和沉默来判断局势，讨厌没有记录的疼痛。",
-        "selfIntro": "如果有人要崩溃，请按顺序来。记录表只有一张。"
-      },
-      "voiceTone": "克制、精确、轻微疲惫；常把恐惧描述成症状，把坏消息描述成流程。",
-      "personalityTags": ["把痛苦换算成数值", "温柔但不安慰", "记录强迫", "讨厌英雄主义"],
-      "expertise": [
-        {
-          "expertiseId": "clinical_eye",
-          "name": "冷静评估",
-          "description": "面对伤病或惊慌时，能快速拆成可处理步骤。"
-        },
-        {
-          "expertiseId": "triage_memory",
-          "name": "分诊记忆",
-          "description": "她记得每一次被迫排优先级的选择。"
-        }
-      ],
-      "diaryEntries": [
-        {
-          "entryId": "lin_xia_init_dust",
-          "triggerNode": "初始待命",
-          "gameSecond": 0,
-          "text": "这里的风噪像一台没有校准的呼吸机。中控台没有问我感受，这一点值得表扬。",
-          "availability": "delivered"
-        }
-      ],
-      "canCommunicate": true,
-      "lastContactTime": 0
-    },
-    {
-      "crewId": "kael",
-      "name": "Kael",
-      "role": "轨道城邦祭司学徒",
-      "currentTile": "4-2",
-      "status": "idle",
-      "statusTone": "muted",
-      "summary": "最近一次回报：静电里有重复的七拍节奏，他说这不是巧合。",
-      "attributes": {
-        "physical": 3,
-        "agility": 3,
-        "intellect": 3,
-        "perception": 5,
-        "luck": 6
-      },
-      "skills": ["pattern_seer", "bad_omen"],
-      "inventory": [
-        { "itemId": "old_compass", "quantity": 1 },
-        { "itemId": "signal_flare", "quantity": 1 },
-        { "itemId": "chocolate", "quantity": 1 }
-      ],
-      "profile": {
-        "originWorld": "轨道城邦 / 灯环七号",
-        "originProfession": "祭司学徒，后来负责维护坠落前的广播礼仪",
-        "experience": "他的家园毁于一次官方称为“轨道调整”的事故。从那以后，他开始把噪声当作幸存者名单。",
-        "selfIntro": "仪器说没有信号。仪器当然会这么说。"
-      },
-      "voiceTone": "低声、断续、像在听别人听不见的东西；会把技术名词和兆头混在一起。",
-      "personalityTags": ["迷信但敏锐", "害怕安静", "把噪声当征兆", "对数字七过度认真"],
-      "expertise": [
-        {
-          "expertiseId": "pattern_seer",
-          "name": "直觉解读",
-          "description": "能从重复噪声、断续信号和坏掉的仪表里看出异常模式。"
-        },
-        {
-          "expertiseId": "bad_omen",
-          "name": "坏兆头",
-          "description": "他总能提前说出一句让所有人不舒服但后来很难反驳的话。"
-        }
-      ],
-      "diaryEntries": [
-        {
-          "entryId": "kael_init_signal",
-          "triggerNode": "初始待命",
-          "gameSecond": 0,
-          "text": "通讯台的噪声重复了七次。不是求救，也不是风。风不会数数。",
-          "availability": "delivered"
-        }
-      ],
-      "canCommunicate": true,
-      "lastContactTime": 0
     }
   ]
 }

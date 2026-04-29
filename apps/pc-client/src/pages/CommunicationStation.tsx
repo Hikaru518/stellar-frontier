@@ -445,7 +445,6 @@ function CrewCard({
         <p className={`crew-status status-${member.statusTone}`}>{member.status}</p>
         <p className="muted-text">位置：{getCrewLocationLabel(member)}</p>
         <p className="muted-text">{getCrewTiming(member, elapsedGameSeconds)}</p>
-        <p className="muted-text">{member.summary}</p>
       </div>
       <div className="crew-actions">
         {hasCallEntry ? (
@@ -696,5 +695,5 @@ function formatPrivateSignalStatus(status: PrivateSignalStatus) {
 }
 
 function isCrewId(value: string): value is CrewId {
-  return value === "mike" || value === "amy" || value === "garry" || value === "lin_xia" || value === "kael";
+  return value === "mike" || value === "amy" || value === "garry";
 }

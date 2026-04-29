@@ -15,7 +15,7 @@ source:
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
 | 1 | T001 | 固化去 mock 与去 legacy 审计清单 | completed | 1 |
-| 2 | T002 | 三人化 crew content、schema 与类型 | pending | 0 |
+| 2 | T002 | 三人化 crew content、schema 与类型 | completed | 1 |
 | 3 | T003 | 删除旧角色相关结构化事件资产 | pending | 0 |
 | 4 | T004 | 三人化地图、初始状态与测试 fixture | pending | 0 |
 | 5 | T005 | 删除 legacy event 内容入口 | pending | 0 |
@@ -56,3 +56,10 @@ source:
 - 完成时间: 2026-04-29 16:42
 - 尝试次数: 1
 - Monkey summary: 在 `game-system-demock-implementation-plan.md` 中新增按 content、runtime/UI、mobile、editor、dual-device、scripts、generated、tests、docs 分类的审计清单，明确关键词范围、历史材料例外和后续删除规则。未运行 npm 命令，因为本任务只修改 Markdown 计划文档。
+
+### T002: 三人化 crew content、schema 与类型
+- 状态: completed
+- 开始时间: 2026-04-29 16:43
+- 完成时间: 2026-04-29 16:56
+- 尝试次数: 1
+- Monkey summary: 删除 Lin Xia / Kael crew content，删除 crew `summary` 字段、schema、类型和 UI 读取路径；将 `CrewId` 收窄为 Mike、Amy、Garry，并更新相关 PC 测试。验证：`npm run validate:content` 通过；PC client lint/test 通过；root `npm run lint` 和 `npm run test` 失败在 editor 既有 `@xyflow/react` / `@dagrejs/dagre` 缺依赖，不属于本任务改动范围。

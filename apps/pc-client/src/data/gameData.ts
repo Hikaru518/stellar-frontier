@@ -13,7 +13,7 @@ import { deriveLegacyTiles, getTileLocationLabel, type RuntimeMapState } from ".
 
 export type PageId = "control" | "station" | "call" | "map" | "ending";
 
-export type CrewId = "mike" | "amy" | "garry" | "lin_xia" | "kael";
+export type CrewId = CrewDefinition["crewId"];
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
 
@@ -78,7 +78,6 @@ export interface CrewMember {
   coord: string;
   status: string;
   statusTone: Tone;
-  summary: string;
   attributes: CrewDefinition["attributes"];
   skills: string[];
   inventory: InventoryEntry[];
@@ -219,8 +218,8 @@ export const initialTiles: MapTile[] = [
   tile("3-2", "(3,2)", 3, 2, "平原"),
   tile("3-3", "(3,3)", 3, 3, "丘陵", ["铁矿床"], ["采矿厂：铁 #2"], ["水银温度计"], ["garry"], "未发现即时危险", "工作中"),
   tile("3-4", "(3,4)", 3, 4, "丘陵", ["铁矿床"]),
-  tile("4-1", "(4,1)", 4, 1, "旧医疗前哨", ["废弃医疗舱"], [], ["扫描器残留信号"], ["lin_xia"], "未发现即时危险", "待命"),
-  tile("4-2", "(4,2)", 4, 2, "坠落广播塔", ["断续信号"], [], ["损坏中继器"], ["kael"], "未知回声", "待命"),
+  tile("4-1", "(4,1)", 4, 1, "旧医疗前哨", ["废弃医疗舱"], [], ["扫描器残留信号"], [], "未发现即时危险", "待命"),
+  tile("4-2", "(4,2)", 4, 2, "坠落广播塔", ["断续信号"], [], ["损坏中继器"], [], "未知回声", "待命"),
   tile("4-3", "(4,3)", 4, 3, "沙漠"),
   tile("4-4", "(4,4)", 4, 4, "沙漠"),
 ];
@@ -338,7 +337,7 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
   const activeAction = member.activeAction ? createInitialAction(member, member.activeAction) : undefined;
 
   return {
-    id: member.crewId as CrewId,
+    id: member.crewId,
     name: member.name,
     role: member.role,
     currentTile: member.currentTile,
@@ -346,7 +345,6 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     coord: tile?.coord ?? member.currentTile,
     status: getInitialStatus(member),
     statusTone: member.statusTone,
-    summary: member.summary,
     attributes: member.attributes,
     skills: member.skills,
     inventory: member.inventory,

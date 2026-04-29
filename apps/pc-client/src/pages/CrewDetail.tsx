@@ -40,7 +40,6 @@ export function CrewDetail({ member, eventLogs = [] }: { member: CrewMember; eve
 
       <Panel title="通讯语气">
         <p>{member.voiceTone}</p>
-        <p className="muted-text">{member.summary}</p>
       </Panel>
 
       <Panel title="5 维轻量属性">

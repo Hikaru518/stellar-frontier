@@ -63,3 +63,26 @@ describe("default map config", () => {
     }
   });
 });
+
+describe("crew content exports", () => {
+  it("only exposes the three supported runtime crew ids", async () => {
+    const { crewDefinitions } = await import("./contentData");
+    const { initialCrew } = await import("../data/gameData");
+
+    expect(crewDefinitions.map((member) => member.crewId)).toEqual(["mike", "amy", "garry"]);
+    expect(initialCrew.map((member) => member.id)).toEqual(["mike", "amy", "garry"]);
+  });
+
+  it("does not expose unsupported crew summary copy", async () => {
+    const { crewDefinitions } = await import("./contentData");
+    const { initialCrew } = await import("../data/gameData");
+
+    for (const member of crewDefinitions) {
+      expect("summary" in member).toBe(false);
+    }
+
+    for (const member of initialCrew) {
+      expect("summary" in member).toBe(false);
+    }
+  });
+});

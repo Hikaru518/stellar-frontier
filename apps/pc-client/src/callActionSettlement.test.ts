@@ -18,7 +18,6 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
     coord: "(0,0)",
     status: "待命中。",
     statusTone: "neutral",
-    summary: "Test member",
     attributes: {
       physical: 3,
       agility: 3,

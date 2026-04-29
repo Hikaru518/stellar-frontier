@@ -222,7 +222,6 @@
         "currentTile",
         "status",
         "statusTone",
-        "summary",
         "attributes",
         "inventory",
         "canCommunicate",
@@ -235,7 +234,8 @@
       ],
       "properties": {
         "crewId": {
-          "$ref": "#/$defs/id"
+          "type": "string",
+          "enum": ["mike", "amy", "garry"]
         },
         "name": {
           "$ref": "#/$defs/localizedText"
@@ -254,9 +254,6 @@
         "statusTone": {
           "type": "string",
           "enum": ["neutral", "muted", "accent", "danger", "success"]
-        },
-        "summary": {
-          "$ref": "#/$defs/localizedText"
         },
         "attributes": {
           "$ref": "#/$defs/attributeMap"
