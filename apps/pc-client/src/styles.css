@@ -424,7 +424,7 @@ p {
   gap: 14px;
 }
 
-.realtime-link-demo {
+.realtime-link-diagram {
   display: grid;
   grid-template-columns: minmax(110px, 0.8fr) minmax(86px, 0.7fr) minmax(130px, 1fr) minmax(86px, 0.7fr) minmax(110px, 0.8fr);
   gap: 8px;
@@ -954,7 +954,7 @@ blockquote {
     position: static;
   }
 
-  .realtime-link-demo {
+  .realtime-link-diagram {
     grid-template-columns: 1fr;
   }
 }

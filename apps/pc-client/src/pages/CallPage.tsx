@@ -106,8 +106,8 @@ export function CallPage({
         return {
           title: `通话页面：${member.name} 事件通话`,
           subtitle: "这条事件通话已经结束、过期或不可用。",
-          scene: "通话中的图片 / 信号静默 / 事件快照不可用",
-          lines: ["当前没有可处理的 runtime call。请返回通讯台查看其他频道。"],
+          scene: "通话画面 / 事件快照不可用",
+          lines: ["当前没有可处理的 runtime call。请返回通讯台查看事件通话。"],
           meta: "事件通话已关闭",
           actions: [] satisfies CallActionOption[],
           actionGroups: [],
@@ -144,7 +144,7 @@ export function CallPage({
     return {
       title: `通话页面：${member.name} 状态确认`,
       subtitle: "当前只处理这一条通话。其他队员可以查看，但不能接入第二条通话。",
-      scene: "通话中的图片 / 常规频道 / 当前坐标回传",
+        scene: "通话画面 / 状态确认 / 当前坐标回传",
       lines: [
         memberActionView.actionStatus === "idle"
           ? `${member.name} 正在等待新的行动指令。`
@@ -162,7 +162,7 @@ export function CallPage({
     return (
       <ConsoleShell title="通话页面" subtitle="没有活动通话。" gameTimeLabel={gameTimeLabel}>
         <Panel>
-          <p>当前没有通话事件。通讯台记录显示这可能只是短暂的安静。</p>
+          <p>当前没有通话事件。请返回通讯台。</p>
           <button type="button" className="primary-button" onClick={onOpenStation}>
             返回通讯台
           </button>

@@ -281,22 +281,22 @@ export const initialTiles: MapTile[] = createMapTilesFromConfig(createInitialMap
 export const initialCrew: CrewMember[] = crewDefinitions.map((member) => createInitialCrewMember(member));
 
 export const initialLogs: SystemLog[] = [
-  { id: 1, time: "19:42", text: "卫星雷达返回 3 个低置信度信号。", tone: "neutral" },
-  { id: 2, time: "19:45", text: "Amy 正在森林中请求接入。", tone: "danger" },
-  { id: 3, time: "19:47", text: "咖啡机拒绝说明上次维护日期。", tone: "muted" },
+  { id: 1, time: "19:42", text: "游戏状态初始化完成。", tone: "neutral" },
+  { id: 2, time: "19:45", text: "队员初始状态已载入。", tone: "neutral" },
+  { id: 3, time: "19:47", text: "地图配置已载入。", tone: "muted" },
 ];
 
 export const facilities: Facility[] = [
-  { id: "window", label: "窗户", subLabel: "外部能见度：低", variant: "large" },
+  { id: "window", label: "外部观察", subLabel: "占位入口", variant: "large" },
   { id: "station", label: "通讯台", subLabel: "1 条来电 · Amy" },
-  { id: "radar", label: "卫星雷达", subLabel: "地图信号：16 格 / 2 异常" },
+  { id: "radar", label: "卫星雷达", subLabel: "打开地图" },
   { id: "console", label: "中控台", subLabel: "资源 / 状态 / 统计" },
   { id: "research", label: "研究台", subLabel: "未供电", variant: "locked" },
   { id: "trade", label: "星际贸易", subLabel: "资源交换", variant: "locked" },
-  { id: "coffee", label: "咖啡机", subLabel: "自检完成" },
-  { id: "record", label: "唱片机", subLabel: "低噪播放" },
-  { id: "fridge", label: "冰箱", subLabel: "无限量啤酒" },
-  { id: "gate", label: "星际之门", subLabel: "请求总部空投", variant: "large" },
+  { id: "coffee", label: "休息终端", subLabel: "未接入玩法" },
+  { id: "record", label: "音频终端", subLabel: "未接入玩法" },
+  { id: "fridge", label: "物资柜", subLabel: "未接入玩法" },
+  { id: "gate", label: "星际之门", subLabel: "等待授权", variant: "large" },
 ];
 
 export const garryActions: ActionOption[] = [

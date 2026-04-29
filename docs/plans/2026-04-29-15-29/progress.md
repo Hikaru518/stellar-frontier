@@ -31,7 +31,7 @@ source:
 | 15 | T015 | 建立地点剧情动作事件样例 | completed | 1 |
 | 16 | T016 | 删除地图 legacy content 字段与 schema | completed | 1 |
 | 17 | T017 | 删除 deriveLegacyTiles 与旧 MapTile 投影 | completed | 1 |
-| 18 | T018 | 清理 PC UI mock 文案 | pending | 0 |
+| 18 | T018 | 清理 PC UI mock 文案 | completed | 1 |
 | 19 | T019 | 清理 mobile UI mock 文案 | pending | 0 |
 | 20 | T020 | 更新正式项目文档 | pending | 0 |
 | 21 | T021 | 全仓关键词审计与生成产物同步 | pending | 0 |
@@ -168,3 +168,10 @@ source:
 - 完成时间: 2026-04-29 18:10
 - 尝试次数: 1
 - Monkey summary: 删除 PC runtime 中的 `deriveLegacyTiles`，从 saved tile views 清理旧 `resources/buildings/instruments/danger` 投影字段，地图页改从 map config、runtime map state、objects 与 special states 展示信息，并使用中性未知格文案。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T018: 清理 PC UI mock 文案
+- 状态: completed
+- 开始时间: 2026-04-29 18:11
+- 完成时间: 2026-04-29 18:15
+- 尝试次数: 1
+- Monkey summary: 清理通讯台硬编码频道/噪声/天线/脚步声/固定求救，清理控制中心设施卡、日志、弹窗中的唱片机/异常数量/假状态和剧情化占位文案，通话页改为中性状态说明，初始系统日志改为中性初始化记录。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。

@@ -150,6 +150,25 @@ describe("App", () => {
     expect(screen.getByText("暂无可分配目标。")).toBeInTheDocument();
   });
 
+  it("does not render hard-coded PC UI mock copy on current fact pages", () => {
+    const forbiddenPcMockCopy =
+      /频道 A-17|信号噪声|天线：|偏移 2\.1|最近信号|脚步声|非常不礼貌的求救|信号日志|重复回声|实时连接演示|唱片机|低噪播放|地图信号：16 格|2 异常|设施状态|常规频道|其他频道|信号静默|短暂的安静|异常数量/;
+    const { container } = render(<App />);
+
+    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+
+    fireEvent.click(screen.getByRole("button", { name: /地图二级菜单/ }));
+    expect(container).not.toHaveTextContent(forbiddenPcMockCopy);
+  });
+
   it("advances game time while the app is running", () => {
     vi.useFakeTimers();
 

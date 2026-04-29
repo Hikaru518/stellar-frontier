@@ -172,8 +172,8 @@ export function CommunicationStation({
       clientId: pairingSession.pcTerminalId,
       sequence: sequenceRef.current,
       payload: {
-        title: "Amy 私频来电",
-        body: "别在主频道回复。我在森林边缘听见了第二组脚步声。",
+        title: "手机终端测试来电",
+        body: "这是一条 PC 授权的手机端测试通讯。",
         fallbackAfterMs: 10000,
       },
     });
@@ -216,7 +216,7 @@ export function CommunicationStation({
   return (
     <ConsoleShell
       title="通讯台"
-      subtitle="频道 A-17 / 信号噪声 38% / 当前仅允许一条通话事件"
+      subtitle="通讯状态 / 当前仅允许一条通话事件"
       gameTimeLabel={gameTimeLabel}
       actions={
         <>
@@ -231,12 +231,12 @@ export function CommunicationStation({
     >
       <div className="station-layout">
         <Panel title="通讯台主机" className="station-deck">
-          <p>天线：偏移 2.1° / 校准建议：忽略</p>
-          <p className="accent-text">最近信号：{latestRuntimeLine ?? "Amy / 森林 / 非常不礼貌的求救"}</p>
+          <p>当前时间：{gameTimeLabel}</p>
+          <p className="accent-text">{latestRuntimeLine ? `事件通话内容：${latestRuntimeLine}` : "暂无待处理事件通话内容。"}</p>
           <div className="terminal-box">
             这里保留通讯台主区域。通讯录展开时悬浮在左侧，不完全遮挡当前上下文。
           </div>
-          <p className="muted-text">[信号日志] 森林方向存在重复回声。</p>
+          <p className="muted-text">事件通话由 runtime call 提供；没有事件时仅显示中性空状态。</p>
         </Panel>
 
         {activeRuntimeCalls.length ? (
@@ -303,7 +303,7 @@ export function CommunicationStation({
             <StatusTag tone={getPhoneStatusTone(phoneConnectionStatus)}>{formatPhoneConnectionStatus(phoneConnectionStatus)}</StatusTag>
           </div>
           <p>手机端是可选增强：扫码或手输码进入私人通讯终端，只接收 PC 授权的私密通讯，并回传 typed events。</p>
-          <div className="realtime-link-demo" aria-label="实时连接演示">
+          <div className="realtime-link-diagram" aria-label="实时连接说明">
             <div className="link-node link-node-pc">
               <span>PC AUTH</span>
               <strong>GameState</strong>
@@ -365,7 +365,7 @@ export function CommunicationStation({
               ["业务边界", "Stellar 只提供 PC/mobile 共享业务层；底层 Host/Terminal/WebRTC 交给 Yuan"],
             ]}
           />
-          {privateSignalStatus === "fallback" ? <p className="accent-text">[PC 备份] Amy：别在主频道回复。我在森林边缘听见了第二组脚步声。</p> : null}
+          {privateSignalStatus === "fallback" ? <p className="accent-text">[PC 备份] 手机终端测试通讯已转为本机查看。</p> : null}
         </Panel>
 
         {openObjectives.length ? (

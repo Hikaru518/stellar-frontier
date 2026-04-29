@@ -43,7 +43,7 @@ export function ControlCenter({
     .slice(0, 3);
   const objectiveList = Object.values(objectives).sort((left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
 
-  const modalContent = useMemo(() => getFacilityModal(modal), [modal]);
+  const modalContent = useMemo(() => getFacilityModal(modal, resources), [modal, resources]);
 
   function handleFacility(id: string) {
     if (id === "station") {
@@ -82,7 +82,7 @@ export function ControlCenter({
               ["能源", resources.energy],
               ["铁矿", resources.iron],
               ["基地完整度", `${resources.baseIntegrity}%`],
-              ["通讯提示", incomingCount ? `${amy?.name ?? "未知"} 正在请求接入` : "没有新的请求，这通常不是好消息。"],
+              ["通讯提示", incomingCount ? `${amy?.name ?? "未知"} 正在请求接入` : "暂无新的通讯请求。"],
             ]}
           />
         </Panel>
@@ -106,8 +106,8 @@ export function ControlCenter({
         <Panel title="当前建议" className="control-hint" tone={incomingCount ? "accent" : "neutral"}>
           <p>
             {incomingCount
-              ? "先处理通讯台来电。中控台认为你继续忽视它也不会让问题变少。"
-              : "暂无紧急请求。基地仍在运行，这一点暂时令人不安地可靠。"}
+              ? "先处理通讯台来电。"
+              : "暂无紧急请求。可查看通讯台、地图或调试工具。"}
           </p>
         </Panel>
 
@@ -191,14 +191,14 @@ function InvestigationReportView({ report, crew }: { report: InvestigationReport
 }
 
 const facilityLog: Record<string, string> = {
-  window: "窗户返回一张低清晰度外部图像，沙尘像坏掉的电视雪花。",
-  console: "中控台展开资源摘要，并提醒你库存不是信仰系统。",
-  coffee: "咖啡机完成了一次毫无必要的自检。咖啡味道像旧电池。",
-  record: "唱片机切换到低噪播放。噪声没有变少，只是更有节奏。",
-  fridge: "冰箱提供了啤酒。它拒绝说明这些啤酒来自哪里。",
-  research: "研究台仍未供电。它看起来对此没有意见。",
-  trade: "星际贸易线路等待授权。价格已经先开始波动。",
-  gate: "星际之门没有开启。总部的沉默非常总部。",
+  window: "外部观察入口已打开。该模块暂未接入实时数据。",
+  console: "中控台资源摘要已打开。",
+  coffee: "休息终端入口已打开。该模块暂未接入玩法效果。",
+  record: "音频终端入口已打开。该模块暂未接入玩法效果。",
+  fridge: "物资柜入口已打开。该模块暂未接入玩法效果。",
+  research: "研究台入口已登记，当前未供电。",
+  trade: "星际贸易入口已登记，当前等待授权。",
+  gate: "星际之门入口已登记，当前等待授权。",
 };
 
 function formatEventTime(seconds: number) {
@@ -218,52 +218,61 @@ function formatEventImportance(importance: EventLog["importance"]) {
   return "简报";
 }
 
-function getFacilityModal(id: string | null): { title: string; body: ReactNode } | null {
+function getFacilityModal(id: string | null, resources: ResourceSummary): { title: string; body: ReactNode } | null {
   switch (id) {
     case "window":
       return {
-        title: "窗户 / 外部观察",
+        title: "外部观察",
         body: (
           <>
-            <div className="image-placeholder">外部观察图像 / 沙尘 / 远处异常光点</div>
-            <p>能见度低。远处的光点没有移动，但雷达坚持说它正在靠近。</p>
+            <div className="image-placeholder">外部观察图像占位</div>
+            <p>该入口尚未接入实时外部观察数据。</p>
           </>
         ),
       };
     case "console":
       return {
         title: "中控台 / 资源状态",
-        body: <p>能源 620，铁矿 1240，基地完整度 71%。当前没有任何数字愿意承担责任。</p>,
+        body: (
+          <FieldList
+            rows={[
+              ["能源", resources.energy],
+              ["铁矿", resources.iron],
+              ["木材", resources.wood],
+              ["基地完整度", `${resources.baseIntegrity}%`],
+            ]}
+          />
+        ),
       };
     case "coffee":
       return {
-        title: "咖啡机",
-        body: <p>你喝了一杯咖啡。系统没有记录任何数值变化，但你开始怀疑旧电池也是一种风味。</p>,
+        title: "休息终端",
+        body: <p>该入口尚未接入玩法效果。</p>,
       };
     case "record":
       return {
-        title: "唱片机",
-        body: <p>低噪播放已开启。基地空气开始像一段被反复覆盖的磁带。</p>,
+        title: "音频终端",
+        body: <p>该入口尚未接入玩法效果。</p>,
       };
     case "fridge":
       return {
-        title: "冰箱",
-        body: <p>冰箱里有啤酒，而且似乎无限量供应。中控台建议不要问补给链。</p>,
+        title: "物资柜",
+        body: <p>该入口尚未接入玩法效果。</p>,
       };
     case "research":
       return {
         title: "研究台",
-        body: <p>科技树入口已登记，但研究台未供电。它目前只研究如何保持沉默。</p>,
+        body: <p>科技树入口已登记，但研究台当前未供电。</p>,
       };
     case "trade":
       return {
         title: "星际贸易",
-        body: <p>资源交换窗口尚未接通。频道里只有报价单的静电声。</p>,
+        body: <p>资源交换入口已登记，当前等待授权。</p>,
       };
     case "gate":
       return {
         title: "星际之门",
-        body: <p>总部请求窗口等待授权。它看起来很重要，也很会拖延。</p>,
+        body: <p>星际之门入口已登记，当前等待授权。</p>,
       };
     default:
       return null;
