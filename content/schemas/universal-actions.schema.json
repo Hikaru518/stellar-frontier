@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://stellar-frontier.local/schemas/universal-actions.schema.json",
   "title": "Stellar Frontier Universal Actions",
   "type": "object",
@@ -12,11 +12,11 @@
     "universal_actions": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/actionDef"
+        "$ref": "#/$defs/actionDef"
       }
     }
   },
-  "definitions": {
+  "$defs": {
     "id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
@@ -35,17 +35,17 @@
       "required": ["id", "category", "label", "conditions", "event_id"],
       "properties": {
         "id": {
-          "$ref": "#/definitions/id"
+          "$ref": "#/$defs/id"
         },
         "category": {
           "type": "string",
           "enum": ["universal", "object"]
         },
         "label": {
-          "$ref": "#/definitions/localizedText"
+          "$ref": "#/$defs/localizedText"
         },
         "tone": {
-          "$ref": "#/definitions/tone"
+          "$ref": "#/$defs/tone"
         },
         "conditions": {
           "type": "array",
@@ -62,7 +62,7 @@
           "enum": ["disabled"]
         },
         "unavailable_hint": {
-          "$ref": "#/definitions/localizedText"
+          "$ref": "#/$defs/localizedText"
         },
         "action_ref": {
           "type": "string",

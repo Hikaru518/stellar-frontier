@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://stellar-frontier.local/schemas/map-objects.schema.json",
   "title": "Stellar Frontier Map Objects",
   "type": "object",
@@ -12,11 +12,11 @@
     "map_objects": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/mapObject"
+        "$ref": "#/$defs/mapObject"
       }
     }
   },
-  "definitions": {
+  "$defs": {
     "id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
@@ -47,17 +47,17 @@
       "required": ["id", "category", "label", "conditions", "event_id"],
       "properties": {
         "id": {
-          "$ref": "#/definitions/id"
+          "$ref": "#/$defs/id"
         },
         "category": {
           "type": "string",
           "enum": ["universal", "object"]
         },
         "label": {
-          "$ref": "#/definitions/localizedText"
+          "$ref": "#/$defs/localizedText"
         },
         "tone": {
-          "$ref": "#/definitions/tone"
+          "$ref": "#/$defs/tone"
         },
         "conditions": {
           "type": "array",
@@ -74,7 +74,7 @@
           "enum": ["disabled"]
         },
         "unavailable_hint": {
-          "$ref": "#/definitions/localizedText"
+          "$ref": "#/$defs/localizedText"
         },
         "action_ref": {
           "type": "string",
@@ -88,21 +88,21 @@
       "required": ["id", "kind", "name", "visibility", "status_options", "initial_status", "actions"],
       "properties": {
         "id": {
-          "$ref": "#/definitions/id"
+          "$ref": "#/$defs/id"
         },
         "kind": {
-          "$ref": "#/definitions/kind"
+          "$ref": "#/$defs/kind"
         },
         "name": {
-          "$ref": "#/definitions/localizedText"
+          "$ref": "#/$defs/localizedText"
         },
         "description": {
-          "$ref": "#/definitions/localizedText"
+          "$ref": "#/$defs/localizedText"
         },
         "tags": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/tag"
+            "$ref": "#/$defs/tag"
           }
         },
         "status_options": {
@@ -121,11 +121,11 @@
         "actions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/actionDef"
+            "$ref": "#/$defs/actionDef"
           }
         },
         "visibility": {
-          "$ref": "#/definitions/visibility"
+          "$ref": "#/$defs/visibility"
         },
         "legacyResource": {
           "type": "string",
