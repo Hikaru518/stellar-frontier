@@ -72,6 +72,20 @@ export function CrewDetail({ member, eventLogs = [] }: { member: CrewMember; eve
         )}
       </Panel>
 
+      <Panel title="状态 / 知识标签">
+        {member.conditions.length ? (
+          <div className="tag-list">
+            {member.conditions.map((condition) => (
+              <span key={condition} className="text-chip">
+                {formatConditionLabel(condition)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="muted-text">暂无状态或知识标签。</p>
+        )}
+      </Panel>
+
       <Panel title="事件影响">
         {memberEventLogs.length ? (
           <ol className="diary-list">
@@ -164,6 +178,17 @@ function formatInventorySummary(inventory: CrewMember["inventory"]) {
 function formatRuleEffect(effect: NonNullable<CrewMember["expertise"][number]["ruleEffect"]>) {
   const percent = Math.round(effect.chance * 100);
   return `调查触发：${percent}% 概率获得 ${effect.resourceId} x${effect.amount}`;
+}
+
+function formatConditionLabel(condition: string) {
+  const labels: Record<string, string> = {
+    knows_repair_tech: "维修技术",
+    knows_field_first_aid: "野外急救",
+    knows_alien_language: "外星语言",
+    wounded: "受伤",
+  };
+
+  return labels[condition] ?? condition;
 }
 
 function getAvailabilityTone(availability: CrewMember["diaryEntries"][number]["availability"]): Tone {

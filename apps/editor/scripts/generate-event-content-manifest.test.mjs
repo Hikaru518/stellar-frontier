@@ -25,6 +25,12 @@ describe("generate-event-content-manifest", () => {
         manifestDomain("crew_kael"),
         manifestDomain("desert"),
         manifestDomain("forest", "presets/forest.json"),
+        manifestDomain("mainline_crash_site"),
+        manifestDomain("mainline_ending"),
+        manifestDomain("mainline_hive"),
+        manifestDomain("mainline_medical"),
+        manifestDomain("mainline_resources"),
+        manifestDomain("mainline_village"),
         manifestDomain("mine"),
         manifestDomain("mountain"),
       ],
@@ -53,8 +59,12 @@ describe("generate-event-content-manifest", () => {
     expect(generated).toContain(
       'import forestPresetsContent from "../../../../../content/events/presets/forest.json";',
     );
+    expect(generated).toContain(
+      'import mainlineCrashSiteEventDefinitionsContent from "../../../../../content/events/definitions/mainline_crash_site.json";',
+    );
     expect(generated).toContain("export const generatedEventDomains = [");
     expect(generated).toContain('  "crash_site",');
+    expect(generated).toContain('  "mainline_crash_site",');
     expect(generated).toContain('  "mountain",');
     expect(generated).toContain("export const generatedEventProgramDefinitions");
     expect(generated).toContain("...mountainCallTemplatesContent.call_templates");

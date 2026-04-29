@@ -26,6 +26,42 @@
       "presets": "presets/forest.json"
     },
     {
+      "id": "mainline_crash_site",
+      "definitions": "definitions/mainline_crash_site.json",
+      "call_templates": "call_templates/mainline_crash_site.json",
+      "presets": null
+    },
+    {
+      "id": "mainline_ending",
+      "definitions": "definitions/mainline_ending.json",
+      "call_templates": "call_templates/mainline_ending.json",
+      "presets": null
+    },
+    {
+      "id": "mainline_hive",
+      "definitions": "definitions/mainline_hive.json",
+      "call_templates": "call_templates/mainline_hive.json",
+      "presets": null
+    },
+    {
+      "id": "mainline_medical",
+      "definitions": "definitions/mainline_medical.json",
+      "call_templates": "call_templates/mainline_medical.json",
+      "presets": null
+    },
+    {
+      "id": "mainline_resources",
+      "definitions": "definitions/mainline_resources.json",
+      "call_templates": "call_templates/mainline_resources.json",
+      "presets": null
+    },
+    {
+      "id": "mainline_village",
+      "definitions": "definitions/mainline_village.json",
+      "call_templates": "call_templates/mainline_village.json",
+      "presets": null
+    },
+    {
       "id": "mine",
       "definitions": "definitions/mine.json",
       "call_templates": "call_templates/mine.json",

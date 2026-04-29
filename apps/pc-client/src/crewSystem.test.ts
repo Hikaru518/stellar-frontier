@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createActiveActionFromCrewAction } from "./crewSystem";
-import type { CrewMember } from "./data/gameData";
+import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, startCrewMove } from "./crewSystem";
+import type { CrewMember, MapTile } from "./data/gameData";
 import { initialCrew } from "./data/gameData";
 import type { CrewActionState } from "./events/types";
 
@@ -66,12 +66,53 @@ describe("createActiveActionFromCrewAction", () => {
   });
 });
 
+describe("wounded movement timing", () => {
+  it("applies a 1.5x step duration multiplier to movement previews and active movement", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
+    const healthy = crewMember("mike", "1-1");
+    const wounded = { ...healthy, conditions: ["wounded"] };
+
+    const healthyPreview = createMovePreview(healthy, "1-3", tiles);
+    const woundedPreview = createMovePreview(wounded, "1-3", tiles);
+
+    expect(healthyPreview.steps.map((step) => step.durationSeconds)).toEqual([60, 90]);
+    expect(woundedPreview.steps.map((step) => step.durationSeconds)).toEqual([90, 135]);
+    expect(woundedPreview.totalDurationSeconds).toBe(healthyPreview.totalDurationSeconds * 1.5);
+
+    const moving = startCrewMove(wounded, woundedPreview, tiles, 0);
+    expect(moving.activeAction?.stepFinishTime).toBe(90);
+    expect(moving.activeAction?.finishTime).toBe(225);
+
+    const afterFirstStep = advanceCrewMovement(moving, tiles, [], 90).member;
+    expect(afterFirstStep.currentTile).toBe("1-2");
+    expect(afterFirstStep.activeAction?.stepFinishTime).toBe(225);
+  });
+
+  it("does not change non-move action durations", () => {
+    const member = {
+      ...crewMember("garry", "3-3"),
+      conditions: ["wounded"],
+      activeAction: {
+        id: "garry-gather",
+        actionType: "gather" as const,
+        status: "inProgress" as const,
+        startTime: 10,
+        durationSeconds: 180,
+        finishTime: 190,
+      },
+    };
+
+    expect(member.activeAction.durationSeconds).toBe(180);
+    expect(member.activeAction.finishTime).toBe(190);
+  });
+});
+
 function crewMember(id: CrewMember["id"], currentTile: string): CrewMember {
   const member = initialCrew.find((item) => item.id === id);
   if (!member) {
     throw new Error(`Missing crew member ${id}`);
   }
-  return { ...member, currentTile };
+  return { ...member, currentTile, activeAction: undefined };
 }
 
 function crewAction(overrides: Partial<CrewActionState>): CrewActionState {
@@ -96,5 +137,23 @@ function crewAction(overrides: Partial<CrewActionState>): CrewActionState {
     interrupt_duration_seconds: 10,
     action_params: {},
     ...overrides,
+  };
+}
+
+function tile(id: string, terrain: string): MapTile {
+  const [row, col] = id.split("-").map(Number);
+  return {
+    id,
+    coord: `(${row},${col})`,
+    row,
+    col,
+    terrain,
+    resources: [],
+    buildings: [],
+    instruments: [],
+    crew: [],
+    danger: "未发现即时危险",
+    status: "已发现",
+    investigated: true,
   };
 }

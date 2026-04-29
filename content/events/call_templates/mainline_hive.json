@@ -1,0 +1,22 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_hive_entrance_and_hatchery.call.hive",
+      "version": 1,
+      "domain": "mainline_hive",
+      "event_definition_id": "mainline_hive_entrance_and_hatchery",
+      "node_id": "hive_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "hive_opening", "text": "{{crew_display_name}} 抵达外星生物巢穴。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "hive_body", "text": "入口需要消耗 1 个 decoy 引开守卫；入口完成后，孵化室还要再消耗 1 个 decoy 才能取得 alien_slime_fuel。两段都是高风险推进，wounded 队员不能执行。", "priority": 0 }] }],
+      "option_lines": {
+        "lure_guard": { "selection": "best_match", "variants": [{ "id": "hive_lure", "text": "消耗诱饵引开入口守卫。", "priority": 0 }] },
+        "collect_slime_fuel": { "selection": "best_match", "variants": [{ "id": "hive_collect", "text": "进入孵化室，消耗诱饵采集粘液燃料并撤离。", "priority": 0 }] },
+        "observe": { "selection": "best_match", "variants": [{ "id": "hive_observe", "text": "只观察入口，等待诱饵或恢复受伤。", "priority": 0 }] }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

@@ -23,7 +23,20 @@ describe("call-actions content exports", () => {
 });
 
 describe("generated event content exports", () => {
-  const structuredDomains = ["crash_site", "crew_kael", "desert", "forest", "mine", "mountain"];
+  const structuredDomains = [
+    "crash_site",
+    "crew_kael",
+    "desert",
+    "forest",
+    "mainline_crash_site",
+    "mainline_ending",
+    "mainline_hive",
+    "mainline_medical",
+    "mainline_resources",
+    "mainline_village",
+    "mine",
+    "mountain",
+  ];
 
   it("tracks every authored structured event domain in the manifest", () => {
     expect(eventManifest.schema_version).toBe("event-manifest.v1");
