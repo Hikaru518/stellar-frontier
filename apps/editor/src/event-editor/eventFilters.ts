@@ -23,6 +23,8 @@ export function buildEventBrowserItems(library: EventEditorLibraryResponse): Eve
   const assets: EditorEventAsset<unknown>[] = [
     ...(library.definitions as EditorEventAsset<unknown>[]),
     ...callTemplates,
+    ...library.presets,
+    ...library.handlers,
   ];
 
   return assets.map((asset) => {

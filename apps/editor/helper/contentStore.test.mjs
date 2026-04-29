@@ -12,6 +12,8 @@ describe("contentStore", () => {
 
     expect(library.definitions.length).toBeGreaterThan(0);
     expect(library.call_templates.length).toBeGreaterThan(0);
+    expect(library.presets).toEqual(expect.any(Array));
+    expect(library.handlers.length).toBeGreaterThan(0);
     expect(library.definitions[0]).toEqual(
       expect.objectContaining({
         asset_type: "event_definition",
@@ -25,6 +27,14 @@ describe("contentStore", () => {
         asset_type: "call_template",
         file_path: "content/events/call_templates/crash_site.json",
         json_path: "/call_templates/0",
+        editable: false,
+      }),
+    );
+    expect(library.handlers[0]).toEqual(
+      expect.objectContaining({
+        asset_type: "handler",
+        file_path: "content/events/handler_registry.json",
+        json_path: "/handlers/0",
         editable: false,
       }),
     );

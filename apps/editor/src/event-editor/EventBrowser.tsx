@@ -17,6 +17,8 @@ interface EventBrowserProps {
 const ASSET_TYPE_OPTIONS = [
   { value: "event_definition", label: "Definitions" },
   { value: "call_template", label: "Call templates" },
+  { value: "preset", label: "Presets" },
+  { value: "handler", label: "Handlers" },
 ];
 
 export default function EventBrowser({ library, selectedAsset, onSelectAsset }: EventBrowserProps) {
@@ -167,8 +169,6 @@ function formatAssetType(assetType: EditorEventAsset<unknown>["asset_type"]): st
       return "definition";
     case "call_template":
       return "call template";
-    case "legacy_event":
-      return "legacy event";
     case "handler":
       return "handler";
     case "preset":

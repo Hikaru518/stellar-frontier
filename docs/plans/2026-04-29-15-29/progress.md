@@ -19,8 +19,8 @@ source:
 | 3 | T003 | 删除旧角色相关结构化事件资产 | completed | 1 |
 | 4 | T004 | 三人化地图、初始状态与测试 fixture | completed | 1 |
 | 5 | T005 | 删除 legacy event 内容入口 | completed | 1 |
-| 6 | T006 | 删除 editor legacy event 展示 | pending | 0 |
-| 7 | T007 | 建立 crew_actions 派生视图模型 | pending | 0 |
+| 6 | T006 | 删除 editor legacy event 展示 | completed | 1 |
+| 7 | T007 | 建立 crew_actions 派生视图模型 | in_progress | 1 |
 | 8 | T008 | 强化阻塞与单主行动约束 | pending | 0 |
 | 9 | T009 | 迁移时间推进到 crew_actions | pending | 0 |
 | 10 | T010 | 迁移移动行动到 crew_actions | pending | 0 |
@@ -84,3 +84,15 @@ source:
 - 完成时间: 2026-04-29 17:10
 - 尝试次数: 1
 - Monkey summary: 删除 `content/events/events.json` 与 `content/schemas/events.schema.json`，移除 runtime/content validation/editor helper 对 legacy event asset 的加载路径，并更新 README 与相关测试说明，使结构化事件成为唯一事件内容入口。验证：`npm run validate:content` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过；legacy 删除相关目标测试通过。root lint/test 仍因 editor 既有 `@xyflow/react` / `@dagrejs/dagre` 缺依赖失败。
+
+### T006: 删除 editor legacy event 展示
+- 状态: completed
+- 开始时间: 2026-04-29 17:12
+- 完成时间: 2026-04-29 17:15
+- 尝试次数: 1
+- Monkey summary: 删除 editor `legacy_event` asset type 与 UI 渲染路径，并让 editor library/browser 支持结构化 presets、handlers、schemas。验证：`npm --prefix apps/editor run test -- src/event-editor/EventBrowser.test.tsx helper/contentStore.test.mjs` 通过；完整 editor lint/test 仍因既有 graph 依赖 `@xyflow/react` / `@dagrejs/dagre` 缺失受阻。
+
+### T007: 建立 crew_actions 派生视图模型
+- 状态: in_progress
+- 开始时间: 2026-04-29 17:12
+- 尝试次数: 1

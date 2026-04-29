@@ -47,6 +47,8 @@ function createLibraryResponse(): EventEditorLibraryResponse {
   return {
     definitions: [],
     call_templates: [],
+    presets: [],
+    handlers: [],
     schemas: {},
   };
 }
