@@ -134,6 +134,19 @@ describe("validate-content", () => {
     expect(result.output).toContain("Unregistered call template domain file: content/events/call_templates/forest.json");
   });
 
+  it("rejects structured event content that references retired crew ids", () => {
+    const root = createContentRoot();
+    const forestDefinitions = readJson(root, "content/events/definitions/forest.json");
+    forestDefinitions.event_definitions[0].sample_contexts[0].crew_id = "kael";
+    writeJson(root, "content/events/definitions/forest.json", forestDefinitions);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Retired crew id in structured event content: kael");
+    expect(result.output).toContain("content/events/definitions/forest.json");
+  });
+
   it("rejects map candidate actions missing from object call-actions", () => {
     const root = createContentRoot();
     writeJson(root, "content/call-actions/basic-actions.json", {

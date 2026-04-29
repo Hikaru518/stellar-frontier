@@ -101,6 +101,7 @@ for (const [dataPath, schemaPath] of eventAssetFiles) {
 }
 
 if (!eventSchemaFailed) {
+  failed = validateStructuredEventRetiredCrewReferences() || failed;
   failed = validateEventProgramReferences() || failed;
 }
 
@@ -174,6 +175,51 @@ function loadEventContentLibrary() {
 
 function loadArrayFromFiles(relativeDirectory, propertyName) {
   return listJsonFiles(relativeDirectory).flatMap((dataPath) => readJson(dataPath)[propertyName] ?? []);
+}
+
+function validateStructuredEventRetiredCrewReferences() {
+  let hasError = false;
+  const retiredCrewIds = new Set(["lin_xia", "kael", "crew_kael"]);
+  for (const { directoryPath } of eventAssetGroups) {
+    for (const dataPath of listJsonFiles(directoryPath)) {
+      hasError = validateRetiredCrewReferencesInValue(readJson(dataPath), dataPath, [], retiredCrewIds) || hasError;
+    }
+  }
+  return hasError;
+}
+
+function validateRetiredCrewReferencesInValue(value, dataPath, segments, retiredCrewIds) {
+  if (typeof value === "string") {
+    if (retiredCrewIds.has(value)) {
+      return report(`Retired crew id in structured event content: ${value} at ${dataPath}${formatJsonPath(segments)}`);
+    }
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce(
+      (hasError, item, index) =>
+        validateRetiredCrewReferencesInValue(item, dataPath, [...segments, index], retiredCrewIds) || hasError,
+      false,
+    );
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).reduce(
+      (hasError, [key, child]) =>
+        validateRetiredCrewReferencesInValue(child, dataPath, [...segments, key], retiredCrewIds) || hasError,
+      false,
+    );
+  }
+
+  return false;
+}
+
+function formatJsonPath(segments) {
+  if (segments.length === 0) {
+    return "";
+  }
+  return `/${segments.map(escapeJsonPointer).join("/")}`;
 }
 
 async function loadEventValidation() {

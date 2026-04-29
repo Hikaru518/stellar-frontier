@@ -5,7 +5,6 @@ import { buildEventContentIndex } from "../events/contentIndex";
 describe("generated event content exports", () => {
   const structuredDomains = [
     "crash_site",
-    "crew_kael",
     "desert",
     "forest",
     "mainline_crash_site",
@@ -49,6 +48,18 @@ describe("generated event content exports", () => {
     expect(indexResult.errors).toEqual([]);
     expect(indexResult.index.definitionsByDomain.size).toBe(structuredDomains.length);
     expect(indexResult.index.presetsById.size).toBe(generatedContent.generatedPresetDefinitions.length);
+  });
+
+  it("does not expose retired crew structured event content", async () => {
+    const contentData = await import("./contentData");
+
+    const serializedStructuredContent = JSON.stringify({
+      domains: contentData.eventContentLibrary.domains,
+      eventProgramDefinitions: contentData.eventProgramDefinitions,
+      callTemplates: contentData.callTemplates,
+    });
+
+    expect(serializedStructuredContent).not.toMatch(/\b(?:crew_kael|lin_xia|kael)\b/);
   });
 });
 

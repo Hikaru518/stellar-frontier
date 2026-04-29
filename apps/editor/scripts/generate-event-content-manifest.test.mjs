@@ -22,7 +22,6 @@ describe("generate-event-content-manifest", () => {
       schema_version: "event-manifest.v1",
       domains: [
         manifestDomain("crash_site"),
-        manifestDomain("crew_kael"),
         manifestDomain("desert"),
         manifestDomain("forest", "presets/forest.json"),
         manifestDomain("mainline_crash_site"),
@@ -53,9 +52,8 @@ describe("generate-event-content-manifest", () => {
     expect(generated).toContain(
       'import crashSiteEventDefinitionsContent from "../../../../../content/events/definitions/crash_site.json";',
     );
-    expect(generated).toContain(
-      'import crewKaelCallTemplatesContent from "../../../../../content/events/call_templates/crew_kael.json";',
-    );
+    expect(generated).not.toContain("crewKael");
+    expect(generated).not.toContain("crew_kael");
     expect(generated).toContain(
       'import forestPresetsContent from "../../../../../content/events/presets/forest.json";',
     );

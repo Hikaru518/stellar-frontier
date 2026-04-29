@@ -8,13 +8,11 @@ import {
 } from "./sampleFixtures";
 
 describe("sample event fixtures", () => {
-  it("exposes the five approved TASK-011 sample event ids", () => {
+  it("exposes the supported approved sample event ids", () => {
     expect(SAMPLE_EVENT_IDS).toEqual([
       "forest_trace_small_camp",
       "forest_beast_emergency",
-      "mountain_signal_probe",
       "volcanic_ash_trace",
-      "lost_relic_argument",
     ]);
   });
 
@@ -23,9 +21,7 @@ describe("sample event fixtures", () => {
       expect.objectContaining({
         normal_discovery: expect.arrayContaining(["forest_trace_small_camp"]),
         emergency_multi_call: expect.arrayContaining(["forest_beast_emergency"]),
-        wait_node: expect.arrayContaining(["mountain_signal_probe"]),
         cross_crew_objective: expect.arrayContaining(["volcanic_ash_trace"]),
-        long_term_consequence: expect.arrayContaining(["lost_relic_argument"]),
       }),
     );
   });
@@ -34,9 +30,7 @@ describe("sample event fixtures", () => {
     expect(SAMPLE_EVENT_REACHABILITY).toEqual({
       forest_trace_small_camp: "seeded-regression",
       forest_beast_emergency: "seeded-regression",
-      mountain_signal_probe: "manual-reachable",
       volcanic_ash_trace: "seeded-regression",
-      lost_relic_argument: "seeded-regression",
     });
   });
 

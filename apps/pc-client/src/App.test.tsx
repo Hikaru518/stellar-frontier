@@ -599,7 +599,7 @@ describe("App", () => {
         "forest_trace_small_camp",
         "forest_beast_emergency",
         "mine_anomaly_report",
-        "mountain_signal_probe",
+        "garry_mine_anomaly_report",
         "volcanic_ash_trace",
       ]),
     );

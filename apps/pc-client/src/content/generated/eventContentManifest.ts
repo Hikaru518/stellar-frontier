@@ -5,8 +5,6 @@
 import type { CallTemplate, EventDefinition, PresetDefinition } from "../../events/types";
 import crashSiteEventDefinitionsContent from "../../../../../content/events/definitions/crash_site.json";
 import crashSiteCallTemplatesContent from "../../../../../content/events/call_templates/crash_site.json";
-import crewKaelEventDefinitionsContent from "../../../../../content/events/definitions/crew_kael.json";
-import crewKaelCallTemplatesContent from "../../../../../content/events/call_templates/crew_kael.json";
 import desertEventDefinitionsContent from "../../../../../content/events/definitions/desert.json";
 import desertCallTemplatesContent from "../../../../../content/events/call_templates/desert.json";
 import forestEventDefinitionsContent from "../../../../../content/events/definitions/forest.json";
@@ -31,7 +29,6 @@ import mountainCallTemplatesContent from "../../../../../content/events/call_tem
 
 export const generatedEventDomains = [
   "crash_site",
-  "crew_kael",
   "desert",
   "forest",
   "mainline_crash_site",
@@ -46,7 +43,6 @@ export const generatedEventDomains = [
 
 export const generatedEventProgramDefinitions = [
   ...crashSiteEventDefinitionsContent.event_definitions,
-  ...crewKaelEventDefinitionsContent.event_definitions,
   ...desertEventDefinitionsContent.event_definitions,
   ...forestEventDefinitionsContent.event_definitions,
   ...mainlineCrashSiteEventDefinitionsContent.event_definitions,
@@ -61,7 +57,6 @@ export const generatedEventProgramDefinitions = [
 
 export const generatedCallTemplates = [
   ...crashSiteCallTemplatesContent.call_templates,
-  ...crewKaelCallTemplatesContent.call_templates,
   ...desertCallTemplatesContent.call_templates,
   ...forestCallTemplatesContent.call_templates,
   ...mainlineCrashSiteCallTemplatesContent.call_templates,
