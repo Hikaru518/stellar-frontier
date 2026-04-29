@@ -33,6 +33,7 @@ const eventSchemaPaths = [
   "content/schemas/events/event-graph.schema.json",
   "content/schemas/events/event-definition.schema.json",
   "content/schemas/events/call-template.schema.json",
+  "content/schemas/events/preset.schema.json",
   "content/schemas/events/handler-registry.schema.json",
 ];
 
@@ -44,6 +45,10 @@ const eventAssetGroups = [
   {
     directoryPath: "content/events/call_templates",
     schemaPath: "content/schemas/events/call-template.schema.json",
+  },
+  {
+    directoryPath: "content/events/presets",
+    schemaPath: "content/schemas/events/preset.schema.json",
   },
 ];
 
@@ -100,6 +105,7 @@ for (const [dataPath, schemaPath] of eventAssetFiles) {
 if (!eventSchemaFailed) {
   failed = validateStructuredEventCrewReferences() || failed;
   failed = validateEventProgramReferences() || failed;
+  failed = validateMapObjectActionEventReferences() || failed;
 }
 
 failed = validateReferences(loaded) || failed;
@@ -170,6 +176,18 @@ function loadEventContentLibrary() {
   };
 }
 
+function collectEventDefinitionIds() {
+  const ids = new Set();
+  for (const dataPath of listJsonFiles("content/events/definitions")) {
+    for (const definition of readJson(dataPath).event_definitions ?? []) {
+      if (typeof definition.id === "string") {
+        ids.add(definition.id);
+      }
+    }
+  }
+  return ids;
+}
+
 function loadArrayFromFiles(relativeDirectory, propertyName) {
   return listJsonFiles(relativeDirectory).flatMap((dataPath) => readJson(dataPath)[propertyName] ?? []);
 }
@@ -230,6 +248,33 @@ function validateKnownCrewId(crewId, dataPath, segments, crewIds) {
     return false;
   }
   return report(`Unknown crew id in structured event content: ${crewId} at ${dataPath}${formatJsonPath(segments)}`);
+}
+
+function validateMapObjectActionEventReferences() {
+  let hasError = false;
+  const eventDefinitionIds = collectEventDefinitionIds();
+  for (const dataPath of listJsonFiles("content/map-objects")) {
+    const data = readJson(dataPath);
+    for (const [objectIndex, definition] of (data.map_objects ?? []).entries()) {
+      for (const [actionIndex, action] of (definition.actions ?? []).entries()) {
+        if (typeof action.event_id !== "string" || eventDefinitionIds.has(action.event_id)) {
+          continue;
+        }
+
+        hasError =
+          report(
+            `Unknown event_id in map object action: ${action.event_id} at ${dataPath}${formatJsonPath([
+              "map_objects",
+              objectIndex,
+              "actions",
+              actionIndex,
+              "event_id",
+            ])} (map object ${definition.id})`,
+          ) || hasError;
+      }
+    }
+  }
+  return hasError;
 }
 
 function formatJsonPath(segments) {
@@ -356,7 +401,17 @@ function validateMap(map, knownObjectIds) {
     hasError = report(`Map initialDiscoveredTileIds must include originTileId: ${map.originTileId}`) || hasError;
   }
 
-  for (const tile of map.tiles) {
+  const forbiddenLegacyObjectIds = new Set([
+    "acidic-marsh",
+    "animal-tracks",
+    "black-pine-stand",
+    "fallen-timber",
+    "fracture-vent",
+    "needlewood-stand",
+    "southwest-timber",
+  ]);
+
+  for (const [tileIndex, tile] of map.tiles.entries()) {
     const expectedTileId = `${tile.row}-${tile.col}`;
 
     if (!addUnique(tileIds, tile.id)) {
@@ -373,9 +428,14 @@ function validateMap(map, knownObjectIds) {
       hasError = report(`Map tile coordinate out of bounds: ${tile.id} (${tile.row},${tile.col}) for ${rows} x ${cols}`) || hasError;
     }
 
-    for (const objectId of tile.objectIds) {
+    for (const [objectIndex, objectId] of tile.objectIds.entries()) {
+      const objectPath = `content/maps/default-map.json${formatJsonPath(["tiles", tileIndex, "objectIds", objectIndex])}`;
       if (!knownObjectIds.has(objectId)) {
-        hasError = report(`Unknown objectId in tile ${tile.id}: ${objectId}`) || hasError;
+        hasError = report(`Unknown objectId in default map: ${objectId} at ${objectPath} (tile ${tile.id})`) || hasError;
+      }
+      if (forbiddenLegacyObjectIds.has(objectId)) {
+        hasError =
+          report(`Forbidden legacy objectId in default map: ${objectId} at ${objectPath} (tile ${tile.id})`) || hasError;
       }
       const previousTileId = referencedObjectIds.get(objectId);
       if (previousTileId !== undefined) {

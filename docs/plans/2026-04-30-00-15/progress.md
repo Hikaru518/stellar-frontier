@@ -18,7 +18,7 @@ source:
 | 2 | T002 | 删除非主线结构化事件资产并重生成 manifest 模块 | completed | 1 |
 | 3 | T003 | 清理默认地图与旧地图对象 | completed | 1 |
 | 4 | T004 | 迁移事件系统测试样例到测试 fixture | completed | 1 |
-| 5 | T005 | 加强 content 校验防止非主线内容回流 | pending | 0 |
+| 5 | T005 | 加强 content 校验防止非主线内容回流 | completed | 1 |
 | 6 | T006 | 验证主线 15 步闭环仍完整可玩 | pending | 0 |
 | 7 | T007 | 同步正式文档中的当前内容边界 | pending | 0 |
 
@@ -59,3 +59,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 将剩余事件系统样例迁移为 fixture-only IDs，清理旧 demo App / e2e 断言，并保留 engine 通用能力覆盖。
 - 质量检查: `npm run lint`、`npm run test` 通过；`ReadLints` 未发现新增诊断。未运行完整 e2e，因为本任务未要求浏览器端到端执行。
+
+### T005: 加强 content 校验防止非主线内容回流
+- 状态: completed
+- 开始时间: 2026-04-30 01:16
+- 完成时间: 2026-04-30 01:17
+- 尝试次数: 1
+- Monkey summary: 为 content validator 增加主线 domain 白名单、未注册事件 / preset 检查、preset schema 校验、map-object event_id 引用校验和默认地图 objectIds 禁止 / 缺失检查。
+- 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 通过；`ReadLints` 未发现新增诊断。

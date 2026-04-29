@@ -5,6 +5,14 @@ import { fileURLToPath } from "node:url";
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifestRelativePath = "content/events/manifest.json";
 const defaultOutputRelativePath = "apps/pc-client/src/content/generated/eventContentManifest.ts";
+const allowedRuntimeEventDomains = new Set([
+  "mainline_crash_site",
+  "mainline_ending",
+  "mainline_hive",
+  "mainline_medical",
+  "mainline_resources",
+  "mainline_village",
+]);
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
@@ -61,6 +69,7 @@ export function validateEventManifest(root = sourceRoot) {
 
   const definitionFiles = new Set();
   const callTemplateFiles = new Set();
+  const presetFiles = new Set();
   const domainIds = new Set();
 
   for (const [domainIndex, domain] of manifest.domains.entries()) {
@@ -79,6 +88,10 @@ export function validateEventManifest(root = sourceRoot) {
       issues.push(`Duplicate event manifest domain id: ${domain.id}`);
     }
     domainIds.add(domain.id);
+
+    if (!allowedRuntimeEventDomains.has(domain.id)) {
+      issues.push(`Forbidden event manifest domain at ${domainPath}.id: ${domain.id}`);
+    }
 
     const definitionsPath = validateManifestAssetPath(domain, "definitions", "definitions", domainPath, issues);
     const callTemplatesPath = validateManifestAssetPath(domain, "call_templates", "call_templates", domainPath, issues);
@@ -100,6 +113,7 @@ export function validateEventManifest(root = sourceRoot) {
     }
 
     if (presetsPath) {
+      presetFiles.add(toContentEventsRelativePath(presetsPath));
       validateManifestFileExists(root, presetsPath, "presets", issues);
     }
   }
@@ -113,6 +127,12 @@ export function validateEventManifest(root = sourceRoot) {
   for (const dataPath of listJsonFiles(root, "content/events/call_templates")) {
     if (!callTemplateFiles.has(dataPath)) {
       issues.push(`Unregistered call template domain file: ${dataPath}`);
+    }
+  }
+
+  for (const dataPath of listJsonFiles(root, "content/events/presets")) {
+    if (!presetFiles.has(dataPath)) {
+      issues.push(`Unregistered event preset domain file: ${dataPath}`);
     }
   }
 

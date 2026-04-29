@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/events/preset.schema.json",
+  "title": "Stellar Frontier Event Preset File",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["presets"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/preset"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
+    },
+    "json_object": {
+      "type": "object"
+    },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "expands_to", "description"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["condition", "effect", "effect_group", "probability_modifier"]
+        },
+        "expands_to": {
+          "$ref": "#/$defs/json_object"
+        },
+        "params": {
+          "$ref": "#/$defs/json_object"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

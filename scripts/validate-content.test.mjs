@@ -125,13 +125,39 @@ describe("validate-content", () => {
 
   it("rejects event domain files missing from the manifest", () => {
     const root = createContentRoot();
+    const manifest = readJson(root, "content/events/manifest.json");
+    manifest.domains = manifest.domains.filter((domain) => domain.id !== "mainline_crash_site");
+    writeJson(root, "content/events/manifest.json", manifest);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Event manifest validation failed:");
+    expect(result.output).toContain(
+      "Unregistered event definition domain file: content/events/definitions/mainline_crash_site.json",
+    );
+    expect(result.output).toContain(
+      "Unregistered call template domain file: content/events/call_templates/mainline_crash_site.json",
+    );
+  });
+
+  it("rejects manifest event domains outside the mainline runtime boundary", () => {
+    const root = createContentRoot();
+    const definition = minimalEventDefinition();
+    definition.domain = "forest";
+    writeJson(root, "content/events/definitions/forest.json", {
+      event_definitions: [definition],
+    });
+    writeJson(root, "content/events/call_templates/forest.json", {
+      call_templates: [minimalCallTemplate()],
+    });
     writeJson(root, "content/events/manifest.json", {
       schema_version: "event-manifest.v1",
       domains: [
         {
-          id: "crash_site",
-          definitions: "definitions/crash_site.json",
-          call_templates: "call_templates/crash_site.json",
+          id: "forest",
+          definitions: "definitions/forest.json",
+          call_templates: "call_templates/forest.json",
           presets: null,
         },
       ],
@@ -140,78 +166,106 @@ describe("validate-content", () => {
     const result = runValidator(root);
 
     expect(result.status).toBe(1);
-    expect(result.output).toContain("Event manifest validation failed:");
-    expect(result.output).toContain("Unregistered event definition domain file: content/events/definitions/forest.json");
-    expect(result.output).toContain("Unregistered call template domain file: content/events/call_templates/forest.json");
+    expect(result.output).toContain("Forbidden event manifest domain at domains[0].id: forest");
   });
 
-  it("rejects structured event content that references unknown crew ids", () => {
+  it("rejects preset files missing from the manifest", () => {
     const root = createContentRoot();
-    const forestDefinitions = readJson(root, "content/events/definitions/forest.json");
-    forestDefinitions.event_definitions[0].sample_contexts[0].crew_id = "unknown_crew";
-    writeJson(root, "content/events/definitions/forest.json", forestDefinitions);
+    writeJson(root, "content/events/presets/forest.json", {
+      presets: [minimalPreset()],
+    });
 
     const result = runValidator(root);
 
     expect(result.status).toBe(1);
-    expect(result.output).toContain("Unknown crew id in structured event content: unknown_crew");
-    expect(result.output).toContain("content/events/definitions/forest.json");
+    expect(result.output).toContain("Unregistered event preset domain file: content/events/presets/forest.json");
   });
 
-  it("rejects map candidate actions missing from object call-actions", () => {
+  it("validates registered preset files against the preset schema", () => {
     const root = createContentRoot();
-    writeJson(root, "content/call-actions/basic-actions.json", {
-      $schema: "../schemas/call-actions.schema.json",
-      call_actions: minimalBasicCallActions(),
+    const manifest = readJson(root, "content/events/manifest.json");
+    manifest.domains[0].presets = "presets/mainline_crash_site.json";
+    writeJson(root, "content/events/manifest.json", manifest);
+    writeJson(root, "content/events/presets/mainline_crash_site.json", {
+      presets: [{ id: "bad_preset" }],
     });
-    writeJson(root, "content/call-actions/object-actions.json", {
-      $schema: "../schemas/call-actions.schema.json",
-      call_actions: minimalObjectCallActions().filter((action) => action.id !== "scan"),
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Schema validation failed: content/events/presets/mainline_crash_site.json");
+    expect(result.output).toContain("/presets/0/kind");
+  });
+
+  it("rejects map-object actions that point to missing event definitions", () => {
+    const root = createContentRoot();
+    writeJson(root, "content/map-objects/resources.json", {
+      $schema: "../schemas/map-objects.schema.json",
+      map_objects: [
+        minimalMapObject({
+          id: "invalid-event-action-object",
+          actions: [
+            {
+              id: "invalid-event-action-object:inspect",
+              category: "object",
+              label: "Inspect invalid event action",
+              conditions: [],
+              event_id: "missing_event_definition",
+            },
+          ],
+        }),
+      ],
     });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Unknown event_id in map object action: missing_event_definition");
+    expect(result.output).toContain("content/map-objects/resources.json/map_objects/0/actions/0/event_id");
+    expect(result.output).toContain("invalid-event-action-object");
+  });
+
+  it("reports default map objectIds that do not exist with a concrete path", () => {
+    const root = createContentRoot();
     const defaultMap = readJson(root, "content/maps/default-map.json");
-    defaultMap.tiles[0].objects = [
-      {
-        id: "scan-target",
-        kind: "signal",
-        name: "Scan Target",
-        visibility: "onDiscovered",
-        candidateActions: ["scan"],
-      },
-    ];
+    defaultMap.tiles[0].objectIds = ["missing-map-object"];
     writeJson(root, "content/maps/default-map.json", defaultMap);
 
     const result = runValidator(root);
 
     expect(result.status).toBe(1);
-    expect(result.output).toContain("candidateActions references missing object call-action: scan");
+    expect(result.output).toContain("Unknown objectId in default map: missing-map-object");
+    expect(result.output).toContain("content/maps/default-map.json/tiles/0/objectIds/0");
   });
 
-  it("rejects basic call-actions outside the map candidate enum", () => {
+  it("rejects forbidden legacy objectIds when they reappear in the default map", () => {
     const root = createContentRoot();
-    writeJson(root, "content/call-actions/basic-actions.json", {
-      $schema: "../schemas/call-actions.schema.json",
-      call_actions: [
-        ...minimalBasicCallActions(),
-        {
-          id: "teleport",
-          category: "universal",
-          label: "Teleport",
-          tone: "accent",
-          availableWhenBusy: false,
-          durationSeconds: 0,
-          handler: "teleport",
-        },
-      ],
+    writeJson(root, "content/map-objects/resources.json", {
+      $schema: "../schemas/map-objects.schema.json",
+      map_objects: [minimalMapObject({ id: "black-pine-stand" })],
     });
-    writeJson(root, "content/call-actions/object-actions.json", {
-      $schema: "../schemas/call-actions.schema.json",
-      call_actions: minimalObjectCallActions(),
-    });
+    const defaultMap = readJson(root, "content/maps/default-map.json");
+    defaultMap.tiles[0].objectIds = ["black-pine-stand"];
+    writeJson(root, "content/maps/default-map.json", defaultMap);
 
     const result = runValidator(root);
 
     expect(result.status).toBe(1);
-    expect(result.output).toContain("teleport");
+    expect(result.output).toContain("Forbidden legacy objectId in default map: black-pine-stand");
+    expect(result.output).toContain("content/maps/default-map.json/tiles/0/objectIds/0");
+  });
+
+  it("rejects structured event content that references unknown crew ids", () => {
+    const root = createContentRoot();
+    const medicalDefinitions = readJson(root, "content/events/definitions/mainline_medical.json");
+    medicalDefinitions.event_definitions[0].sample_contexts[0].crew_id = "unknown_crew";
+    writeJson(root, "content/events/definitions/mainline_medical.json", medicalDefinitions);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Unknown crew id in structured event content: unknown_crew");
+    expect(result.output).toContain("content/events/definitions/mainline_medical.json");
   });
 });
 
@@ -358,6 +412,65 @@ function minimalCallNode(overrides = {}) {
       blocking_key_template: null,
     },
     expires_in_seconds: 120,
+    ...overrides,
+  };
+}
+
+function minimalCallTemplate(overrides = {}) {
+  return {
+    schema_version: "call-template-v1",
+    id: "forest_trace_call",
+    version: 1,
+    domain: "forest",
+    event_definition_id: "forest_trace",
+    node_id: "call",
+    render_context_fields: [],
+    opening_lines: minimalTextVariantGroup("opening"),
+    option_lines: {
+      accept: minimalTextVariantGroup("accept"),
+    },
+    fallback_order: ["default"],
+    default_variant_required: true,
+    ...overrides,
+  };
+}
+
+function minimalTextVariantGroup(id) {
+  return {
+    variants: [
+      {
+        id: `${id}_default`,
+        text: "Sample text.",
+        priority: 1,
+      },
+    ],
+    selection: "first_match",
+  };
+}
+
+function minimalPreset(overrides = {}) {
+  return {
+    id: "forest_flag_preset",
+    kind: "condition",
+    expands_to: {
+      type: "world_flag_equals",
+      field: "sample_flag",
+      value: true,
+    },
+    description: "Sample preset.",
+    ...overrides,
+  };
+}
+
+function minimalMapObject(overrides = {}) {
+  return {
+    id: "sample-map-object",
+    kind: "structure",
+    name: "Sample Map Object",
+    visibility: "onDiscovered",
+    status_options: ["pristine"],
+    initial_status: "pristine",
+    actions: [],
     ...overrides,
   };
 }
