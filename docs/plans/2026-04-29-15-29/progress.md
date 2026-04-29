@@ -26,7 +26,7 @@ source:
 | 10 | T010 | 迁移移动行动到 crew_actions | completed | 1 |
 | 11 | T011 | 迁移停止与待命行动到事件 runtime | completed | 1 |
 | 12 | T012 | 迁移调查当前区域到地点事件入口 | completed | 1 |
-| 13 | T013 | 重构基础行动 content 与 schema | pending | 0 |
+| 13 | T013 | 重构基础行动 content 与 schema | completed | 1 |
 | 14 | T014 | 删除 legacy dispatch 与旧行动入口 | pending | 0 |
 | 15 | T015 | 建立地点剧情动作事件样例 | pending | 0 |
 | 16 | T016 | 删除地图 legacy content 字段与 schema | pending | 0 |
@@ -133,3 +133,10 @@ source:
 - 完成时间: 2026-04-29 17:42
 - 尝试次数: 1
 - Monkey summary: “调查当前区域”从 `legacy.survey` 迁移到结构化地点事件入口，按当前地块可见 map objects 尝试事件候选；无可触发调查事件时显示中性空状态，不生成旧通用调查结果。验证：合并态 `npm run validate:content`、`npm --prefix apps/pc-client run lint`、`npm --prefix apps/pc-client run test` 通过。
+
+### T013: 重构基础行动 content 与 schema
+- 状态: completed
+- 开始时间: 2026-04-29 17:43
+- 完成时间: 2026-04-29 17:47
+- 尝试次数: 1
+- Monkey summary: `universal-actions` 收紧为四类基础行动，`move/standby/stop` 的 `event_id` 改为 `crew_actions.*`，schema 限定 action id/category 并拒绝 `legacy.*`；通话页过滤旧通用对象动作 `gather/build/extract/scan`。验证：`npm run validate:content` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。

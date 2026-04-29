@@ -35,6 +35,8 @@ interface ActionCandidate {
   object?: MapObjectDefinition;
 }
 
+const RETIRED_GENERIC_OBJECT_ACTION_VERBS = new Set(["gather", "build", "extract", "scan"]);
+
 /**
  * Builds the call-page action view for a member at a tile.
  *
@@ -106,11 +108,23 @@ function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate
       continue;
     }
     for (const action of definition.actions) {
+      if (isRetiredGenericObjectAction(action)) {
+        continue;
+      }
       candidates.push({ action, object: definition });
     }
   }
 
   return candidates;
+}
+
+function isRetiredGenericObjectAction(action: ActionDef): boolean {
+  if (action.category !== "object") {
+    return false;
+  }
+  const actionIdParts = action.id.split(":");
+  const actionVerb = actionIdParts[actionIdParts.length - 1];
+  return actionVerb ? RETIRED_GENERIC_OBJECT_ACTION_VERBS.has(actionVerb) : false;
 }
 
 function evaluateCandidate(candidate: ActionCandidate, context: ReturnType<typeof buildCallActionContext>): CallActionView | null {

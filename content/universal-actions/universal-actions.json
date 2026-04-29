@@ -16,7 +16,7 @@
           "value": "active"
         }
       ],
-      "event_id": "legacy.move"
+      "event_id": "crew_actions.move"
     },
     {
       "id": "universal:standby",
@@ -33,7 +33,7 @@
           "value": "active"
         }
       ],
-      "event_id": "legacy.standby"
+      "event_id": "crew_actions.standby"
     },
     {
       "id": "universal:stop",
@@ -50,7 +50,7 @@
           "value": "active"
         }
       ],
-      "event_id": "legacy.stop"
+      "event_id": "crew_actions.stop"
     },
     {
       "id": "universal:survey",

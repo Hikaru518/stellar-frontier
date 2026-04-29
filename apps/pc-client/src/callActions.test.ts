@@ -139,9 +139,8 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 describe("buildCallView", () => {
   it("groups universal actions first then revealed object actions for an idle crew member", () => {
     // tile `2-3` exists in default-map.json and lists `black-pine-stand` as one
-    // of its objectIds. The black-pine-stand definition declares two object
-    // actions (survey/gather) with empty conditions, so they should always be
-    // visible once the object is revealed.
+    // of its objectIds. The call page should keep object investigation
+    // available without exposing generic gather/build/extract/scan buttons.
     const tile = createTile("2-3");
     const blackPine = mapObjectDefinitionById.get("black-pine-stand");
     expect(blackPine).toBeDefined();
@@ -169,8 +168,31 @@ describe("buildCallView", () => {
 
     const blackPineGroup = view.groups.find((group) => group.title === blackPine!.name);
     expect(blackPineGroup).toBeDefined();
-    expect(blackPineGroup!.actions.map((action) => action.id)).toEqual(["black-pine-stand:survey", "black-pine-stand:gather"]);
+    expect(blackPineGroup!.actions.map((action) => action.id)).toEqual(["black-pine-stand:survey"]);
     expect(blackPineGroup!.actions.every((action) => !action.disabled)).toBe(true);
+  });
+
+  it("does not render retired generic object action buttons", () => {
+    const tile = createTile("3-2");
+    const gameState = createGameState({
+      crew: [createMember({ currentTile: "3-2" })],
+      map: {
+        ...createGameState().map,
+        discoveredTileIds: ["3-2"],
+        tilesById: {
+          "3-2": {
+            discovered: true,
+            investigated: true,
+            revealedObjectIds: ["mainline-damaged-forge", "mainline-damaged-warp-pod", "iron-ridge-deposit"],
+          },
+        },
+      },
+    });
+
+    const view = buildCallView({ member: createMember({ currentTile: "3-2" }), tile, gameState });
+    const actionIds = view.groups.flatMap((group) => group.actions.map((action) => action.id));
+
+    expect(actionIds.some((id) => /:(gather|build|extract|scan)$/.test(id))).toBe(false);
   });
 
   it("does not render an object's actions before its visibility is satisfied", () => {

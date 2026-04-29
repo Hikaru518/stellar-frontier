@@ -1687,7 +1687,7 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "停止当前行动" })).not.toBeInTheDocument();
     expect(screen.getByText("铁矿床")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "调查 铁矿床" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "采集 铁矿床" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "采集 铁矿床" })).not.toBeInTheDocument();
   });
 
   it("renders only busy-available call actions for a busy crew member", () => {

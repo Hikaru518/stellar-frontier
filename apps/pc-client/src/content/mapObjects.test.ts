@@ -1,4 +1,6 @@
+import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
+import universalActionsSchema from "../../../../content/schemas/universal-actions.schema.json";
 import {
   getMapObjectDefinition,
   mapObjectDefinitionById,
@@ -46,5 +48,42 @@ describe("mapObjects content", () => {
     const survey = universalActions.find((action) => action.id === "universal:survey");
     expect(survey).toBeDefined();
     expect(survey?.event_id).not.toBe("legacy.survey");
+  });
+
+  it("does not route any universal action through a legacy event id", () => {
+    expect(universalActions.every((action) => !action.event_id.startsWith("legacy."))).toBe(true);
+  });
+
+  it("rejects retired universal action ids and legacy event ids at the schema boundary", () => {
+    const ajv = new Ajv2020({ allErrors: true });
+    const validate = ajv.compile(universalActionsSchema);
+
+    expect(
+      validate({
+        universal_actions: [
+          {
+            id: "universal:gather",
+            category: "universal",
+            label: "采集当前区域",
+            conditions: [],
+            event_id: "system.generic_gather",
+          },
+        ],
+      }),
+    ).toBe(false);
+
+    expect(
+      validate({
+        universal_actions: [
+          {
+            id: "universal:move",
+            category: "universal",
+            label: "移动到指定区域",
+            conditions: [],
+            event_id: "legacy.move",
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 });
