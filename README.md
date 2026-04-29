@@ -41,7 +41,7 @@ npm run dev:pc
 npm run dev:mobile
 ```
 
-默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Yuan Host 为 `ws://localhost:8888/`。
+默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Game Editor 为 `http://localhost:5175/`，Yuan Host 为 `ws://localhost:8888/`。
 
 启动本地 Game Editor / Event Editor。先开一个终端运行 helper：
 

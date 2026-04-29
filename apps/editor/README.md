@@ -31,7 +31,7 @@ node ../../common/scripts/install-run-rushx.js dev
 默认地址：
 
 - Helper: `http://127.0.0.1:4317/api/health`
-- Editor: `http://localhost:5174/`
+- Editor: `http://localhost:5175/`
 
 打开 Editor 后，页面会请求 `GET /api/event-editor/library`。如果 helper 未启动，页面会显示 `npm run editor:helper` 的本地启动提示。
 
