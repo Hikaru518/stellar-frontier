@@ -199,6 +199,64 @@ describe("App", () => {
     });
   });
 
+  it("reveals the damaged warp pod and triggers its object action", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "mike",
+            currentTile: "4-4",
+            location: "坠毁区域",
+            coord: "(0,0)",
+            status: "残骸附近待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles("4-4"),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const firstMikeCard = screen.getByText("Mike，特战干员").closest("article");
+    expect(firstMikeCard).not.toBeNull();
+    fireEvent.click(within(firstMikeCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+    fireEvent.click(screen.getByRole("button", { name: "记录返航主目标，继续扩大调查。" }));
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+
+    let saved = readSavedGameState();
+    expect(saved.map.tilesById["4-4"].revealedObjectIds).toContain("mainline-damaged-warp-pod");
+
+    const secondMikeCard = screen.getByText("Mike，特战干员").closest("article");
+    expect(secondMikeCard).not.toBeNull();
+    fireEvent.click(within(secondMikeCard as HTMLElement).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByText("损坏折跃仓")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "调查 损坏折跃仓" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "修复 损坏折跃仓" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "启动 损坏折跃仓" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "调查 损坏折跃仓" }));
+
+    expect(screen.getByText("地点事件已进入通讯队列。")).toBeInTheDocument();
+    saved = readSavedGameState();
+    expect(findRuntimeEvent(saved, "mainline_crash_site_survey_chain")).toBeDefined();
+  });
+
   it("does not render hard-coded PC prototype copy on current fact pages", () => {
     const forbiddenPcPrototypeCopy = new RegExp(
       [
@@ -385,7 +443,7 @@ describe("App", () => {
     expect(savedCrew(saved, "garry").inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
   });
 
-  it("does not expose removed object survey as a call decision", () => {
+  it("exposes explicit mainline object actions without restoring removed demo objects", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
@@ -418,7 +476,9 @@ describe("App", () => {
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
 
-    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "调查 铁矿床" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "采集 铁矿床" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /潮湿木材|野生动物踪迹|矿洞异常/ })).not.toBeInTheDocument();
   });
 
   it("does not reveal investigated map objects through current-area survey without an event effect", () => {
@@ -1166,9 +1226,9 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "移动到指定区域" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "原地待命" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "停止当前行动" })).not.toBeInTheDocument();
-    expect(screen.queryByText("铁矿床")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "采集 铁矿床" })).not.toBeInTheDocument();
+    expect(screen.getByText("铁矿床")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "调查 铁矿床" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "采集 铁矿床" })).toBeInTheDocument();
   });
 
   it("renders only busy-available call actions for a busy crew member", () => {

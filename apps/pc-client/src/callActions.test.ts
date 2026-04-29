@@ -133,9 +133,7 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 }
 
 describe("buildCallView", () => {
-  it("groups universal actions without exposing removed object actions", () => {
-    // Mainline objects without inline actions should not create empty object
-    // groups; current-area survey owns the structured investigation path.
+  it("renders scenario-specific actions for revealed mainline objects", () => {
     const tile = createTile("4-4");
     const warpPod = mapObjectDefinitionById.get("mainline-damaged-warp-pod");
     expect(warpPod).toBeDefined();
@@ -161,10 +159,17 @@ describe("buildCallView", () => {
       universalActions.filter((action) => action.id !== "universal:stop").map((action) => action.id),
     );
 
-    expect(view.groups.find((group) => group.title === warpPod!.name)).toBeUndefined();
+    const warpPodGroup = view.groups.find((group) => group.title === warpPod!.name);
+    expect(warpPodGroup?.actions.map((action) => action.id)).toEqual(
+      expect.arrayContaining([
+        "mainline-damaged-warp-pod:survey",
+        "mainline-damaged-warp-pod:build",
+        "mainline-damaged-warp-pod:extract",
+      ]),
+    );
   });
 
-  it("does not render removed generic object action buttons", () => {
+  it("renders only explicit story actions for revealed mainline objects", () => {
     const tile = createTile("3-2");
     const gameState = createGameState({
       crew: [createMember({ currentTile: "3-2" })],
@@ -184,7 +189,16 @@ describe("buildCallView", () => {
     const view = buildCallView({ member: createMember({ currentTile: "3-2" }), tile, gameState });
     const actionIds = view.groups.flatMap((group) => group.actions.map((action) => action.id));
 
-    expect(actionIds.some((id) => !id.startsWith("universal:") && /:(survey|gather|build|extract|scan)$/.test(id))).toBe(false);
+    expect(actionIds).toEqual(
+      expect.arrayContaining([
+        "mainline-damaged-forge:survey",
+        "mainline-damaged-forge:build",
+        "iron-ridge-deposit:survey",
+        "iron-ridge-deposit:gather",
+      ]),
+    );
+    expect(actionIds).not.toContain("mainline-damaged-forge:gather");
+    expect(actionIds).not.toContain("iron-ridge-deposit:build");
   });
 
   it("does not render an object's actions before its visibility is satisfied", () => {
@@ -248,7 +262,7 @@ describe("buildCallView", () => {
 
     expect(() => buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState })).not.toThrow();
     const view = buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState });
-    expect(view.groups.map((group) => group.title)).not.toContain("外星村落");
+    expect(view.groups.map((group) => group.title)).toContain("外星村落");
     expect(view.groups.map((group) => group.title)).not.toContain("ghost-object");
   });
 
