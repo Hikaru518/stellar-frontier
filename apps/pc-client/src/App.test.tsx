@@ -118,6 +118,10 @@ describe("App", () => {
     expect(saved.crew.some((member: { hasIncoming?: boolean }) => member.hasIncoming)).toBe(false);
     expect(JSON.stringify(saved.crew)).not.toContain(["emergency", "Event"].join(""));
     expect(saved.crew.map((member: { status?: string }) => member.status)).not.toContain("遭遇紧急事件，等待指令。");
+    expect(saved.crew.map((member: { status?: string }) => member.status)).not.toEqual(
+      expect.arrayContaining(["正在前往目标地点，行进中。", "工作中。"]),
+    );
+    expect(Object.keys(saved.crew_actions)).toEqual([]);
     expect(saved.tiles.flatMap((tile: { crew?: string[] }) => tile.crew ?? []).sort()).toEqual(["amy", "garry", "mike"]);
     expect(saved.tiles).toHaveLength(defaultMapConfig.tiles.length);
     expect(

@@ -7,8 +7,8 @@
       "name": "Mike",
       "role": "特战干员",
       "currentTile": "1-1",
-      "status": "moving",
-      "statusTone": "muted",
+      "status": "idle",
+      "statusTone": "neutral",
       "attributes": {
         "physical": 5,
         "agility": 5,
@@ -127,8 +127,8 @@
       "name": "Garry",
       "role": "退休老大爷",
       "currentTile": "3-3",
-      "status": "working",
-      "statusTone": "muted",
+      "status": "idle",
+      "statusTone": "neutral",
       "attributes": {
         "physical": 3,
         "agility": 2,
