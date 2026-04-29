@@ -114,6 +114,8 @@ describe("App", () => {
       investigationReportsById: {},
     });
     expect(saved.map.tilesById["4-4"].discovered).toBe(true);
+    expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "amy", "garry"]);
+    expect(saved.tiles.flatMap((tile: { crew?: string[] }) => tile.crew ?? []).sort()).toEqual(["amy", "garry", "mike"]);
   });
 
   it("ignores old v1 saves when starting a v2 game", () => {

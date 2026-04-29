@@ -481,7 +481,7 @@ test("completes a seeded assigned objective when its crew action finishes", asyn
         activeAction: undefined,
       },
       {
-        id: "lin_xia",
+        id: "amy",
         currentTile: "4-3",
         location: "火山灰沙漠",
         coord: "(4,3)",
@@ -735,7 +735,7 @@ function createForestRuntimeCallState() {
 function createVolcanicObjectiveState() {
   const eventId = "volcanic_ash_trace:480";
   const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
-  const actionId = "lin-xia-ash-survey";
+  const actionId = "amy-ash-survey";
 
   return {
     eventId,
@@ -805,7 +805,7 @@ function createVolcanicObjectiveState() {
             duration_seconds: 45,
             can_interrupt: true,
           },
-          assigned_crew_id: "lin_xia",
+          assigned_crew_id: "amy",
           action_id: actionId,
           created_at: 481,
           assigned_at: 482,
@@ -826,7 +826,7 @@ function volcanicTiles() {
           ...tile,
           terrain: "火山灰沙漠",
           resources: ["火山灰"],
-          crew: ["garry", "lin_xia"],
+          crew: ["garry", "amy"],
           danger: "灰线不稳定",
           status: "复核中",
         }

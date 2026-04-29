@@ -17,8 +17,8 @@ source:
 | 1 | T001 | 固化去 mock 与去 legacy 审计清单 | completed | 1 |
 | 2 | T002 | 三人化 crew content、schema 与类型 | completed | 1 |
 | 3 | T003 | 删除旧角色相关结构化事件资产 | completed | 1 |
-| 4 | T004 | 三人化地图、初始状态与测试 fixture | pending | 0 |
-| 5 | T005 | 删除 legacy event 内容入口 | pending | 0 |
+| 4 | T004 | 三人化地图、初始状态与测试 fixture | completed | 1 |
+| 5 | T005 | 删除 legacy event 内容入口 | in_progress | 1 |
 | 6 | T006 | 删除 editor legacy event 展示 | pending | 0 |
 | 7 | T007 | 建立 crew_actions 派生视图模型 | pending | 0 |
 | 8 | T008 | 强化阻塞与单主行动约束 | pending | 0 |
@@ -70,3 +70,15 @@ source:
 - 完成时间: 2026-04-29 17:00
 - 尝试次数: 1
 - Monkey summary: 删除 `crew_kael` definitions / call templates 与 manifest domain，清理 desert、mainline_medical、mountain 中的 Lin Xia / Kael 结构化事件引用，重新生成 event manifest，并新增 retired crew content validator。验证：`npm run validate:content` 通过；PC client lint/test 通过；新增 retired crew validator 测试通过。root `npm run lint` / `npm run test` 仍失败在 editor 既有 `@xyflow/react` / `@dagrejs/dagre` 缺依赖；完整 `scripts/validate-content.test.mjs` 仍有两个既有 map candidate action 断言失败。
+
+### T004: 三人化地图、初始状态与测试 fixture
+- 状态: completed
+- 开始时间: 2026-04-29 17:01
+- 完成时间: 2026-04-29 17:07
+- 尝试次数: 1
+- Monkey summary: 清理 PC unit/e2e fixture 中 Lin Xia / Kael 的正向引用，改为三人 crew id，并在初始 runtime 测试中增加三人 crew id 与地图占位断言。验证：`npm run validate:content` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。e2e 因本机 Playwright Chromium 缓存缺失未进入业务断言。
+
+### T005: 删除 legacy event 内容入口
+- 状态: in_progress
+- 开始时间: 2026-04-29 17:01
+- 尝试次数: 1

@@ -150,9 +150,7 @@ describe("structured condition evaluator", () => {
         crew: {
           amy: { ...amy, tile_id: "4-4", status: "idle", communication_state: "available" },
           mike: { id: "mike", tile_id: "4-4", status: "idle", communication_state: "available", condition_tags: [] },
-          garry: { id: "garry", tile_id: "3-3", status: "lost_contact", communication_state: "lost_contact", condition_tags: [] },
-          lin_xia: { id: "lin_xia", tile_id: "2-2", status: "dead", communication_state: "available", condition_tags: ["dead"] },
-          kael: { id: "kael", tile_id: "1-1", status: "unavailable", communication_state: "available", condition_tags: [] },
+          garry: { id: "garry", tile_id: "3-3", status: "unavailable", communication_state: "available", condition_tags: [] },
         },
       },
       {
