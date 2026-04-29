@@ -3,19 +3,47 @@ import eventManifest from "../../../../content/events/manifest.json";
 import { buildEventContentIndex } from "../events/contentIndex";
 
 describe("generated event content exports", () => {
-  const structuredDomains = [
+  const playableStructuredDomains = [
+    "mainline_crash_site",
+    "mainline_resources",
+    "mainline_village",
+    "mainline_medical",
+    "mainline_hive",
+    "mainline_ending",
+  ];
+
+  const legacyStructuredDomainsPendingRemoval = [
     "crash_site",
     "desert",
     "forest",
-    "mainline_crash_site",
-    "mainline_ending",
-    "mainline_hive",
-    "mainline_medical",
-    "mainline_resources",
-    "mainline_village",
     "mine",
     "mountain",
   ];
+
+  const structuredDomains = [...legacyStructuredDomainsPendingRemoval, ...playableStructuredDomains].sort();
+  const sortedPlayableStructuredDomains = [...playableStructuredDomains].sort();
+
+  it("documents the only playable structured event domains for this content boundary", () => {
+    const playableDomainSet = new Set(playableStructuredDomains);
+    const mainlineManifestDomains = eventManifest.domains.map((domain) => domain.id).filter((domain) => playableDomainSet.has(domain)).sort();
+
+    expect(playableStructuredDomains).toEqual([
+      "mainline_crash_site",
+      "mainline_resources",
+      "mainline_village",
+      "mainline_medical",
+      "mainline_hive",
+      "mainline_ending",
+    ]);
+    expect(mainlineManifestDomains).toEqual(sortedPlayableStructuredDomains);
+  });
+
+  it("keeps non-mainline runtime domains explicit until the cleanup tasks remove them", () => {
+    const playableDomainSet = new Set(playableStructuredDomains);
+    const nonMainlineManifestDomains = eventManifest.domains.map((domain) => domain.id).filter((domain) => !playableDomainSet.has(domain)).sort();
+
+    expect(nonMainlineManifestDomains).toEqual(legacyStructuredDomainsPendingRemoval);
+  });
 
   it("tracks every authored structured event domain in the manifest", () => {
     expect(eventManifest.schema_version).toBe("event-manifest.v1");

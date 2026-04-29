@@ -1,0 +1,222 @@
+{
+  "topic": "minimal-use-case-content-boundary",
+  "created": "2026-04-30",
+  "source": {
+    "design": "docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-design.md",
+    "technical_design": "docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-technical-design.md"
+  },
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "建立可玩内容边界审计与基线断言",
+      "priority": "P0",
+      "depends_on": [],
+      "summary": "先把当前 runtime content 边界变成可验证事实，明确哪些 domain、地图对象和测试样例必须移出正式内容。",
+      "scope": [
+        "审计 content/events/manifest.json、content/events/definitions、content/events/call_templates、content/events/presets。",
+        "审计 content/maps/default-map.json 与 content/map-objects/*.json 中的非主线对象、危险状态和旧演示标签。",
+        "更新或新增测试断言，表达正式 runtime 只允许 mainline_* event domain。",
+        "记录需要迁移到测试 fixture 的旧事件系统样例，区分保留测试价值与删除剧情内容。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/content/contentData.test.ts",
+        "apps/pc-client/src/events/mainlineContent.test.ts",
+        "docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-implementation-plan.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: 审计结果列出所有非主线 runtime event domain、call template、preset、map object 和默认地图引用。",
+        "AC2: 测试或文档基线明确 mainline_crash_site、mainline_resources、mainline_village、mainline_medical、mainline_hive、mainline_ending 是本轮唯一可玩 event domain。",
+        "AC3: 审计不修改玩法逻辑，也不把旧演示内容改写为新支线。"
+      ],
+      "notes": "本任务是删除前的边界固定任务，后续任务不得重新把旧 domain 视为正式 content。"
+    },
+    {
+      "id": "T002",
+      "title": "删除非主线结构化事件资产并重生成 manifest 模块",
+      "priority": "P0",
+      "depends_on": [
+        "T001"
+      ],
+      "summary": "从正式 runtime 事件入口中彻底移除旧 crash_site、desert、forest、mine、mountain 等非主线事件资产。",
+      "scope": [
+        "从 content/events/manifest.json 删除非 mainline_* domain。",
+        "删除对应的旧 definitions、call_templates 和 presets 文件。",
+        "重新生成 apps/pc-client/src/content/generated/eventContentManifest.ts。",
+        "更新 contentData.test.ts 的 domain 断言和生成模块断言。"
+      ],
+      "suggested_files": [
+        "content/events/manifest.json",
+        "content/events/definitions/crash_site.json",
+        "content/events/definitions/desert.json",
+        "content/events/definitions/forest.json",
+        "content/events/definitions/mine.json",
+        "content/events/definitions/mountain.json",
+        "content/events/call_templates/crash_site.json",
+        "content/events/call_templates/desert.json",
+        "content/events/call_templates/forest.json",
+        "content/events/call_templates/mine.json",
+        "content/events/call_templates/mountain.json",
+        "content/events/presets/forest.json",
+        "apps/pc-client/src/content/generated/eventContentManifest.ts",
+        "apps/pc-client/src/content/contentData.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: content/events/manifest.json 只列出 mainline_* domain。",
+        "AC2: content/events/definitions 与 content/events/call_templates 下不存在非主线正式事件 JSON。",
+        "AC3: 生成模块不 import 或导出 crash_site、desert、forest、mine、mountain。",
+        "AC4: 运行 npm run validate:content、npm run lint、npm run test 通过。"
+      ],
+      "notes": "如果旧事件只用于测试事件引擎能力，先在 T004 迁移为 fixture；不要把旧 JSON 留在 content/events 下。"
+    },
+    {
+      "id": "T003",
+      "title": "清理默认地图与旧地图对象",
+      "priority": "P0",
+      "depends_on": [
+        "T001"
+      ],
+      "summary": "让默认地图和 map-object content 只表达主线地点、主线对象和纯地形氛围，删除旧演示对象与危险状态。",
+      "scope": [
+        "删除或清空不服务主线的 content/map-objects/resources.json 与 content/map-objects/hazards.json 内容。",
+        "从 content/maps/default-map.json 移除森林野兽、野生动物踪迹、旧矿洞、沙漠/山地样例等旧对象引用。",
+        "保留主线地点对象：坠毁点、丘陵、村落、罗塞塔、医疗舱、火山、熔炉、旧飞船、营地、湿地、巢穴、折跃仓。",
+        "保留地形、天气和环境数值作为氛围，但不得让非主线对象形成可玩事件入口。"
+      ],
+      "suggested_files": [
+        "content/maps/default-map.json",
+        "content/map-objects/mainline.json",
+        "content/map-objects/resources.json",
+        "content/map-objects/hazards.json",
+        "apps/pc-client/src/events/mainlineContent.test.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: 默认地图 objectIds 只引用存在且服务主线的 map object。",
+        "AC2: 默认地图不再包含森林野兽、矿洞异常、沙漠/山地样例等可玩或误导性旧内容。",
+        "AC3: map-object loader 不再暴露旧演示对象。",
+        "AC4: 主线对象仍能支撑 15 步玩家旅程中所有地点和行动入口。",
+        "AC5: 运行 npm run validate:content、npm run lint、npm run test 通过。"
+      ],
+      "notes": "如果某个旧对象只提供氛围但没有主线用途，优先删除；氛围可以写入 map tile 文本与环境字段。"
+    },
+    {
+      "id": "T004",
+      "title": "迁移事件系统测试样例到测试 fixture",
+      "priority": "P0",
+      "depends_on": [
+        "T001"
+      ],
+      "summary": "保留事件系统需要的测试覆盖，但不再从正式 content 目录 import 旧演示剧情。",
+      "scope": [
+        "查找测试中对非主线 content/events/definitions 或 call_templates 的 import。",
+        "将仍有系统测试价值的样例迁移为 inline fixture 或测试专用 fixture 文件。",
+        "删除只验证旧剧情文本或旧演示路线的测试断言。",
+        "确保 fixture 路径不会被 runtime content loader、manifest 或 validate-content 当成正式内容。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/events/*.test.ts",
+        "apps/pc-client/src/events/__fixtures__/*.ts",
+        "apps/pc-client/src/App.test.tsx",
+        "apps/pc-client/tests/e2e/app.spec.ts"
+      ],
+      "acceptance_criteria": [
+        "AC1: 测试不再 import content/events/definitions/forest.json、desert.json、mine.json、mountain.json、crash_site.json 或对应 call templates。",
+        "AC2: 事件引擎、条件、效果、graph runner 的通用能力仍有测试覆盖。",
+        "AC3: fixture 不位于 content/events、content/map-objects 或 content/maps 下。",
+        "AC4: 运行 npm run lint 和 npm run test 通过。"
+      ],
+      "notes": "测试 fixture 可以描述抽象事件能力，但不要保留玩家可遭遇的旧剧情名称。"
+    },
+    {
+      "id": "T005",
+      "title": "加强 content 校验防止非主线内容回流",
+      "priority": "P0",
+      "depends_on": [
+        "T002",
+        "T003"
+      ],
+      "summary": "把本轮内容边界写进自动校验，防止未注册事件、错误 action.event_id 或旧 demo content 再次进入 runtime。",
+      "scope": [
+        "校验 manifest domain 白名单或等价的当前版本 runtime domain 策略。",
+        "校验 content/events/presets 下的 JSON schema，并要求 presets 必须通过 manifest 引用或为空目录。",
+        "校验 map-object actions[].event_id 必须指向已存在的 EventDefinition.id。",
+        "校验默认地图 objectIds 均存在，且旧演示对象 id 不再出现。",
+        "让校验错误信息指向具体文件、对象 id 与字段路径。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/scripts/validate-content.mjs",
+        "apps/editor/scripts/generate-event-content-manifest.mjs",
+        "apps/pc-client/src/content/contentData.test.ts",
+        "content/schemas/events/*.schema.json"
+      ],
+      "acceptance_criteria": [
+        "AC1: 未注册 definitions、call_templates 或 presets 文件会导致 npm run validate:content 失败。",
+        "AC2: map-object action.event_id 指向不存在事件时，npm run validate:content 失败并给出明确错误。",
+        "AC3: 默认地图引用不存在或被禁止的旧对象时，npm run validate:content 失败。",
+        "AC4: 当前主线 content 通过 npm run validate:content。",
+        "AC5: 修改客户端或脚本后 npm run lint 和 npm run test 通过。"
+      ],
+      "notes": "校验应守住当前版本边界；未来新增正式支线时，需要先更新设计和白名单策略。"
+    },
+    {
+      "id": "T006",
+      "title": "验证主线 15 步闭环仍完整可玩",
+      "priority": "P0",
+      "depends_on": [
+        "T002",
+        "T003",
+        "T004",
+        "T005"
+      ],
+      "summary": "在旧内容删除后，重新验证主线从首次通讯到返航完成的完整路径仍由 content 驱动且可通关。",
+      "scope": [
+        "核对 mainlineContent.test.ts 对 15 步玩家旅程的覆盖。",
+        "补齐缺失的主线断言，尤其是全员回坠毁区、三步终局和 EndingPage。",
+        "更新或新增最小 e2e / 集成验收，证明删除旧 content 后主线仍能推进。",
+        "记录最终手动或自动通关路径。"
+      ],
+      "suggested_files": [
+        "apps/pc-client/src/events/mainlineContent.test.ts",
+        "apps/pc-client/src/App.test.tsx",
+        "apps/pc-client/tests/e2e/app.spec.ts",
+        "docs/plans/2026-04-30-00-15/minimal-use-case-content-boundary-implementation-plan.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: 15 步玩家旅程每一步都能对应到 mainline event content、map object、item、condition 或 runtime handler。",
+        "AC2: 删除旧 content 后，主线关键物品、知识、地点和终局条件没有硬锁。",
+        "AC3: return_home_completed 会进入 EndingPage。",
+        "AC4: npm run validate:content、npm run lint、npm run test 通过。",
+        "AC5: 如果未运行 npm run test:e2e，任务总结说明原因和替代验证。"
+      ],
+      "notes": "本任务是收口验收，不新增支线和新剧情分支。"
+    },
+    {
+      "id": "T007",
+      "title": "同步正式文档中的当前内容边界",
+      "priority": "P1",
+      "depends_on": [
+        "T006"
+      ],
+      "summary": "把实现后的内容边界同步到正式知识库，避免 docs 继续把旧演示内容描述为当前事实。",
+      "scope": [
+        "更新 docs/game_model/event.md、docs/game_model/event-integration.md 或相关当前事实文档。",
+        "更新 docs/game_model/map.md 中默认地图与地图对象边界。",
+        "必要时更新 docs/gameplay/event-system/event-system.md 中 runtime content 与 fixture 的区别。",
+        "不修改 docs/core-ideas.md，除非先获得人类确认。"
+      ],
+      "suggested_files": [
+        "docs/game_model/event.md",
+        "docs/game_model/event-integration.md",
+        "docs/game_model/map.md",
+        "docs/gameplay/event-system/event-system.md",
+        "docs/todo.md"
+      ],
+      "acceptance_criteria": [
+        "AC1: 正式 docs 明确当前 runtime 只加载主线 content。",
+        "AC2: 正式 docs 区分 content runtime assets 与测试 fixture。",
+        "AC3: 正式 docs 不再把森林野兽、矿洞异常、沙漠/山地样例描述为当前可玩内容。",
+        "AC4: 不修改 docs/core-ideas.md。"
+      ],
+      "notes": "如果本轮只执行代码任务，可把文档同步留到项目总结阶段。"
+    }
+  ]
+}
