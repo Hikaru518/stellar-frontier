@@ -611,7 +611,7 @@ function createPhoneTerminalPairingSession() {
 }
 
 function shouldStartYuanTerminal() {
-  return import.meta.env.MODE !== "test" && typeof WebSocket !== "undefined";
+  return import.meta.env.MODE !== "test" && import.meta.env.VITE_DISABLE_YUAN_TERMINAL !== "true" && typeof WebSocket !== "undefined";
 }
 
 function getConfiguredYuanHostUrl() {
