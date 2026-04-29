@@ -28,6 +28,17 @@ describe("validate-content", () => {
     expect(result.output).toContain("/event_definitions/0/title");
   });
 
+  it("does not require the removed event asset or schema", () => {
+    const root = createContentRoot();
+    fs.rmSync(path.join(root, "content", "events", ["events", "json"].join(".")), { force: true });
+    fs.rmSync(path.join(root, "content/schemas/events.schema.json"), { force: true });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("Content validation passed.");
+  });
+
   it("reports forbidden editor and runtime fields with concrete paths", () => {
     const root = createContentRoot();
     const definition = minimalEventDefinition();
@@ -132,6 +143,19 @@ describe("validate-content", () => {
     expect(result.output).toContain("Event manifest validation failed:");
     expect(result.output).toContain("Unregistered event definition domain file: content/events/definitions/forest.json");
     expect(result.output).toContain("Unregistered call template domain file: content/events/call_templates/forest.json");
+  });
+
+  it("rejects structured event content that references unknown crew ids", () => {
+    const root = createContentRoot();
+    const forestDefinitions = readJson(root, "content/events/definitions/forest.json");
+    forestDefinitions.event_definitions[0].sample_contexts[0].crew_id = "unknown_crew";
+    writeJson(root, "content/events/definitions/forest.json", forestDefinitions);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Unknown crew id in structured event content: unknown_crew");
+    expect(result.output).toContain("content/events/definitions/forest.json");
   });
 
   it("rejects map candidate actions missing from object call-actions", () => {

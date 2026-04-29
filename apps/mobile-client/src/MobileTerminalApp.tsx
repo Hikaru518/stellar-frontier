@@ -142,14 +142,19 @@ export function MobileTerminalApp() {
             </button>
           </div>
         </section>
-      ) : null}
-      <section className="terminal-card terminal-live-card" aria-label="实时连接演示">
+      ) : (
+        <section className="terminal-card terminal-card-muted" aria-label="私密来电状态">
+          <h2>暂无私密来电</h2>
+          <p>没有 PC 授权的私密来电时，手机端会保持待命。</p>
+        </section>
+      )}
+      <section className="terminal-card terminal-live-card" aria-label="实时连接状态">
         <div className="live-heading">
           <div>
-            <p className="eyebrow">Realtime Link Demo</p>
-            <h2>实时连接演示</h2>
+            <p className="eyebrow">Yuan Runtime Link</p>
+            <h2>实时连接状态</h2>
           </div>
-          <span>{connectionStatus === "connected" ? "LIVE" : "ARMED"}</span>
+          <span>{formatConnectionStatus(connectionStatus)}</span>
         </div>
         <div className="signal-orbit" aria-hidden="true">
           <i />

@@ -10,28 +10,10 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "black-pine-stand:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "black-pine-stand:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "tags": [
         "forest"
-      ],
-      "legacyResource": "wood"
+      ]
     },
     {
       "id": "fallen-timber",
@@ -42,17 +24,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "fallen-timber:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
-      "legacyResource": "wood"
+      "actions": []
     },
     {
       "id": "needlewood-stand",
@@ -63,17 +35,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "needlewood-stand:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
-      "legacyResource": "wood"
+      "actions": []
     },
     {
       "id": "southwest-timber",
@@ -84,25 +46,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "southwest-timber:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "southwest-timber:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
-      "legacyResource": "wood"
+      "actions": []
     }
   ]
 }

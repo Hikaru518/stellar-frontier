@@ -42,7 +42,7 @@ describe("objective runtime", () => {
       state: started.state,
       index,
       objective_id: objectiveId,
-      crew_id: "kael",
+      crew_id: "garry",
       occurred_at: 130,
     });
 
@@ -51,15 +51,15 @@ describe("objective runtime", () => {
     expect(objective).toEqual(
       expect.objectContaining({
         status: "assigned",
-        assigned_crew_id: "kael",
+        assigned_crew_id: "garry",
         assigned_at: 130,
-        action_id: "evt_objective:map_site:objective:kael:action",
+        action_id: "evt_objective:map_site:objective:garry:action",
       }),
     );
     expect(assigned.state.crew_actions[objective.action_id ?? ""]).toEqual(
       expect.objectContaining({
-        id: "evt_objective:map_site:objective:kael:action",
-        crew_id: "kael",
+        id: "evt_objective:map_site:objective:garry:action",
+        crew_id: "garry",
         type: "survey",
         source: "objective",
         parent_event_id: "evt_objective",
@@ -67,7 +67,7 @@ describe("objective runtime", () => {
         target_tile_id: "2-3",
       }),
     );
-    expect(assigned.state.crew.kael.current_action_id).toBe(objective.action_id);
+    expect(assigned.state.crew.garry.current_action_id).toBe(objective.action_id);
   });
 
   it("does not assign ineligible crew or advance the parent event", () => {
@@ -99,7 +99,7 @@ describe("objective runtime", () => {
       state: started.state,
       index,
       objective_id: objectiveId,
-      crew_id: "kael",
+      crew_id: "garry",
       occurred_at: 130,
     });
 
@@ -130,7 +130,7 @@ function createState(): GraphRunnerGameState {
     elapsed_game_seconds: 120,
     crew: {
       amy: crew("amy", 4),
-      kael: crew("kael", 5),
+      garry: crew("garry", 5),
     },
     tiles: {},
   };

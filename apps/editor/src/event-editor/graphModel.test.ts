@@ -72,6 +72,8 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
   return {
     definitions: [],
     call_templates: [],
+    presets: [],
+    handlers: [],
     schemas: {},
     ...overrides,
   };

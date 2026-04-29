@@ -1,8 +1,6 @@
-import crewKaelCallTemplatesContent from "../../../../content/events/call_templates/crew_kael.json";
 import desertCallTemplatesContent from "../../../../content/events/call_templates/desert.json";
 import forestCallTemplatesContent from "../../../../content/events/call_templates/forest.json";
 import mountainCallTemplatesContent from "../../../../content/events/call_templates/mountain.json";
-import crewKaelDefinitionsContent from "../../../../content/events/definitions/crew_kael.json";
 import desertDefinitionsContent from "../../../../content/events/definitions/desert.json";
 import forestDefinitionsContent from "../../../../content/events/definitions/forest.json";
 import mountainDefinitionsContent from "../../../../content/events/definitions/mountain.json";
@@ -28,9 +26,7 @@ import {
 export const SAMPLE_EVENT_IDS = [
   "forest_trace_small_camp",
   "forest_beast_emergency",
-  "mountain_signal_probe",
   "volcanic_ash_trace",
-  "lost_relic_argument",
 ] as const;
 
 export type SampleEventId = (typeof SAMPLE_EVENT_IDS)[number];
@@ -38,25 +34,19 @@ export type SampleEventId = (typeof SAMPLE_EVENT_IDS)[number];
 export type SampleCoverageCategory =
   | "normal_discovery"
   | "emergency_multi_call"
-  | "wait_node"
-  | "cross_crew_objective"
-  | "long_term_consequence";
+  | "cross_crew_objective";
 export type SampleReachability = "manual-reachable" | "seeded-regression" | "future-integration";
 
 export const SAMPLE_EVENT_COVERAGE = {
   normal_discovery: ["forest_trace_small_camp"],
   emergency_multi_call: ["forest_beast_emergency"],
-  wait_node: ["mountain_signal_probe"],
   cross_crew_objective: ["volcanic_ash_trace"],
-  long_term_consequence: ["lost_relic_argument"],
 } satisfies Record<SampleCoverageCategory, readonly SampleEventId[]>;
 
 export const SAMPLE_EVENT_REACHABILITY = {
   forest_trace_small_camp: "seeded-regression",
   forest_beast_emergency: "seeded-regression",
-  mountain_signal_probe: "manual-reachable",
   volcanic_ash_trace: "seeded-regression",
-  lost_relic_argument: "seeded-regression",
 } satisfies Record<SampleEventId, SampleReachability>;
 
 export interface SampleDryRunReport {
@@ -105,18 +95,16 @@ export function dryRunApprovedSampleEvents(): SampleDryRunReport[] {
 
 function sampleEventContentLibrary() {
   return {
-    domains: ["forest", "mountain", "desert", "crew_kael"],
+    domains: ["forest", "mountain", "desert"],
     event_definitions: [
       ...readDefinitions(forestDefinitionsContent),
       ...readDefinitions(mountainDefinitionsContent),
       ...readDefinitions(desertDefinitionsContent),
-      ...readDefinitions(crewKaelDefinitionsContent),
     ],
     call_templates: [
       ...readCallTemplates(forestCallTemplatesContent),
       ...readCallTemplates(mountainCallTemplatesContent),
       ...readCallTemplates(desertCallTemplatesContent),
-      ...readCallTemplates(crewKaelCallTemplatesContent),
     ],
     handlers: (handlerRegistryContent.handlers ?? []) as HandlerDefinition[],
     presets: (forestPresetsContent.presets ?? []) as PresetDefinition[],
@@ -259,8 +247,6 @@ function createSampleState(context: TriggerContext): GraphRunnerGameState {
   const crew = {
     amy: crewState("amy", "Amy", "2-3", { perception: 4 }, ["steady"], ["field_scout"]),
     garry: crewState("garry", "Garry", "4-3", { perception: 3 }, ["practical"], ["miner"]),
-    kael: crewState("kael", "Kael", "4-2", { perception: 5, intelligence: 4 }, ["guarded", "relic_sensitive"], ["signal_operator"]),
-    lin_xia: crewState("lin_xia", "Lin Xia", "4-1", { perception: 5, intelligence: 5 }, ["precise"], ["medic"]),
     mike: crewState("mike", "Mike", "2-1", { strength: 5 }, ["direct"], ["guard"]),
   };
 
@@ -270,15 +256,11 @@ function createSampleState(context: TriggerContext): GraphRunnerGameState {
     crew,
     tiles: {
       "2-3": tileState("2-3", { x: 2, y: 3 }, "forest", ["forest", "woods"], ["beast_tracks"], ["amy"]),
-      "4-1": tileState("4-1", { x: 4, y: 1 }, "old_medical_outpost", ["ruin"], [], ["lin_xia"]),
-      "4-2": tileState("4-2", { x: 4, y: 2 }, "mountain_signal", ["mountain", "mountain_signal"], [], ["kael"]),
       "4-3": tileState("4-3", { x: 4, y: 3 }, "desert_volcanic", ["desert", "volcanic"], [], ["garry"]),
     },
     inventories: {
       inv_amy: inventory("inv_amy", "crew", "amy"),
       inv_garry: inventory("inv_garry", "crew", "garry"),
-      inv_kael: inventory("inv_kael", "crew", "kael"),
-      inv_lin_xia: inventory("inv_lin_xia", "crew", "lin_xia"),
       inv_mike: inventory("inv_mike", "crew", "mike"),
       inv_base: inventory("inv_base", "base", "base"),
     },

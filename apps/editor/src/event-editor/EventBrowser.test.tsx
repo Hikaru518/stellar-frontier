@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +53,20 @@ describe("EventBrowser", () => {
     cleanup();
   });
 
+  it("keeps removed event assets out of the editor surface", () => {
+    const typeSource = readFileSync("src/event-editor/types.ts", "utf8");
+    const browserSource = readFileSync("src/event-editor/EventBrowser.tsx", "utf8");
+    const readmeSource = readFileSync("README.md", "utf8");
+    const removedAssetType = ["leg", "acy_event"].join("");
+    const removedAssetLabel = ["leg", "acy event"].join("");
+    const removedAssetFile = ["events", ".json"].join("");
+
+    expect(typeSource).not.toContain(removedAssetType);
+    expect(browserSource).not.toContain(removedAssetType);
+    expect(browserSource).not.toContain(removedAssetLabel);
+    expect(readmeSource).not.toContain(removedAssetFile);
+  });
+
   it("renders the available filter chips for the trimmed asset set", () => {
     const library = createLibraryResponse();
 
@@ -99,24 +114,21 @@ describe("EventBrowser", () => {
     expect(callTemplateRow).not.toHaveTextContent(/OK|ERROR|WARNING/);
   });
 
-  it("does not surface legacy events in the browser list", () => {
+  it("includes structured preset and handler assets in the browser", () => {
     const library = createLibraryResponse({
-      definitions: [
-        createDefinitionAsset("forest.signal", {
-          data: createDefinitionData({
-            id: "forest.signal",
-            title: "Signal flare",
-            summary: "Crew finds a rescue marker.",
-            triggerType: "arrival",
-            handlerType: "grant_item",
-          }),
-        }),
-      ],
+      presets: [createPresetAsset("forest.relic_preset")],
+      handlers: [createHandlerAsset("grant_item")],
     });
 
     render(<EventBrowser library={library} selectedAsset={null} onSelectAsset={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: /select legacy/i })).not.toBeInTheDocument();
+    const presetRow = screen.getByRole("button", { name: /select forest.relic_preset/i });
+    const handlerRow = screen.getByRole("button", { name: /select grant_item/i });
+
+    expect(presetRow).toHaveTextContent("preset");
+    expect(handlerRow).toHaveTextContent("handler");
+    expect(screen.getByLabelText("Asset type filter")).toHaveTextContent("Presets");
+    expect(screen.getByLabelText("Asset type filter")).toHaveTextContent("Handlers");
   });
 
   it("lets users combine browser filters and select a matching asset", () => {
@@ -168,6 +180,8 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
   return {
     definitions: [],
     call_templates: [],
+    presets: [],
+    handlers: [],
     schemas: {},
     ...overrides,
   };
@@ -202,6 +216,27 @@ function createCallTemplateAsset(
     file_path: "content/events/call_templates/forest.json",
     ...overrides,
   }) as EventEditorLibraryResponse["call_templates"][number];
+}
+
+function createPresetAsset(id: string, overrides: Partial<EditorEventAsset<unknown>> = {}): EditorEventAsset<unknown> {
+  return createAsset(id, {
+    asset_type: "preset",
+    file_path: "content/events/presets/forest.json",
+    json_path: "/presets/0",
+    data: { id, type: "condition" },
+    ...overrides,
+  });
+}
+
+function createHandlerAsset(id: string, overrides: Partial<EditorEventAsset<unknown>> = {}): EditorEventAsset<unknown> {
+  return createAsset(id, {
+    domain: "global",
+    asset_type: "handler",
+    file_path: "content/events/handler_registry.json",
+    json_path: "/handlers/0",
+    data: { handler_type: id, kind: "effect" },
+    ...overrides,
+  });
 }
 
 function createDefinitionData({

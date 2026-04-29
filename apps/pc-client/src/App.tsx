@@ -5,11 +5,12 @@ import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
-import { applyImmediateOrCreateAction, settleAction, type ActionSettlementPatch, type SettlementActiveAction } from "./callActionSettlement";
-import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, hydrateMoveActionRoute, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
+import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
+import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
-import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
+import { buildCallView } from "./callActions";
+import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -26,10 +27,11 @@ import {
   type WorldFlag,
 } from "./events/types";
 import { defaultMapConfig } from "./content/contentData";
-import { canMoveToTile, deriveLegacyTiles, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
+import { canMoveToTile, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
+  createMapTilesFromConfig,
   initialCrew,
   initialLogs,
   resources as initialResources,
@@ -54,8 +56,9 @@ if (eventContentIndexResult.errors.length > 0) {
   throw new Error(`Event content index failed: ${eventContentIndexResult.errors.map((error) => error.message).join("; ")}`);
 }
 const eventContentIndex = eventContentIndexResult.index;
+const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 
-type SavedCrewMember = Partial<CrewMember> & { id: CrewId; bag?: unknown };
+type SavedCrewMember = Partial<CrewMember> & { id: CrewId };
 
 type SavedGameState = Partial<Omit<GameState, "crew">> & {
   crew?: SavedCrewMember[];
@@ -160,9 +163,6 @@ function App() {
       return;
     }
 
-    // Runtime calls dispatch the raw option_id from the EventDefinition; no
-    // translation. Handled before the legacy-dispatch translator so its
-    // unknown-id warning doesn't fire for valid event choice ids.
     if (currentCall.runtimeCallId) {
       if (currentCall.settled) {
         return;
@@ -183,17 +183,7 @@ function App() {
       return;
     }
 
-    // Translate the new schema's action ids back to the legacy "verb[:objectId]"
-    // shape `applyImmediateOrCreateAction` understands. See
-    // `docs/plans/2026-04-29-01-40/technical-design.md` §7.2 — the migrated
-    // action defs intentionally keep `event_id: "legacy.<verb>"`, so the
-    // dispatch layer falls back to the existing handlers in `callActionSettlement.ts`.
-    // TODO(map-object-action-refactor): replace this translator with real
-    // EventDefinition entry points once universal/object events exist as
-    // proper graph nodes (Task 4 in the next round).
-    const legacyDispatch = translateActionIdToLegacyDispatch(actionId);
-
-    if (legacyDispatch === "move") {
+    if (actionId === "universal:move") {
       setCurrentCall((call) =>
         call
           ? {
@@ -208,31 +198,65 @@ function App() {
       return;
     }
 
+    if (actionId === "universal:survey") {
+      if (currentCall.settled) {
+        return;
+      }
+      const applied = triggerCurrentAreaSurvey(gameState, currentCall.crewId);
+      setGameState(applied.state);
+      setCurrentCall((call) =>
+        call
+          ? {
+              ...call,
+              settled: true,
+              result: applied.createdEvent ? "调查事件已进入通讯队列。" : CURRENT_AREA_SURVEY_EMPTY_RESULT,
+            }
+          : call,
+      );
+      return;
+    }
+
     if (currentCall.settled) {
       return;
     }
 
-    setGameState((state) => {
-      const applied = applyImmediateOrCreateAction({
-        state,
-        crewId: currentCall.crewId,
-        actionViewId: legacyDispatch,
-        occurredAt: state.elapsedGameSeconds,
+    if (actionId === "universal:standby" || actionId === "universal:stop") {
+      setGameState((state) => {
+        const nextState =
+          actionId === "universal:standby"
+            ? createStandbyCrewAction(state, currentCall.crewId, state.elapsedGameSeconds)
+            : createStopCrewAction(state, currentCall.crewId, state.elapsedGameSeconds);
+        return settleGameTime(nextState);
       });
-      const settledState = settleGameTime(applied.state);
+      setCurrentCall((call) =>
+        call
+          ? {
+              ...call,
+              settled: true,
+              result: "行动指令已提交。",
+            }
+          : call,
+      );
+      return;
+    }
 
-      return applied.patch.triggerContexts.reduce(processAppEventTrigger, settledState);
-    });
+    const selectedStoryAction = findVisibleLocationStoryAction(gameState, currentCall.crewId, actionId);
+    if (selectedStoryAction) {
+      const applied = triggerLocationStoryAction(gameState, selectedStoryAction);
+      setGameState(applied.state);
+      setCurrentCall((call) =>
+        call
+          ? {
+              ...call,
+              settled: true,
+              result: applied.createdEvent ? "地点事件已进入通讯队列。" : "当前地点没有可触发的地点事件。",
+            }
+          : call,
+      );
+      return;
+    }
 
-    setCurrentCall((call) =>
-      call
-        ? {
-            ...call,
-            settled: true,
-            result: "行动指令已提交。",
-          }
-        : call,
-    );
+    appendLog(`通话选项未提交：${actionId} 不是可执行的基础行动或事件选项。`, "muted");
   }
 
   function selectMoveTarget(tileId: string) {
@@ -273,6 +297,14 @@ function App() {
         return state;
       }
 
+      const blockingAction = selectActiveCrewActionForCrew(state.crew_actions, member.id);
+      if (blockingAction) {
+        return {
+          ...state,
+          logs: appendLogEntry(state.logs, "移动确认失败：队员已有进行中的主要行动。", "danger", state.elapsedGameSeconds),
+        };
+      }
+
       const targetTileId = currentCall.selectedTargetTileId!;
       if (!canMoveToTile(defaultMapConfig, state.map, targetTileId)) {
         return {
@@ -290,16 +322,21 @@ function App() {
       }
 
       const targetTile = state.tiles.find((tile) => tile.id === preview.targetTileId);
+      const startedMove = startCrewMove(member, preview, state.tiles, state.elapsedGameSeconds);
       const updatedCrew = state.crew.map((item) =>
-        item.id === currentCall.crewId ? startCrewMove(item, preview, state.tiles, state.elapsedGameSeconds) : item,
+        item.id === currentCall.crewId ? startedMove.member : item,
       );
 
       const nextMap = syncMapCrew(state.map, updatedCrew);
       return {
         ...state,
         crew: updatedCrew,
+        crew_actions: {
+          ...state.crew_actions,
+          [startedMove.action.id]: startedMove.action,
+        },
         map: nextMap,
-        tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, nextMap), updatedCrew),
+        tiles: syncTileCrew(createMapTilesFromConfig(nextMap, state.tiles), updatedCrew),
         logs: appendLogEntry(
           state.logs,
           `${member.name} 开始前往 ${targetTile?.coord ?? preview.targetTileId}，预计 ${formatDuration(preview.totalDurationSeconds)}。`,
@@ -336,10 +373,12 @@ function App() {
     return (
       <CommunicationStation
         crew={crew}
+        crewActions={gameState.crew_actions}
         activeCalls={gameState.active_calls}
         objectives={gameState.objectives}
         eventLogs={gameState.event_logs}
         elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
         gameTimeLabel={gameTimeLabel}
         onBack={() => setPage("control")}
         onStartCall={startCall}
@@ -375,6 +414,8 @@ function App() {
           tiles={tiles}
           map={map}
           crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
           eventLogs={gameState.event_logs}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
@@ -424,8 +465,7 @@ function createInitialGameState(): GameState {
   if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
-      const { bag: _deprecatedBag, ...memberWithoutBag } = member;
-      const normalizedMember = normalizeCrewMember(memberWithoutBag as CrewMember, initialMember as CrewMember);
+      const normalizedMember = normalizeCrewMember(member as CrewMember, initialMember as CrewMember);
 
       return {
         ...normalizedMember,
@@ -446,7 +486,7 @@ function createInitialGameState(): GameState {
         ? saved.baseInventory
         : createBaseInventoryFromResources(saved.resources),
       map: syncedMap,
-      tiles: syncTileCrew(deriveLegacyTiles(defaultMapConfig, syncedMap), crewWithNewDefaults),
+      tiles: syncTileCrew(createMapTilesFromConfig(syncedMap, saved.tiles), crewWithNewDefaults),
       eventHistory: saved.eventHistory ?? {},
       active_events: saved.active_events ?? emptyEventState.active_events,
       active_calls: saved.active_calls ?? emptyEventState.active_calls,
@@ -469,7 +509,7 @@ function createInitialGameState(): GameState {
     crew: initialCrew,
     baseInventory: createBaseInventoryFromResources(initialResources),
     map,
-    tiles: deriveLegacyTiles(defaultMapConfig, map),
+    tiles: createMapTilesFromConfig(map),
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
@@ -488,6 +528,143 @@ function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
   return getTileLocationLabel(defaultMapConfig, tileId);
 }
 
+function createStandbyCrewAction(state: GameState, crewId: CrewId, occurredAt: number): GameState {
+  const member = state.crew.find((item) => item.id === crewId);
+  if (!member) {
+    return state;
+  }
+
+  const crewActions = state.crew_actions;
+  if (findActiveCrewActionForMember(crewActions, member)) {
+    return {
+      ...state,
+      logs: appendLogEntry(state.logs, `${member.name} 正在执行行动，不能切换为原地待命。`, "muted", occurredAt),
+      crew_actions: crewActions,
+    };
+  }
+
+  const actionId = `standby:${crewId}:${occurredAt}`;
+  const action = createBasicCrewAction({
+    id: actionId,
+    crewId,
+    type: "standby",
+    source: "player_command",
+    tileId: member.currentTile,
+    occurredAt,
+    durationSeconds: 0,
+  });
+
+  return {
+    ...state,
+    crew_actions: {
+      ...crewActions,
+      [actionId]: action,
+    },
+  };
+}
+
+function createStopCrewAction(state: GameState, crewId: CrewId, occurredAt: number): GameState {
+  const member = state.crew.find((item) => item.id === crewId);
+  if (!member) {
+    return state;
+  }
+
+  const materializedActions = state.crew_actions;
+  const runtimeAction = findActiveCrewActionForMember(materializedActions, member);
+  if (!runtimeAction) {
+    return {
+      ...state,
+      logs: appendLogEntry(state.logs, `${member.name} 没有可停止的当前行动。`, "muted", occurredAt),
+      crew_actions: materializedActions,
+    };
+  }
+
+  if (!runtimeAction.can_interrupt) {
+    return {
+      ...state,
+      logs: appendLogEntry(state.logs, `${member.name} 的当前行动不能被中断。`, "danger", occurredAt),
+      crew_actions: materializedActions,
+    };
+  }
+
+  const stopDuration = runtimeAction.interrupt_duration_seconds || 10;
+  const stopActionId = `stop:${crewId}:${runtimeAction.id}:${occurredAt}`;
+  const stopAction = createBasicCrewAction({
+    id: stopActionId,
+    crewId,
+    type: "stop",
+    source: "player_command",
+    tileId: member.currentTile,
+    occurredAt,
+    durationSeconds: stopDuration,
+  });
+  const interruptedAction = interruptCrewActionState(runtimeAction, occurredAt);
+  const stoppingMember = {
+    ...member,
+    status: "停止当前行动中。",
+    statusTone: "danger" as Tone,
+  };
+
+  return {
+    ...state,
+    crew: state.crew.map((item) => (item.id === crewId ? stoppingMember : item)),
+    logs: appendLogEntry(state.logs, `${member.name} 开始停止当前行动。`, "danger", occurredAt),
+    crew_actions: {
+      ...materializedActions,
+      [runtimeAction.id]: interruptedAction,
+      [stopActionId]: stopAction,
+    },
+  };
+}
+
+function createBasicCrewAction(args: {
+  id: Id;
+  crewId: Id;
+  type: "standby" | "stop";
+  source: CrewActionState["source"];
+  tileId: Id;
+  occurredAt: number;
+  durationSeconds: number;
+}): CrewActionState {
+  return {
+    id: args.id,
+    crew_id: args.crewId,
+    type: args.type,
+    status: "active",
+    source: args.source,
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: args.tileId,
+    to_tile_id: null,
+    target_tile_id: args.tileId,
+    path_tile_ids: [],
+    started_at: args.occurredAt,
+    ends_at: args.occurredAt + args.durationSeconds,
+    progress_seconds: 0,
+    duration_seconds: args.durationSeconds,
+    action_params: {},
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+  };
+}
+
+function findActiveCrewActionForMember(crewActions: Record<Id, CrewActionState>, member: CrewMember): CrewActionState | undefined {
+  return Object.values(crewActions)
+    .filter((action) => action.crew_id === member.id && action.status === "active")
+    .sort((left, right) => (right.started_at ?? 0) - (left.started_at ?? 0) || right.id.localeCompare(left.id))[0];
+}
+
+function interruptCrewActionState(action: CrewActionState, occurredAt: number): CrewActionState {
+  const startedAt = action.started_at ?? occurredAt;
+  return {
+    ...action,
+    status: "interrupted",
+    ends_at: occurredAt,
+    progress_seconds: Math.min(action.duration_seconds, Math.max(0, occurredAt - startedAt)),
+  };
+}
+
 function settleGameTime(state: GameState): GameState {
   let changed = false;
   let resources = state.resources;
@@ -495,25 +672,31 @@ function settleGameTime(state: GameState): GameState {
   let tiles = state.tiles;
   let logs = state.logs;
   let baseInventory = state.baseInventory;
+  let crewActions = state.crew_actions;
   const triggerContexts: TriggerContext[] = [];
+  const dueActionsByCrew = collectDueCrewActions(crewActions, state.elapsedGameSeconds);
 
   const crew = state.crew.map((member) => {
     let nextMember = member;
+    const dueAction = dueActionsByCrew.get(member.id);
+    const activeMoveAction = selectActiveCrewActionForCrew(crewActions, member.id, "move");
 
-    if (member.activeAction?.actionType === "move") {
-      const movingMember = hydrateMoveActionRoute(member, tiles, state.elapsedGameSeconds);
-      const settled = advanceCrewMovement(movingMember, tiles, logs, state.elapsedGameSeconds);
+    if (activeMoveAction) {
+      const settled = advanceCrewMoveAction(member, activeMoveAction, tiles, logs, state.elapsedGameSeconds);
       nextMember = settled.member;
       logs = settled.logs;
-      changed = changed || movingMember !== member;
-      changed = changed || settled.changed;
+      crewActions = {
+        ...crewActions,
+        [activeMoveAction.id]: settled.action,
+      };
+      changed = changed || settled.changed || settled.action !== activeMoveAction;
 
-      if (settled.changed && nextMember.currentTile !== movingMember.currentTile) {
+      if (settled.changed && nextMember.currentTile !== member.currentTile) {
         map = discoverMapTile(map, nextMember.currentTile);
-        tiles = syncTileCrew(deriveLegacyTiles(defaultMapConfig, map), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
+        tiles = syncTileCrew(createMapTilesFromConfig(map, tiles), state.crew.map((crewMember) => (crewMember.id === nextMember.id ? nextMember : crewMember)));
       }
 
-      if (settled.changed && movingMember.activeAction && !nextMember.activeAction) {
+      if (settled.arrived) {
         nextMember = appendArrivalDiary(nextMember, state.elapsedGameSeconds);
         triggerContexts.push({
           trigger_type: "arrival",
@@ -521,22 +704,26 @@ function settleGameTime(state: GameState): GameState {
           source: "crew_action",
           crew_id: nextMember.id,
           tile_id: nextMember.currentTile,
-          action_id: movingMember.activeAction.id,
+          action_id: activeMoveAction.id,
           payload: {
             action_type: "move",
-            from_tile_id: movingMember.activeAction.fromTile ?? null,
-            target_tile_id: movingMember.activeAction.targetTile ?? null,
+            from_tile_id: activeMoveAction.from_tile_id ?? null,
+            target_tile_id: activeMoveAction.target_tile_id ?? activeMoveAction.to_tile_id ?? null,
           },
         });
       }
-    } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
-      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
+    } else if (dueAction) {
+      const settled = settleCrewActionState(dueAction, member, state.elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
       nextMember = settled.member;
       resources = settled.resources;
       tiles = settled.tiles;
       logs = settled.logs;
       map = settled.map;
       baseInventory = settled.baseInventory ?? baseInventory;
+      crewActions = {
+        ...crewActions,
+        [dueAction.id]: completeCrewActionState(dueAction, state.elapsedGameSeconds),
+      };
       triggerContexts.push(...settled.triggerContexts);
       changed = true;
     }
@@ -545,7 +732,7 @@ function settleGameTime(state: GameState): GameState {
   });
 
   const syncedMap = syncMapCrew(map, crew);
-  let nextState = changed ? { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs } : state;
+  let nextState = changed ? { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs, crew_actions: crewActions } : state;
   nextState = processObjectiveCompletions(nextState, triggerContexts);
 
   for (const context of triggerContexts) {
@@ -555,7 +742,40 @@ function settleGameTime(state: GameState): GameState {
   return processAppEventWakeups(nextState);
 }
 
-function settleCrewAction(
+type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" };
+
+function collectDueCrewActions(crewActions: Record<Id, CrewActionState>, elapsedGameSeconds: number): Map<Id, CrewActionState> {
+  const dueActions = Object.values(crewActions)
+    .filter((action) => action.status === "active" && typeof action.ends_at === "number" && action.ends_at <= elapsedGameSeconds)
+    .sort((left, right) => (left.ends_at ?? 0) - (right.ends_at ?? 0) || left.id.localeCompare(right.id));
+  const byCrew = new Map<Id, CrewActionState>();
+
+  for (const action of dueActions) {
+    if (!byCrew.has(action.crew_id)) {
+      byCrew.set(action.crew_id, action);
+    }
+  }
+
+  return byCrew;
+}
+
+function selectActiveCrewActionForCrew(crewActions: Record<Id, CrewActionState>, crewId: Id, actionType?: CrewActionState["type"]): CrewActionState | undefined {
+  return Object.values(crewActions)
+    .filter((action) => action.crew_id === crewId && action.status === "active" && (!actionType || action.type === actionType))
+    .sort((left, right) => (right.started_at ?? 0) - (left.started_at ?? 0) || right.id.localeCompare(left.id))[0];
+}
+
+function completeCrewActionState(action: CrewActionState, elapsedGameSeconds: number): CrewActionState {
+  return {
+    ...action,
+    status: "completed",
+    ends_at: action.ends_at ?? elapsedGameSeconds,
+    progress_seconds: action.duration_seconds,
+  };
+}
+
+function settleCrewActionState(
+  action: CrewActionState,
   member: CrewMember,
   elapsedGameSeconds: number,
   resources: ResourceSummary,
@@ -564,100 +784,148 @@ function settleCrewAction(
   logs: SystemLog[],
   map: GameMapState,
 ): ActionSettlementPatch {
-  const action = member.activeAction;
-  if (!action) {
-    return { member, resources, baseInventory, tiles, logs, map, triggerContexts: [] };
+  if (action.type === "standby") {
+    return settleStandbyCrewActionState(action, member, elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
   }
 
-  return settleAction({
-    member,
-    action: enrichActionForSettlement(member, action),
-    occurredAt: elapsedGameSeconds,
+  if (action.type === "stop") {
+    return settleStopCrewActionState(action, member, elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
+  }
+
+  if (canSettleWithRuntimeHandler(action)) {
+    const settled = settleAction({
+      member,
+      action,
+      occurredAt: elapsedGameSeconds,
+      resources,
+      baseInventory,
+      tiles,
+      map,
+      logs,
+    });
+
+    return {
+      ...settled,
+      triggerContexts: settled.triggerContexts.length > 0 ? settled.triggerContexts : [createCrewActionCompleteTrigger(action, member, elapsedGameSeconds)],
+    };
+  }
+
+  const nextMember = {
+    ...member,
+    status: action.type === "event_waiting" ? "待命中。" : "行动完成，待命中。",
+    statusTone: (action.type === "event_waiting" ? "muted" : "neutral") as Tone,
+    unavailable: action.type === "event_waiting" ? false : member.unavailable,
+    canCommunicate: action.type === "event_waiting" ? true : member.canCommunicate,
+  };
+
+  return {
+    member: nextMember,
     resources,
     baseInventory,
     tiles,
     map,
-    logs,
-  });
+    logs: appendLogEntry(logs, `${member.name} 的行动已完成。`, "neutral", elapsedGameSeconds),
+    triggerContexts: [createCrewActionCompleteTrigger(action, member, elapsedGameSeconds)],
+  };
 }
 
-/**
- * Translate a new-schema action id (`universal:<verb>` or `<objectId>:<verb>`)
- * to the legacy "verb[:objectId]" dispatch token consumed by
- * `callActionSettlement.ts`. Unknown ids fall through unchanged with a
- * console warn (R7 defensive impl).
- */
-function translateActionIdToLegacyDispatch(actionId: string): string {
-  if (actionId.startsWith("universal:")) {
-    return actionId.slice("universal:".length);
-  }
-
-  const colonIndex = actionId.lastIndexOf(":");
-  if (colonIndex > 0) {
-    const objectId = actionId.slice(0, colonIndex);
-    const verb = actionId.slice(colonIndex + 1);
-    if (verb.length > 0) {
-      return `${verb}:${objectId}`;
-    }
-  }
-
-  // Bare verb (legacy-style id) is accepted as-is for back-compat with any
-  // call sites that still synthesise the old shape (e.g. App.test.tsx
-  // pre-creates an active action with `id: "gather:iron-ridge-outcrop:..."`).
-  if (
-    actionId === "move" ||
-    actionId === "survey" ||
-    actionId === "standby" ||
-    actionId === "stop" ||
-    actionId === "gather" ||
-    actionId === "build" ||
-    actionId === "extract" ||
-    actionId === "scan"
-  ) {
-    return actionId;
-  }
-
-  console.warn(`[App.handleDecision] unrecognized action id: ${actionId}`);
-  return actionId;
-}
-
-function enrichActionForSettlement(member: CrewMember, action: ActiveAction): ActiveAction | SettlementActiveAction {
-  if (hasSettlementMetadata(action)) {
-    return action;
-  }
-
-  if (isObjectCandidateAction(action.actionType)) {
-    const object = findCandidateObject(action.targetTile ?? member.currentTile, action.actionType, undefined);
-    return {
-      ...action,
-      objectId: object?.id,
-      params: {
-        ...createLegacyYieldParams(action, object),
-        ...action.params,
+function settleStandbyCrewActionState(
+  action: CrewActionState,
+  member: CrewMember,
+  elapsedGameSeconds: number,
+  resources: ResourceSummary,
+  baseInventory: GameState["baseInventory"],
+  tiles: MapTile[],
+  logs: SystemLog[],
+  map: GameMapState,
+): ActionSettlementPatch {
+  return {
+    member: {
+      ...member,
+      status: "待命中。",
+      statusTone: "muted" as Tone,
+      unavailable: false,
+      canCommunicate: true,
+    },
+    resources,
+    baseInventory,
+    tiles,
+    map,
+    logs: appendLogEntry(logs, `${member.name} 原地待命。`, "muted", elapsedGameSeconds),
+    triggerContexts: [
+      {
+        trigger_type: "idle_time",
+        occurred_at: elapsedGameSeconds,
+        source: "crew_action",
+        crew_id: member.id,
+        tile_id: member.currentTile,
+        action_id: action.id,
+        payload: {
+          action_type: "standby",
+        },
       },
-      handler: action.actionType,
-      actionDefId: action.actionType,
-    };
-  }
-
-  if (action.actionType === "survey" || action.actionType === "standby") {
-    return {
-      ...action,
-      params: action.params ?? {},
-      handler: action.actionType,
-      actionDefId: action.actionType,
-    };
-  }
-
-  return action;
+    ],
+  };
 }
 
-function hasSettlementMetadata(action: ActiveAction): action is ActiveAction & SettlementActiveAction {
-  return "handler" in action && typeof action.handler === "string";
+function settleStopCrewActionState(
+  action: CrewActionState,
+  member: CrewMember,
+  elapsedGameSeconds: number,
+  resources: ResourceSummary,
+  baseInventory: GameState["baseInventory"],
+  tiles: MapTile[],
+  logs: SystemLog[],
+  map: GameMapState,
+): ActionSettlementPatch {
+  return {
+    member: {
+      ...member,
+      status: "行动已停止，待命中。",
+      statusTone: "muted" as Tone,
+      unavailable: false,
+      canCommunicate: true,
+    },
+    resources,
+    baseInventory,
+    tiles,
+    map,
+    logs: appendLogEntry(logs, `${member.name} 停止当前行动。`, "danger", elapsedGameSeconds),
+    triggerContexts: [],
+  };
 }
 
-function isObjectCandidateAction(actionType: ActiveAction["actionType"]): actionType is "gather" | "build" {
-  return actionType === "gather" || actionType === "build";
+function canSettleWithRuntimeHandler(
+  action: CrewActionState,
+): action is RuntimeSettleableCrewAction {
+  return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract";
+}
+
+function createCrewActionCompleteTrigger(action: CrewActionState, member: CrewMember, elapsedGameSeconds: number): TriggerContext {
+  return {
+    trigger_type: "action_complete",
+    occurred_at: elapsedGameSeconds,
+    source: "crew_action",
+    crew_id: action.crew_id,
+    tile_id: action.target_tile_id ?? action.to_tile_id ?? member.currentTile,
+    action_id: action.id,
+    event_id: action.objective_id ? null : action.parent_event_id ?? null,
+    node_id: action.action_request_id ?? null,
+    objective_id: action.objective_id ?? null,
+    payload: {
+      action_type: action.type,
+      object_id: stringParam(action.action_params.object_id) ?? null,
+      tags: readStringArray(action.action_params.tags),
+    },
+  };
+}
+
+function stringParam(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function findCandidateObject(tileId: string, verb: string, map: GameMapState | undefined): MapObjectDefinition | undefined {
@@ -693,19 +961,6 @@ function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: G
   );
 }
 
-function createLegacyYieldParams(action: ActiveAction, object: MapObjectDefinition | undefined) {
-  const resourceId = action.resource ?? object?.legacyResource;
-  if (action.actionType !== "gather" || !resourceId) {
-    return {};
-  }
-
-  return {
-    perRoundYieldByResource: {
-      [resourceId]: action.perRoundYield ?? 1,
-    },
-  };
-}
-
 function processAppEventTrigger(state: GameState, context: TriggerContext): GameState {
   const result = processTrigger({
     state: toEventEngineState(state),
@@ -724,6 +979,161 @@ function processAppEventWakeups(state: GameState): GameState {
   });
 
   return mergeEventRuntimeState(state, result.state);
+}
+
+function triggerCurrentAreaSurvey(state: GameState, crewId: CrewId): { state: GameState; createdEvent: boolean } {
+  const member = state.crew.find((item) => item.id === crewId);
+  if (!member) {
+    return { state, createdEvent: false };
+  }
+
+  const eventState = toEventEngineState(state);
+  for (const context of createCurrentAreaSurveyTriggerContexts(state, member)) {
+    const result = processTrigger({
+      state: eventState,
+      index: eventContentIndex,
+      context,
+    });
+    if ((result.candidate_report?.created_event_ids.length ?? 0) > 0) {
+      return { state: mergeEventRuntimeState(state, result.state), createdEvent: true };
+    }
+  }
+
+  return { state, createdEvent: false };
+}
+
+interface LocationStoryActionSelection {
+  member: CrewMember;
+  object: MapObjectDefinition;
+  action: ActionDef;
+}
+
+function findVisibleLocationStoryAction(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): LocationStoryActionSelection | undefined {
+  const member = state.crew.find((item) => item.id === crewId);
+  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
+  if (!member || !tile) {
+    return undefined;
+  }
+
+  const visibleEnabled = buildCallView({ member, tile, gameState: state }).groups.some((group) =>
+    group.actions.some((action) => action.id === actionId && !action.disabled),
+  );
+  if (!visibleEnabled) {
+    return undefined;
+  }
+
+  for (const object of getVisibleMapObjects(state, member.currentTile)) {
+    const action = object.actions.find((item) => item.id === actionId);
+    if (!action) {
+      continue;
+    }
+    return { member, object, action };
+  }
+
+  return undefined;
+}
+
+function triggerLocationStoryAction(
+  state: GameState,
+  selection: LocationStoryActionSelection,
+): { state: GameState; createdEvent: boolean } {
+  const context = createLocationStoryActionTriggerContext(state, selection);
+  const result = processTrigger({
+    state: toEventEngineState(state),
+    index: eventContentIndex,
+    context,
+  });
+
+  return {
+    state: mergeEventRuntimeState(state, result.state),
+    createdEvent: (result.candidate_report?.created_event_ids.length ?? 0) > 0,
+  };
+}
+
+function createLocationStoryActionTriggerContext(
+  state: GameState,
+  { member, object, action }: LocationStoryActionSelection,
+): TriggerContext {
+  return {
+    trigger_type: "action_complete",
+    occurred_at: state.elapsedGameSeconds,
+    source: "call",
+    crew_id: member.id,
+    tile_id: member.currentTile,
+    action_id: action.id,
+    event_definition_id: action.event_id,
+    payload: {
+      action_type: actionVerb(action.id),
+      action_def_id: action.id,
+      object_id: object.id,
+      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object.tags ?? []),
+    },
+  };
+}
+
+function createCurrentAreaSurveyTriggerContexts(state: GameState, member: CrewMember): TriggerContext[] {
+  const tileId = member.currentTile;
+  const objects = getVisibleSurveyObjects(state, tileId);
+  const contexts = objects.map((object) => createCurrentAreaSurveyTriggerContext(state, member, object));
+  contexts.push(createCurrentAreaSurveyTriggerContext(state, member));
+  return contexts;
+}
+
+function createCurrentAreaSurveyTriggerContext(
+  state: GameState,
+  member: CrewMember,
+  object?: MapObjectDefinition,
+): TriggerContext {
+  return {
+    trigger_type: "action_complete",
+    occurred_at: state.elapsedGameSeconds,
+    source: "crew_action",
+    crew_id: member.id,
+    tile_id: member.currentTile,
+    action_id: `current-area-survey:${member.id}:${member.currentTile}:${state.elapsedGameSeconds}`,
+    payload: {
+      action_type: "survey",
+      object_id: object?.id ?? null,
+      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object?.tags ?? []),
+    },
+  };
+}
+
+function getVisibleSurveyObjects(state: GameState, tileId: string): MapObjectDefinition[] {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  if (!configTile) {
+    return [];
+  }
+
+  return configTile.objectIds
+    .map((objectId) => mapObjectDefinitionById.get(objectId))
+    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)))
+    .filter((definition) => definition.actions.some((action) => action.id === `${definition.id}:survey`));
+}
+
+function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  if (!configTile) {
+    return [];
+  }
+
+  return configTile.objectIds
+    .map((objectId) => mapObjectDefinitionById.get(objectId))
+    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)));
+}
+
+function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
+  const tile = state.tiles.find((item) => item.id === tileId);
+  return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile, state.map)) : [];
+}
+
+function actionVerb(actionId: string): string {
+  const parts = actionId.split(":");
+  return parts[parts.length - 1] || actionId;
 }
 
 function processObjectiveCompletions(state: GameState, contexts: TriggerContext[]): GameState {
@@ -767,8 +1177,8 @@ export function toEventEngineState(state: GameState): GraphRunnerGameState {
   return {
     ...state,
     elapsed_game_seconds: state.elapsedGameSeconds,
-    crew: Object.fromEntries(state.crew.map((member) => [member.id, toCrewState(member)])),
-    tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile)])),
+    crew: Object.fromEntries(state.crew.map((member) => [member.id, toCrewState(member, state.crew_actions)])),
+    tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile, state.map)])),
     resources: numericResources(state.resources),
     inventories: {
       ...state.inventories,
@@ -837,12 +1247,11 @@ function bridgeCrewActions(state: GameState, eventState: GraphRunnerGameState): 
   const crew = state.crew.map((member) => {
     const eventAction = actionByCrew.get(member.id);
     if (!eventAction) {
-      if (member.activeAction?.actionType === "event" || (member.unavailable && member.canCommunicate && member.status === "遭遇事件，等待通讯接通。")) {
+      if (member.unavailable && member.canCommunicate && member.status === "遭遇事件，等待通讯接通。") {
         return {
           ...member,
           status: "待命中。",
           statusTone: "muted" as Tone,
-          activeAction: undefined,
           unavailable: false,
           canCommunicate: true,
         };
@@ -850,27 +1259,17 @@ function bridgeCrewActions(state: GameState, eventState: GraphRunnerGameState): 
       return member;
     }
 
-    const isSameAction = member.activeAction?.id === eventAction.id;
-    const activeAction = isSameAction ? member.activeAction : createActiveActionFromCrewAction(member, eventAction);
-    if (member.activeAction && !isSameAction) {
-      logs = appendLogEntry(logs, `${member.name} 的当前行动被中断，事件指令接管。`, "accent", state.elapsedGameSeconds);
-    }
-
     if (eventAction.type === "event_waiting") {
       return {
         ...member,
         status: "遭遇事件，等待通讯接通。",
         statusTone: "danger" as Tone,
-        activeAction,
         unavailable: true,
         canCommunicate: true,
       };
     }
 
-    return {
-      ...member,
-      activeAction,
-    };
+    return member;
   });
 
   return { crew, logs };
@@ -881,6 +1280,9 @@ function collectBridgeableCrewActions(crewActions: Record<Id, CrewActionState>) 
 
   for (const action of Object.values(crewActions)) {
     if (action.source !== "event_action_request" || action.status !== "active") {
+      continue;
+    }
+    if (action.type === "move") {
       continue;
     }
 
@@ -957,6 +1359,10 @@ function mergeStringLists(existing: string[], incoming: string[]) {
   return Array.from(new Set([...existing, ...incoming]));
 }
 
+function mergeTags(...groups: string[][]) {
+  return Array.from(new Set(groups.flat()));
+}
+
 function mergeEventMarks(existing: NonNullable<MapTile["eventMarks"]>, incoming: NonNullable<TileState["event_marks"]>) {
   const marksById = new Map(existing.map((mark) => [mark.id, mark]));
   for (const mark of incoming) {
@@ -965,12 +1371,13 @@ function mergeEventMarks(existing: NonNullable<MapTile["eventMarks"]>, incoming:
   return Array.from(marksById.values()).sort((left, right) => left.created_at - right.created_at || left.id.localeCompare(right.id));
 }
 
-function toCrewState(member: CrewMember): CrewState {
+function toCrewState(member: CrewMember, crewActions: Record<Id, CrewActionState> = {}): CrewState {
+  const runtimeAction = selectActiveCrewActionForCrew(crewActions, member.id);
   return {
     id: member.id,
     display_name: member.name,
     tile_id: member.currentTile,
-    status: toCrewRuntimeStatus(member),
+    status: toCrewRuntimeStatus(member, runtimeAction),
     attributes: {
       strength: member.attributes.physical,
       agility: member.attributes.agility,
@@ -982,7 +1389,7 @@ function toCrewState(member: CrewMember): CrewState {
     expertise_tags: member.expertise.map((item) => item.expertiseId),
     condition_tags: member.conditions,
     communication_state: member.unavailable || !member.canCommunicate ? "lost_contact" : "available",
-    current_action_id: member.activeAction?.id ?? null,
+    current_action_id: runtimeAction?.id ?? null,
     blocking_event_id: null,
     blocking_call_id: null,
     background_event_ids: [],
@@ -992,7 +1399,7 @@ function toCrewState(member: CrewMember): CrewState {
   };
 }
 
-function toTileState(tile: MapTile): TileState {
+function toTileState(tile: MapTile, map: GameMapState): TileState {
   return {
     id: tile.id,
     coordinates: {
@@ -1001,19 +1408,14 @@ function toTileState(tile: MapTile): TileState {
     },
     terrain_type: tile.terrain,
     tags: inferTileTags(tile),
-    danger_tags: inferTileDangerTags(tile),
+    danger_tags: inferTileDangerTags(tile, map),
     discovery_state: tile.investigated ? "mapped" : "known",
     survey_state: tile.investigated ? "surveyed" : "unsurveyed",
     visibility: "visible",
     current_crew_ids: tile.crew,
-    resource_nodes: tile.resources.map((resource) => ({
-      id: `${tile.id}:${resource}`,
-      resource_id: resource,
-      amount: 1,
-      state: "discovered" as const,
-    })),
-    site_objects: tile.instruments.map((instrument) => ({ id: `${tile.id}:${instrument}`, object_type: instrument, tags: [] })),
-    buildings: tile.buildings.map((building) => ({ id: `${tile.id}:${building}`, building_type: building, status: "active" })),
+    resource_nodes: [],
+    site_objects: getConfigTileObjects(tile).map((object) => ({ id: object.id, object_type: object.kind, tags: object.tags ?? [] })),
+    buildings: [],
     event_marks: tile.eventMarks ?? [],
     history_keys: [],
   };
@@ -1045,17 +1447,17 @@ function toInventoryStates(state: GameState): Record<Id, InventoryState> {
   };
 }
 
-function toCrewRuntimeStatus(member: CrewMember): CrewState["status"] {
+function toCrewRuntimeStatus(member: CrewMember, runtimeAction?: CrewActionState): CrewState["status"] {
   if (member.unavailable) {
     return "unavailable";
   }
   if (!member.canCommunicate) {
     return "lost_contact";
   }
-  if (member.activeAction?.actionType === "move") {
+  if (runtimeAction?.type === "move") {
     return "moving";
   }
-  if (member.activeAction) {
+  if (runtimeAction) {
     return "acting";
   }
   return "idle";
@@ -1084,16 +1486,10 @@ function crewInventoryId(crewId: CrewId) {
 }
 
 function inferTileTags(tile: MapTile) {
-  const text = [tile.terrain, tile.status, tile.danger, ...tile.resources, ...tile.buildings, ...tile.instruments].join(" ");
-  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const configObjects = getConfigTileObjects(tile);
+  const text = [tile.terrain, tile.status, ...configObjects.flatMap((object) => [object.name, object.kind, ...(object.tags ?? [])])].join(" ");
   const explicitTags = "tags" in tile && Array.isArray(tile.tags) ? tile.tags.filter((tag): tag is string => typeof tag === "string") : [];
-  const contentTags = configTile
-    ? configTile.objectIds.flatMap((objectId) => {
-        const def = mapObjectDefinitionById.get(objectId);
-        return def?.tags?.filter((tag) => tag === "crash_site") ?? [];
-      })
-    : [];
-  const tags = new Set<string>([...explicitTags, ...contentTags]);
+  const tags = new Set<string>([...explicitTags, ...configObjects.flatMap((object) => object.tags ?? [])]);
 
   if (/森林|木材|野生动物/.test(text)) {
     tags.add("forest");
@@ -1114,22 +1510,32 @@ function inferTileTags(tile: MapTile) {
   return Array.from(tags);
 }
 
-function inferTileDangerTags(tile: MapTile) {
+function inferTileDangerTags(tile: MapTile, map: GameMapState) {
   if (tile.dangerTags) {
     return tile.dangerTags;
   }
 
-  if (tile.danger === "未发现即时危险") {
-    return [];
-  }
-
   const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const runtimeTile = map.tilesById[tile.id];
+  const activeSpecialStateIds = new Set(runtimeTile?.activeSpecialStateIds ?? configTile?.specialStates.filter((state) => state.startsActive).map((state) => state.id) ?? []);
   const configDangerTags =
     configTile?.specialStates
-      .filter((state) => state.legacyDanger === tile.danger)
-      .flatMap((state) => ("dangerTags" in state && Array.isArray(state.dangerTags) ? state.dangerTags : state.tags ?? [])) ?? [];
+      .filter((state) => activeSpecialStateIds.has(state.id))
+      .flatMap((state) => {
+        const dangerTags = "dangerTags" in state && Array.isArray(state.dangerTags) ? state.dangerTags.filter((tag): tag is string => typeof tag === "string") : [];
+        return dangerTags.length ? dangerTags : (state.tags ?? []);
+      }) ?? [];
 
-  return configDangerTags.length > 0 ? configDangerTags : [tile.danger];
+  return configDangerTags;
+}
+
+function getConfigTileObjects(tile: Pick<MapTile, "id">): MapObjectDefinition[] {
+  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  return (
+    configTile?.objectIds
+      .map((objectId) => mapObjectDefinitionById.get(objectId))
+      .filter((object): object is MapObjectDefinition => Boolean(object)) ?? []
+  );
 }
 
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {

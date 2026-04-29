@@ -265,13 +265,22 @@
       "version": 1,
       "domain": "forest",
       "title": "森林野兽紧急来电",
-      "summary": "Amy 在带有野兽踪迹的森林地块待命时被大型野兽逼近，需要玩家在倒计时内接通处理。",
+      "summary": "Amy 调查带有野兽踪迹的森林地块时被大型野兽逼近，需要玩家在倒计时内接通处理。",
       "tags": ["sample", "emergency", "forest"],
       "status": "approved",
       "trigger": {
-        "type": "idle_time",
-        "required_context": ["crew_id", "tile_id"],
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
         "conditions": [
+          {
+            "type": "compare_field",
+            "target": {
+              "type": "primary_crew"
+            },
+            "field": "id",
+            "op": "equals",
+            "value": "amy"
+          },
           {
             "type": "has_tag",
             "target": {
@@ -279,6 +288,14 @@
             },
             "field": "danger_tags",
             "value": "beast_tracks"
+          },
+          {
+            "type": "handler_condition",
+            "handler_type": "trigger_context_value_equals",
+            "params": {
+              "field": "payload.action_type",
+              "value": "survey"
+            }
           }
         ]
       },
@@ -509,7 +526,7 @@
                 "type": "event_log"
               },
               "params": {
-                "summary": "Amy 用噪声和随身武器逼退野兽，短时间内不宜继续深入。",
+                "summary": "Amy 用声响和随身武器逼退野兽，短时间内不宜继续深入。",
                 "importance": "major",
                 "visibility": "player_visible",
                 "result_key": "beast_engaged"
@@ -616,12 +633,12 @@
       },
       "sample_contexts": [
         {
-          "trigger_type": "idle_time",
+          "trigger_type": "action_complete",
           "occurred_at": 240,
-          "source": "time_system",
+          "source": "crew_action",
           "crew_id": "amy",
           "tile_id": "2-3",
-          "action_id": null,
+          "action_id": "current-area-survey:amy:2-3:240",
           "event_id": null,
           "event_definition_id": null,
           "node_id": null,
@@ -631,7 +648,9 @@
           "world_flag_key": null,
           "proximity": null,
           "payload": {
-            "idle_seconds": 300
+            "action_type": "survey",
+            "object_id": null,
+            "tags": ["forest", "beast_tracks"]
           }
         }
       ]

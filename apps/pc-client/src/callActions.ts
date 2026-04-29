@@ -40,8 +40,8 @@ interface ActionCandidate {
  *
  * The pipeline (see `docs/plans/2026-04-29-01-40/technical-design.md` §4):
  *
- * 1. Collect candidates: every universal action plus every revealed object's
- *    `actions[]`.
+ * 1. Collect candidates: every universal action plus revealed object actions
+ *    that already point at structured event content.
  * 2. Build a single `ConditionEvaluationContext` via `buildCallActionContext`.
  * 3. Evaluate each candidate's `conditions[]`. The decision matrix:
  *    - all pass               → visible + enabled.

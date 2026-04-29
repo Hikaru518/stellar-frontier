@@ -5,7 +5,6 @@ import { buildEventContentIndex } from "../events/contentIndex";
 describe("generated event content exports", () => {
   const structuredDomains = [
     "crash_site",
-    "crew_kael",
     "desert",
     "forest",
     "mainline_crash_site",
@@ -50,16 +49,68 @@ describe("generated event content exports", () => {
     expect(indexResult.index.definitionsByDomain.size).toBe(structuredDomains.length);
     expect(indexResult.index.presetsById.size).toBe(generatedContent.generatedPresetDefinitions.length);
   });
+
+  it("does not expose unsupported crew references in structured event content", async () => {
+    const contentData = await import("./contentData");
+    const supportedCrewIds = new Set(["mike", "amy", "garry"]);
+    const referencedCrewIds = contentData.eventProgramDefinitions.flatMap((definition) =>
+      [...(definition.content_refs?.crew_ids ?? []), ...definition.sample_contexts.map((context) => context.crew_id)].filter(
+        (crewId): crewId is string => typeof crewId === "string",
+      ),
+    );
+
+    expect(referencedCrewIds.every((crewId) => supportedCrewIds.has(crewId))).toBe(true);
+  });
+
+  it("does not expose removed event content exports", async () => {
+    const contentData = await import("./contentData");
+
+    expect("eventDefinitions" in contentData).toBe(false);
+    expect("eventDefinitionById" in contentData).toBe(false);
+  });
 });
 
 describe("default map config", () => {
-  it("exposes tile.objectIds (post-migration) and no legacy tile.objects field", async () => {
+  it("exposes tile.objectIds (post-migration) and no inline tile.objects field", async () => {
     const { defaultMapConfig } = await import("./contentData");
     expect(defaultMapConfig.tiles.length).toBeGreaterThan(0);
     for (const tile of defaultMapConfig.tiles) {
       expect(Array.isArray(tile.objectIds)).toBe(true);
-      // The legacy `tile.objects` projection must be gone — Task 3 deleted it.
       expect("objects" in tile).toBe(false);
+    }
+  });
+});
+
+describe("crew content exports", () => {
+  it("only exposes the three supported runtime crew ids", async () => {
+    const { crewDefinitions } = await import("./contentData");
+    const { initialCrew } = await import("../data/gameData");
+
+    expect(crewDefinitions.map((member) => member.crewId)).toEqual(["mike", "amy", "garry"]);
+    expect(initialCrew.map((member) => member.id)).toEqual(["mike", "amy", "garry"]);
+  });
+
+  it("does not expose unsupported crew summary copy", async () => {
+    const { crewDefinitions } = await import("./contentData");
+    const { initialCrew } = await import("../data/gameData");
+
+    for (const member of crewDefinitions) {
+      expect("summary" in member).toBe(false);
+    }
+
+    for (const member of initialCrew) {
+      expect("summary" in member).toBe(false);
+    }
+  });
+
+  it("does not expose removed crew emergency fields", async () => {
+    const { crewDefinitions } = await import("./contentData");
+    const removedEmergencyField = ["emergency", "Event"].join("");
+    const removedEventStatus = ["in", "Event"].join("");
+
+    for (const member of crewDefinitions) {
+      expect(removedEmergencyField in member).toBe(false);
+      expect(member.status).not.toBe(removedEventStatus);
     }
   });
 });

@@ -27,7 +27,7 @@
       ] }],
       "log_templates": [{ "id": "medical_docs_available_log", "summary": "医疗舱资料已保存", "importance": "major", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_medical_pod_survey.call.report"], "item_ids": ["medicine"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1320, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "4-1", "action_id": "survey:abandoned-medical-pod:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "abandoned-medical-pod", "tags": ["mainline", "mainline_medical", "medical_pod"] } }]
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1320, "source": "crew_action", "crew_id": "mike", "tile_id": "4-1", "action_id": "survey:abandoned-medical-pod:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "abandoned-medical-pod", "tags": ["mainline", "mainline_medical", "medical_pod"] } }]
     },
     {
       "schema_version": "event-program-model-v1",
@@ -42,7 +42,13 @@
         { "type": "world_flag_equals", "field": "medical_docs_available", "value": true },
         { "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "knows_field_first_aid" }] },
         { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-medical-docs" } },
-        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } },
+          { "type": "all_of", "conditions": [
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "learn" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "event_definition_id", "value": "mainline_medical_docs_repeat_learning" } }
+          ] }
+        ] }
       ] },
       "candidate_selection": { "priority": 83, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
       "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_medical_docs_repeat_learning:{crew_id}", "allow_while_active": false },
@@ -56,7 +62,10 @@
       ] }],
       "log_templates": [{ "id": "field_first_aid_learned_log", "summary": "野外急救已补学", "importance": "normal", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_medical_docs_repeat_learning.call.learn"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1380, "source": "crew_action", "crew_id": "kael", "tile_id": "4-1", "action_id": "survey:mainline-medical-docs:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-medical-docs", "tags": ["mainline", "mainline_medical", "field_first_aid"] } }]
+      "sample_contexts": [
+        { "trigger_type": "action_complete", "occurred_at": 1380, "source": "crew_action", "crew_id": "amy", "tile_id": "4-1", "action_id": "survey:mainline-medical-docs:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-medical-docs", "tags": ["mainline", "mainline_medical", "field_first_aid"] } },
+        { "trigger_type": "action_complete", "occurred_at": 1380, "source": "call", "crew_id": "amy", "tile_id": "4-1", "action_id": "mainline-medical-docs:learn", "event_id": null, "event_definition_id": "mainline_medical_docs_repeat_learning", "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "learn", "action_def_id": "mainline-medical-docs:learn", "object_id": "mainline-medical-docs", "tags": ["mainline", "mainline_medical", "field_first_aid"] } }
+      ]
     },
     {
       "schema_version": "event-program-model-v1",
@@ -96,7 +105,7 @@
       ],
       "log_templates": [{ "id": "wounded_recovered_log", "summary": "队员受伤状态已恢复", "importance": "major", "visibility": "player_visible" }, { "id": "wounded_recovery_skipped_log", "summary": "暂未处理受伤状态", "importance": "normal", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_wounded_recovery_options.call.recover"], "item_ids": ["medicine"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1440, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "4-1", "action_id": "survey:abandoned-medical-pod:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "abandoned-medical-pod", "tags": ["mainline", "mainline_medical"] } }]
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1440, "source": "crew_action", "crew_id": "mike", "tile_id": "4-1", "action_id": "survey:abandoned-medical-pod:4-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "abandoned-medical-pod", "tags": ["mainline", "mainline_medical"] } }]
     },
     {
       "schema_version": "event-program-model-v1",
@@ -138,7 +147,7 @@
       ],
       "log_templates": [{ "id": "camp_decoy_obtained_log", "summary": "营地救援完成并取得诱饵", "importance": "major", "visibility": "player_visible" }, { "id": "camp_rescue_waiting_log", "summary": "营地救援等待药品或野外急救条件", "importance": "normal", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_injured_villager_rescue_decoy.call.rescue"], "item_ids": ["medicine", "decoy"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1500, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "5-2", "action_id": "survey:mainline-injured-villager:5-2:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-injured-villager", "tags": ["mainline", "mainline_medical", "injured_villager", "decoy_source"] } }]
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1500, "source": "crew_action", "crew_id": "mike", "tile_id": "5-2", "action_id": "survey:mainline-injured-villager:5-2:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-injured-villager", "tags": ["mainline", "mainline_medical", "injured_villager", "decoy_source"] } }]
     },
     {
       "schema_version": "event-program-model-v1",
@@ -169,7 +178,7 @@
       ] }],
       "log_templates": [{ "id": "marsh_decoy_obtained_log", "summary": "浅滩湿地诱饵已取得", "importance": "major", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["mainline_marsh_decoy_source.call.obtain"], "item_ids": ["decoy"] },
-      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1560, "source": "crew_action", "crew_id": "lin_xia", "tile_id": "6-1", "action_id": "gather:mainline-marsh-decoy-source:6-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "gather", "object_id": "mainline-marsh-decoy-source", "tags": ["mainline", "mainline_medical", "marsh", "decoy_source"] } }]
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 1560, "source": "crew_action", "crew_id": "mike", "tile_id": "6-1", "action_id": "gather:mainline-marsh-decoy-source:6-1:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "gather", "object_id": "mainline-marsh-decoy-source", "tags": ["mainline", "mainline_medical", "marsh", "decoy_source"] } }]
     }
   ]
 }

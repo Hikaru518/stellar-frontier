@@ -86,7 +86,7 @@ export function isCompatibleGameSaveState(value: unknown) {
 }
 
 function omitDeprecatedSaveFields(key: string, value: unknown) {
-  if (key === "bag" || key === "emergencyEvent") {
+  if (key === "bag") {
     return undefined;
   }
 

@@ -1,6 +1,6 @@
 # Crew 模型
 
-本文描述当前代码中的队员模型。`crew` 既是内容配置，也是运行时状态的核心入口：编辑器主要应编辑 `content/crew/crew.json` 中的静态内容定义；游戏运行时会把这些定义转换为 `GameState.crew` 中的 `CrewMember`，再被地图、行动、事件、物品、日记和时间系统共同读取与修改。
+本文描述当前代码中的队员模型。`crew` 既是内容配置，也是运行时状态的核心入口：编辑器主要应编辑 `content/crew/crew.json` 中 Mike、Amy、Garry 三名队员的静态内容定义；游戏运行时会把这些定义转换为 `GameState.crew` 中的 `CrewMember`，再被地图、`crew_actions`、事件、物品、日记和时间系统共同读取与修改。
 
 ## 模型分层
 
@@ -10,7 +10,7 @@ flowchart TD
   CrewDefinition --> InitialCrew["initialCrew"]
   InitialCrew --> CrewMember["CrewMember in GameState"]
   CrewMember --> GameMapState["GameState.map currentTile"]
-  CrewMember --> ActiveAction["ActiveAction"]
+  CrewMember --> CrewActionState["CrewActionState in GameState.crew_actions"]
   CrewMember --> EmergencyEvent["EmergencyEvent"]
   CrewMember --> Inventory["InventoryEntry + ItemDefinition"]
   CrewMember --> EventRules["Event conditions/effects"]
@@ -21,7 +21,7 @@ flowchart TD
 | --- | --- | --- | --- | --- |
 | 内容文件 | `content/crew/crew.json` | 队员内容配置 | JSON | 人物编辑器应主要读写的文件，包含初始队员档案、属性、携带物、初始行动和初始紧急事件。 |
 | 内容定义 | `CrewDefinition` | 队员定义 | `src/content/contentData.ts` | TypeScript 对 `content/crew/crew.json` 单个队员条目的描述。字段与 schema 基本对应。 |
-| 运行时状态 | `CrewMember` | 队员运行时状态 | `src/data/gameData.ts` | 进入游戏状态后的队员对象，包含派生位置显示、运行中行动、紧急事件实例、状态条件等。 |
+| 运行时状态 | `CrewMember` | 队员运行时状态 | `src/data/gameData.ts` | 进入游戏状态后的队员对象，包含派生位置显示、紧急事件实例、状态条件等。当前行动由 `GameState.crew_actions` 记录。 |
 | 初始队员列表 | `initialCrew` | 初始队员状态 | `src/data/gameData.ts` | 由 `crewDefinitions.map(createInitialCrewMember)` 生成，是新存档的队员状态来源。 |
 
 ## 内容文件结构
@@ -36,13 +36,12 @@ flowchart TD
 
 | 代码名称 | 中文名 | 类型 / 约束 | 介绍 | 和其他模型的关系 |
 | --- | --- | --- | --- | --- |
-| `crewId` | 队员 ID | 小写字母开头，允许数字和下划线 | 内容层唯一标识，例如 `mike`、`lin_xia`。 | 转为运行时 `CrewMember.id`；被地图队员索引、通话、测试和部分手写行动逻辑引用。 |
+| `crewId` | 队员 ID | 小写字母开头，允许数字和下划线 | 内容层唯一标识，例如 `mike`、`amy`、`garry`。 | 转为运行时 `CrewMember.id`；被地图队员索引、通话、测试和结构化事件逻辑引用。 |
 | `name` | 姓名 | 非空字符串 | UI 展示名。 | 通讯录、通话页、地图队员状态、日志文本都会展示。 |
 | `role` | 身份 / 职责 | 非空字符串 | 人物短职业或身份标签。 | 通讯录卡片和档案弹窗展示。 |
 | `currentTile` | 当前地块 | 形如 `row-col` 的字符串 | 队员初始所在地图格。 | 转为 `CrewMember.currentTile`；和地图配置中的 tile id 对应；地图运行时状态可据此派生每格驻留队员。 |
-| `status` | 初始规则状态 | `idle` / `moving` / `working` / `inEvent` / `lost` / `dead` | 内容层枚举状态，用来推导初始显示状态。 | `createInitialCrewMember` 通过 `getInitialStatus` 转为运行时中文 `status`；事件条件中的 `crew.status` 读取运行时规则状态而不是这段原始文本。 |
+| `status` | 初始规则状态 | `idle` / `moving` / `working` / `lost` / `dead` | 内容层枚举状态，用来推导初始显示状态。 | `createInitialCrewMember` 通过 `getInitialStatus` 转为运行时中文 `status`；事件占用状态由 `crew_actions` 和 `active_calls` 表示，不写入初始 crew content。 |
 | `statusTone` | 状态语气 | `neutral` / `muted` / `accent` / `danger` / `success` | UI 色调和风险提示强度。 | 通讯录、档案、地图等用它决定 `StatusTag` 或状态文本样式。 |
-| `summary` | 状态摘要 | 非空字符串 | 对队员当前情况的短描述。 | 通讯录卡片、档案通讯语气和通话结果会展示；行动和事件会更新运行时 `summary`。 |
 | `attributes` | 五维属性 | `CrewAttributeMap`，每项 `1-6` | 队员轻量数值能力。 | 事件条件可通过 `crew.attributes.<key>` 读取；档案页以 6 格条展示。 |
 | `skills` | 技能标签 | `string[]`，ID 格式 | 规则用的自由技能 ID。 | 事件条件支持 `crew.skills.has(skillId)`；目前与 `expertise.expertiseId` 可同名但不是同一个字段。 |
 | `inventory` | 初始携带物 | `InventoryEntry[]` | 队员初始背包。 | `itemId` 关联 `ItemDefinition.itemId`；事件条件、事件效果、通话选项道具需求都会读取或修改背包。 |
@@ -53,8 +52,6 @@ flowchart TD
 | `diaryEntries` | 初始日记 | `DiaryEntryDefinition[]` | 角色关键节点记录。 | 档案页按 `gameSecond` 排序展示；可见性由 `availability` 和日记系统处理。 |
 | `canCommunicate` | 是否可通讯 | 布尔值 | 队员初始是否能接收指令和通话。 | 移动预览、日记传回、失联/死亡事件都会读取或更新该值。 |
 | `lastContactTime` | 最后联系时间 | 整数，最小 `0` | 初始最后通讯的游戏秒数。 | 行动下达时会更新为当前 `elapsedGameSeconds`；目前主要作为通讯状态数据保留。 |
-| `activeAction` | 初始行动 | 可选 `ActiveAction` 内容简化版 | 队员开局正在执行的行动，例如移动或采集。 | `createInitialAction` 会补全运行时计时字段；由 `settleGameTime` 按时间推进和结算。 |
-| `emergencyEvent` | 初始紧急事件 | 可选紧急事件简化版 | 队员开局正在等待处理的紧急事件。 | `eventId` 关联 `EventDefinition.eventId`；运行时会补全实例 ID、升级时间和结算状态。 |
 | `unavailable` | 不可用 | 布尔值，可选 | 标记队员不可用。 | 通讯按钮、地图同步、移动指令和事件规则状态都会受到影响。 |
 
 ## 五维属性
@@ -69,7 +66,7 @@ flowchart TD
 | `attributes.perception` | 感知 | 观察、发现异常、读取环境细节能力。 | 已被事件 `modifiers` 使用，例如 `crew.attributes.perception >= 3` 会提高调查发现概率。 |
 | `attributes.luck` | 运气 | 偶然性、戏剧性转机和不可控收益倾向。 | 当前主要展示；事件系统已支持 `crew.attributes.luck` 条件。 |
 
-事件条件通过 `eventSystem.resolveValue` 读取 `crew.attributes.<key>`，再用比较表达式结算，例如：
+结构化事件条件可读取 `crew.attributes.<key>`，再用比较表达式结算，例如：
 
 ```text
 crew.attributes.perception >= 3
@@ -120,7 +117,7 @@ crew.attributes.perception >= 3
 | `inventory[].itemId` | 物品 ID | ID 字符串 | 队员携带的物品类型。 | 关联 `content/items/items.json` 中的 `ItemDefinition.itemId`。 |
 | `inventory[].quantity` | 数量 | 整数，最小 `1` | 该物品的数量。 | `inventorySystem` 会过滤数量小于等于 0 的条目；事件和专长可增加或消耗。 |
 
-通讯台对象交互产生的简单携带物复用 `CrewMember.inventory`。当前队员模型只记录物品 ID 与数量，不包含重量、容量、丢弃、交付基地或资源运输链。
+事件结算产生的简单携带物复用 `CrewMember.inventory`。当前队员模型只记录物品 ID 与数量，不包含重量、容量、丢弃、交付基地或资源运输链。
 
 背包和事件系统有三种主要关系：
 
@@ -128,74 +125,52 @@ crew.attributes.perception >= 3
 - 道具响应：通话选项可配置 `usesItemTag`，`CallPage` 会用物品标签检查是否有可用道具。
 - 效果结算：事件效果 `addItem` 会给队员或基地背包加物品；`useItemByTag` 会按标签使用队员背包中的可响应道具。
 
-## 行动 ActiveAction
+## 行动 CrewActionState
 
-内容层 `activeAction` 是初始行动的简化配置；运行时 `ActiveAction` 会补上开始时间、结束时间、移动路线等计时字段。
+`GameState.crew_actions` 是当前角色行动的唯一 runtime 事实源。`CrewMember` 保留队员身份、位置和通讯状态；某名队员是否忙碌、正在移动到哪里、行动何时完成，都从 `crew_actions` 中查询。
 
-### 内容层 activeAction
+### 基础行动
 
-| 代码名称 | 中文名 | 类型 / 约束 | 介绍 | 关系 |
-| --- | --- | --- | --- | --- |
-| `activeAction.actionType` | 行动类型 | `move` / `gather` / `build` / `survey` / `standby` / `event` | 初始行动类型。 | 转为运行时 `ActiveAction.actionType`；决定结算逻辑和事件触发来源。通讯台对象行动结算层还支持 `extract` 与 `scan` 作为动态行动，不作为队员内容文件的初始行动类型。 |
-| `activeAction.status` | 行动状态 | `pending` / `inProgress` / `completed` / `interrupted` / `failed` | 初始行动状态。 | 只有 `inProgress` 会被时间推进逻辑持续结算。 |
-| `activeAction.targetTile` | 目标地块 | 形如 `1-1` 的字符串 | 行动目标或所在地块。 | 转为运行时 `targetTile`；移动行动还会生成初始 `route`。 |
-| `activeAction.durationSeconds` | 持续秒数 | 整数，最小 `0` | 初始行动总时长。 | 转为运行时 `durationSeconds` 和 `finishTime`。 |
-| `activeAction.resourceId` | 资源 ID | ID 字符串，可选 | 采集行动的资源目标。 | 转为运行时 `resource`；当前 `iron_ore` 会给 Garry 采矿逻辑设置 `perRoundYield`。 |
+当前基础行动只包含四类，均通过“通讯台 → 通话”进入：
 
-### 运行时 ActiveAction
+| 行动 | 说明 | 事件关系 |
+| --- | --- | --- |
+| 移动到指定区域 | 选择目标地块，按地图路径逐格推进。 | 抵达后发出 `arrival`。 |
+| 原地待命 | 让队员保持待命，或记录一次待命事实。 | 可发出 `idle_time`。 |
+| 停止当前行动 | 中断当前主行动并回到待命。 | 停止动作本身保留 `10 秒` 时长。 |
+| 调查当前区域 | 检查队员当前地块的结构化地点事件入口。 | 匹配事件时创建 runtime call；无可触发事件时显示中性空结果。 |
+
+资源获取、设施处理、回收、扫描、修复、交易、使用道具、撤离等不再是通用行动菜单能力。它们如果属于当前剧情，应由结构化地点事件、事件选项、`action_request` 或 objective 提供专属选项与结算。
+
+### 运行时 CrewActionState
 
 | 代码名称 | 中文名 | 介绍 | 关系 |
 | --- | --- | --- | --- |
-| `id` | 行动实例 ID | 当前行动的运行时标识。 | 通常由队员、行动类型、目标和时间拼出。 |
-| `actionType` | 行动类型 | 移动、采集、建设、调查等。 | 决定 `settleGameTime` 使用移动推进还是普通行动完成结算。 |
-| `status` | 行动状态 | 当前行动是否进行中或已结束。 | `getCrewActionTiming` 和时间推进只关心 `inProgress`。 |
-| `startTime` | 开始时间 | 行动开始的游戏秒。 | 来自当前 `elapsedGameSeconds` 或初始 `0`。 |
-| `durationSeconds` | 持续秒数 | 本行动或一轮行动持续时间。 | 用于计算 `finishTime` 和剩余时间。 |
-| `finishTime` | 完成时间 | 行动完成的游戏秒。 | `settleGameTime` 用它判断是否结算。 |
-| `fromTile` | 出发地块 | 移动行动的起点。 | 移动预览和行动实例记录。 |
-| `targetTile` | 目标地块 | 行动目标地块。 | 移动、建设、调查等逻辑使用。 |
-| `route` | 移动路径 | 移动时逐格路线。 | `advanceCrewMovement` 按路线逐步更新 `currentTile`。 |
-| `routeStepIndex` | 当前路径步数 | 移动中当前推进到第几步。 | 控制逐格移动结算。 |
-| `stepStartedAt` | 当前步开始时间 | 当前移动步开始的游戏秒。 | 用于分段移动时间。 |
-| `stepFinishTime` | 当前步完成时间 | 当前移动步结束的游戏秒。 | 到点后更新地块并进入下一步。 |
-| `totalDurationSeconds` | 总移动时长 | 整条移动路线的总时长。 | UI 预览和状态文本展示。 |
-| `resource` | 采集资源 | 采集行动的资源目标。 | Garry 采矿逻辑读取 `iron` / `iron_ore`。 |
-| `perRoundYield` | 每轮产量 | 每轮采集产出。 | 当前 `iron_ore` 初始行动会设置为 `5`。 |
+| `id` | 行动实例 ID | 当前行动的运行时标识。 | 通常由行动类型、队员、目标和时间拼出。 |
+| `type` | 行动类型 | 当前只把 `move`、`standby`、`stop`、`survey` 作为基础行动类型。 | 事件或目标可创建更具体的剧情行动，但必须仍写入 `crew_actions`。 |
+| `crew_id` | 执行队员 | Mike、Amy 或 Garry。 | 用于判断同一队员是否已有 active 行动。 |
+| `status` | 行动状态 | 当前行动是否 active、completed、interrupted 或 failed。 | 时间系统和事件条件读取该字段。 |
+| `started_at` | 开始时间 | 行动开始的游戏秒。 | 来自当前 `elapsedGameSeconds`。 |
+| `duration_seconds` | 持续秒数 | 本行动持续时间。 | 用于计算完成时间和剩余时间。 |
+| `finish_at` | 完成时间 | 行动完成的游戏秒。 | 到点后由时间结算推进。 |
+| `from_tile_id` | 出发地块 | 移动行动的起点。 | 移动预览和行动实例记录。 |
+| `target_tile_id` | 目标地块 | 行动目标地块。 | 移动、调查和剧情行动都可引用。 |
+| `route` | 移动路径 | 移动时逐格路线。 | 移动结算按路线逐步更新 `CrewMember.currentTile`。 |
+| `action_params` | 行动参数 | 行动专属参数。 | 调查层级、事件请求、目标 ID 等扩展信息放在这里。 |
 
 行动和其他模型的关系：
 
-- 地图：移动行动根据 `MapTile` 地形寻找路线；抵达后更新 `CrewMember.currentTile`、`coord`、`location`，再通过 `syncTileCrew` 更新 `MapTile.crew`。
-- 时间：`elapsedGameSeconds` 驱动 `finishTime`、`stepFinishTime`、紧急事件升级和行动结算。
-- 通讯台：普通通话通过 `content/call-actions/*.json` 创建调查、采集、建设、回收、扫描、待命或停止等行动；地块对象按钮来自已揭示对象的 `candidateActions`。
-- 事件：移动完成触发 `arrival`；调查、采集、建设、回收、扫描等行动完成后发出 `action_complete`。
-- 日记：部分行动完成会追加角色日记，例如 Mike 抵达湖边、Garry 调查矿床。
+- 地图：移动行动根据地图配置和运行时发现状态寻找路线；抵达后更新 `CrewMember.currentTile`、`coord`、`location`，再同步地图队员索引。
+- 时间：`elapsedGameSeconds` 驱动行动完成时间、移动分段时间、紧急事件升级和行动结算。
+- 通讯台：普通通话只创建移动、待命、停止、调查四类基础行动。
+- 事件：抵达、待命、调查当前区域、事件通话选择和 objective 完成都会生成结构化触发上下文。
+- 日记：部分行动或事件完成会追加角色日记，例如 Mike 抵达关键地点、Garry 完成一次调查反馈。
 
-## 紧急事件 EmergencyEvent
+## 结构化事件来电
 
-内容层 `emergencyEvent` 是初始紧急事件配置；运行时 `EmergencyEvent` 是某个具体紧急事件实例。
+紧急来电不再保存在 `CrewMember` 上。事件系统通过 `GameState.active_events` 和 `GameState.active_calls` 记录来电、倒计时、选项和结算结果；若事件需要占用队员行动槽，会同时创建 `crew_actions` 中的 `event_waiting` 行动。
 
-### 内容层 emergencyEvent
-
-| 代码名称 | 中文名 | 类型 / 约束 | 介绍 | 关系 |
-| --- | --- | --- | --- | --- |
-| `emergencyEvent.eventId` | 事件 ID | ID 字符串 | 初始紧急事件对应的事件定义。 | 关联 `EventDefinition.eventId`，并要求该事件有 `emergency` 配置。 |
-| `emergencyEvent.dangerStage` | 初始危险阶段 | 整数，最小 `0` | 开局时紧急事件的危险阶段。 | 转为运行时 `dangerStage`。 |
-| `emergencyEvent.deadlineSeconds` | 截止秒数 | 整数，最小 `1` | 开局紧急事件的处理截止时间。 | 转为运行时 `deadlineTime`。 |
-
-### 运行时 EmergencyEvent
-
-| 代码名称 | 中文名 | 介绍 | 关系 |
-| --- | --- | --- | --- |
-| `instanceId` | 事件实例 ID | 本次紧急事件实例标识。 | 由队员、事件和时间拼出。 |
-| `eventId` | 事件 ID | 指向事件定义。 | `getEmergencyEventDefinition` 用它读取 `EventDefinition`。 |
-| `createdAt` | 创建时间 | 紧急事件开始的游戏秒。 | 用于记录事件生命周期。 |
-| `callReceivedTime` | 来电时间 | 通讯台收到来电的游戏秒。 | 通讯台显示已等待时间。 |
-| `dangerStage` | 危险阶段 | 当前危险升级层级。 | 影响紧急选项成功率，超过阶段或超时会自动结算。 |
-| `nextEscalationTime` | 下次升级时间 | 下一次危险阶段升级的游戏秒。 | 由 `EventDefinition.emergency.escalationIntervalSeconds` 推进。 |
-| `deadlineTime` | 截止时间 | 自动结算的游戏秒。 | 到点后调用 `createAutoEmergencyDecision`。 |
-| `settled` | 是否已结算 | 该紧急事件是否完成。 | 已结算后通话页显示事件结束，不再阻止移动。 |
-
-紧急事件和 crew 状态强绑定：未结算紧急事件会让 `hasIncoming` 为 `true`，阻止移动改派；事件效果 `updateCrewStatus` 可把队员置为 `inEvent`、`lost` 或 `dead`，其中 `lost` / `dead` 会把 `canCommunicate` 设为 `false`，并把 `unavailable` 设为 `true`。
+队员是否能接普通指令由 `crew_actions`、`active_calls`、`canCommunicate` 和 `unavailable` 共同决定。开局 crew content 不配置紧急事件，也不伪造初始来电。
 
 ## 日记 Diary
 
@@ -219,7 +194,7 @@ crew.attributes.perception >= 3
 | `location` | 位置名称 | 从当前地图块区域名派生的显示文本。 | 位置文案应优先显示区域名；不得再用资源名或地块对象名冒充地点。 |
 | `coord` | 坐标文本 | 从地图系统的玩家显示坐标派生。 | 地图、通讯录和状态文本展示；普通 UI 不直接显示内部 row/col。 |
 | `conditions` | 队员状态条件 | 运行时标签数组，初始为空。 | 事件效果 `addCrewCondition` 添加；事件条件支持 `crew.conditions.has(conditionId)`。 |
-| `hasIncoming` | 是否有来电 | 通讯台来电标记。 | 初始由 `emergencyEvent` 推导；紧急事件和状态更新会修改它。 |
+| `hasIncoming` | 是否有来电 | 通讯台兼容来电标记。 | 新结构化事件来电以 `active_calls` 为准；初始 content 不设置来电。 |
 
 ## 事件模型关系
 
@@ -228,13 +203,11 @@ crew.attributes.perception >= 3
 | 事件侧代码 | 中文名 | 作用于 crew 的方式 |
 | --- | --- | --- |
 | `conditions[]` / `modifiers[]` | 事件条件 / 概率修正 | 支持 `crew.skills.has(...)`、`crew.conditions.has(...)`、`crew.attributes.<key>`、`crew.status`、`inventory.has(...)`。 |
-| `effects[].type = "updateCrewStatus"` | 更新队员状态 | 修改 `status`、`statusTone`、`hasIncoming`、`canCommunicate`、`unavailable`。 |
-| `effects[].type = "addCrewCondition"` | 添加队员条件 | 向 `conditions[]` 添加状态标签，例如 `light_wound`、`heavy_wound`。 |
-| `effects[].type = "startEmergency"` | 开始紧急事件 | 创建运行时 `emergencyEvent`，并把 `hasIncoming` 设为 `true`。 |
-| `effects[].type = "addItem"` | 添加物品 | 默认向队员 `inventory` 添加物品，除非目标是基地背包。 |
-| `effects[].type = "useItemByTag"` | 按标签使用物品 | 从队员 `inventory` 中寻找可用于响应的物品，必要时消耗。 |
+| `effects[].type = "add_crew_condition"` | 添加队员条件 | 向 `conditions[]` 添加状态标签，例如 `light_wound`、`heavy_wound`。 |
+| `effects[].type = "create_crew_action"` | 创建队员行动 | 写入 `crew_actions`，用于剧情等待、移动、调查等事件驱动行动。 |
+| `effects[].type = "cancel_crew_action"` / `update_crew_action` | 修改队员行动 | 取消、完成或更新 `crew_actions` 中的行动实例。 |
 
-当前 `crew.status` 条件不是直接读取显示文本，而是由运行时状态推导：`unavailable` 为 `lost`，未结算紧急事件为 `inEvent`，移动行动为 `moving`，其他行动为 `working`，否则为 `idle`。
+当前队员忙碌状态不直接读取显示文本，而是由运行时状态推导：`unavailable` 表示不可用，active 移动行动表示 `moving`，其他 active 行动表示 `working`，没有 active 行动则为 `idle`。
 
 ## 地图模型关系
 
@@ -253,7 +226,7 @@ crew.attributes.perception >= 3
 
 地形耗时按代码中的判断顺序命中：丘陵、森林、山、沙漠、默认值。因此复合地形若同时包含森林和山，会先按森林耗时结算。
 
-地图模型的静态配置、运行时状态、玩家显示坐标和 legacy tile 投影详见 `docs/game_model/map.md`。
+地图模型的静态配置、运行时状态和玩家显示坐标详见 `docs/game_model/map.md`。
 
 ## 时间模型关系
 
@@ -262,19 +235,17 @@ crew.attributes.perception >= 3
 | 字段 | 中文名 | 时间来源 / 用法 |
 | --- | --- | --- |
 | `lastContactTime` | 最后联系时间 | 下达移动等指令时写入当前 `elapsedGameSeconds`。 |
-| `activeAction.startTime` | 行动开始时间 | 行动创建时写入当前游戏秒。 |
-| `activeAction.finishTime` | 行动完成时间 | `startTime + durationSeconds`。 |
-| `activeAction.stepFinishTime` | 移动步完成时间 | 逐格移动时每一步单独计算。 |
-| `emergencyEvent.createdAt` | 紧急事件创建时间 | 事件触发时写入当前游戏秒。 |
-| `emergencyEvent.nextEscalationTime` | 下次升级时间 | 当前时间加 `firstWaitSeconds` 或 `escalationIntervalSeconds`。 |
-| `emergencyEvent.deadlineTime` | 紧急截止时间 | 当前时间加 `deadlineSeconds`。 |
+| `crew_actions[].started_at` | 行动开始时间 | 行动创建时写入当前游戏秒。 |
+| `crew_actions[].finish_at` | 行动完成时间 | `started_at + duration_seconds`。 |
+| `crew_actions[].route_step_finish_at` | 移动步完成时间 | 逐格移动时每一步单独计算。 |
+| `active_calls[].created_at` | 事件来电创建时间 | 事件图进入 call 节点时写入当前游戏秒。 |
+| `active_calls[].expires_at` | 事件来电截止时间 | 紧急或限时通话用它计算倒计时。 |
 | `diaryEntries[].gameSecond` | 日记时间 | 日记生成时写入当前游戏秒。 |
 
 ## 编辑器注意事项
 
 - 人物编辑器应优先编辑 `CrewDefinition` 字段，不应直接编辑运行时派生字段 `location`、`coord`、`conditions`、`hasIncoming`。
-- `crewId`、`inventory[].itemId`、`expertise[].ruleEffect.resourceId`、`emergencyEvent.eventId` 应做跨文件引用校验。
+- `crewId`、`inventory[].itemId`、`expertise[].ruleEffect.resourceId` 应做跨文件引用校验。
 - `attributes` 五项必须齐全，且范围是 `1-6`。
 - `personalityTags` 需要保持 `3-5` 个。
-- `activeAction` 和 `emergencyEvent` 是开局状态配置；如果编辑器只负责人物档案，可以先隐藏或放到“初始状态”高级区。
 - 当前内容里有些 `skills` 条件示例引用的技能未必出现在队员 `skills` 中；编辑器可以提示“规则可用标签”和“叙事标签”不是同一类字段。

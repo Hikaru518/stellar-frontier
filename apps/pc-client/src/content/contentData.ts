@@ -1,4 +1,3 @@
-import eventsContent from "../../../../content/events/events.json";
 import handlerRegistryContent from "../../../../content/events/handler_registry.json";
 import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
@@ -13,12 +12,7 @@ import {
 } from "./generated/eventContentManifest";
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
-export type CrewStatus = "idle" | "moving" | "working" | "inEvent" | "lost" | "dead";
-export type EventType = "arrival" | "survey" | "idle" | "gather" | "build" | "emergency" | "story" | "reminder";
-export type EventScope = "crew" | "tile" | "global";
-export type TriggerSource = "arrival" | "surveyComplete" | "gatherComplete" | "buildComplete" | "idleTime" | "callChoice";
-export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
-export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
+export type CrewStatus = "idle" | "moving" | "working" | "lost" | "dead";
 export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recovered";
 export type MapVisibility = "onDiscovered" | "onInvestigated" | "hidden";
 export type MapRadiationLevel = "none" | "low" | "medium" | "high" | "critical";
@@ -63,86 +57,15 @@ export interface DiaryEntryDefinition {
   availability: DiaryAvailability;
 }
 
-export interface EventEffectDefinition {
-  type:
-    | "addResource"
-    | "removeResource"
-    | "discoverResource"
-    | "updateTile"
-    | "updateCrewStatus"
-    | "addCrewCondition"
-    | "startEmergency"
-    | "addLog"
-    | "addItem"
-    | "useItemByTag";
-  resource?: string;
-  itemId?: string;
-  itemTag?: string;
-  target?: "crewInventory" | "baseInventory";
-  amount?: number;
-  quality?: string;
-  field?: string;
-  value?: unknown;
-  status?: CrewStatus;
-  condition?: string;
-  text?: string;
-  tone?: Tone;
-}
-
-export interface EventChoiceDefinition {
-  choiceId: string;
-  text: string;
-  hint?: string;
-  tone?: Tone;
-  baseSuccessChance?: number;
-  dangerStageModifier?: number;
-  durationSeconds?: number;
-  unavailableHint?: string;
-  successEffects?: EventEffectDefinition[];
-  failureEffects?: EventEffectDefinition[];
-  effects?: EventEffectDefinition[];
-}
-
-export interface EventDefinition {
-  eventId: string;
-  title: string;
-  type: EventType;
-  priority: number;
-  scope: EventScope;
-  repeatable: boolean;
-  cooldownSeconds: number;
-  trigger: {
-    source: TriggerSource;
-    tileTypes?: string[];
-    actionTypes?: ActionType[];
-    minIdleSeconds?: number;
-    surveyLevel?: "quick" | "standard" | "deep";
-    choiceId?: string;
-  };
-  conditions: string[];
-  baseChance: number;
-  modifiers: Array<{ condition: string; chance: number }>;
-  durationSeconds: number;
-  effects: EventEffectDefinition[];
-  choices: EventChoiceDefinition[];
-  emergency?: {
-    firstWaitSeconds: number;
-    escalationIntervalSeconds: number;
-    deadlineSeconds: number;
-    autoResolveResult: string;
-  } | null;
-  resultText: Record<string, string>;
-  tags: string[];
-}
+export type CrewDefinitionId = "mike" | "amy" | "garry";
 
 export interface CrewDefinition {
-  crewId: string;
+  crewId: CrewDefinitionId;
   name: string;
   role: string;
   currentTile: string;
   status: CrewStatus;
   statusTone: Tone;
-  summary: string;
   attributes: CrewAttributeMap;
   skills: string[];
   inventory: Array<{ itemId: string; quantity: number }>;
@@ -153,18 +76,6 @@ export interface CrewDefinition {
   diaryEntries: DiaryEntryDefinition[];
   canCommunicate: boolean;
   lastContactTime: number;
-  activeAction?: {
-    actionType: ActionType;
-    status: ActionStatus;
-    targetTile: string;
-    durationSeconds: number;
-    resourceId?: string;
-  };
-  emergencyEvent?: {
-    eventId: string;
-    dangerStage: number;
-    deadlineSeconds: number;
-  };
   unavailable?: boolean;
 }
 
@@ -200,7 +111,6 @@ export interface MapSpecialStateDefinition {
   tags?: string[];
   startsActive: boolean;
   durationGameSeconds?: number;
-  legacyDanger?: string;
 }
 
 export interface MapTileDefinition {
@@ -242,13 +152,11 @@ export const eventContentLibrary: EventContentLibrary = {
   presets: presetDefinitions,
 };
 
-export const eventDefinitions = eventsContent.events as unknown as EventDefinition[];
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
 
 export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigDefinition);
 
-export const eventDefinitionById = new Map(eventDefinitions.map((event) => [event.eventId, event]));
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));
 
 export function formatInventory(entries: Array<{ itemId: string; quantity: number }>) {
@@ -263,7 +171,7 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
  * Defensive normalization of the migrated map JSON: ensures every tile has an
  * `objectIds` array (defaulting to `[]`). All consumers should now read
  * `tile.objectIds` and resolve definitions via `mapObjectDefinitionById`; the
- * legacy synthesised `tile.objects` projection has been removed.
+ * old synthesised `tile.objects` projection has been removed.
  */
 function normalizeMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
   return {

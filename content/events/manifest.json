@@ -8,12 +8,6 @@
       "presets": null
     },
     {
-      "id": "crew_kael",
-      "definitions": "definitions/crew_kael.json",
-      "call_templates": "call_templates/crew_kael.json",
-      "presets": null
-    },
-    {
       "id": "desert",
       "definitions": "definitions/desert.json",
       "call_templates": "call_templates/desert.json",

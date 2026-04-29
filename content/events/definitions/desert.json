@@ -303,7 +303,7 @@
       ],
       "content_refs": {
         "call_template_ids": ["volcanic_ash_trace.call.briefing"],
-        "crew_ids": ["garry", "lin_xia"]
+        "crew_ids": ["garry", "amy"]
       },
       "sample_contexts": [
         {
@@ -323,7 +323,7 @@
           "proximity": null,
           "payload": {
             "action_type": "survey",
-            "dry_run_assignee_crew_id": "lin_xia"
+            "dry_run_assignee_crew_id": "amy"
           }
         }
       ]

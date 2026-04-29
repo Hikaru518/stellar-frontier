@@ -60,7 +60,7 @@ maintained_by: audit-wiki
 | [Crew 模型](./game_model/crew.md) | 描述队员内容配置、运行时队员状态，以及地图、行动、事件、物品、日记和时间系统如何读取队员。 |
 | [事件模型](./game_model/event.md) | 描述事件核心模型，包含资产库、静态事件定义、事件图、节点、runtime event/call/objective、condition/effect、handler、生命周期和校验。 |
 | [事件集成状态边界](./game_model/event-integration.md) | 描述事件系统会读写的外部 game model 边界，包括队员、行动、地块、物品、资源、历史、世界标记和存档。 |
-| [地图模型](./game_model/map.md) | 描述静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换和 legacy tile 投影。 |
+| [地图模型](./game_model/map.md) | 描述静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换和调查报告。 |
 | [通话行动模型](./game_model/call-action.md) | 描述普通通话中的行动定义、按钮生成和行动结算数据契约。 |
 | [事件程序模型与玩家旅程模型索引](./game_model/event-program-model-player-journey.md) | 兼容旧引用的索引页，指向事件核心模型与事件集成状态边界。 |
 

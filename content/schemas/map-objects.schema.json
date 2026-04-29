@@ -126,18 +126,6 @@
         },
         "visibility": {
           "$ref": "#/$defs/visibility"
-        },
-        "legacyResource": {
-          "type": "string",
-          "minLength": 1
-        },
-        "legacyBuilding": {
-          "type": "string",
-          "minLength": 1
-        },
-        "legacyInstrument": {
-          "type": "string",
-          "minLength": 1
         }
       }
     }

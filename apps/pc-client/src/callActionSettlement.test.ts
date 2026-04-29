@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyImmediateOrCreateAction, settleAction, type SettlementActiveAction } from "./callActionSettlement";
+import { settleAction } from "./callActionSettlement";
 import { defaultMapConfig } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
 import type { CrewMember, GameMapState, GameState, MapTile, ResourceSummary } from "./data/gameData";
+import type { CrewActionState } from "./events/types";
 
 type TileWithContent = MapTile & {
   tags?: string[];
@@ -18,7 +19,6 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
     coord: "(0,0)",
     status: "待命中。",
     statusTone: "neutral",
-    summary: "Test member",
     attributes: {
       physical: 3,
       agility: 3,
@@ -54,11 +54,7 @@ function createTile(tileId: string, overrides: Partial<TileWithContent> = {}): T
     row: configTile?.row ?? 1,
     col: configTile?.col ?? 1,
     terrain: configTile?.terrain ?? "平原",
-    resources: [],
-    buildings: [],
-    instruments: [],
     crew: ["amy"],
-    danger: "未发现即时危险",
     status: "已发现",
     investigated: false,
     tags: ["test_tile"],
@@ -130,75 +126,6 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
   };
 }
 
-describe("applyImmediateOrCreateAction", () => {
-  it("settles standby immediately and emits an idle_time trigger", () => {
-    const activeAction: SettlementActiveAction = {
-      id: "amy-survey-3-3",
-      actionType: "survey",
-      status: "inProgress",
-      startTime: 10,
-      durationSeconds: 120,
-      finishTime: 130,
-      targetTile: "3-3",
-      params: {},
-    };
-    const state = createGameState({
-      crew: [createMember({ activeAction: activeAction as unknown as CrewMember["activeAction"], status: "调查中。", statusTone: "accent" })],
-    });
-
-    const result = applyImmediateOrCreateAction({ state, crewId: "amy", actionViewId: "standby", occurredAt: 42 });
-
-    const member = result.state.crew[0];
-    expect(result.settled).toBe(true);
-    expect(member.activeAction).toBeUndefined();
-    expect(member.status).toContain("待命");
-    expect(member.statusTone).toBe("muted");
-    expect(result.patch.triggerContexts).toEqual([
-      expect.objectContaining({
-        trigger_type: "idle_time",
-        occurred_at: 42,
-        source: "crew_action",
-        crew_id: "amy",
-        tile_id: "3-3",
-        action_id: "standby",
-      }),
-    ]);
-  });
-
-  it.each([
-    ["survey", "survey"],
-    ["gather:iron-ridge-deposit", "gather"],
-    ["build:mainline-damaged-warp-pod", "build"],
-    ["extract:mainline-damaged-warp-pod", "extract"],
-  ])("creates an in-progress activeAction for %s", (actionViewId, actionType) => {
-    const state = createGameState();
-
-    const result = applyImmediateOrCreateAction({ state, crewId: "amy", actionViewId, occurredAt: 100 });
-
-    expect(result.settled).toBe(false);
-    expect(result.state.crew[0].activeAction).toEqual(
-      expect.objectContaining({
-        actionType,
-        status: "inProgress",
-        startTime: 100,
-        finishTime: expect.any(Number),
-        params: expect.any(Object),
-      }),
-    );
-  });
-
-  it("returns a danger log instead of throwing when the action handler is not registered", () => {
-    const state = createGameState();
-
-    expect(() => applyImmediateOrCreateAction({ state, crewId: "amy", actionViewId: "move", occurredAt: 5 })).not.toThrow();
-
-    const result = applyImmediateOrCreateAction({ state, crewId: "amy", actionViewId: "move", occurredAt: 5 });
-    expect(result.settled).toBe(false);
-    expect(result.patch.logs).toEqual([expect.objectContaining({ tone: "danger" })]);
-    expect(result.state.logs).toEqual([expect.objectContaining({ tone: "danger" })]);
-  });
-});
-
 describe("settleAction", () => {
   it("reveals onInvestigated objects and emits an action_complete trigger with tile and object tags", () => {
     // tile `5-3` carries `southwest-timber` (visibility: onInvestigated) per the
@@ -210,16 +137,12 @@ describe("settleAction", () => {
 
     const tile = createTile(tileId, { tags: ["forest_marsh"] });
     const member = createMember({ currentTile: tileId });
-    const action: SettlementActiveAction = {
+    const action = createCrewAction({
       id: "amy-survey-5-3",
-      actionType: "survey",
-      status: "inProgress",
-      startTime: 0,
-      durationSeconds: 120,
-      finishTime: 120,
-      targetTile: tileId,
-      params: { surveyLevel: "standard" },
-    };
+      type: "survey",
+      target_tile_id: tileId,
+      action_params: { surveyLevel: "standard" },
+    });
 
     const patch = settleAction({
       member,
@@ -250,21 +173,18 @@ describe("settleAction", () => {
 
   it("adds mineral deposit yield from action params instead of a hardcoded amount", () => {
     const member = createMember();
-    const action: SettlementActiveAction = {
+    const action = createCrewAction({
       id: "amy-gather-iron-ridge-deposit",
-      actionType: "gather",
-      status: "inProgress",
-      startTime: 0,
-      durationSeconds: 180,
-      finishTime: 180,
-      targetTile: "3-3",
-      objectId: "iron-ridge-deposit",
-      params: {
+      type: "gather",
+      target_tile_id: "3-3",
+      duration_seconds: 180,
+      action_params: {
+        object_id: "iron-ridge-deposit",
         perRoundYieldByResource: {
           iron_ore: 7,
         },
       },
-    };
+    });
 
     const patch = settleAction({
       member,
@@ -280,3 +200,28 @@ describe("settleAction", () => {
     expect(patch.member.inventory).toContainEqual({ itemId: "iron_ore", quantity: 7 });
   });
 });
+
+function createCrewAction(overrides: Partial<CrewActionState> = {}): CrewActionState {
+  return {
+    id: "amy-survey-3-3",
+    crew_id: "amy",
+    type: "survey",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: "3-3",
+    to_tile_id: null,
+    target_tile_id: "3-3",
+    path_tile_ids: [],
+    started_at: 0,
+    ends_at: 120,
+    progress_seconds: 0,
+    duration_seconds: 120,
+    action_params: {},
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+    ...overrides,
+  };
+}

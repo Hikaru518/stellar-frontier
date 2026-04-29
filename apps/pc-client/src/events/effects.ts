@@ -416,6 +416,17 @@ function createCrewAction(
     return { state: context.state, errors: [...crew.errors, ...actionType.errors] };
   }
 
+  const activeActionId = activeCrewActionId(context.state, crew.target.id, crew.target.value);
+  if (activeActionId) {
+    return fail(
+      context.state,
+      effect,
+      "invalid_effect",
+      `${path}.params.action_id`,
+      `Crew ${crew.target.id} already has active crew action ${activeActionId}; create_crew_action cannot overwrite it.`,
+    );
+  }
+
   const actionId = stringParam(effect.params.action_id) ?? `${effect.id}:action`;
   const startedAt = numberParam(effect.params.started_at, now(context));
   const actionParams = readObject(effect, "action_params", path, false).value ?? {};
@@ -474,16 +485,49 @@ function updateCrewAction(
     return fail(context.state, effect, "missing_target", `${path}.params.action_id`, `Crew action ${actionId ?? "<missing>"} does not exist.`);
   }
 
+  const nextAction = { ...action, ...patch };
+  const nextCrew = releaseCrewActionPointer(context.state.crew, action, actionId, nextAction.status);
+
   return {
     state: {
       ...context.state,
+      crew: nextCrew,
       crew_actions: {
         ...context.state.crew_actions,
-        [actionId]: { ...action, ...patch },
+        [actionId]: nextAction,
       },
     },
     errors: [],
   };
+}
+
+function releaseCrewActionPointer(
+  crew: EffectGameState["crew"],
+  action: CrewActionState,
+  actionId: Id,
+  status: CrewActionState["status"],
+): EffectGameState["crew"] {
+  if (!isTerminalCrewActionStatus(status)) {
+    return crew;
+  }
+
+  const crewState = crew[action.crew_id];
+  if (!crewState || crewState.current_action_id !== actionId) {
+    return crew;
+  }
+
+  return {
+    ...crew,
+    [action.crew_id]: {
+      ...crewState,
+      current_action_id: null,
+      status: "idle",
+    },
+  };
+}
+
+function isTerminalCrewActionStatus(status: CrewActionState["status"]) {
+  return status === "completed" || status === "failed" || status === "interrupted" || status === "cancelled";
 }
 
 function updateTileField(
@@ -1448,6 +1492,14 @@ function readStringArray(value: unknown, fallbackValues: Array<string | null | u
 
 function addUnique(values: string[], value: string): string[] {
   return values.includes(value) ? values : [...values, value];
+}
+
+function activeCrewActionId(state: EffectGameState, crewId: Id, crew: CrewState): Id | null {
+  if (crew.current_action_id) {
+    return crew.current_action_id;
+  }
+
+  return Object.values(state.crew_actions).find((action) => action.crew_id === crewId && action.status === "active")?.id ?? null;
 }
 
 function isWorldFlagValue(value: unknown): value is WorldFlag["value"] {

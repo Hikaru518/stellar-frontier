@@ -5,6 +5,7 @@ import App from "./App";
 
 describe("Editor App", () => {
   beforeEach(() => {
+    installMemoryLocalStorage();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify(createLibraryResponse()), { status: 200 })),
@@ -35,6 +36,25 @@ function createLibraryResponse() {
   return {
     definitions: [],
     call_templates: [],
+    presets: [],
+    handlers: [],
     schemas: {},
   };
+}
+
+function installMemoryLocalStorage(): void {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+      clear: () => values.clear(),
+      key: (index: number) => Array.from(values.keys())[index] ?? null,
+      get length() {
+        return values.size;
+      },
+    } satisfies Storage,
+  });
 }

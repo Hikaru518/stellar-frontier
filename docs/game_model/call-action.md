@@ -1,84 +1,81 @@
 # 通话行动模型
 
-本文描述普通通话中的行动定义、按钮生成和行动结算数据契约。它连接地图对象、队员行动和事件 runtime：地图对象声明可候选行动，通话页把候选行动渲染为按钮，App 层把按钮选择结算为真实 `ActiveAction` 或即时状态更新。
+本文描述普通通话中的基础行动定义、按钮生成和行动结算数据契约。当前基础行动只包含移动到指定区域、原地待命、停止当前行动、调查当前区域。剧情动作由结构化地点事件、事件选项、`action_request` 或 objective 提供，不再由地图对象生成通用按钮。
 
 ## 1. 模型范围与命名
 
 | 规则 | 说明 |
 | --- | --- |
-| `scope` | 覆盖 `content/call-actions/*.json`、通话按钮视图、对象候选行动、行动 handler 白名单、行动完成 patch、与事件 runtime call 的边界。 |
+| `scope` | 覆盖 `content/universal-actions/universal-actions.json`、通话按钮视图、基础行动触发、与事件 runtime call 的边界。 |
 | `out_of_scope` | 不定义完整背包 / 负重，不定义对象互动子菜单，不把所有普通行动改写成事件图。 |
-| `content_source_of_truth` | 行动 metadata 来自 `content/call-actions/`；地块对象可用行动来自 `content/maps/default-map.json` 的 `objects[].candidateActions`。 |
-| `runtime_source_of_truth` | 当前行动状态来自 `GameState.crew[].activeAction`；地图发现 / 调查状态来自 `GameState.map`。 |
-| `handler_policy` | JSON 只能声明 handler ID 和参数；具体状态修改由代码侧白名单 handler 执行。 |
+| `content_source_of_truth` | 基础行动 metadata 来自 `content/universal-actions/universal-actions.json`；结构化地点事件来自 `content/events/definitions/*.json`。 |
+| `runtime_source_of_truth` | 当前行动状态来自 `GameState.crew_actions`；地图发现 / 调查状态来自 `GameState.map`。 |
+| `handler_policy` | JSON 只能声明事件 ID、条件和参数；具体状态修改由结构化事件 runtime 与白名单 effect / handler 执行。 |
 
 ## 2. 资产库布局
 
 | 路径 | 内容 |
 | --- | --- |
-| `content/call-actions/basic-actions.json` | 全员通用行动，例如 `survey`、`move`、`standby`、`stop`。 |
-| `content/call-actions/object-actions.json` | 由地块对象提供的行动，例如 `gather`、`extract`、`scan`、`build`。 |
-| `content/schemas/call-actions.schema.json` | 通话行动内容 schema。 |
-| `content/maps/default-map.json` | 地块对象通过 `candidateActions` 引用行动 ID。 |
+| `content/universal-actions/universal-actions.json` | 全员基础行动：移动、待命、停止、调查。 |
+| `content/events/definitions/*.json` | 地点事件、剧情动作、事件图和结算规则。 |
+| `content/events/call_templates/*.json` | 事件通话模板。 |
+| `content/schemas/universal-actions.schema.json` | 基础行动内容 schema。 |
 
-`scripts/validate-content.mjs` 需要交叉校验：地图对象引用的 `candidateActions` 必须存在于 call-actions 内容中；call-actions 的 ID 与 maps schema 中允许的枚举保持一致。
+`scripts/validate-content.mjs` 需要校验基础行动 ID、事件 ID、结构化事件引用和 schema。地图对象不再承担通用按钮入口。
 
 ## 3. 静态内容模型
 
-### 3.1 `call_action_definition`
+### 3.1 `universal_action_definition`
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | `move` / `survey` / `gather` / `build` / `standby` / `extract` / `scan` / `stop` | 行动定义 ID，也是地图对象 `candidateActions` 的引用值。 |
-| `category` | `universal` / `object_action` | 通用行动或对象行动。 |
-| `label` | `string` | 按钮文案，可包含 `{objectName}`。 |
+| `id` | `universal:move` / `universal:standby` / `universal:stop` / `universal:survey` | 基础行动定义 ID。 |
+| `category` | `universal` | 当前固定为基础行动。 |
+| `label` | `string` | 按钮文案。 |
 | `tone` | `neutral` / `accent` / `muted` / `danger` | UI 色调。 |
-| `availableWhenBusy` | `boolean` | 队员忙碌时是否仍显示。 |
-| `applicableObjectKinds` | `string[]` | 对象行动可应用的地块对象类型。 |
-| `durationSeconds` | `number` | 创建行动时使用的默认耗时；`0` 可表示即时结算。 |
-| `handler` | `string` | 代码侧 `callActionSettlement` handler ID。 |
-| `params` | `object` | 透传给 handler 的结构化参数。 |
+| `conditions` | `condition[]` | 按队员行动状态、通讯状态或上下文判断是否显示。 |
+| `event_id` | `string` | 点击后进入的结构化事件或系统处理入口。 |
 
-### 3.2 `candidateActions`
+### 3.2 四类基础行动
 
-地块对象用 `candidateActions` 声明自己能提供哪些通话行动。对象必须先对玩家可见，行动才会进入通话页：
-
-- `visibility = onDiscovered` 的对象在地块发现后可提供行动。
-- `visibility = onInvestigated` 的对象需要调查揭示后才可提供行动。
-- 客户端即使伪造 action ID，结算层仍要检查对象存在、对象已揭示、handler 存在。
+| 行动 | 说明 | 运行时结果 |
+| --- | --- | --- |
+| 移动到指定区域 | 进入地图选点并在通话页确认目标。 | 创建 `crew_actions` 移动行动，抵达后发出 `arrival`。 |
+| 原地待命 | 队员保持待命或记录一次待命事实。 | 写入 `crew_actions` 或触发 `idle_time`。 |
+| 停止当前行动 | 中断当前 active 行动并回到待命。 | 创建停止行动，完成后标记原行动 interrupted。 |
+| 调查当前区域 | 以当前地块、可见对象和队员上下文检查地点事件。 | 命中事件时创建 runtime call；否则显示中性空结果。 |
 
 ## 4. 运行时视图模型
 
-`src/callActions.ts` 把 `(crew, tile, gameState)` 转成通话页可渲染的按钮组：
+通话页把 `(crew, tile, gameState)` 转成可渲染按钮组：
 
 | 视图 | 说明 |
 | --- | --- |
-| `CallActionGroup` | 一组按钮，例如“基础行动”或某个对象名。 |
-| `CallActionView.id` | UI 提交用 ID；通用行动通常是 `survey`，对象行动可包含对象 ID。 |
-| `CallActionView.defId` | 对应 `call_action_definition.id`。 |
-| `CallActionView.objectId` | 对象行动关联的地块对象 ID。 |
+| `CallActionGroup` | 一组按钮，例如“基础行动”。 |
+| `CallActionView.id` | UI 提交用 ID，例如 `universal:move`。 |
+| `CallActionView.eventId` | 对应结构化事件或系统处理入口。 |
 | `disabled` / `disabledReason` | 不可执行原因，供 UI 展示或禁用。 |
 
 显示规则：
 
-- 队员待命时显示通用行动：调查当前区域、移动到指定区域、原地待命。
-- 队员忙碌时只显示允许忙碌时使用的行动，例如停止当前行动、原地待命。
-- 当前地块上已揭示对象的 `candidateActions` 会追加为对象行动按钮。
-- 如果当前通话是事件 runtime call，则事件选项由 runtime call 提供；普通行动按钮不反向决定事件图分支。
+- 队员待命时显示移动、原地待命、调查当前区域。
+- 队员忙碌时只显示停止当前行动，必要时显示原地待命。
+- 当前通话是事件 runtime call 时，事件选项由 runtime call 提供；基础行动按钮不反向决定事件图分支。
 
 ## 5. 结算模型
 
-`src/callActionSettlement.ts` 负责把按钮选择或行动完成转换为 `GameState` patch。
+基础行动选择最终写入 `GameState.crew_actions` 或推进结构化事件 runtime。
 
-| 函数 | 职责 |
+| 行为 | 结算职责 |
 | --- | --- |
-| `applyImmediateOrCreateAction` | 玩家点击通话行动时调用；即时行动直接改状态，耗时行动创建 `crew[].activeAction`。 |
-| `settleAction` | 时间推进到 `finishTime` 后调用；结算调查、采集、回收、扫描、建设等结果。 |
-| `actionHandlers` | handler 白名单；每个 handler 明确读写队员、地图、物品、日志和 trigger context。 |
+| 移动 | 创建移动行动，记录路线、开始时间、完成时间和目标地块。 |
+| 待命 | 清理或保持队员行动状态，并可触发 `idle_time`。 |
+| 停止 | 中断当前 active 行动，创建停止行动或进入待命。 |
+| 调查 | 生成当前区域调查上下文，交给结构化地点事件选择。 |
 
 结算结果可以包含：
 
-- 更新后的队员状态和 `activeAction`。
+- 更新后的 `crew_actions`。
 - 地图发现 / 调查 / 对象揭示 / 特殊状态揭示。
 - 队员携带物或资源变化。
 - 系统日志。
@@ -88,35 +85,34 @@
 
 ### 地图模型
 
-- `objects[].candidateActions` 是对象行动入口。
-- `GameState.map` 决定对象是否已揭示。
+- `GameState.map` 决定地块是否已发现、是否已调查、对象和特殊状态是否已揭示。
 - 地图页只展示和辅助选点，不直接执行行动。
+- 地块对象通过类型、标签和可见性参与结构化事件条件。
 
 ### 队员模型
 
-- `crew[].activeAction` 是行动运行时事实源。
+- `crew_actions` 是行动运行时事实源。
 - 通话行动会读取队员是否忙碌、是否可通讯、当前位置和背包。
 - 行动完成后更新队员状态，并可能触发日记或事件。
 
 ### 事件模型
 
-- 普通通话行动完成后可发出 `action_complete`，供事件候选选择。
-- 事件 runtime call 的选项使用稳定 `option_id`，不复用普通通话 action ID。
-- 事件 effect 若需要安排真实行动，应创建 `crew_action_state`，再桥接到 `crew[].activeAction`。
+- 基础行动完成后可发出 `arrival`、`action_complete` 或 `idle_time`，供事件候选选择。
+- 事件 runtime call 的选项使用稳定 `option_id`，不复用基础行动 ID。
+- 事件 effect 若需要安排真实行动，应创建或更新 `crew_action_state`。
 
 ## 7. 校验规则
 
-- 所有 `content/call-actions/*.json` 必须符合 `call-actions.schema.json`。
-- 每个 `candidateActions` 引用必须存在于 call-actions 内容中。
-- 每个 `handler` 必须存在于代码侧白名单。
-- 对象行动必须声明适用的对象类型，避免同一 action 错挂到不支持的对象上。
-- `durationSeconds` 必须为非负数。
+- `content/universal-actions/universal-actions.json` 必须符合 schema。
+- 每个 `universal_action.id` 必须属于当前四类基础行动。
+- 每个 `event_id` 必须能解析到结构化事件或允许的系统入口。
+- 基础行动条件必须能在当前 condition runtime 中求值。
+- 剧情动作不得通过地图对象通用按钮绕过事件系统。
 
 ## 8. 后续扩展记录
 
-- 对象和行动数量增加后，可把动态按钮收敛为“与当前地块对象互动”子菜单。
-- 完整背包 / 负重 / 交付基地规则应独立设计，不塞进通话行动模型。
-- 行动 handler 可继续保持代码白名单；只有 metadata 和参数进入内容层。
+- 完整背包 / 负重 / 交付基地规则应独立设计，不塞进基础行动模型。
+- 如果未来需要对象级耗时、消耗或工具需求，应扩展结构化事件或目标模型。
 
 ## 来源
 

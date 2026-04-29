@@ -21,7 +21,7 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
-    expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
+    expect(screen.getByText("未读通讯 0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /通讯台/ })).toBeInTheDocument();
   });
 
@@ -114,6 +114,22 @@ describe("App", () => {
       investigationReportsById: {},
     });
     expect(saved.map.tilesById["4-4"].discovered).toBe(true);
+    expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "amy", "garry"]);
+    expect(saved.crew.some((member: { hasIncoming?: boolean }) => member.hasIncoming)).toBe(false);
+    expect(JSON.stringify(saved.crew)).not.toContain(["emergency", "Event"].join(""));
+    expect(saved.crew.map((member: { status?: string }) => member.status)).not.toContain("遭遇紧急事件，等待指令。");
+    expect(saved.crew.map((member: { status?: string }) => member.status)).not.toEqual(
+      expect.arrayContaining(["正在前往目标地点，行进中。", "工作中。"]),
+    );
+    expect(Object.keys(saved.crew_actions)).toEqual([]);
+    expect(saved.tiles.flatMap((tile: { crew?: string[] }) => tile.crew ?? []).sort()).toEqual(["amy", "garry", "mike"]);
+    expect(saved.tiles).toHaveLength(defaultMapConfig.tiles.length);
+    expect(
+      saved.tiles.every(
+        (tile: Record<string, unknown>) =>
+          !("resources" in tile) && !("buildings" in tile) && !("instruments" in tile) && !("danger" in tile),
+      ),
+    ).toBe(true);
   });
 
   it("ignores old v1 saves when starting a v2 game", () => {
@@ -141,6 +157,47 @@ describe("App", () => {
     expect(screen.getByText("暂无可分配目标。")).toBeInTheDocument();
   });
 
+  it("does not render hard-coded PC prototype copy on current fact pages", () => {
+    const forbiddenPcPrototypeCopy = new RegExp(
+      [
+        ["频", "道 A-17"].join(""),
+        ["信号", "噪", "声"].join(""),
+        ["天", "线："].join(""),
+        "偏移 2\\.1",
+        "最近信号",
+        ["脚", "步声"].join(""),
+        ["非常不礼貌的求", "救"].join(""),
+        "信号日志",
+        "重复回声",
+        ["实时连接", "演", "示"].join(""),
+        ["唱", "片机"].join(""),
+        "低噪播放",
+        "地图信号：16 格",
+        "2 异常",
+        ["设施", "状态"].join(""),
+        ["常规频", "道"].join(""),
+        ["其他频", "道"].join(""),
+        "信号静默",
+        "短暂的安静",
+        ["异常", "数量"].join(""),
+      ].join("|"),
+    );
+    const { container } = render(<App />);
+
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
+
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
+
+    fireEvent.click(screen.getByRole("button", { name: /地图二级菜单/ }));
+    expect(container).not.toHaveTextContent(forbiddenPcPrototypeCopy);
+  });
+
   it("advances game time while the app is running", () => {
     vi.useFakeTimers();
 
@@ -153,9 +210,34 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
   });
 
-  it("settles arrival event checks against derived legacy tiles without crashing", () => {
+  it("settles arrival event checks against runtime map state without crashing", () => {
     vi.useFakeTimers();
-    const mikeTargetTileId = crewDefinitions.find((member) => member.crewId === "mike")?.activeAction?.targetTile;
+    const mikeTargetTileId = "2-1";
+    const action = eventCrewAction({
+      id: "mike-initial-move",
+      crew_id: "mike",
+      source: "player_command",
+      type: "move",
+      from_tile_id: "1-1",
+      to_tile_id: mikeTargetTileId,
+      target_tile_id: mikeTargetTileId,
+      path_tile_ids: [mikeTargetTileId],
+      started_at: 0,
+      ends_at: 60,
+      duration_seconds: 60,
+    });
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [{ id: "mike", currentTile: "1-1", hasIncoming: false }],
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
 
     render(<App />);
 
@@ -172,13 +254,26 @@ describe("App", () => {
   it("settles Garry gathering on a mineral_deposit tile into Garry's inventory", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
+    const action = garryGatherAction(mineralTile.id, "iron-ridge-deposit");
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [{ id: "garry", currentTile: mineralTile.id, hasIncoming: false }],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
 
     render(<App />);
 
     const initialSaved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const initialGarry = savedCrew(initialSaved, "garry");
     expect(initialGarry.currentTile).toBe(mineralTile.id);
-    expect(initialGarry.activeAction).toMatchObject({ actionType: "gather", targetTile: mineralTile.id });
+    expect(initialSaved.crew_actions[action.id]).toMatchObject({ type: "gather", target_tile_id: mineralTile.id });
 
     act(() => {
       vi.advanceTimersByTime(300_000);
@@ -205,6 +300,19 @@ describe("App", () => {
   it("creates and resolves Garry's mine anomaly call after gathering on a mineral_deposit tile", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
+    const action = garryGatherAction(mineralTile.id, "iron-ridge-deposit");
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [{ id: "garry", currentTile: mineralTile.id, hasIncoming: false }],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
 
     render(<App />);
 
@@ -245,18 +353,11 @@ describe("App", () => {
 
   it("does not create Garry's mine anomaly call when gathering lacks the mineral_deposit tag", () => {
     vi.useFakeTimers();
-    const untaggedIronTile = defaultMapConfig.tiles.find((tile) =>
-      tile.objectIds.some((objectId) => {
-        const object = mapObjectDefinitionById.get(objectId);
-        return Boolean(
-          object &&
-            object.legacyResource === "iron_ore" &&
-            object.actions.some((action) => action.id === `${object.id}:gather`) &&
-            !object.tags?.includes("mineral_deposit"),
-        );
-      }),
-    );
+    const untaggedIronObject = mapObjectDefinitionById.get("iron-ridge-outcrop");
+    expect(untaggedIronObject?.tags ?? []).not.toContain("mineral_deposit");
+    const untaggedIronTile = defaultMapConfig.tiles.find((tile) => tile.objectIds.includes("iron-ridge-outcrop"));
     expect(untaggedIronTile).toBeDefined();
+    const action = garryGatherAction(untaggedIronTile!.id, "iron-ridge-outcrop", 180);
 
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -264,36 +365,20 @@ describe("App", () => {
         elapsedGameSeconds: 0,
         crew: [
           {
-            id: "garry",
+            id: "amy",
             currentTile: untaggedIronTile?.id,
             location: untaggedIronTile?.areaName,
             coord: `(${untaggedIronTile?.row},${untaggedIronTile?.col})`,
             status: "裸露矿床采集中。",
             statusTone: "accent",
             hasIncoming: false,
-            activeAction: {
-              id: "gather:iron-ridge-outcrop:3-4:0",
-              actionType: "gather",
-              status: "inProgress",
-              startTime: 0,
-              durationSeconds: 180,
-              finishTime: 180,
-              targetTile: untaggedIronTile?.id,
-              objectId: "iron-ridge-outcrop",
-              handler: "gather",
-              actionDefId: "gather",
-              params: {
-                perRoundYieldByResource: {
-                  iron_ore: 5,
-                },
-              },
-            },
           },
         ],
         tiles: initialTiles,
         map: createMapWithDiscoveredTiles(untaggedIronTile?.id ?? "3-4"),
         logs: initialLogs,
         resources: initialResources,
+        crew_actions: { [action.id]: action },
       })),
     );
 
@@ -308,7 +393,7 @@ describe("App", () => {
     expect(savedCrew(saved, "garry").inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
   });
 
-  it("settles Garry survey on the current mineral_deposit tile through content action metadata", () => {
+  it("does not expose removed object survey as a call decision", () => {
     vi.useFakeTimers();
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
@@ -340,34 +425,12 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: "调查 铁矿床" }));
 
-    const actionStarted = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(savedCrew(actionStarted, "garry").activeAction).toMatchObject({
-      actionType: "survey",
-      targetTile: mineralTile.id,
-      durationSeconds: 120,
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(120_000);
-    });
-
-    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const garry = savedCrew(saved, "garry");
-    expect(garry.activeAction).toBeUndefined();
-    expect(saved.map.tilesById[mineralTile.id].investigated).toBe(true);
-    expect(saved.resources.iron).toBe(1240);
-    expect(saved.logs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ text: "Garry 完成一轮调查。" }),
-      ]),
-    );
+    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
   });
 
-  it("reveals investigated map objects through a tag-selected survey target", () => {
-    vi.useFakeTimers();
-    const signalTile = findTileWithObjectTag("signal", { visibility: "onInvestigated" });
+  it("does not reveal investigated map objects through current-area survey without an event effect", () => {
+    const signalTile = findTileWithObjectTag("mainline_medical", { visibility: "onInvestigated" });
     const signalObject = signalTile.objectIds
       .map((objectId) => mapObjectDefinitionById.get(objectId))
       .find((object) => object?.tags?.includes("signal") && object.visibility === "onInvestigated");
@@ -403,19 +466,14 @@ describe("App", () => {
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
-    act(() => {
-      vi.advanceTimersByTime(180_000);
-    });
-
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const runtimeTile = saved.map.tilesById[signalTile.id];
-    expect(runtimeTile.investigated).toBe(true);
-    expect(runtimeTile.revealedObjectIds).toContain(signalObject?.id);
-    expect(saved.logs).toEqual(expect.arrayContaining([expect.objectContaining({ text: "Garry 完成一轮调查。" })]));
+    expect(runtimeTile.investigated).toBe(false);
+    expect(runtimeTile.revealedObjectIds).not.toContain(signalObject?.id);
+    expect(saved.logs).not.toEqual(expect.arrayContaining([expect.objectContaining({ text: "Garry 完成一轮调查。" })]));
   });
 
-  it("creates a runtime call when a forest-tagged survey finishes", () => {
-    vi.useFakeTimers();
+  it("creates a runtime call immediately when current-area survey matches a location event", () => {
     const forestTile = findTileWithObjectTag("forest");
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -448,11 +506,8 @@ describe("App", () => {
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
-    act(() => {
-      vi.advanceTimersByTime(120_000);
-    });
-
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(savedCrew(saved, "garry").activeAction).toBeFalsy();
     const forestEvent = Object.values(saved.active_events).find(
       (event) => (event as { event_definition_id: string }).event_definition_id === "forest_trace_small_camp",
     ) as { active_call_id: string } | undefined;
@@ -468,8 +523,48 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "标记这处营地痕迹。" })).toBeInTheDocument();
   });
 
-  it("triggers idle_time events after a standby decision", () => {
-    const forestTile = findTileWithObjectTag("forest");
+  it("selects a structured current-area survey event using visible map objects", () => {
+    const crashTileId = "4-4";
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "mike",
+            currentTile: crashTileId,
+            location: "坠毁区域",
+            coord: "(0,0)",
+            status: "坠毁点待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(crashTileId),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const mikeCard = screen.getByText("Mike，特战干员").closest("article");
+    expect(mikeCard).not.toBeNull();
+    fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(savedCrew(saved, "mike").activeAction).toBeFalsy();
+    const crashReconEvent = findRuntimeEvent(saved, "crash_site_wreckage_recon");
+    expect(crashReconEvent).toBeDefined();
+    expect(saved.active_calls[crashReconEvent?.active_call_id ?? ""].status).toBe("awaiting_choice");
+  });
+
+  it("shows a neutral empty result when current-area survey has no location event", () => {
+    const emptyTileId = "1-1";
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -477,19 +572,17 @@ describe("App", () => {
         crew: [
           {
             id: "garry",
-            currentTile: forestTile.id,
-            location: forestTile.areaName,
-            coord: `(${forestTile.row},${forestTile.col})`,
-            status: "森林边缘待命。",
+            currentTile: emptyTileId,
+            location: "北部玄武高地",
+            coord: "(-3,3)",
+            status: "高地待命。",
             statusTone: "neutral",
             hasIncoming: false,
             activeAction: null,
           },
         ],
-        tiles: initialTiles.map((tile) =>
-          tile.id === forestTile.id ? { ...tile, crew: ["garry"], dangerTags: ["beast_tracks"] } : tile,
-        ),
-        map: createInitialMapState(),
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(emptyTileId),
         logs: initialLogs,
         resources: initialResources,
       })),
@@ -501,7 +594,133 @@ describe("App", () => {
     const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
-    fireEvent.click(screen.getByRole("button", { name: "原地待命" }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
+
+    expect(screen.getByText("当前地点没有可触发的调查事件。")).toBeInTheDocument();
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(savedCrew(saved, "garry").activeAction).toBeFalsy();
+    expect(saved.map.tilesById[emptyTileId].investigated).not.toBe(true);
+    expect(saved.logs).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: "Garry 完成一轮调查。" }),
+      ]),
+    );
+  });
+
+  it("lets a medical docs story action enter and resolve a structured event from a call", () => {
+    const medicalTileId = "4-1";
+    const map = createMapWithDiscoveredTiles(medicalTileId);
+    map.tilesById[medicalTileId] = {
+      ...map.tilesById[medicalTileId],
+      investigated: true,
+      revealedObjectIds: ["mainline-medical-docs"],
+    };
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "amy",
+            currentTile: medicalTileId,
+            location: "旧医疗前哨",
+            coord: "(4,1)",
+            status: "医疗舱旁待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+            conditions: [],
+          },
+        ],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+        world_flags: {
+          medical_docs_available: {
+            key: "medical_docs_available",
+            value: true,
+            value_type: "boolean",
+            created_at: 0,
+            updated_at: 0,
+          },
+        },
+      })),
+    );
+
+    render(<App />);
+    expect(screen.queryByText("Amy 正在读取医疗舱保存的急救文档。")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByRole("button", { name: "学习野外急救" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /采集/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /交易/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "学习野外急救" }));
+
+    let saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const medicalEvent = findRuntimeEvent(saved, "mainline_medical_docs_repeat_learning");
+    expect(medicalEvent).toBeDefined();
+    expect(saved.active_calls[medicalEvent?.active_call_id ?? ""].status).toBe("awaiting_choice");
+    expect(savedCrew(saved, "amy").conditions ?? []).not.toContain("knows_field_first_aid");
+
+    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
+    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
+    expect(runtimeCallPanel).not.toBeNull();
+    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByText("Amy 正在读取医疗舱保存的急救文档。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "学习野外急救。" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "学习野外急救。" }));
+    saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+
+    expect(savedCrew(saved, "amy").conditions).toContain("knows_field_first_aid");
+    expect(saved.event_logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event_definition_id: "mainline_medical_docs_repeat_learning",
+          summary: "队员通过医疗文档补学了野外急救。",
+        }),
+      ]),
+    );
+  });
+
+  it("triggers Amy's forest beast emergency after surveying the beast-track tile", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: "2-3",
+            location: "森林 / 山",
+            coord: "(2,3)",
+            status: "森林边缘待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(Object.values(saved.active_events).map((event) => (event as { event_definition_id: string }).event_definition_id)).toContain(
@@ -509,8 +728,110 @@ describe("App", () => {
     );
   });
 
+  it("does not trigger Amy's forest beast emergency from standby alone", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "amy",
+            currentTile: "2-3",
+            location: "森林 / 山",
+            coord: "(2,3)",
+            status: "森林边缘待命。",
+            statusTone: "neutral",
+            hasIncoming: false,
+            activeAction: null,
+          },
+        ],
+        tiles: initialTiles,
+        map: createInitialMapState(),
+        logs: initialLogs,
+        resources: initialResources,
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+    expect(amyCard).not.toBeNull();
+    fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "原地待命" }));
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(Object.values(saved.active_events).map((event) => (event as { event_definition_id: string }).event_definition_id)).not.toContain(
+      "forest_beast_emergency",
+    );
+  });
+
+  it("runs stop through crew_actions without overwriting the interrupted runtime action", () => {
+    vi.useFakeTimers();
+    const mineralTile = findTileWithObjectTag("mineral_deposit");
+    const action = garryGatherAction(mineralTile.id, "iron-ridge-deposit", 180);
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [
+          {
+            id: "garry",
+            currentTile: mineralTile.id,
+            location: mineralTile.areaName,
+            coord: `(${mineralTile.row},${mineralTile.col})`,
+            status: "采集中。",
+            statusTone: "accent",
+            hasIncoming: false,
+          },
+        ],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    const garryCard = screen.getByText("Garry，退休老大爷").closest("article");
+    expect(garryCard).not.toBeNull();
+    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "停止当前行动" }));
+
+    const stopping = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(stopping.crew_actions[action.id]).toMatchObject({
+      status: "interrupted",
+      type: "gather",
+    });
+    const stopAction = Object.values(stopping.crew_actions).find(
+      (action) => (action as CrewActionState).crew_id === "garry" && (action as CrewActionState).type === "stop",
+    ) as CrewActionState | undefined;
+    expect(stopAction).toMatchObject({
+      status: "active",
+      duration_seconds: 10,
+      started_at: 0,
+      ends_at: 10,
+    });
+    expect(savedCrew(stopping, "garry").activeAction).toBeUndefined();
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    const stopped = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(stopped.crew_actions[stopAction?.id ?? ""]).toMatchObject({
+      status: "completed",
+      progress_seconds: 10,
+    });
+    expect(savedCrew(stopped, "garry").activeAction).toBeUndefined();
+    expect((savedCrew(stopped, "garry") as { status?: string }).status).toBe("行动已停止，待命中。");
+  });
+
   it("surfaces Amy's forest beast emergency as a blocking high-severity runtime call", () => {
-    startAmyBeastEmergencyFromStandby();
+    startAmyBeastEmergencyFromSurvey();
 
     const saved = readSavedGameState();
     const event = findSavedEvent(saved, "forest_beast_emergency");
@@ -524,7 +845,11 @@ describe("App", () => {
       expires_at: 180,
       render_context_snapshot: expect.objectContaining({ severity: "high" }),
     });
-    expect(amy.activeAction).toMatchObject({ actionType: "event" });
+    expect(Object.values(saved.crew_actions)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ crew_id: "amy", type: "event_waiting", status: "active" }),
+      ]),
+    );
     expect(amy.unavailable).toBe(true);
 
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
@@ -537,10 +862,10 @@ describe("App", () => {
 
   it.each([
     ["evacuate", "撤离到开阔地。"],
-    ["engage", "用随身武器和噪声驱赶它。"],
+    ["engage", "用随身武器和声响驱赶它。"],
     ["stay_hidden", "继续隐藏，保持安静。"],
   ])("resolves Amy's forest beast emergency option %s and releases her event action", (_optionId, optionLabel) => {
-    startAmyBeastEmergencyFromStandby();
+    startAmyBeastEmergencyFromSurvey();
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
     const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
     expect(runtimeCallPanel).not.toBeNull();
@@ -559,7 +884,7 @@ describe("App", () => {
 
   it("expires Amy's unanswered forest beast emergency through the missed-call consequence path", () => {
     vi.useFakeTimers();
-    startAmyBeastEmergencyFromStandby();
+    startAmyBeastEmergencyFromSurvey();
 
     act(() => {
       vi.advanceTimersByTime(181_000);
@@ -586,10 +911,10 @@ describe("App", () => {
   });
 
   it("keeps items and approved event program samples wired through content data", () => {
-    const lightItem = itemDefinitions.find((item) => item.tags.includes("light") && item.usableInResponse);
-    expect(lightItem).toBeDefined();
+    const usableResponseItem = itemDefinitions.find((item) => item.itemId === "signal_flare" && item.usableInResponse);
+    expect(usableResponseItem).toBeDefined();
     expect(
-      crewDefinitions.some((member) => member.inventory.some((entry) => entry.itemId === lightItem?.itemId && entry.quantity > 0)),
+      crewDefinitions.some((member) => member.inventory.some((entry) => entry.itemId === usableResponseItem?.itemId && entry.quantity > 0)),
     ).toBe(true);
 
     expect(itemDefinitions.some((item) => item.tags.includes("clue"))).toBe(true);
@@ -599,9 +924,8 @@ describe("App", () => {
         "forest_trace_small_camp",
         "forest_beast_emergency",
         "mine_anomaly_report",
-        "mountain_signal_probe",
+        "garry_mine_anomaly_report",
         "volcanic_ash_trace",
-        "lost_relic_argument",
       ]),
     );
     expect(
@@ -746,7 +1070,6 @@ describe("App", () => {
   });
 
   it("opens the seeded forest trace runtime call from the station and submits its stable option_id", () => {
-    vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -779,10 +1102,6 @@ describe("App", () => {
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
-    act(() => {
-      vi.advanceTimersByTime(180_000);
-    });
-
     const endButtons = screen.getAllByRole("button", { name: "结束通话" });
     fireEvent.click(endButtons[endButtons.length - 1]);
     const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
@@ -808,7 +1127,6 @@ describe("App", () => {
   });
 
   it("opens Mike's crash site recon call and marks the wreckage signal", () => {
-    vi.useFakeTimers();
     const crashTile = findTileWithObjectTag("crash_site");
     const crashObject = crashTile.objectIds
       .map((objectId) => mapObjectDefinitionById.get(objectId))
@@ -844,10 +1162,6 @@ describe("App", () => {
     expect(mikeCard).not.toBeNull();
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "通话" }));
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
-
-    act(() => {
-      vi.advanceTimersByTime(180_000);
-    });
 
     let saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const crashEvent = Object.values(saved.active_events).find(
@@ -878,7 +1192,6 @@ describe("App", () => {
   });
 
   it("lets Mike withdraw from crash site recon without revealing the wreckage signal", () => {
-    vi.useFakeTimers();
     const crashTile = findTileWithObjectTag("crash_site");
     const crashObject = crashTile.objectIds
       .map((objectId) => mapObjectDefinitionById.get(objectId))
@@ -914,10 +1227,6 @@ describe("App", () => {
     expect(mikeCard).not.toBeNull();
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "通话" }));
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
-
-    act(() => {
-      vi.advanceTimersByTime(180_000);
-    });
 
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
     const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
@@ -1027,7 +1336,7 @@ describe("App", () => {
             id: "priority-event-call",
             crew_id: "garry",
             severity: "medium",
-            rendered_lines: [runtimeLine("Garry 的事件频道等待接入。", "garry")],
+            rendered_lines: [runtimeLine("Garry 的事件通讯等待接入。", "garry")],
           }),
         },
       })),
@@ -1040,7 +1349,7 @@ describe("App", () => {
     const contactsPanel = screen.getByText("通讯录 · 1 条来电").closest("section");
     expect(runtimeCallPanel).not.toBeNull();
     expect(contactsPanel).not.toBeNull();
-    const eventCallCard = within(runtimeCallPanel as HTMLElement).getByText("Garry 的事件频道等待接入。").closest("article");
+    const eventCallCard = within(runtimeCallPanel as HTMLElement).getByText("Garry 的事件通讯等待接入。").closest("article");
     const contactCard = within(contactsPanel as HTMLElement).getByText("Garry，退休老大爷").closest("article");
     expect(eventCallCard).not.toBeNull();
     expect(contactCard).not.toBeNull();
@@ -1048,12 +1357,11 @@ describe("App", () => {
     expect(screen.getAllByRole("button", { name: "接通" })).toHaveLength(2);
     fireEvent.click(within(contactCard as HTMLElement).getByRole("button", { name: "接通" }));
     expect(screen.getByRole("heading", { name: "通话页面：Garry 事件通话" })).toBeInTheDocument();
-    expect(screen.getByText("Garry 的事件频道等待接入。")).toBeInTheDocument();
+    expect(screen.getByText("Garry 的事件通讯等待接入。")).toBeInTheDocument();
     expect((eventCallCard as HTMLElement).compareDocumentPosition(contactCard as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows the resolved seeded forest camp trace on the map tile", () => {
-    vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -1072,6 +1380,7 @@ describe("App", () => {
           },
         ],
         tiles: initialTiles,
+        map: createMapWithDiscoveredTiles("2-3"),
         logs: initialLogs,
         resources: initialResources,
       })),
@@ -1084,10 +1393,6 @@ describe("App", () => {
     expect(garryCard).not.toBeNull();
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
-
-    act(() => {
-      vi.advanceTimersByTime(180_000);
-    });
 
     fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
     const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
@@ -1103,51 +1408,23 @@ describe("App", () => {
     expect(screen.getByText("一处森林小型营地痕迹已标记，等待后续复核。")).toBeInTheDocument();
   });
 
-  it("shows seeded lost relic argument effects in Kael's crew detail", () => {
-    const { eventState } = createLostRelicArgumentState();
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 600,
-        crew: [
-          {
-            id: "kael",
-            hasIncoming: true,
-            personalityTags: ["relic_sensitive"],
-          },
-        ],
-        tiles: initialTiles,
-        map: createInitialMapState(),
-        logs: initialLogs,
-        resources: initialResources,
-        active_events: eventState.active_events,
-        active_calls: eventState.active_calls,
-      })),
-    );
-
-    render(<App />);
-
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
-    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
-    expect(runtimeCallPanel).not.toBeNull();
-    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
-    fireEvent.click(screen.getByRole("button", { name: "信任 Kael，让他继续追查线索。" }));
-    fireEvent.click(lastElement(screen.getAllByRole("button", { name: "结束通话" })));
-
-    const kaelCard = screen
-      .getAllByText("Kael，轨道城邦祭司学徒")
-      .map((node) => node.closest("article"))
-      .find((article) => article && within(article as HTMLElement).queryByRole("button", { name: "查看档案" }));
-    expect(kaelCard).not.toBeNull();
-    fireEvent.click(within(kaelCard as HTMLElement).getByRole("button", { name: "查看档案" }));
-
-    expect(screen.getByText("relic_burdened")).toBeInTheDocument();
-    expect(screen.getAllByText("Kael 保留了遗物线索，他的长期态度发生变化。").length).toBeGreaterThan(0);
-  });
-
   it("completes a seeded volcanic runtime objective when its crew action finishes", () => {
     vi.useFakeTimers();
     const { eventId, objectiveId, actionId, eventState } = createVolcanicObjectiveState();
+    const action = eventCrewAction({
+      id: actionId,
+      crew_id: "amy",
+      type: "survey",
+      source: "objective",
+      parent_event_id: eventId,
+      objective_id: objectiveId,
+      from_tile_id: "4-3",
+      target_tile_id: "4-3",
+      started_at: 0,
+      ends_at: 1,
+      duration_seconds: 1,
+      action_params: { duration_seconds: 1 },
+    });
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -1164,22 +1441,14 @@ describe("App", () => {
             activeAction: null,
           },
           {
-            id: "lin_xia",
+            id: "amy",
             currentTile: "4-3",
             location: "火山灰沙漠",
             coord: "(4,3)",
             status: "复核火山灰轨迹中。",
             statusTone: "accent",
             hasIncoming: false,
-            activeAction: {
-              id: actionId,
-              actionType: "survey",
-              status: "inProgress",
-              startTime: 0,
-              durationSeconds: 1,
-              finishTime: 1,
-              targetTile: "4-3",
-            },
+            activeAction: null,
           },
         ],
         tiles: volcanicTiles(),
@@ -1187,6 +1456,7 @@ describe("App", () => {
         resources: initialResources,
         active_events: eventState.active_events,
         objectives: eventState.objectives,
+        crew_actions: { [action.id]: action },
       })),
     );
 
@@ -1197,6 +1467,11 @@ describe("App", () => {
     });
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.crew_actions[actionId]).toMatchObject({
+      status: "completed",
+      progress_seconds: 1,
+    });
+    expect(savedCrew(saved, "amy").activeAction).toBeUndefined();
     expect(saved.objectives[objectiveId].status).toBe("completed");
     expect(saved.active_events[eventId].status).toBe("resolved");
     expect(saved.active_events[eventId].current_node_id).toBe("ash_mapped_end");
@@ -1207,7 +1482,7 @@ describe("App", () => {
     );
   });
 
-  it("bridges event-created move crew actions into active actions", () => {
+  it("keeps event-created move crew actions in crew_actions without writing activeAction", () => {
     vi.useFakeTimers();
     const action = eventCrewAction({
       id: "event-move",
@@ -1239,13 +1514,14 @@ describe("App", () => {
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const mike = saved.crew.find((member: { id: string }) => member.id === "mike");
-    expect(mike.activeAction).toMatchObject({
+    expect(mike.activeAction).toBeFalsy();
+    expect(saved.crew_actions["event-move"]).toMatchObject({
       id: "event-move",
-      actionType: "move",
-      status: "inProgress",
-      startTime: 10,
-      finishTime: 40,
-      targetTile: "1-2",
+      type: "move",
+      status: "active",
+      started_at: 10,
+      ends_at: 40,
+      target_tile_id: "1-2",
     });
   });
 
@@ -1279,12 +1555,12 @@ describe("App", () => {
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const amy = saved.crew.find((member: { id: string }) => member.id === "amy");
-    expect(amy.activeAction).toMatchObject({ id: "event-wait", actionType: "event" });
+    expect(saved.crew_actions["event-wait"]).toMatchObject({ id: "event-wait", type: "event_waiting", status: "active" });
     expect(amy.unavailable).toBe(true);
     expect(amy.canCommunicate).toBe(true);
   });
 
-  it("replaces existing active actions with event actions and logs the interruption", () => {
+  it("bridges event actions from crew_actions without saved activeAction state", () => {
     vi.useFakeTimers();
     const action = eventCrewAction({
       id: "event-wait",
@@ -1303,15 +1579,6 @@ describe("App", () => {
             id: "amy",
             currentTile: "2-3",
             hasIncoming: false,
-            activeAction: {
-              id: "amy-survey",
-              actionType: "survey",
-              status: "inProgress",
-              startTime: 0,
-              durationSeconds: 180,
-              finishTime: 180,
-              targetTile: "2-3",
-            },
           },
         ],
         tiles: initialTiles,
@@ -1327,16 +1594,9 @@ describe("App", () => {
     });
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const amy = saved.crew.find((member: { id: string }) => member.id === "amy");
-    expect(amy.activeAction.id).toBe("event-wait");
-    expect(saved.logs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          tone: "accent",
-          text: expect.stringContaining("被中断"),
-        }),
-      ]),
-    );
+    const amy = saved.crew.find((member: { id: string; activeAction?: unknown }) => member.id === "amy");
+    expect(amy.activeAction).toBeUndefined();
+    expect(saved.crew_actions["event-wait"]).toMatchObject({ id: "event-wait", type: "event_waiting", status: "active" });
   });
 
   it("does not bridge crew actions from non-event sources", () => {
@@ -1369,108 +1629,7 @@ describe("App", () => {
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     const mike = saved.crew.find((member: { id: string }) => member.id === "mike");
-    expect(mike.activeAction).toBeNull();
-  });
-
-  it("ignores legacy emergencyEvent fields when opening a call", async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [
-          {
-            id: "lin_xia",
-            status: "洞穴低光区域，等待指令。",
-            statusTone: "danger",
-            hasIncoming: true,
-            emergencyEvent: createSavedEmergencyEvent("lin_xia", "emergency_mountain_cave_darkness"),
-          },
-        ],
-        tiles: initialTiles,
-        logs: initialLogs,
-        resources: initialResources,
-      })),
-    );
-
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: /通讯台/ }));
-    const linCard = screen.getByText("林夏，前轨道麻醉医师").closest("article");
-    expect(linCard).not.toBeNull();
-    await user.click(within(linCard as HTMLElement).getByRole("button", { name: "通话" }));
-
-    expect(screen.getByRole("heading", { name: "通话页面：林夏 状态确认" })).toBeInTheDocument();
-    expect(screen.queryByText(/使用照明道具继续确认洞内路径/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
-  });
-
-  it("does not fall back to legacy emergency choices for an expired runtime call", async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 200,
-        crew: [
-          {
-            id: "amy",
-            currentTile: "2-3",
-            location: "森林 / 山",
-            coord: "(2,3)",
-            status: "森林紧急频道等待接入。",
-            statusTone: "danger",
-            hasIncoming: true,
-            emergencyEvent: createSavedEmergencyEvent("amy", "emergency_forest_beast"),
-          },
-        ],
-        active_calls: {
-          "expired-call": {
-            id: "expired-call",
-            event_id: "expired-event",
-            event_node_id: "beast_first_call",
-            call_template_id: "forest_beast_encounter.call.first",
-            crew_id: "amy",
-            status: "expired",
-            created_at: 0,
-            connected_at: null,
-            ended_at: null,
-            expires_at: 90,
-            render_context_snapshot: {},
-            rendered_lines: [
-              {
-                template_variant_id: "beast_first_opening_default",
-              text: "Amy 压低声音：有个大型生物正在 2-3 周围绕行。",
-                speaker_crew_id: "amy",
-              },
-            ],
-            available_options: [
-              {
-                option_id: "fall_back",
-                template_variant_id: "beast_fallback_default",
-              text: "立刻后撤。",
-                is_default: false,
-              },
-            ],
-            selected_option_id: null,
-            blocking_claim_id: null,
-          },
-        },
-        tiles: initialTiles,
-        logs: initialLogs,
-        resources: initialResources,
-      })),
-    );
-
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: /通讯台/ }));
-    const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
-    expect(amyCard).not.toBeNull();
-    await user.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
-
-    expect(screen.queryByRole("button", { name: "立刻撤离" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "立刻后撤。" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/紧急倒计时/)).not.toBeInTheDocument();
+    expect(mike.activeAction).toBeUndefined();
   });
 
   it("handles an incoming Amy call and settles a decision", async () => {
@@ -1521,14 +1680,14 @@ describe("App", () => {
 
     const grid = screen.getByLabelText(/雷达可见矩形/);
     const amyTile = within(grid).getByRole("button", { name: /\(-1,2\)/ });
-    expect(within(amyTile).getByText("未探索信号")).toBeInTheDocument();
+    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
     expect(within(amyTile).getByText("地形：森林 / 山")).toBeInTheDocument();
     expect(within(amyTile).getByText("天气：薄雾")).toBeInTheDocument();
     expect(within(amyTile).getByText("Amy：等待指令。")).toBeInTheDocument();
     expect(within(amyTile).queryByText("黑松木材带")).not.toBeInTheDocument();
 
     fireEvent.click(amyTile);
-    expect(screen.getByText("队员回传")).toBeInTheDocument();
+    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
     expect(screen.getByText("地形")).toBeInTheDocument();
     expect(screen.getAllByText("森林 / 山").length).toBeGreaterThan(0);
     expect(screen.getByText("天气")).toBeInTheDocument();
@@ -1541,7 +1700,7 @@ describe("App", () => {
     expect(saved.map.tilesById["2-3"].discovered).toBe(false);
   });
 
-  it("renders grouped base and revealed object actions for an idle crew member", () => {
+  it("renders base actions without removed revealed object actions for an idle crew member", () => {
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -1577,12 +1736,28 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "调查当前区域" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "移动到指定区域" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "原地待命" })).toBeInTheDocument();
-    expect(screen.getByText("铁矿床")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "调查 铁矿床" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "采集 铁矿床" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "停止当前行动" })).not.toBeInTheDocument();
+    expect(screen.queryByText("铁矿床")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "调查 铁矿床" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "采集 铁矿床" })).not.toBeInTheDocument();
   });
 
   it("renders only busy-available call actions for a busy crew member", () => {
+    const mineralTile = findTileWithObjectTag("mineral_deposit");
+    const action = garryGatherAction(mineralTile.id, "iron-ridge-deposit", 180);
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [{ id: "garry", currentTile: mineralTile.id, hasIncoming: false }],
+        tiles: initialTiles,
+        map: createMapWithDiscoveredTiles(mineralTile.id),
+        logs: initialLogs,
+        resources: initialResources,
+        crew_actions: { [action.id]: action },
+      })),
+    );
+
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
@@ -1591,7 +1766,7 @@ describe("App", () => {
     fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "通话" }));
 
     expect(screen.getByText("基础行动")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "原地待命" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "原地待命" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "停止当前行动" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "调查当前区域" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "移动到指定区域" })).not.toBeInTheDocument();
@@ -1645,9 +1820,21 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }));
 
     expect(screen.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeInTheDocument();
-    expect(savedCrew(JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}"), "garry").activeAction).toMatchObject({
-      actionType: "move",
-      status: "inProgress",
+    const startedMove = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    const garryStarted = savedCrew(startedMove, "garry");
+    expect(garryStarted.activeAction).toBeUndefined();
+    const moveAction = Object.values(startedMove.crew_actions).find(
+      (action) => (action as CrewActionState).crew_id === "garry" && (action as CrewActionState).type === "move",
+    ) as CrewActionState | undefined;
+    expect(moveAction).toMatchObject({
+      type: "move",
+      status: "active",
+      from_tile_id: mineralTile.id,
+      target_tile_id: "4-3",
+      action_params: expect.objectContaining({
+        route_step_index: 0,
+        step_durations_seconds: expect.any(Array),
+      }),
     });
 
     act(() => {
@@ -1656,6 +1843,8 @@ describe("App", () => {
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(saved.map.discoveredTileIds).toContain("4-3");
+    expect(saved.crew_actions[moveAction?.id ?? ""]).toMatchObject({ status: "completed" });
+    expect(savedCrew(saved, "garry").activeAction).toBeUndefined();
 
     const endButtons = screen.getAllByRole("button", { name: "结束通话" });
     fireEvent.click(endButtons[endButtons.length - 1]);
@@ -1663,7 +1852,7 @@ describe("App", () => {
     expect(screen.getByText("位于 (-1,0)，待命中。")).toBeInTheDocument();
   });
 
-  it("advances an incomplete saved move action one route step at a time instead of jumping to the target", () => {
+  it("advances an incomplete saved move crew_action one route step at a time instead of jumping to the target", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -1680,27 +1869,33 @@ describe("App", () => {
             hasIncoming: false,
             canCommunicate: true,
             unavailable: false,
-            activeAction: {
-              id: "mike-move-4-5",
-              actionType: "move",
-              status: "inProgress",
-              startTime: 0,
-              durationSeconds: 360,
-              finishTime: 360,
-              fromTile: "2-1",
-              targetTile: "4-5",
-              route: ["4-5"],
-              routeStepIndex: 0,
-              stepStartedAt: 0,
-              stepFinishTime: 360,
-              totalDurationSeconds: 360,
-            },
+            activeAction: null,
           },
         ],
         tiles: initialTiles,
         map: createMapWithDiscoveredTiles("2-1"),
         logs: initialLogs,
         resources: initialResources,
+        crew_actions: {
+          "mike-move-4-5": eventCrewAction({
+            id: "mike-move-4-5",
+            crew_id: "mike",
+            type: "move",
+            source: "player_command",
+            from_tile_id: "2-1",
+            target_tile_id: "4-5",
+            path_tile_ids: ["2-2", "2-3", "2-4", "2-5", "3-5", "4-5"],
+            started_at: 0,
+            ends_at: 360,
+            duration_seconds: 360,
+            action_params: {
+              route_step_index: 0,
+              step_started_at: 0,
+              step_finish_time: 60,
+              step_durations_seconds: [60, 60, 60, 60, 60, 60],
+            },
+          }),
+        },
       })),
     );
 
@@ -1713,9 +1908,15 @@ describe("App", () => {
     const saved = readSavedGameState();
     const mike = savedCrew(saved, "mike");
     expect(mike.currentTile).toBe("2-2");
-    expect(mike.activeAction).toMatchObject({
-      targetTile: "4-5",
-      routeStepIndex: 1,
+    expect(mike.activeAction).toBeFalsy();
+    expect(saved.crew_actions["mike-move-4-5"]).toMatchObject({
+      target_tile_id: "4-5",
+      status: "active",
+      progress_seconds: 60,
+      action_params: expect.objectContaining({
+        route_step_index: 1,
+        step_finish_time: 120,
+      }),
     });
     expect(saved.map.discoveredTileIds).toContain("2-2");
     expect(saved.map.tilesById["2-2"]).toMatchObject({
@@ -1725,7 +1926,7 @@ describe("App", () => {
     expect(saved.map.discoveredTileIds).not.toContain("4-5");
 
     act(() => {
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(60_000);
     });
 
     const afterLeaving = readSavedGameState();
@@ -1812,11 +2013,13 @@ describe("App", () => {
 
     const grid = screen.getByLabelText(/雷达可见矩形/);
     expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
-    expect(screen.getAllByRole("button", { name: /未探索信号/ })).toHaveLength(8);
+    expect(screen.getAllByRole("button", { name: /未探索区域/ })).toHaveLength(7);
+    expect(screen.getByRole("button", { name: /\(-1,1\).*队员回传/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
     expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("天气：阴天");
     expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("对象：坠毁残骸");
     expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
+    expect(screen.queryByText("未发现即时危险")).not.toBeInTheDocument();
   });
 
   it("keeps frontier and unknown-hole map cells redacted", () => {
@@ -1843,13 +2046,14 @@ describe("App", () => {
     const grid = screen.getByLabelText(/雷达可见矩形/);
     expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" });
     expect(screen.queryByText("东侧砾原")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /未探索信号/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /未探索区域/ }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索信号/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索区域/ }));
     const detailPanel = screen.getByRole("heading", { name: "坐标详情：(2,0)" }).closest("section");
     expect(detailPanel).not.toBeNull();
-    expect(within(detailPanel as HTMLElement).getByText("信号未确认")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("暂无已确认信息")).toBeInTheDocument();
     expect(within(detailPanel as HTMLElement).getByText("需通过通讯台联系队员前往或调查后确认详情")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).queryByText("信号未确认")).not.toBeInTheDocument();
     expect(screen.queryByText("强风")).not.toBeInTheDocument();
   });
 
@@ -1905,14 +2109,14 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "交易" })).not.toBeInTheDocument();
   });
 
-  it("keeps player call entry as the primary action while inventory remains available", () => {
+  it("keeps normal calls and inventory available without an incoming entry", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
     expect(amyCard).not.toBeNull();
 
-    expect(within(amyCard as HTMLElement).getByRole("button", { name: "通话" })).toHaveClass("primary-button");
+    expect(within(amyCard as HTMLElement).getByRole("button", { name: "通话" })).toHaveClass("secondary-button");
     expect(within(amyCard as HTMLElement).getByRole("button", { name: "查看背包" })).toBeInTheDocument();
   });
 
@@ -1941,13 +2145,13 @@ describe("App", () => {
     expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
   });
 
-  it("rejects legacy saves and starts from the new event save schema", () => {
+  it("rejects obsolete saves and starts from the new event save schema", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify({
         elapsedGameSeconds: 12,
         saveVersion: GAME_SAVE_VERSION,
-        crew: [{ id: "mike", bag: ["legacy item"] }],
+        crew: [{ id: "mike", bag: ["old item"] }],
         tiles: initialTiles,
         map: createInitialMapState(),
         logs: initialLogs,
@@ -1972,7 +2176,6 @@ describe("App", () => {
       { itemId: "ration", quantity: 1 },
     ]);
     expect(JSON.stringify(saved)).not.toContain("bag");
-    expect(JSON.stringify(saved)).not.toContain("emergencyEvent");
   });
 
   it("uses the debug toolbox to accelerate game time", () => {
@@ -2006,19 +2209,6 @@ describe("App", () => {
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
   });
 });
-
-function createSavedEmergencyEvent(crewId: string, eventId: string) {
-  return {
-    instanceId: `${crewId}-${eventId}-test`,
-    eventId,
-    createdAt: 0,
-    callReceivedTime: 0,
-    dangerStage: 0,
-    nextEscalationTime: 30,
-    deadlineTime: 120,
-    settled: false,
-  };
-}
 
 function lastElement<T>(items: T[]): T {
   return items[items.length - 1];
@@ -2090,7 +2280,7 @@ function findSavedEvent(saved: { active_events?: Record<string, unknown> }, even
   };
 }
 
-function startAmyBeastEmergencyFromStandby() {
+function startAmyBeastEmergencyFromSurvey() {
   window.localStorage.setItem(
     GAME_SAVE_KEY,
     JSON.stringify(createCompatibleSavedGameState({
@@ -2121,7 +2311,7 @@ function startAmyBeastEmergencyFromStandby() {
   const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
   expect(amyCard).not.toBeNull();
   fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
-  fireEvent.click(screen.getByRole("button", { name: "原地待命" }));
+  fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 }
 
 function findTileWithObjectTag(tag: string, filters: { visibility?: string } = {}) {
@@ -2194,6 +2384,26 @@ function eventCrewAction(overrides: Partial<CrewActionState>): CrewActionState {
   };
 }
 
+function garryGatherAction(tileId: string, objectId: string, durationSeconds = 300): CrewActionState {
+  return eventCrewAction({
+    id: `gather:${objectId}:${tileId}:0`,
+    crew_id: "garry",
+    source: "player_command",
+    type: "gather",
+    target_tile_id: tileId,
+    started_at: 0,
+    ends_at: durationSeconds,
+    duration_seconds: durationSeconds,
+    action_params: {
+      object_id: objectId,
+      resource_id: "iron_ore",
+      perRoundYieldByResource: {
+        iron_ore: 5,
+      },
+    },
+  });
+}
+
 function createRuntimeCall(overrides: Record<string, unknown> = {}) {
   return {
     id: "runtime-call",
@@ -2230,121 +2440,10 @@ function runtimeLine(text: string, speakerCrewId: string) {
   };
 }
 
-function createLostRelicArgumentState() {
-  const eventId = "lost_relic_argument:600";
-  const callId = `${eventId}:relic_argument_call:call`;
-
-  return {
-    eventId,
-    callId,
-    eventState: {
-      active_events: {
-        [eventId]: {
-          id: eventId,
-          event_definition_id: "lost_relic_argument",
-          event_definition_version: 1,
-          status: "waiting_call",
-          current_node_id: "relic_argument_call",
-          primary_crew_id: "kael",
-          related_crew_ids: [],
-          primary_tile_id: "4-2",
-          related_tile_ids: [],
-          parent_event_id: null,
-          child_event_ids: [],
-          objective_ids: [],
-          active_call_id: callId,
-          selected_options: {},
-          random_results: {},
-          blocking_claim_ids: [],
-          created_at: 600,
-          updated_at: 600,
-          deadline_at: 780,
-          next_wakeup_at: null,
-          trigger_context_snapshot: {
-            trigger_type: "proximity",
-            occurred_at: 600,
-            source: "tile_system",
-            crew_id: "kael",
-            tile_id: "4-2",
-            action_id: null,
-            event_id: eventId,
-            event_definition_id: "lost_relic_argument",
-            node_id: null,
-            call_id: null,
-            objective_id: null,
-            selected_option_id: null,
-            world_flag_key: null,
-            proximity: {
-              origin_tile_id: "4-2",
-              nearby_tile_ids: ["4-1", "4-3"],
-              distance: 1,
-            },
-            payload: {
-              relic_id: "lost_relic_alpha",
-            },
-          },
-          history_keys: [],
-          result_key: null,
-          result_summary: null,
-        },
-      },
-      active_calls: {
-        [callId]: {
-          id: callId,
-          event_id: eventId,
-          event_node_id: "relic_argument_call",
-          call_template_id: "lost_relic_argument.call.argument",
-          crew_id: "kael",
-          status: "awaiting_choice",
-          created_at: 600,
-          connected_at: null,
-          ended_at: null,
-          expires_at: 780,
-          render_context_snapshot: {
-            crew_id: "kael",
-            crew_display_name: "Kael",
-            tile_id: "4-2",
-            event_pressure: "urgent",
-            personality_tags: ["relic_sensitive"],
-          },
-          rendered_lines: [
-            {
-              template_variant_id: "relic_opening_default",
-              text: "Kael 拒绝把遗物装袋，除非基地先给出承诺。",
-              speaker_crew_id: "kael",
-            },
-            {
-              template_variant_id: "relic_body_default",
-              text: "他说那东西属于一个再也没能回家的人。",
-              speaker_crew_id: "kael",
-            },
-          ],
-          available_options: [
-            {
-              option_id: "trust_kael",
-              template_variant_id: "relic_trust_default",
-              text: "信任 Kael，让他继续追查线索。",
-              is_default: true,
-            },
-            {
-              option_id: "secure_relic",
-              template_variant_id: "relic_secure_default",
-              text: "按基地规程封存遗物。",
-              is_default: false,
-            },
-          ],
-          selected_option_id: null,
-          blocking_claim_id: null,
-        },
-      },
-    },
-  };
-}
-
 function createVolcanicObjectiveState() {
   const eventId = "volcanic_ash_trace:480";
   const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
-  const actionId = "lin-xia-ash-survey";
+  const actionId = "amy-ash-survey";
 
   return {
     eventId,
@@ -2414,7 +2513,7 @@ function createVolcanicObjectiveState() {
             duration_seconds: 45,
             can_interrupt: true,
           },
-          assigned_crew_id: "lin_xia",
+          assigned_crew_id: "amy",
           action_id: actionId,
           created_at: 481,
           assigned_at: 482,
@@ -2434,9 +2533,7 @@ function volcanicTiles() {
       ? {
           ...tile,
           terrain: "火山灰沙漠",
-          resources: ["火山灰"],
-          crew: ["garry", "lin_xia"],
-          danger: "灰线不稳定",
+          crew: ["garry", "amy"],
           status: "复核中",
         }
       : tile,

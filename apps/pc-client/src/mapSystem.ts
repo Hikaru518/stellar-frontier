@@ -1,6 +1,6 @@
 import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "./content/mapObjects";
-import type { CrewId, InvestigationReport, MapTile } from "./data/gameData";
+import type { CrewId, InvestigationReport } from "./data/gameData";
 
 export type VisibleTileStatus = "discovered" | "frontier" | "unknownHole";
 
@@ -36,7 +36,7 @@ export interface RuntimeMapState {
   tilesById: Record<string, RuntimeMapTileState | undefined>;
   /**
    * Flat by-id state for every map object, populated at game-start from
-   * `mapObjectDefinitionById`. Optional on the type so legacy test fixtures
+   * `mapObjectDefinitionById`. Optional on the type so narrow test fixtures
    * still compile; runtime always treats `undefined` as `{}`.
    */
   mapObjects?: RuntimeMapObjectsState;
@@ -159,45 +159,6 @@ export function canMoveToTile(config: MapConfigDefinition, runtimeMap: RuntimeMa
 
   const cell = getVisibleTileWindow(config, runtimeMap).cells.find((item) => item.id === tileId);
   return cell?.status === "discovered" || cell?.status === "frontier";
-}
-
-export function deriveLegacyTiles(config: MapConfigDefinition, runtimeMap: RuntimeMapState): MapTile[] {
-  const origin = getOrigin(config);
-  return config.tiles.map((tile) => {
-    const state = runtimeMap.tilesById[tile.id];
-    const discovered = isDiscovered(runtimeMap, tile.id);
-    const investigated = Boolean(state?.investigated);
-    const revealedObjectIds = new Set(state?.revealedObjectIds ?? []);
-    const revealedSpecialStateIds = new Set(state?.revealedSpecialStateIds ?? []);
-    const activeSpecialStateIds = new Set(
-      state?.activeSpecialStateIds ?? tile.specialStates.filter((item) => item.startsActive).map((item) => item.id),
-    );
-    const tileObjectDefinitions = resolveTileObjects(tile);
-    const visibleObjects = tileObjectDefinitions.filter(
-      (object) => object.visibility === "onDiscovered" || investigated || revealedObjectIds.has(object.id),
-    );
-    const visibleSpecialStates = tile.specialStates.filter(
-      (specialState) =>
-        activeSpecialStateIds.has(specialState.id) &&
-        (specialState.visibility === "onDiscovered" || investigated || revealedSpecialStateIds.has(specialState.id)),
-    );
-    const displayCoord = origin ? formatDisplayCoord(getDisplayCoord(tile, origin)) : `(${tile.row},${tile.col})`;
-
-    return {
-      id: tile.id,
-      coord: displayCoord,
-      row: tile.row,
-      col: tile.col,
-      terrain: tile.terrain,
-      resources: visibleObjects.flatMap((object) => (object.legacyResource ? [object.legacyResource] : [])),
-      buildings: visibleObjects.flatMap((object) => (object.legacyBuilding ? [object.legacyBuilding] : [])),
-      instruments: visibleObjects.flatMap((object) => (object.legacyInstrument ? [object.legacyInstrument] : [])),
-      crew: state?.crew ?? [],
-      danger: visibleSpecialStates.find((specialState) => specialState.legacyDanger)?.legacyDanger ?? "未发现即时危险",
-      status: state?.status ?? (discovered ? "已发现" : "未探索"),
-      investigated,
-    };
-  });
 }
 
 /**

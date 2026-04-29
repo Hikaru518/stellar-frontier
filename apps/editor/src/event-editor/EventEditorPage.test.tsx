@@ -114,7 +114,7 @@ describe("EventEditorPage", () => {
     expect(within(triggerSummary).getByText(/每位队员/)).toBeInTheDocument();
     expect(within(triggerSummary).getByText(/最多 1 次/)).toBeInTheDocument();
     expect(within(triggerSummary).getByText("Intended For")).toBeInTheDocument();
-    expect(within(triggerSummary).getByText("kael")).toBeInTheDocument();
+    expect(within(triggerSummary).getByText("amy")).toBeInTheDocument();
   });
 
   it("omits the Intended For row when content_refs.crew_ids is empty", async () => {
@@ -187,6 +187,8 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
   return {
     definitions: [],
     call_templates: [],
+    presets: [],
+    handlers: [],
     schemas: {},
     ...overrides,
   };
@@ -253,7 +255,7 @@ function createDefinitionData(): unknown {
       allow_while_active: false,
     },
     content_refs: {
-      crew_ids: ["kael"],
+      crew_ids: ["amy"],
     },
     event_graph: {
       entry_node_id: "intro_call",

@@ -90,7 +90,7 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
         <Header statusLabel="EMPTY" />
         <div className="editor-state-card">
           <h3>No event assets found</h3>
-          <p className="muted-text">The helper responded, but the event library did not include event definitions or call templates.</p>
+          <p className="muted-text">The helper responded, but the event library did not include structured event assets.</p>
         </div>
       </section>
     );
@@ -175,6 +175,8 @@ function EventLibraryStatusBar({ library }: { library: EventEditorLibraryRespons
       <strong>Loaded</strong>
       <span>{formatCount(library.definitions.length, "definition")}</span>
       <span>{formatCount(library.call_templates.length, "call template")}</span>
+      <span>{formatCount(library.presets.length, "preset")}</span>
+      <span>{formatCount(library.handlers.length, "handler")}</span>
     </div>
   );
 }
@@ -291,7 +293,7 @@ function Header({ statusLabel }: { statusLabel: string }) {
     <div className="editor-panel-heading">
       <div>
         <h2 className="panel-title">Event Inspector</h2>
-        <p className="muted-text">Read-only view of event definitions and call templates served by the local helper.</p>
+        <p className="muted-text">Read-only view of structured event assets served by the local helper.</p>
       </div>
       <span className="status-tag status-success">{statusLabel}</span>
     </div>
@@ -299,7 +301,7 @@ function Header({ statusLabel }: { statusLabel: string }) {
 }
 
 function getBrowserAssets(library: EventEditorLibraryResponse): EditorEventAsset<unknown>[] {
-  return [...library.definitions, ...library.call_templates];
+  return [...library.definitions, ...library.call_templates, ...library.presets, ...library.handlers];
 }
 
 function formatCount(count: number, singular: string): string {

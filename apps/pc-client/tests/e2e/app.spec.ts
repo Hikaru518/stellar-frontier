@@ -51,7 +51,7 @@ test("PS-001 opens basic normal-call actions for Mike, Amy, and Garry", async ({
   }
 });
 
-test("PS-002 changes Mike's dynamic object actions after investigation", async ({ page }) => {
+test("PS-002 keeps removed object actions hidden after current-area survey", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("mike", "5-3", { status: "林地边缘待命。" })],
@@ -72,13 +72,9 @@ test("PS-002 changes Mike's dynamic object actions after investigation", async (
   await expect(page.getByRole("button", { name: "采集 潮湿木材" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "调查当前区域" }).click();
-  await page.clock.runFor(121_000);
-  await page.getByRole("button", { name: "结束通话" }).last().click();
-  await startNormalCrewCall(page, "Mike，特战干员");
-
-  await expect(page.getByRole("heading", { name: "潮湿木材" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "调查 潮湿木材" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "采集 潮湿木材" })).toBeVisible();
+  await expect(page.getByText("当前地点没有可触发的调查事件。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "调查 潮湿木材" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "采集 潮湿木材" })).toHaveCount(0);
 });
 
 test("PS-003 resolves Mike's crash-site runtime call and reveals the wreckage object", async ({ page }) => {
@@ -126,13 +122,13 @@ test("PS-003 resolves Amy's beast emergency and shows the urgent countdown", asy
   await page.goto("/");
   await page.getByRole("button", { name: /通讯台/ }).click();
   await startNormalCrewCall(page, "Amy，千金大小姐");
-  await page.getByRole("button", { name: "原地待命" }).click();
+  await page.getByRole("button", { name: "调查当前区域" }).click();
   await page.getByRole("button", { name: "结束通话" }).last().click();
 
   const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
   await expect(runtimeCallPanel).toBeVisible();
   await expect(runtimeCallPanel.getByText("紧急")).toBeVisible();
-  await expect(runtimeCallPanel.getByText("剩余 03:00")).toBeVisible();
+  await expect(runtimeCallPanel.getByText(/剩余 02:5\d/)).toBeVisible();
   await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
 
   await expect(page.getByText("Amy 压低声音：大型野兽正在 2-3 周围逼近，我需要立刻指令。")).toBeVisible();
@@ -147,20 +143,19 @@ test("PS-003 resolves Amy's beast emergency and shows the urgent countdown", asy
 });
 
 test("PS-003 resolves Garry's mine anomaly call and records the anomaly log", async ({ page }) => {
+  const { callId, eventId, eventState } = createMineAnomalyRuntimeCallState();
   await installSave(page, {
     elapsedGameSeconds: 0,
-    crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
+    crew: [idleCrew("garry", "3-3", { status: "矿带待命。", hasIncoming: true })],
     map: createMapWithDiscoveredTiles("3-3"),
     logs: initialLogs,
     resources: initialResources,
+    active_events: eventState.active_events,
+    active_calls: eventState.active_calls,
   });
 
   await page.goto("/");
   await page.getByRole("button", { name: /通讯台/ }).click();
-  await startNormalCrewCall(page, "Garry，退休老大爷");
-  await page.getByRole("button", { name: "采集 铁矿床" }).click();
-  await page.clock.runFor(181_000);
-  await page.getByRole("button", { name: "结束通话" }).last().click();
 
   const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
   await expect(runtimeCallPanel).toBeVisible();
@@ -171,6 +166,8 @@ test("PS-003 resolves Garry's mine anomaly call and records the anomaly log", as
   await page.getByRole("button", { name: "记录矿脉异常，采矿流程保持不变。" }).click();
 
   const saved = await readSave(page);
+  expect(saved.active_calls[callId]).toMatchObject({ status: "ended", selected_option_id: "log_anomaly" });
+  expect(saved.active_events[eventId]).toMatchObject({ status: "resolved", current_node_id: "ok" });
   const garry = findSavedCrew(saved, "garry");
   expect(garry.conditions).toContain("noted_mine_anomaly");
   expect(saved.event_logs).toEqual(
@@ -180,7 +177,7 @@ test("PS-003 resolves Garry's mine anomaly call and records the anomaly log", as
   );
 });
 
-test("loads the app and opens the incoming Amy channel without legacy emergency choices", async ({ page }) => {
+test("loads the app and opens the incoming Amy call without saved emergency choices", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
@@ -213,14 +210,14 @@ test("opens the communication station and shows a crew inventory", async ({ page
   await expect(page.getByText("可在失联或救援相关事件中提供定位帮助。")).toBeVisible();
 });
 
-test("shows the Yuan realtime link demo with WebRTC as LAN upgrade and WSS fallback", async ({ page }) => {
+test("shows the Yuan realtime link with WebRTC as LAN upgrade and WSS fallback", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
 
   const phonePanel = page.getByText("手机私人终端").locator("xpath=ancestor::section[1]");
   await expect(phonePanel).toBeVisible();
-  await expect(phonePanel.getByLabel("实时连接演示")).toBeVisible();
+  await expect(phonePanel.getByLabel("实时连接说明")).toBeVisible();
   await expect(phonePanel.getByText("局域网升级")).toBeVisible();
   await expect(phonePanel.getByText(/yuan-webrtc-datachannel/)).toBeVisible();
   await expect(phonePanel.getByText("公网兜底")).toBeVisible();
@@ -237,7 +234,8 @@ test("shows only the crash site and frontier window on a new map", async ({ page
   await expect(grid).toBeVisible();
   await expect(grid.getByRole("button")).toHaveCount(9);
   await expect(grid.getByRole("button", { name: /坠毁区域/ })).toBeVisible();
-  await expect(grid.getByRole("button", { name: /未探索信号/ })).toHaveCount(8);
+  await expect(grid.getByRole("button", { name: /未探索区域/ })).toHaveCount(7);
+  await expect(grid.getByRole("button", { name: /队员回传/ })).toHaveCount(1);
   await expect(page.getByText(/4x4|4 x 4/)).toHaveCount(0);
   await expect(grid.getByText("坠毁西缘")).toHaveCount(0);
   await expect(grid.getByText("北部玄武高地")).toHaveCount(0);
@@ -257,7 +255,7 @@ test("shows crew-returned coarse info on an occupied frontier tile without revea
 
   const grid = page.getByLabel(/雷达可见矩形/);
   const amyTile = grid.getByRole("button", { name: /\(-1,2\)/ });
-  await expect(amyTile.getByText("未探索信号")).toBeVisible();
+  await expect(amyTile.getByText("队员回传")).toBeVisible();
   await expect(amyTile.getByText("地形：森林 / 山")).toBeVisible();
   await expect(amyTile.getByText("天气：薄雾")).toBeVisible();
   await expect(amyTile.getByText("Amy：等待指令。")).toBeVisible();
@@ -281,26 +279,32 @@ test("moves a crew member along intermediate route steps instead of jumping to t
         coord: "(-3,2)",
         status: "正在前往目标地点，行进中。",
         statusTone: "muted",
-        activeAction: {
-          id: "mike-move-4-5",
-          actionType: "move",
-          status: "inProgress",
-          startTime: 0,
-          durationSeconds: 360,
-          finishTime: 360,
-          fromTile: "2-1",
-          targetTile: "4-5",
-          route: ["4-5"],
-          routeStepIndex: 0,
-          stepStartedAt: 0,
-          stepFinishTime: 360,
-          totalDurationSeconds: 360,
-        },
       }),
     ],
     map: createMapWithDiscoveredTiles("2-1"),
     logs: initialLogs,
     resources: initialResources,
+    crew_actions: {
+      "mike-move-4-5": runtimeCrewAction({
+        id: "mike-move-4-5",
+        crew_id: "mike",
+        source: "player_command",
+        type: "move",
+        from_tile_id: "2-1",
+        to_tile_id: "4-5",
+        target_tile_id: "4-5",
+        path_tile_ids: ["2-2", "2-3", "3-3", "4-3", "4-4", "4-5"],
+        started_at: 0,
+        ends_at: 630,
+        duration_seconds: 630,
+        action_params: {
+          route_step_index: 0,
+          step_started_at: 0,
+          step_finish_time: 60,
+          step_durations_seconds: [60, 120, 90, 120, 60, 180],
+        },
+      }),
+    },
   });
 
   await page.goto("/");
@@ -313,7 +317,7 @@ test("moves a crew member along intermediate route steps instead of jumping to t
   const saved = await readSave(page);
   const mike = findSavedCrew(saved, "mike");
   expect(mike.currentTile).toBe("2-2");
-  expect((mike.activeAction as { routeStepIndex?: number }).routeStepIndex).toBe(1);
+  expect((saved.crew_actions["mike-move-4-5"] as { action_params?: { route_step_index?: number } }).action_params?.route_step_index).toBe(1);
   expect(saved.map.discoveredTileIds).toContain("2-2");
   expect(saved.map.tilesById["2-2"]).toMatchObject({ discovered: true });
   expect(saved.map.tilesById["2-2"].investigated).not.toBe(true);
@@ -364,10 +368,10 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await page.getByRole("button", { name: /地图二级菜单/ }).click();
   const grid = page.getByLabel(/雷达可见矩形/);
   await expect(grid.getByRole("button", { name: /坠毁西缘/ })).toBeVisible();
-  await expect(grid.getByRole("button")).toHaveCount(25);
+  await expect(grid.getByRole("button")).toHaveCount(12);
 });
 
-test("creates a manual Garry mine anomaly call after the default survey path", async ({ page }) => {
+test("does not create the removed Garry mine anomaly call from the default survey path", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
@@ -381,22 +385,15 @@ test("creates a manual Garry mine anomaly call after the default survey path", a
   await page.getByRole("button", { name: /通讯台/ }).click();
   const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
   await garryCard.getByRole("button", { name: "通话" }).click();
-  await page.getByRole("button", { name: "采集 铁矿床" }).click();
+  await page.getByRole("button", { name: "调查当前区域" }).click();
 
   await page.clock.runFor(180_000);
 
-  await page.waitForFunction((key) => {
-    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
-    return Object.values(save.active_events ?? {}).some(
-      (event) => (event as { event_definition_id?: string }).event_definition_id === "mine_anomaly_report",
-    );
-  }, GAME_SAVE_KEY);
-
-  await page.getByRole("button", { name: "结束通话" }).last().click();
-  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
-  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
-  await expect(page.getByText("Garry 报告 3-3 的矿脉深处传来异常空声。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "记录矿脉异常，采矿流程保持不变。" })).toBeVisible();
+  const saved = await readSave(page);
+  expect(Object.values(saved.active_events ?? {}).map((event) => (event as { event_definition_id?: string }).event_definition_id)).not.toContain(
+    "mine_anomaly_report",
+  );
+  await expect(page.getByText("当前地点没有可触发的调查事件。")).toBeVisible();
 });
 
 test("opens an investigation report from the log with environment fields", async ({ page }) => {
@@ -481,22 +478,13 @@ test("completes a seeded assigned objective when its crew action finishes", asyn
         activeAction: undefined,
       },
       {
-        id: "lin_xia",
+        id: "amy",
         currentTile: "4-3",
         location: "火山灰沙漠",
         coord: "(4,3)",
         status: "复核火山灰轨迹中。",
         statusTone: "accent",
         hasIncoming: false,
-        activeAction: {
-          id: actionId,
-          actionType: "survey",
-          status: "inProgress",
-          startTime: 0,
-          durationSeconds: 1,
-          finishTime: 1,
-          targetTile: "4-3",
-        },
       },
     ],
     tiles: volcanicTiles(),
@@ -504,6 +492,21 @@ test("completes a seeded assigned objective when its crew action finishes", asyn
     resources: initialResources,
     active_events: eventState.active_events,
     objectives: eventState.objectives,
+    crew_actions: {
+      [actionId]: runtimeCrewAction({
+        id: actionId,
+        crew_id: "amy",
+        source: "event_action_request",
+        parent_event_id: eventId,
+        objective_id: objectiveId,
+        action_request_id: "ash_cross_crew_objective",
+        type: "survey",
+        target_tile_id: "4-3",
+        started_at: 0,
+        ends_at: 1,
+        duration_seconds: 1,
+      }),
+    },
   });
 
   await page.goto("/");
@@ -732,10 +735,110 @@ function createForestRuntimeCallState() {
   };
 }
 
+function createMineAnomalyRuntimeCallState() {
+  const eventId = "mine_anomaly_report:180";
+  const callId = `${eventId}:report:call`;
+
+  return {
+    eventId,
+    callId,
+    eventState: {
+      active_events: {
+        [eventId]: {
+          id: eventId,
+          event_definition_id: "mine_anomaly_report",
+          event_definition_version: 1,
+          status: "waiting_call",
+          current_node_id: "report",
+          primary_crew_id: "garry",
+          related_crew_ids: [],
+          primary_tile_id: "3-3",
+          related_tile_ids: [],
+          parent_event_id: null,
+          child_event_ids: [],
+          objective_ids: [],
+          active_call_id: callId,
+          selected_options: {},
+          random_results: {},
+          blocking_claim_ids: [],
+          created_at: 180,
+          updated_at: 180,
+          deadline_at: null,
+          next_wakeup_at: null,
+          trigger_context_snapshot: {
+            trigger_type: "action_complete",
+            occurred_at: 180,
+            source: "crew_action",
+            crew_id: "garry",
+            tile_id: "3-3",
+            action_id: "garry-gather-3-3",
+            event_id: eventId,
+            event_definition_id: "mine_anomaly_report",
+            node_id: null,
+            call_id: null,
+            objective_id: null,
+            selected_option_id: null,
+            world_flag_key: null,
+            proximity: null,
+            payload: {
+              action_type: "gather",
+            },
+          },
+          history_keys: [],
+          result_key: null,
+          result_summary: null,
+        },
+      },
+      active_calls: {
+        [callId]: {
+          id: callId,
+          event_id: eventId,
+          event_node_id: "report",
+          call_template_id: "mine_anomaly_report.call.report",
+          crew_id: "garry",
+          status: "awaiting_choice",
+          created_at: 180,
+          connected_at: null,
+          ended_at: null,
+          expires_at: 360,
+          render_context_snapshot: {
+            crew_id: "garry",
+            crew_display_name: "Garry",
+            tile_id: "3-3",
+            event_pressure: "normal",
+          },
+          rendered_lines: [
+            {
+              template_variant_id: "mine_anomaly_opening_default",
+              text: "Garry 报告 3-3 的矿脉深处传来异常空声。",
+              speaker_crew_id: "garry",
+            },
+            {
+              template_variant_id: "mine_anomaly_body_default",
+              text: "敲击回波不像实心矿体，更像有一段被掏空的裂腔。",
+              speaker_crew_id: "garry",
+            },
+          ],
+          available_options: [
+            {
+              option_id: "log_anomaly",
+              template_variant_id: "mine_anomaly_log_default",
+              text: "记录矿脉异常，采矿流程保持不变。",
+              is_default: true,
+            },
+          ],
+          selected_option_id: null,
+          blocking_claim_id: null,
+        },
+      },
+    },
+  };
+}
+
 function createVolcanicObjectiveState() {
   const eventId = "volcanic_ash_trace:480";
   const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
-  const actionId = "lin-xia-ash-survey";
+  const actionId = "amy-ash-survey";
 
   return {
     eventId,
@@ -805,7 +908,7 @@ function createVolcanicObjectiveState() {
             duration_seconds: 45,
             can_interrupt: true,
           },
-          assigned_crew_id: "lin_xia",
+          assigned_crew_id: "amy",
           action_id: actionId,
           created_at: 481,
           assigned_at: 482,
@@ -826,7 +929,7 @@ function volcanicTiles() {
           ...tile,
           terrain: "火山灰沙漠",
           resources: ["火山灰"],
-          crew: ["garry", "lin_xia"],
+          crew: ["garry", "amy"],
           danger: "灰线不稳定",
           status: "复核中",
         }
@@ -845,6 +948,31 @@ function createEmptyEventRuntimeState() {
     crew_actions: {},
     inventories: {},
     rng_state: null,
+  };
+}
+
+function runtimeCrewAction(overrides: Record<string, unknown>) {
+  return {
+    id: "runtime-action",
+    crew_id: "mike",
+    type: "move",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: null,
+    to_tile_id: null,
+    target_tile_id: null,
+    path_tile_ids: [],
+    started_at: 0,
+    ends_at: null,
+    progress_seconds: 0,
+    duration_seconds: 0,
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+    action_params: {},
+    ...overrides,
   };
 }
 

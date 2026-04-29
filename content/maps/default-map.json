@@ -143,8 +143,7 @@
           "name": "静电锋面",
           "visibility": "hidden",
           "severity": "medium",
-          "startsActive": true,
-          "legacyDanger": "静电干扰"
+          "startsActive": true
         }
       ],
       "objectIds": []
@@ -183,9 +182,7 @@
         "atmosphericPressureKpa": 94
       },
       "specialStates": [],
-      "objectIds": [
-        "shallow-lake"
-      ]
+      "objectIds": []
     },
     {
       "id": "2-2",
@@ -203,9 +200,7 @@
         "atmosphericPressureKpa": 95
       },
       "specialStates": [],
-      "objectIds": [
-        "reed-waterline"
-      ]
+      "objectIds": []
     },
     {
       "id": "2-3",
@@ -231,8 +226,7 @@
           "dangerTags": [
             "beast_tracks"
           ],
-          "startsActive": true,
-          "legacyDanger": "大型野兽接近"
+          "startsActive": true
         }
       ],
       "objectIds": [
@@ -316,7 +310,6 @@
       },
       "specialStates": [],
       "objectIds": [
-        "echo-cave",
         "mainline-hive-entrance",
         "mainline-hive-hatchery"
       ]
@@ -393,9 +386,7 @@
       "specialStates": [],
       "objectIds": [
         "iron-ridge-deposit",
-        "mainline-rare-ore-strata",
-        "iron-mine-two",
-        "mercury-thermometer-cache"
+        "mainline-rare-ore-strata"
       ]
     },
     {
@@ -508,8 +499,7 @@
       "specialStates": [],
       "objectIds": [
         "abandoned-medical-pod",
-        "mainline-medical-docs",
-        "scanner-residue"
+        "mainline-medical-docs"
       ]
     },
     {
@@ -530,17 +520,13 @@
       "specialStates": [
         {
           "id": "unknown-echo",
-          "name": "未知回声",
+          "name": "异常回波",
           "visibility": "onDiscovered",
           "severity": "low",
-          "startsActive": true,
-          "legacyDanger": "未知回声"
+          "startsActive": true
         }
       ],
-      "objectIds": [
-        "broken-relay",
-        "intermittent-signal"
-      ]
+      "objectIds": []
     },
     {
       "id": "4-3",
@@ -829,8 +815,7 @@
           "name": "酸雨积水",
           "visibility": "onInvestigated",
           "severity": "medium",
-          "startsActive": true,
-          "legacyDanger": "酸性积水"
+          "startsActive": true
         }
       ],
       "objectIds": [
@@ -1222,9 +1207,7 @@
         "atmosphericPressureKpa": 85
       },
       "specialStates": [],
-      "objectIds": [
-        "deep-rift-signal"
-      ]
+      "objectIds": []
     },
     {
       "id": "8-7",

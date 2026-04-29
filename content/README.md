@@ -4,10 +4,12 @@ This folder stores authored game content outside of application code.
 
 ## Structure
 
-- `events/events.json`: event definitions.
+- `events/definitions/*.json`: structured event definitions.
+- `events/call_templates/*.json`: structured event call templates.
+- `events/handler_registry.json`: structured event handler allowlist.
 - `crew/crew.json`: crew definitions.
 - `items/items.json`: item definitions.
-- `schemas/events.schema.json`: JSON Schema for `events/events.json`.
+- `schemas/events/*.schema.json`: JSON Schemas for structured event assets.
 - `schemas/crew.schema.json`: JSON Schema for `crew/crew.json`.
 - `schemas/items.schema.json`: JSON Schema for `items/items.json`.
 

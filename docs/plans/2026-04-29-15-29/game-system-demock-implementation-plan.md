@@ -54,7 +54,44 @@ source:
 
 如果某处删除后页面信息变少，使用中性空状态，不补虚构世界状态。
 
-## 3. 任务顺序
+## 3. T001 审计清单
+
+本清单把关键词审计结果固化为后续实现任务的检查项。它只标记删除边界，不引入兼容 shim，也不要求在 T001 修改业务逻辑。
+
+审计关键词：
+
+- 结构与 legacy：`legacy`、`events.json`、`deriveLegacyTiles`、`legacyResource`、`legacyBuilding`、`legacyInstrument`、`legacyDanger`。
+- 旧角色与无机制字段：`lin_xia`、`kael`、`summary`。
+- mock 世界状态词：`最近一次通讯`、`最近通讯`、`天线`、`信号噪声`、`脚步声`、`未知回声`、`演示`、`mock`、`频道`、`噪声`、`固定求救`、`求救`、`唱片机`、`异常数量`、`设施状态`。
+
+当前事实审计范围：
+
+- `content/`：清理 crew 中的 Lin Xia、Kael 和 `summary`；删除 legacy event 入口、旧角色 event domain、legacy map 字段、通用行动中的 `legacy.*` 引用；同步 schema、manifest 和 content README。
+- `apps/pc-client/` runtime：清理 `contentData`、`gameData`、`App`、`crewSystem`、`callActionSettlement`、`mapSystem`、`content/mapObjects`、`conditions/callActionContext`、`events/*` 中的 legacy loader、legacy dispatch、旧行动状态、旧地图投影和旧角色引用。
+- `apps/pc-client/` UI：清理 `CommunicationStation`、`ControlCenter`、`CallPage`、`MapPage`、`CrewDetail` 中的虚构信号、天线、最近通讯、脚步声、异常数量、唱片机、固定求救等静态世界状态。保留页面标签、正式 content、真实 runtime 状态和中性空状态。
+- `apps/mobile-client/`：清理 `MobileTerminalApp` 中的演示型世界状态和固定剧情求救；保留真实配对、连接、消息和私密来电状态。
+- `apps/editor/`：删除 `legacy_event` 类型、Event Browser 的旧格式只读展示、helper 返回的 legacy asset 分支，以及 editor README 中的 `events.json` 当前能力说明。
+- `packages/dual-device/`：只审计是否残留 mock 世界状态词；除非任务明确改 shared transport 类型，否则不修改传输逻辑。
+- `scripts/` 与 app scripts：删除 validate-content 中的 legacy event schema pair；更新对应脚本测试。
+- 生成产物：在删除 event manifest domain 后重新生成 `apps/pc-client/src/content/generated/eventContentManifest.ts`，确保不再 import 被删除 domain。
+- 测试：同步 `*.test.*`、`tests/e2e/*`、editor 测试、mobile 测试和 content 校验测试；旧断言应改为当前事实，不用 skip、兼容 fallback 或同义 legacy 概念绕过。
+- 正式 docs：同步 `AGENTS.md`、`README.md`、`docs/game_model/*.md`、`docs/gameplay/*/*.md`、`docs/ui-designs/**/*.md`。不修改 `docs/core-ideas.md`，除非先获得人类确认。
+
+历史设计输入与允许例外：
+
+- `docs/plans/2026-04-29-15-29/*` 是本轮设计、调研、访谈、技术方案、任务和进度材料，允许描述本轮要删除的对象。
+- `docs/plans/**` 中更早轮次的研究、设计、任务、备份和 merge diff 也是历史材料，不作为当前事实审计对象；如果它们被正式 docs 索引当作当前事实引用，后续任务应改正式 docs 的引用关系，而不是改写历史记录。
+- `docs/ui-designs/pencil-pages/*.pen` 是 Pencil 设计源。如后续需要审计或修改其内容，必须通过 Pencil MCP 工具读取和写入；T001 不直接改 `.pen` 文件。
+- 依赖 lockfile、Rush 配置、第三方包名或测试工具名中的 `mock`、`legacy` 等词不等同于游戏事实残留。最终审计时应记录为工具链命中或无关命中。
+
+后续任务处理规则：
+
+- 删除字段时同步删 schema、TypeScript 类型、运行时读取、UI 展示和测试断言。
+- 删除文件时同步删 import、manifest、校验脚本、生成产物和文档当前事实引用。
+- 如果关键词用于描述“禁止项”或“已删除项”，它只能出现在本轮 plan 或任务总结中；当前事实代码、content、schema、UI、测试和正式 docs 不应保留这些描述。
+- 不把旧概念改名为新字段继续保存；缺少真实机制时使用中性空状态。
+
+## 4. 任务顺序
 
 任务详情见 `game-system-demock-tasks.json`。数组顺序就是后续串行执行顺序。
 
@@ -83,7 +120,7 @@ source:
 
 这个顺序先删除内容源头，再统一 runtime，随后迁移基础行动、地图和 UI，最后更新 docs 与审计。每个任务都应在自己的影响范围内保持仓库可验证。
 
-## 4. 验证要求
+## 5. 验证要求
 
 后续每个开发任务必须按影响范围运行验证：
 
@@ -99,7 +136,7 @@ source:
 
 如果没有运行 `npm run test:e2e`，实现总结必须说明原因。
 
-## 5. 主要风险
+## 6. 主要风险
 
 - **行动 runtime 重写范围大**：通过 T007-T014 分阶段迁移，先建派生视图和约束，再迁移时间推进、移动、待命、调查和 dispatch。
 - **结构化事件内容不足**：基础行动之外的动作只通过地点事件出现；T015 先做最小样例证明路径，不把整条主线塞入本轮。
@@ -107,7 +144,7 @@ source:
 - **docs 与代码不同步**：T020 和 T021 把正式文档更新、关键词审计和生成产物同步作为独立收口工作。
 - **旧存档或旧测试依赖被误保留**：本轮明确不做兼容，失败的旧断言应改为当前事实，而不是加 fallback。
 
-## 6. 输出文件
+## 7. 输出文件
 
 - `docs/plans/2026-04-29-15-29/game-system-demock-technical-design.md`
 - `docs/plans/2026-04-29-15-29/game-system-demock-tasks.json`

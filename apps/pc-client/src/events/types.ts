@@ -604,6 +604,8 @@ export interface ObjectiveTemplate {
 export type CrewActionType =
   | "move"
   | "survey"
+  | "standby"
+  | "stop"
   | "gather"
   | "build"
   | "extract"

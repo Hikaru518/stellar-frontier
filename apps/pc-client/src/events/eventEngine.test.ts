@@ -269,6 +269,104 @@ describe("event engine trigger intake", () => {
     expect(result.event?.event_definition_id).toBe("selectable_event");
   });
 
+  it("treats an active crew action as occupying the blocking slot while keeping background events eligible", () => {
+    const blockingDefinition = definitionWith({
+      id: "blocking_event",
+      triggerType: "arrival",
+      priority: 5,
+      requiresBlockingSlot: true,
+    });
+    const backgroundDefinition = definitionWith({
+      id: "background_event",
+      triggerType: "arrival",
+      priority: 1,
+      requiresBlockingSlot: false,
+    });
+    const state = {
+      ...createState(),
+      crew: {
+        amy: {
+          ...crew("amy"),
+          status: "acting",
+          current_action_id: "act_move",
+          background_event_ids: ["evt_background"],
+        },
+      },
+      crew_actions: {
+        act_move: crewAction("act_move"),
+      },
+      active_events: {
+        evt_background: runtimeEvent("evt_background", "background_existing", "active"),
+      },
+    } satisfies GraphRunnerGameState;
+    const index = indexFor([
+      blockingDefinition,
+      backgroundDefinition,
+      definitionWith({ id: "background_existing", triggerType: "idle_time" }),
+    ]);
+
+    const result = processTrigger({ state, index, context: triggerContext(120) });
+
+    expect(result.errors).toEqual([]);
+    expect(result.candidate_report?.filtered_by_blocking_ids).toEqual(["blocking_event"]);
+    expect(result.candidate_report?.selected_event_definition_ids).toEqual(["background_event"]);
+    expect(result.event?.event_definition_id).toBe("background_event");
+    expect(result.state.crew.amy.current_action_id).toBe("act_move");
+  });
+
+  it("filters blocking candidates when an active blocking event or call already owns the crew slot", () => {
+    const blockingDefinition = definitionWith({
+      id: "blocking_event",
+      triggerType: "arrival",
+      requiresBlockingSlot: true,
+    });
+    const backgroundDefinition = definitionWith({
+      id: "background_event",
+      triggerType: "arrival",
+      requiresBlockingSlot: false,
+    });
+    const index = indexFor([blockingDefinition, backgroundDefinition]);
+    const eventBlocked = {
+      ...createState(),
+      active_events: {
+        evt_existing_block: {
+          ...runtimeEvent("evt_existing_block", "existing_block", "waiting_time"),
+          blocking_claim_ids: ["evt_existing_block:wait:crew_action"],
+        },
+      },
+    } satisfies GraphRunnerGameState;
+    const callBlocked = {
+      ...createState(),
+      active_calls: {
+        call_existing_block: {
+          id: "call_existing_block",
+          event_id: "evt_call",
+          event_node_id: "call_node",
+          call_template_id: "template",
+          crew_id: "amy",
+          status: "awaiting_choice" as const,
+          created_at: 100,
+          connected_at: null,
+          ended_at: null,
+          expires_at: null,
+          render_context_snapshot: {},
+          rendered_lines: [],
+          available_options: [],
+          selected_option_id: null,
+          blocking_claim_id: "evt_call:call_node:communication",
+        },
+      },
+    } satisfies GraphRunnerGameState;
+
+    const eventResult = processTrigger({ state: eventBlocked, index, context: triggerContext(120) });
+    const callResult = processTrigger({ state: callBlocked, index, context: triggerContext(120) });
+
+    expect(eventResult.candidate_report?.filtered_by_blocking_ids).toEqual(["blocking_event"]);
+    expect(eventResult.candidate_report?.selected_event_definition_ids).toEqual(["background_event"]);
+    expect(callResult.candidate_report?.filtered_by_blocking_ids).toEqual(["blocking_event"]);
+    expect(callResult.candidate_report?.selected_event_definition_ids).toEqual(["background_event"]);
+  });
+
   it("uses priority first and weight for deterministic candidate selection", () => {
     const lowPriority = definitionWith({ id: "low_priority", triggerType: "arrival", priority: 1, weight: 100 });
     const zeroWeight = definitionWith({ id: "zero_weight", triggerType: "arrival", priority: 5, weight: 0 });
@@ -523,6 +621,30 @@ function runtimeEvent(id: string, definitionId: string, status: GraphRunnerGameS
     history_keys: [],
     result_key: null,
     result_summary: null,
+  };
+}
+
+function crewAction(id: string) {
+  return {
+    id,
+    crew_id: "amy",
+    type: "move" as const,
+    status: "active" as const,
+    source: "event_action_request" as const,
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: "2-3",
+    to_tile_id: "base",
+    target_tile_id: "base",
+    path_tile_ids: [],
+    started_at: 100,
+    ends_at: 160,
+    progress_seconds: 20,
+    duration_seconds: 60,
+    action_params: {},
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
   };
 }
 

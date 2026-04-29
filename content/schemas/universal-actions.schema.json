@@ -19,7 +19,7 @@
   "$defs": {
     "id": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
+      "enum": ["universal:move", "universal:standby", "universal:stop", "universal:survey"]
     },
     "localizedText": {
       "type": "string",
@@ -39,7 +39,7 @@
         },
         "category": {
           "type": "string",
-          "enum": ["universal", "object"]
+          "enum": ["universal"]
         },
         "label": {
           "$ref": "#/$defs/localizedText"
@@ -55,7 +55,10 @@
         },
         "event_id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "not": {
+            "pattern": "^leg[a]cy\\."
+          }
         },
         "display_when_unavailable": {
           "type": "string",

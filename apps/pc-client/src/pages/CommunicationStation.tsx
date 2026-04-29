@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
   createDualDeviceMessage,
@@ -19,9 +19,9 @@ import {
 } from "@stellar-frontier/dual-device";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
-import { getCrewActionTiming } from "../crewSystem";
-import type { CrewId, CrewMember } from "../data/gameData";
-import type { EventLog, Objective, RuntimeCall } from "../events/types";
+import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
+import type { CrewId, CrewMember, MapTile } from "../data/gameData";
+import type { CrewActionState, EventLog, Objective, RuntimeCall } from "../events/types";
 import { getInventoryView, type InventoryItemView } from "../inventorySystem";
 import { getTileLocationLabel } from "../mapSystem";
 import { CrewDetail } from "./CrewDetail";
@@ -32,10 +32,12 @@ type PrivateSignalStatus = "idle" | "sent" | "read" | "answered" | "fallback";
 
 interface CommunicationStationProps {
   crew: CrewMember[];
+  crewActions: Record<string, CrewActionState>;
   activeCalls: Record<string, RuntimeCall>;
   objectives: Record<string, Objective>;
   eventLogs: EventLog[];
   elapsedGameSeconds: number;
+  tiles: MapTile[];
   gameTimeLabel: string;
   onBack: () => void;
   onStartCall: (crewId: CrewId) => void;
@@ -43,10 +45,12 @@ interface CommunicationStationProps {
 
 export function CommunicationStation({
   crew,
+  crewActions,
   activeCalls,
   objectives,
   eventLogs,
   elapsedGameSeconds,
+  tiles,
   gameTimeLabel,
   onBack,
   onStartCall,
@@ -68,7 +72,24 @@ export function CommunicationStation({
   const openObjectives = Object.values(objectives)
     .filter((objective) => objective.status === "available" || objective.status === "assigned" || objective.status === "in_progress")
     .sort((left, right) => left.created_at - right.created_at || left.id.localeCompare(right.id));
+  const crewActionViews = useMemo(
+    () =>
+      Object.fromEntries(
+        crew.map((member) => [
+          member.id,
+          deriveCrewActionViewModel({
+            member,
+            crewActions,
+            activeCalls,
+            elapsedGameSeconds,
+            tiles,
+          }),
+        ]),
+      ) as Record<CrewId, CrewActionViewModel>,
+    [activeCalls, crew, crewActions, elapsedGameSeconds, tiles],
+  );
   const detailCrew = crew.find((member) => member.id === detailCrewId);
+  const detailCrewView = detailCrew ? crewActionViews[detailCrew.id] : undefined;
   const inventoryCrew = crew.find((member) => member.id === inventoryCrewId);
   const latestRuntimeLine = activeRuntimeCalls[0]?.rendered_lines[0]?.text;
   const recentEventLogs = eventLogs
@@ -151,8 +172,8 @@ export function CommunicationStation({
       clientId: pairingSession.pcTerminalId,
       sequence: sequenceRef.current,
       payload: {
-        title: "Amy 私频来电",
-        body: "别在主频道回复。我在森林边缘听见了第二组脚步声。",
+        title: "手机终端测试来电",
+        body: "这是一条 PC 授权的手机端测试通讯。",
         fallbackAfterMs: 10000,
       },
     });
@@ -195,7 +216,7 @@ export function CommunicationStation({
   return (
     <ConsoleShell
       title="通讯台"
-      subtitle="频道 A-17 / 信号噪声 38% / 当前仅允许一条通话事件"
+      subtitle="通讯状态 / 当前仅允许一条通话事件"
       gameTimeLabel={gameTimeLabel}
       actions={
         <>
@@ -210,12 +231,12 @@ export function CommunicationStation({
     >
       <div className="station-layout">
         <Panel title="通讯台主机" className="station-deck">
-          <p>天线：偏移 2.1° / 校准建议：忽略</p>
-          <p className="accent-text">最近信号：{latestRuntimeLine ?? "Amy / 森林 / 非常不礼貌的求救"}</p>
+          <p>当前时间：{gameTimeLabel}</p>
+          <p className="accent-text">{latestRuntimeLine ? `事件通话内容：${latestRuntimeLine}` : "暂无待处理事件通话内容。"}</p>
           <div className="terminal-box">
             这里保留通讯台主区域。通讯录展开时悬浮在左侧，不完全遮挡当前上下文。
           </div>
-          <p className="muted-text">[信号日志] 森林方向存在重复回声。</p>
+          <p className="muted-text">事件通话由 runtime call 提供；没有事件时仅显示中性空状态。</p>
         </Panel>
 
         {activeRuntimeCalls.length ? (
@@ -257,7 +278,7 @@ export function CommunicationStation({
                 <CrewCard
                   key={member.id}
                   member={member}
-                  elapsedGameSeconds={elapsedGameSeconds}
+                  actionView={crewActionViews[member.id]}
                   hasRuntimeCall={activeCallCrewIds.has(member.id)}
                   onOpenDetail={() => setDetailCrewId(member.id)}
                   onOpenInventory={() => setInventoryCrewId(member.id)}
@@ -282,7 +303,7 @@ export function CommunicationStation({
             <StatusTag tone={getPhoneStatusTone(phoneConnectionStatus)}>{formatPhoneConnectionStatus(phoneConnectionStatus)}</StatusTag>
           </div>
           <p>手机端是可选增强：扫码或手输码进入私人通讯终端，只接收 PC 授权的私密通讯，并回传 typed events。</p>
-          <div className="realtime-link-demo" aria-label="实时连接演示">
+          <div className="realtime-link-diagram" aria-label="实时连接说明">
             <div className="link-node link-node-pc">
               <span>PC AUTH</span>
               <strong>GameState</strong>
@@ -344,7 +365,7 @@ export function CommunicationStation({
               ["业务边界", "Stellar 只提供 PC/mobile 共享业务层；底层 Host/Terminal/WebRTC 交给 Yuan"],
             ]}
           />
-          {privateSignalStatus === "fallback" ? <p className="accent-text">[PC 备份] Amy：别在主频道回复。我在森林边缘听见了第二组脚步声。</p> : null}
+          {privateSignalStatus === "fallback" ? <p className="accent-text">[PC 备份] 手机终端测试通讯已转为本机查看。</p> : null}
         </Panel>
 
         {openObjectives.length ? (
@@ -398,8 +419,9 @@ export function CommunicationStation({
             rows={[
               ["身份", detailCrew.role],
               ["位置", getCrewLocationLabel(detailCrew)],
-              ["当前状态", detailCrew.status],
-              ["时间状态", getCrewTiming(detailCrew, elapsedGameSeconds)],
+              ["当前状态", detailCrewView?.statusText ?? detailCrew.status],
+              ["行动", detailCrewView?.actionTitle ?? "原地待命"],
+              ["时间状态", detailCrewView?.timingText ?? "无进行中的计时行动"],
             ]}
           />
           <CrewDetail member={detailCrew} eventLogs={eventLogs} />
@@ -417,21 +439,21 @@ export function CommunicationStation({
 
 function CrewCard({
   member,
-  elapsedGameSeconds,
+  actionView,
   hasRuntimeCall,
   onOpenDetail,
   onOpenInventory,
   onStartCall,
 }: {
   member: CrewMember;
-  elapsedGameSeconds: number;
+  actionView: CrewActionViewModel;
   hasRuntimeCall: boolean;
   onOpenDetail: () => void;
   onOpenInventory: () => void;
   onStartCall: () => void;
 }) {
-  const hasCallEntry = member.hasIncoming || hasRuntimeCall;
-  const callDisabled = member.unavailable && !hasRuntimeCall;
+  const hasCallEntry = member.hasIncoming || hasRuntimeCall || Boolean(actionView.activeCallId);
+  const callDisabled = !actionView.canStartCall;
   return (
     <article className={`crew-card ${hasCallEntry ? "crew-card-alert" : ""}`}>
       <div className="avatar-box">头像</div>
@@ -440,18 +462,18 @@ function CrewCard({
           <h3>
             {member.name}，{member.role}
           </h3>
-          {hasCallEntry ? <StatusTag tone={hasRuntimeCall ? "accent" : "danger"}>来电</StatusTag> : <StatusTag tone={member.statusTone}>在线</StatusTag>}
+          {hasCallEntry ? <StatusTag tone={hasRuntimeCall ? "accent" : "danger"}>来电</StatusTag> : <StatusTag tone={actionView.statusTone}>在线</StatusTag>}
         </div>
-        <p className={`crew-status status-${member.statusTone}`}>{member.status}</p>
+        <p className={`crew-status status-${actionView.statusTone}`}>{actionView.statusText}</p>
         <p className="muted-text">位置：{getCrewLocationLabel(member)}</p>
-        <p className="muted-text">{getCrewTiming(member, elapsedGameSeconds)}</p>
-        <p className="muted-text">{member.summary}</p>
+        <p className="muted-text">行动：{actionView.actionTitle}</p>
+        <p className="muted-text">{actionView.blockingReason ?? actionView.timingText}</p>
       </div>
       <div className="crew-actions">
         {hasCallEntry ? (
           <>
             <button type="button" className="primary-button" disabled={callDisabled} onClick={onStartCall}>
-              {callDisabled ? "信号中断" : hasRuntimeCall ? "接通" : "通话"}
+              {callDisabled ? "不可通讯" : hasRuntimeCall ? "接通" : "通话"}
             </button>
             <button type="button" className="secondary-button" onClick={onOpenInventory}>
               查看背包
@@ -465,7 +487,7 @@ function CrewCard({
             <button type="button" className="secondary-button" onClick={onOpenInventory}>
               查看背包
             </button>
-            <button type="button" className="secondary-button" disabled={member.unavailable} onClick={onStartCall}>
+            <button type="button" className="secondary-button" disabled={callDisabled} onClick={onStartCall}>
               通话
             </button>
           </>
@@ -516,14 +538,6 @@ function formatBoolean(value: boolean) {
 
 function getCrewLocationLabel(member: CrewMember) {
   return getTileLocationLabel(defaultMapConfig, member.currentTile);
-}
-
-function getCrewTiming(member: CrewMember, elapsedGameSeconds: number) {
-  if (member.activeAction?.status === "inProgress") {
-    return getCrewActionTiming(member, elapsedGameSeconds);
-  }
-
-  return "无进行中的计时行动";
 }
 
 function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {
@@ -597,7 +611,7 @@ function createPhoneTerminalPairingSession() {
 }
 
 function shouldStartYuanTerminal() {
-  return import.meta.env.MODE !== "test" && typeof WebSocket !== "undefined";
+  return import.meta.env.MODE !== "test" && import.meta.env.VITE_DISABLE_YUAN_TERMINAL !== "true" && typeof WebSocket !== "undefined";
 }
 
 function getConfiguredYuanHostUrl() {
@@ -696,5 +710,5 @@ function formatPrivateSignalStatus(status: PrivateSignalStatus) {
 }
 
 function isCrewId(value: string): value is CrewId {
-  return value === "mike" || value === "amy" || value === "garry" || value === "lin_xia" || value === "kael";
+  return value === "mike" || value === "amy" || value === "garry";
 }

@@ -5,8 +5,8 @@ import { createPathGuard } from "./pathGuard.mjs";
 const EVENT_ROOT = "content/events";
 const SCHEMA_ROOT = "content/schemas";
 const MANIFEST_PATH = "content/events/manifest.json";
+const HANDLER_REGISTRY_PATH = "content/events/handler_registry.json";
 const SCHEMA_PATHS = [
-  "content/schemas/events.schema.json",
   "content/schemas/events/condition.schema.json",
   "content/schemas/events/effect.schema.json",
   "content/schemas/events/event-graph.schema.json",
@@ -22,6 +22,7 @@ export async function loadEventEditorLibrary({
   const manifest = await readJson(guard, MANIFEST_PATH);
   const definitions = [];
   const callTemplates = [];
+  const presets = [];
 
   for (const domainEntry of manifest.domains ?? []) {
     definitions.push(
@@ -38,13 +39,25 @@ export async function loadEventEditorLibrary({
         assetType: "call_template",
       })),
     );
+    if (typeof domainEntry.presets === "string") {
+      presets.push(
+        ...(await loadDomainAssets(guard, domainEntry, {
+          manifestField: "presets",
+          collectionName: "presets",
+          assetType: "preset",
+        })),
+      );
+    }
   }
 
+  const handlers = await loadHandlerAssets(guard);
   const schemas = await loadSchemas(guard);
 
   return {
     definitions,
     call_templates: callTemplates,
+    presets,
+    handlers,
     schemas,
   };
 }
@@ -55,12 +68,27 @@ async function loadDomainAssets(guard, domainEntry, { manifestField, collectionN
   const items = content[collectionName] ?? [];
 
   return items.map((item, index) => ({
-    id: item.id,
+    id: item.id ?? `${domainEntry.id}.${assetType}.${index}`,
     domain: item.domain ?? domainEntry.id,
     asset_type: assetType,
     file_path: filePath,
     json_path: `/${collectionName}/${index}`,
     data: item,
+    editable: false,
+  }));
+}
+
+async function loadHandlerAssets(guard) {
+  const content = await readJson(guard, HANDLER_REGISTRY_PATH);
+  const handlers = content.handlers ?? [];
+
+  return handlers.map((handler, index) => ({
+    id: handler.handler_type,
+    domain: "global",
+    asset_type: "handler",
+    file_path: HANDLER_REGISTRY_PATH,
+    json_path: `/handlers/${index}`,
+    data: handler,
     editable: false,
   }));
 }

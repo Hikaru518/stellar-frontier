@@ -12,6 +12,8 @@ describe("contentStore", () => {
 
     expect(library.definitions.length).toBeGreaterThan(0);
     expect(library.call_templates.length).toBeGreaterThan(0);
+    expect(library.presets).toEqual(expect.any(Array));
+    expect(library.handlers.length).toBeGreaterThan(0);
     expect(library.definitions[0]).toEqual(
       expect.objectContaining({
         asset_type: "event_definition",
@@ -28,13 +30,22 @@ describe("contentStore", () => {
         editable: false,
       }),
     );
-    expect(Object.keys(library.schemas)).toEqual(
+    expect(library.handlers[0]).toEqual(
+      expect.objectContaining({
+        asset_type: "handler",
+        file_path: "content/events/handler_registry.json",
+        json_path: "/handlers/0",
+        editable: false,
+      }),
+    );
+    const schemaPaths = Object.keys(library.schemas);
+    expect(schemaPaths).toEqual(
       expect.arrayContaining([
         "content/schemas/events/event-definition.schema.json",
         "content/schemas/events/call-template.schema.json",
         "content/schemas/events/handler-registry.schema.json",
-        "content/schemas/events.schema.json",
       ]),
     );
+    expect(schemaPaths).not.toContain("content/schemas/events.schema.json");
   });
 });

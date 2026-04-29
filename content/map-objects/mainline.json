@@ -10,22 +10,12 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "abandoned-medical-pod:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "tags": [
         "mainline",
         "mainline_medical",
         "medical_pod"
-      ],
-      "legacyResource": "废弃医疗舱"
+      ]
     },
     {
       "id": "crash-site-wreckage",
@@ -36,22 +26,12 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "crash-site-wreckage:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "tags": [
         "crash_site",
         "mainline",
         "mainline_crash_site"
-      ],
-      "legacyBuilding": "坠毁残骸"
+      ]
     },
     {
       "id": "iron-ridge-deposit",
@@ -62,30 +42,12 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "iron-ridge-deposit:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "iron-ridge-deposit:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "tags": [
         "mineral_deposit",
         "mainline",
         "mainline_rare_ore_source"
-      ],
-      "legacyResource": "iron_ore"
+      ]
     },
     {
       "id": "iron-ridge-outcrop",
@@ -96,29 +58,11 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "iron-ridge-outcrop:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "iron-ridge-outcrop:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "tags": [
         "mainline",
         "mainline_rare_ore_source"
-      ],
-      "legacyResource": "iron_ore"
+      ]
     },
     {
       "id": "mainline-alien-trader",
@@ -129,16 +73,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-alien-trader:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "愿意用稀有矿石样本交换高温开采设备的村落商人。",
       "tags": [
         "mainline",
@@ -156,16 +91,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-alien-village:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "黑松林缘深处的外星聚落，是语言、交易和营地线索的主线节点。",
       "tags": [
         "mainline",
@@ -182,16 +108,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-basic-radar:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "仍能输出粗略方向线索的基础雷达阵列。",
       "tags": [
         "mainline",
@@ -208,24 +125,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-damaged-forge:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "mainline-damaged-forge:build",
-          "category": "object",
-          "label": "建设 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.build"
-        }
-      ],
+      "actions": [],
       "description": "裂谷边缘的废弃熔炉，修复后可制造折跃仓修复套件。",
       "tags": [
         "mainline",
@@ -242,32 +142,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-damaged-warp-pod:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "mainline-damaged-warp-pod:build",
-          "category": "object",
-          "label": "建设 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.build"
-        },
-        {
-          "id": "mainline-damaged-warp-pod:extract",
-          "category": "object",
-          "label": "回收 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.extract"
-        }
-      ],
+      "actions": [],
       "description": "坠毁后严重受损的返航核心，需要修复套件、燃料与坐标才能启动。",
       "tags": [
         "mainline",
@@ -285,16 +160,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-dead-cockpit:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "旧飞船残骸内的失效驾驶舱，可调查恢复折跃坐标。",
       "tags": [
         "mainline",
@@ -311,16 +177,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-hive-entrance:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "外星生物巢穴的入口，推进前需要诱饵引开守卫。",
       "tags": [
         "mainline",
@@ -338,16 +195,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-hive-hatchery:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "description": "可取得外星粘液燃料的深层空间，需先处理入口守卫。",
       "tags": [
         "mainline",
@@ -366,16 +214,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-injured-villager:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "需要药品或野外急救的受伤村民。",
       "tags": [
         "mainline",
@@ -393,16 +232,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-injured-villager-camp:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "外星村民临时营地，救援后可获得巢穴诱饵线索与奖励。",
       "tags": [
         "mainline",
@@ -419,24 +249,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-marsh-decoy-source:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        },
-        {
-          "id": "mainline-marsh-decoy-source:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "description": "浅滩湿地中可稳定取得额外诱饵的小型生物活动区。",
       "tags": [
         "mainline",
@@ -456,12 +269,30 @@
       "initial_status": "pristine",
       "actions": [
         {
-          "id": "mainline-medical-docs:survey",
+          "id": "mainline-medical-docs:learn",
           "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
+          "label": "学习野外急救",
+          "tone": "accent",
+          "conditions": [
+            {
+              "type": "world_flag_equals",
+              "field": "medical_docs_available",
+              "value": true
+            },
+            {
+              "type": "not",
+              "conditions": [
+                {
+                  "type": "has_condition",
+                  "target": {
+                    "type": "primary_crew"
+                  },
+                  "value": "knows_field_first_aid"
+                }
+              ]
+            }
+          ],
+          "event_id": "mainline_medical_docs_repeat_learning"
         }
       ],
       "description": "医疗舱内残存的野外急救流程，可供队员重复学习。",
@@ -480,16 +311,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-obsidian-vein:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "description": "火山高温区中的黑曜石矿脉，是修复套件材料来源。",
       "tags": [
         "mainline",
@@ -507,16 +329,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-old-ship-wreck:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "东部荒原中半埋的旧飞船残骸，可能保存返航坐标。",
       "tags": [
         "mainline",
@@ -533,24 +346,14 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-rare-ore-strata:gather",
-          "category": "object",
-          "label": "采集 {objectName}",
-          "tone": "accent",
-          "conditions": [],
-          "event_id": "legacy.gather"
-        }
-      ],
+      "actions": [],
       "description": "铁矿床中夹杂的异常矿脉，后续事件会记录采集进度并保底产出样本。",
       "tags": [
         "mainline",
         "mainline_resources",
         "mainline_rare_ore_source",
         "rare_ore"
-      ],
-      "legacyResource": "iron_ore"
+      ]
     },
     {
       "id": "mainline-repair-docs",
@@ -561,16 +364,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-repair-docs:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "坠毁残骸中保存的维修日志，是学习维修技术的稳定来源。",
       "tags": [
         "mainline",
@@ -587,16 +381,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-rosetta-device:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "覆有多层符号的外星翻译装置，是学习外星语言的稳定来源。",
       "tags": [
         "mainline",
@@ -613,16 +398,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-village-residents:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "掌握受伤村民营地线索的村落居民。",
       "tags": [
         "mainline",
@@ -639,16 +415,7 @@
         "pristine"
       ],
       "initial_status": "pristine",
-      "actions": [
-        {
-          "id": "mainline-volcanic-vent:survey",
-          "category": "object",
-          "label": "调查 {objectName}",
-          "tone": "neutral",
-          "conditions": [],
-          "event_id": "legacy.survey"
-        }
-      ],
+      "actions": [],
       "description": "火山边缘的高温区域，需要高温开采设备才能安全作业。",
       "tags": [
         "mainline",

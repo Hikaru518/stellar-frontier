@@ -36,7 +36,6 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
     coord: "(0,0)",
     status: "待命中。",
     statusTone: "neutral",
-    summary: "Test member",
     attributes: {
       physical: 3,
       agility: 3,
@@ -72,11 +71,7 @@ function createTile(): MapTile {
     row: configTile.row,
     col: configTile.col,
     terrain: configTile.terrain,
-    resources: [],
-    buildings: [],
-    instruments: [],
     crew: [],
-    danger: "未发现即时危险",
     status: "已发现",
     investigated: false,
   };
@@ -168,7 +163,7 @@ describe("map-object-action pipeline integration", () => {
           label: "切割舱门",
           tone: "danger",
           conditions: [inventoryCondition],
-          event_id: "legacy.gather",
+          event_id: "test.cut_door",
           display_when_unavailable: "disabled",
         },
       ],
@@ -239,7 +234,7 @@ describe("map-object-action pipeline integration", () => {
               params: { object_id: STUB_OBJECT_ID, status: "unlocked" },
             } as Condition,
           ],
-          event_id: "legacy.standby",
+          event_id: "test.enter_door",
         },
       ],
     });

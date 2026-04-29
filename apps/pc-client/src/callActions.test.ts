@@ -16,7 +16,6 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
     coord: "(-1,2)",
     status: "待命中。",
     statusTone: "neutral",
-    summary: "Test member",
     attributes: {
       physical: 3,
       agility: 3,
@@ -53,11 +52,7 @@ function createTile(tileId: string, overrides: Partial<MapTile> = {}): MapTile {
     row: configTile?.row ?? 1,
     col: configTile?.col ?? 1,
     terrain: configTile?.terrain ?? "平原",
-    resources: [],
-    buildings: [],
-    instruments: [],
     crew: [],
-    danger: "未发现即时危险",
     status: "已发现",
     investigated: Boolean(overrides.investigated),
     ...overrides,
@@ -138,11 +133,10 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 }
 
 describe("buildCallView", () => {
-  it("groups universal actions first then revealed object actions for an idle crew member", () => {
+  it("groups universal actions without exposing removed object actions", () => {
     // tile `2-3` exists in default-map.json and lists `black-pine-stand` as one
-    // of its objectIds. The black-pine-stand definition declares two object
-    // actions (survey/gather) with empty conditions, so they should always be
-    // visible once the object is revealed.
+    // of its objectIds. Its old object actions are intentionally no longer
+    // call decisions; current-area survey owns the structured investigation path.
     const tile = createTile("2-3");
     const blackPine = mapObjectDefinitionById.get("black-pine-stand");
     expect(blackPine).toBeDefined();
@@ -164,12 +158,34 @@ describe("buildCallView", () => {
     const view = buildCallView({ member: createMember(), tile, gameState });
 
     expect(view.groups[0].title).toBe("基础行动");
-    expect(view.groups[0].actions.map((action) => action.id)).toEqual(universalActions.map((action) => action.id));
+    expect(view.groups[0].actions.map((action) => action.id)).toEqual(
+      universalActions.filter((action) => action.id !== "universal:stop").map((action) => action.id),
+    );
 
-    const blackPineGroup = view.groups.find((group) => group.title === blackPine!.name);
-    expect(blackPineGroup).toBeDefined();
-    expect(blackPineGroup!.actions.map((action) => action.id)).toEqual(["black-pine-stand:survey", "black-pine-stand:gather"]);
-    expect(blackPineGroup!.actions.every((action) => !action.disabled)).toBe(true);
+    expect(view.groups.find((group) => group.title === blackPine!.name)).toBeUndefined();
+  });
+
+  it("does not render removed generic object action buttons", () => {
+    const tile = createTile("3-2");
+    const gameState = createGameState({
+      crew: [createMember({ currentTile: "3-2" })],
+      map: {
+        ...createGameState().map,
+        discoveredTileIds: ["3-2"],
+        tilesById: {
+          "3-2": {
+            discovered: true,
+            investigated: true,
+            revealedObjectIds: ["mainline-damaged-forge", "mainline-damaged-warp-pod", "iron-ridge-deposit"],
+          },
+        },
+      },
+    });
+
+    const view = buildCallView({ member: createMember({ currentTile: "3-2" }), tile, gameState });
+    const actionIds = view.groups.flatMap((group) => group.actions.map((action) => action.id));
+
+    expect(actionIds.some((id) => !id.startsWith("universal:") && /:(survey|gather|build|extract|scan)$/.test(id))).toBe(false);
   });
 
   it("does not render an object's actions before its visibility is satisfied", () => {
@@ -233,7 +249,7 @@ describe("buildCallView", () => {
 
     expect(() => buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState })).not.toThrow();
     const view = buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState });
-    expect(view.groups.map((group) => group.title)).toContain("黑松木材带");
+    expect(view.groups.map((group) => group.title)).not.toContain("黑松木材带");
     expect(view.groups.map((group) => group.title)).not.toContain("ghost-object");
   });
 
@@ -387,7 +403,7 @@ function createTestAction(
     label: `测试动作 ${verb}`,
     tone: "neutral",
     conditions,
-    event_id: `legacy.${verb}`,
+    event_id: `test.${verb}`,
   };
   if (extras.display_when_unavailable) {
     action.display_when_unavailable = extras.display_when_unavailable;
