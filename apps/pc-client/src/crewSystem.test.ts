@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, deriveCrewActionViewModel, startCrewMove } from "./crewSystem";
+import {
+  advanceCrewMoveAction,
+  createActiveActionFromCrewAction,
+  createMovePreview,
+  deriveCrewActionViewModel,
+  startCrewMove,
+} from "./crewSystem";
 import type { CrewMember, MapTile } from "./data/gameData";
 import { initialCrew } from "./data/gameData";
 import type { CrewActionState, CrewState, RuntimeCall } from "./events/types";
@@ -194,7 +200,68 @@ describe("deriveCrewActionViewModel", () => {
 });
 
 describe("wounded movement timing", () => {
-  it("applies a 1.5x step duration multiplier to movement previews and active movement", () => {
+  it("creates a move crew_action without mutating CrewMember.activeAction", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
+    const member = crewMember("mike", "1-1");
+    const preview = createMovePreview(member, "1-3", tiles);
+
+    const started = startCrewMove(member, preview, tiles, 10);
+
+    expect(started.member.activeAction).toBeUndefined();
+    expect(started.member.status).toBe("待命中。");
+    expect(started.action).toMatchObject({
+      id: "mike-move-1-3-10",
+      crew_id: "mike",
+      type: "move",
+      status: "active",
+      source: "player_command",
+      from_tile_id: "1-1",
+      target_tile_id: "1-3",
+      path_tile_ids: ["1-2", "1-3"],
+      started_at: 10,
+      ends_at: 160,
+      duration_seconds: 150,
+      progress_seconds: 0,
+      action_params: {
+        route_step_index: 0,
+        step_started_at: 10,
+        step_finish_time: 70,
+        step_durations_seconds: [60, 90],
+      },
+    });
+  });
+
+  it("advances a move crew_action one route step at a time", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
+    const member = crewMember("mike", "1-1");
+    const preview = createMovePreview(member, "1-3", tiles);
+    const started = startCrewMove(member, preview, tiles, 0);
+
+    const afterFirstStep = advanceCrewMoveAction(started.member, started.action, tiles, [], 60);
+
+    expect(afterFirstStep.member.currentTile).toBe("1-2");
+    expect(afterFirstStep.action).toMatchObject({
+      status: "active",
+      progress_seconds: 60,
+      action_params: {
+        route_step_index: 1,
+        step_started_at: 60,
+        step_finish_time: 150,
+      },
+    });
+    expect(afterFirstStep.arrived).toBe(false);
+
+    const arrived = advanceCrewMoveAction(afterFirstStep.member, afterFirstStep.action, tiles, afterFirstStep.logs, 150);
+    expect(arrived.member.currentTile).toBe("1-3");
+    expect(arrived.member.activeAction).toBeUndefined();
+    expect(arrived.action).toMatchObject({
+      status: "completed",
+      progress_seconds: 150,
+    });
+    expect(arrived.arrived).toBe(true);
+  });
+
+  it("applies a 1.5x step duration multiplier to movement previews and crew_actions", () => {
     const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
     const healthy = crewMember("mike", "1-1");
     const wounded = { ...healthy, conditions: ["wounded"] };
@@ -207,12 +274,12 @@ describe("wounded movement timing", () => {
     expect(woundedPreview.totalDurationSeconds).toBe(healthyPreview.totalDurationSeconds * 1.5);
 
     const moving = startCrewMove(wounded, woundedPreview, tiles, 0);
-    expect(moving.activeAction?.stepFinishTime).toBe(90);
-    expect(moving.activeAction?.finishTime).toBe(225);
+    expect(moving.action.action_params.step_finish_time).toBe(90);
+    expect(moving.action.ends_at).toBe(225);
 
-    const afterFirstStep = advanceCrewMovement(moving, tiles, [], 90).member;
-    expect(afterFirstStep.currentTile).toBe("1-2");
-    expect(afterFirstStep.activeAction?.stepFinishTime).toBe(225);
+    const afterFirstStep = advanceCrewMoveAction(moving.member, moving.action, tiles, [], 90);
+    expect(afterFirstStep.member.currentTile).toBe("1-2");
+    expect(afterFirstStep.action.action_params.step_finish_time).toBe(225);
   });
 
   it("does not change non-move action durations", () => {

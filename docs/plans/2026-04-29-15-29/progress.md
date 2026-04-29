@@ -23,9 +23,9 @@ source:
 | 7 | T007 | 建立 crew_actions 派生视图模型 | completed | 1 |
 | 8 | T008 | 强化阻塞与单主行动约束 | completed | 1 |
 | 9 | T009 | 迁移时间推进到 crew_actions | completed | 1 |
-| 10 | T010 | 迁移移动行动到 crew_actions | pending | 0 |
-| 11 | T011 | 迁移停止与待命行动到事件 runtime | pending | 0 |
-| 12 | T012 | 迁移调查当前区域到地点事件入口 | pending | 0 |
+| 10 | T010 | 迁移移动行动到 crew_actions | completed | 1 |
+| 11 | T011 | 迁移停止与待命行动到事件 runtime | completed | 1 |
+| 12 | T012 | 迁移调查当前区域到地点事件入口 | completed | 1 |
 | 13 | T013 | 重构基础行动 content 与 schema | pending | 0 |
 | 14 | T014 | 删除 legacy dispatch 与旧行动入口 | pending | 0 |
 | 15 | T015 | 建立地点剧情动作事件样例 | pending | 0 |
@@ -112,3 +112,24 @@ source:
 - 完成时间: 2026-04-29 17:32
 - 尝试次数: 1
 - Monkey summary: 将 `settleGameTime` 的到期行动结算切到 active `crew_actions`，完成后标记 action completed、清理旧 activeAction 显示并发出 `action_complete` trigger；objective completion 测试改为基于 `crew_actions`。调度层修复了 `event_waiting` action completion 保留 unavailable 的集成问题。验证：`npm --prefix apps/pc-client run test -- App.test.tsx` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T010: 迁移移动行动到 crew_actions
+- 状态: completed
+- 开始时间: 2026-04-29 17:33
+- 完成时间: 2026-04-29 17:42
+- 尝试次数: 1
+- Monkey summary: 移动确认创建 `CrewActionState` 并写入 `crew_actions`，移动路径、step timing 与 route index 存入 action params；时间推进通过 active `crew_actions` 推进移动、更新 crew tile / map discovery，抵达后完成 action 并发出 `arrival` trigger。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T011: 迁移停止与待命行动到事件 runtime
+- 状态: completed
+- 开始时间: 2026-04-29 17:33
+- 完成时间: 2026-04-29 17:42
+- 尝试次数: 1
+- Monkey summary: 停止/待命迁移到 `crew_actions` runtime；stop 中断原 active action 并创建默认 10 秒 stop action，standby 创建并完成 standby action 并触发 `idle_time`，`cancel_crew_action` 会释放 crew runtime 指针。验证：合并态 `npm run validate:content`、`npm --prefix apps/pc-client run lint`、`npm --prefix apps/pc-client run test` 通过。
+
+### T012: 迁移调查当前区域到地点事件入口
+- 状态: completed
+- 开始时间: 2026-04-29 17:33
+- 完成时间: 2026-04-29 17:42
+- 尝试次数: 1
+- Monkey summary: “调查当前区域”从 `legacy.survey` 迁移到结构化地点事件入口，按当前地块可见 map objects 尝试事件候选；无可触发调查事件时显示中性空状态，不生成旧通用调查结果。验证：合并态 `npm run validate:content`、`npm --prefix apps/pc-client run lint`、`npm --prefix apps/pc-client run test` 通过。

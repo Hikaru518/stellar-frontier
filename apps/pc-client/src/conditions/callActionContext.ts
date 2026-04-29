@@ -44,9 +44,18 @@ export function buildCallActionContext({
   const synthesisedCrewActions: Record<string, { id: string; status: string; crew_id: string }> = {
     ...((gameState.crew_actions as Record<string, { id: string; status: string; crew_id: string }>) ?? {}),
   };
+  const activeRuntimeActionByCrew = new Map(
+    Object.values(synthesisedCrewActions)
+      .filter((action) => action.status === "active")
+      .map((action) => [action.crew_id, action]),
+  );
   const bridgedCrew = gameState.crew.map((entry) => {
     const syntheticActionId = `__call_view_idle__:${entry.id}`;
     if (!entry.activeAction) {
+      const activeRuntimeAction = activeRuntimeActionByCrew.get(entry.id);
+      if (activeRuntimeAction) {
+        return { ...entry, current_action_id: activeRuntimeAction.id };
+      }
       synthesisedCrewActions[syntheticActionId] = {
         id: syntheticActionId,
         status: "completed",

@@ -485,16 +485,49 @@ function updateCrewAction(
     return fail(context.state, effect, "missing_target", `${path}.params.action_id`, `Crew action ${actionId ?? "<missing>"} does not exist.`);
   }
 
+  const nextAction = { ...action, ...patch };
+  const nextCrew = releaseCrewActionPointer(context.state.crew, action, actionId, nextAction.status);
+
   return {
     state: {
       ...context.state,
+      crew: nextCrew,
       crew_actions: {
         ...context.state.crew_actions,
-        [actionId]: { ...action, ...patch },
+        [actionId]: nextAction,
       },
     },
     errors: [],
   };
+}
+
+function releaseCrewActionPointer(
+  crew: EffectGameState["crew"],
+  action: CrewActionState,
+  actionId: Id,
+  status: CrewActionState["status"],
+): EffectGameState["crew"] {
+  if (!isTerminalCrewActionStatus(status)) {
+    return crew;
+  }
+
+  const crewState = crew[action.crew_id];
+  if (!crewState || crewState.current_action_id !== actionId) {
+    return crew;
+  }
+
+  return {
+    ...crew,
+    [action.crew_id]: {
+      ...crewState,
+      current_action_id: null,
+      status: "idle",
+    },
+  };
+}
+
+function isTerminalCrewActionStatus(status: CrewActionState["status"]) {
+  return status === "completed" || status === "failed" || status === "interrupted" || status === "cancelled";
 }
 
 function updateTileField(

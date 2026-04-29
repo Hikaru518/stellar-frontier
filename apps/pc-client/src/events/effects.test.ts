@@ -197,6 +197,35 @@ describe("structured effect executor", () => {
     expect(result.state.crew_actions.act_move).toBeUndefined();
   });
 
+  it("cancels an active crew action and releases the crew runtime pointer", () => {
+    const state = createState();
+    const busyState: EffectGameState = {
+      ...state,
+      crew: {
+        ...state.crew,
+        amy: {
+          ...state.crew.amy,
+          status: "acting",
+          current_action_id: "act_survey",
+        },
+      },
+      crew_actions: {
+        act_survey: crewAction("act_survey", "survey"),
+      },
+    };
+
+    const result = executeEffects(
+      [effect("cancel", "cancel_crew_action", { type: "primary_crew" }, {})],
+      createContext(busyState),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.errors).toEqual([]);
+    expect(result.state.crew_actions.act_survey).toMatchObject({ status: "cancelled" });
+    expect(result.state.crew.amy.current_action_id).toBeNull();
+    expect(result.state.crew.amy.status).toBe("idle");
+  });
+
   it("calls only registered effect handlers and returns clear handler errors", () => {
     const state = createState();
     const context = createContext(state, {

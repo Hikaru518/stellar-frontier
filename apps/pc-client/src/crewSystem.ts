@@ -55,6 +55,19 @@ interface MovementSettlement {
   changed: boolean;
 }
 
+export interface StartedCrewMove {
+  member: CrewMember;
+  action: CrewActionState;
+}
+
+export interface MoveActionSettlement {
+  member: CrewMember;
+  action: CrewActionState;
+  logs: SystemLog[];
+  changed: boolean;
+  arrived: boolean;
+}
+
 export function createMovePreview(member: CrewMember, targetTileId: string, tiles: MapTile[]): MovePreview {
   const fromTileId = member.currentTile;
   const targetTile = getTile(tiles, targetTileId);
@@ -106,37 +119,78 @@ export function createMovePreview(member: CrewMember, targetTileId: string, tile
   };
 }
 
-export function startCrewMove(member: CrewMember, preview: MovePreview, tiles: MapTile[], elapsedGameSeconds: number): CrewMember {
+export function startCrewMove(member: CrewMember, preview: MovePreview, tiles: MapTile[], elapsedGameSeconds: number): StartedCrewMove {
   const targetTile = getTile(tiles, preview.targetTileId);
   const firstStep = preview.steps[0];
 
   if (!preview.canMove || !targetTile || !firstStep) {
-    return member;
+    return {
+      member,
+      action: createIdleMoveAction(member, preview, elapsedGameSeconds),
+    };
   }
 
-  const action: ActiveAction = {
+  const action: CrewActionState = {
     id: `${member.id}-move-${preview.targetTileId}-${elapsedGameSeconds}`,
-    actionType: "move",
-    status: "inProgress",
-    startTime: elapsedGameSeconds,
-    durationSeconds: preview.totalDurationSeconds,
-    finishTime: elapsedGameSeconds + preview.totalDurationSeconds,
-    fromTile: preview.fromTileId,
-    targetTile: preview.targetTileId,
-    route: preview.route,
-    routeStepIndex: 0,
-    stepStartedAt: elapsedGameSeconds,
-    stepFinishTime: elapsedGameSeconds + firstStep.durationSeconds,
-    totalDurationSeconds: preview.totalDurationSeconds,
+    crew_id: member.id,
+    type: "move",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: preview.fromTileId,
+    to_tile_id: preview.targetTileId,
+    target_tile_id: preview.targetTileId,
+    path_tile_ids: preview.route,
+    started_at: elapsedGameSeconds,
+    ends_at: elapsedGameSeconds + preview.totalDurationSeconds,
+    progress_seconds: 0,
+    duration_seconds: preview.totalDurationSeconds,
+    action_params: {
+      route_step_index: 0,
+      step_started_at: elapsedGameSeconds,
+      step_finish_time: elapsedGameSeconds + firstStep.durationSeconds,
+      step_durations_seconds: preview.steps.map((step) => step.durationSeconds),
+    },
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
   };
 
   return {
-    ...member,
-    status: `位于 ${member.coord}，正在前往 ${targetTile.coord}，剩余 ${formatDuration(preview.totalDurationSeconds)}。`,
-    statusTone: "muted" as Tone,
-    activeAction: action,
-    hasIncoming: false,
-    lastContactTime: elapsedGameSeconds,
+    member: {
+      ...member,
+      status: "待命中。",
+      statusTone: "neutral" as Tone,
+      activeAction: undefined,
+      hasIncoming: false,
+      lastContactTime: elapsedGameSeconds,
+    },
+    action,
+  };
+}
+
+function createIdleMoveAction(member: CrewMember, preview: MovePreview, elapsedGameSeconds: number): CrewActionState {
+  return {
+    id: `${member.id}-move-${preview.targetTileId}-${elapsedGameSeconds}`,
+    crew_id: member.id,
+    type: "move",
+    status: "failed",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: preview.fromTileId,
+    to_tile_id: preview.targetTileId,
+    target_tile_id: preview.targetTileId,
+    path_tile_ids: preview.route,
+    started_at: elapsedGameSeconds,
+    ends_at: elapsedGameSeconds,
+    progress_seconds: 0,
+    duration_seconds: 0,
+    action_params: {},
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
   };
 }
 
@@ -336,6 +390,102 @@ export function advanceCrewMovement(
   return { member: nextMember, logs: nextLogs, changed };
 }
 
+export function advanceCrewMoveAction(
+  member: CrewMember,
+  action: CrewActionState,
+  tiles: MapTile[],
+  logs: SystemLog[],
+  elapsedGameSeconds: number,
+): MoveActionSettlement {
+  if (action.type !== "move" || action.status !== "active") {
+    return { member, action, logs, changed: false, arrived: false };
+  }
+
+  let nextMember = member.activeAction?.id === action.id ? { ...member, activeAction: undefined } : member;
+  let nextAction = hydrateMoveCrewActionRoute(nextMember, action, tiles);
+  let nextLogs = logs;
+  const route = nextAction.path_tile_ids ?? [];
+  const stepDurations = getMoveActionStepDurations(nextMember, nextAction, tiles);
+  let routeStepIndex = readNumberParam(nextAction.action_params.route_step_index) ?? inferRouteStepIndex(nextMember.currentTile, route);
+  let stepStartedAt = readNumberParam(nextAction.action_params.step_started_at) ?? nextAction.started_at ?? elapsedGameSeconds;
+  let stepFinishTime = readNumberParam(nextAction.action_params.step_finish_time) ?? stepStartedAt + (stepDurations[routeStepIndex] ?? 0);
+  let changed = nextMember !== member || nextAction !== action;
+  let arrived = false;
+
+  if (
+    nextAction.ends_at === null ||
+    nextAction.ends_at === undefined ||
+    readNumberParam(nextAction.action_params.route_step_index) === undefined ||
+    readNumberParam(nextAction.action_params.step_started_at) === undefined ||
+    readNumberParam(nextAction.action_params.step_finish_time) === undefined ||
+    readNumberArray(nextAction.action_params.step_durations_seconds).length !== route.length
+  ) {
+    nextAction = {
+      ...nextAction,
+      ends_at: nextAction.ends_at ?? (nextAction.started_at ?? stepStartedAt) + nextAction.duration_seconds,
+      action_params: {
+        ...nextAction.action_params,
+        route_step_index: routeStepIndex,
+        step_started_at: stepStartedAt,
+        step_finish_time: stepFinishTime,
+        step_durations_seconds: stepDurations,
+      },
+    };
+    changed = true;
+  }
+
+  while (routeStepIndex < route.length && elapsedGameSeconds >= stepFinishTime) {
+    const arrivedTileId = route[routeStepIndex];
+    const arrivedTile = getTile(tiles, arrivedTileId);
+    routeStepIndex += 1;
+    changed = true;
+
+    nextMember = updateCrewTile(nextMember, arrivedTileId, arrivedTile);
+
+    if (routeStepIndex >= route.length) {
+      const targetCoord = arrivedTile?.coord ?? arrivedTileId;
+      nextMember = {
+        ...nextMember,
+        status: `位于 ${targetCoord}，待命中。`,
+        statusTone: "neutral" as Tone,
+        activeAction: undefined,
+      };
+      nextAction = {
+        ...nextAction,
+        status: "completed",
+        ends_at: nextAction.ends_at ?? elapsedGameSeconds,
+        progress_seconds: nextAction.duration_seconds,
+        action_params: {
+          ...nextAction.action_params,
+          route_step_index: routeStepIndex,
+          step_started_at: stepStartedAt,
+          step_finish_time: stepFinishTime,
+          step_durations_seconds: stepDurations,
+        },
+      };
+      nextLogs = appendMovementLog(nextLogs, `${nextMember.name} 抵达 ${targetCoord}，移动行动完成。`, "neutral", elapsedGameSeconds);
+      arrived = true;
+      break;
+    }
+
+    stepStartedAt = stepFinishTime;
+    stepFinishTime = stepStartedAt + (stepDurations[routeStepIndex] ?? getMoveStepDuration(nextMember, getTile(tiles, route[routeStepIndex])));
+    nextAction = {
+      ...nextAction,
+      progress_seconds: Math.min(nextAction.duration_seconds, Math.max(0, elapsedGameSeconds - (nextAction.started_at ?? elapsedGameSeconds))),
+      action_params: {
+        ...nextAction.action_params,
+        route_step_index: routeStepIndex,
+        step_started_at: stepStartedAt,
+        step_finish_time: stepFinishTime,
+        step_durations_seconds: stepDurations,
+      },
+    };
+  }
+
+  return { member: nextMember, action: nextAction, logs: nextLogs, changed, arrived };
+}
+
 export function hydrateMoveActionRoute(member: CrewMember, tiles: MapTile[], _elapsedGameSeconds: number): CrewMember {
   const action = member.activeAction;
   if (action?.actionType !== "move" || action.status !== "inProgress" || !action.targetTile) {
@@ -363,6 +513,44 @@ export function hydrateMoveActionRoute(member: CrewMember, tiles: MapTile[], _el
       routeStepIndex: 0,
       stepStartedAt,
       stepFinishTime: stepStartedAt + getMoveStepDuration(member, firstStep),
+    },
+  };
+}
+
+function hydrateMoveCrewActionRoute(member: CrewMember, action: CrewActionState, tiles: MapTile[]): CrewActionState {
+  if (action.type !== "move" || action.status !== "active") {
+    return action;
+  }
+
+  const targetTileId = action.target_tile_id ?? action.to_tile_id;
+  if (!targetTileId) {
+    return action;
+  }
+
+  const route = action.path_tile_ids ?? [];
+  const shouldHydrate = route.length === 0 || (route.length === 1 && route[0] === targetTileId && !isAdjacentTile(member.currentTile, targetTileId, tiles));
+  if (!shouldHydrate) {
+    return action;
+  }
+
+  const hydratedRoute = findRoute(tiles, member.currentTile, targetTileId);
+  if (!hydratedRoute.length) {
+    return action;
+  }
+
+  const stepDurations = hydratedRoute.map((tileId) => getMoveStepDuration(member, getTile(tiles, tileId)));
+  const stepStartedAt = readNumberParam(action.action_params.step_started_at) ?? action.started_at ?? 0;
+  return {
+    ...action,
+    path_tile_ids: hydratedRoute,
+    duration_seconds: action.duration_seconds || stepDurations.reduce((total, duration) => total + duration, 0),
+    ends_at: action.ends_at ?? stepStartedAt + stepDurations.reduce((total, duration) => total + duration, 0),
+    action_params: {
+      ...action.action_params,
+      route_step_index: 0,
+      step_started_at: stepStartedAt,
+      step_finish_time: stepStartedAt + (stepDurations[0] ?? 0),
+      step_durations_seconds: stepDurations,
     },
   };
 }
@@ -510,6 +698,34 @@ function getMoveStepDuration(member: CrewMember, tile?: MapTile) {
   return member.conditions.includes("wounded") ? baseDuration * 1.5 : baseDuration;
 }
 
+function getMoveActionStepDurations(member: CrewMember, action: CrewActionState, tiles: MapTile[]) {
+  const route = action.path_tile_ids ?? [];
+  const configured = readNumberArray(action.action_params.step_durations_seconds);
+  if (configured.length === route.length) {
+    return configured;
+  }
+
+  if (route.length > 0 && action.duration_seconds > 0 && action.source === "event_action_request") {
+    const perStepDuration = action.duration_seconds / route.length;
+    return route.map(() => perStepDuration);
+  }
+
+  return route.map((tileId) => getMoveStepDuration(member, getTile(tiles, tileId)));
+}
+
+function inferRouteStepIndex(currentTileId: string, route: string[]) {
+  const currentIndex = route.indexOf(currentTileId);
+  return currentIndex >= 0 ? currentIndex + 1 : 0;
+}
+
+function readNumberParam(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readNumberArray(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => typeof item === "number" && Number.isFinite(item)) : [];
+}
+
 function isTilePassable(tile: MapTile) {
   return !tile.terrain.includes("不可通行");
 }
@@ -568,6 +784,9 @@ function toActiveActionType(type: CrewActionState["type"]): ActiveAction["action
     case "gather":
     case "build":
       return type;
+    case "standby":
+    case "stop":
+      return "standby";
     case "event_waiting":
     case "guarding_event_site":
     case "extract":
@@ -660,6 +879,10 @@ function getCrewActionTitle(action: CrewActionState | undefined, tiles: MapTile[
       return "采集资源";
     case "build":
       return "建设 / 安装";
+    case "standby":
+      return "原地待命";
+    case "stop":
+      return "停止当前行动";
     case "extract":
       return "撤离";
     case "return_to_base":
@@ -684,6 +907,10 @@ function getCrewActionStatusText(action: CrewActionState, tiles: MapTile[], memb
       return `正在采集 ${targetLabel} 的资源。`;
     case "build":
       return `正在处理 ${targetLabel} 的建设任务。`;
+    case "standby":
+      return "正在原地待命。";
+    case "stop":
+      return "正在停止当前行动。";
     case "extract":
       return "正在撤离。";
     case "return_to_base":

@@ -163,7 +163,9 @@ describe("buildCallView", () => {
     const view = buildCallView({ member: createMember(), tile, gameState });
 
     expect(view.groups[0].title).toBe("基础行动");
-    expect(view.groups[0].actions.map((action) => action.id)).toEqual(universalActions.map((action) => action.id));
+    expect(view.groups[0].actions.map((action) => action.id)).toEqual(
+      universalActions.filter((action) => action.id !== "universal:stop").map((action) => action.id),
+    );
 
     const blackPineGroup = view.groups.find((group) => group.title === blackPine!.name);
     expect(blackPineGroup).toBeDefined();

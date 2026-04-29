@@ -41,4 +41,10 @@ describe("mapObjects content", () => {
       expect(action.category).toBe("universal");
     }
   });
+
+  it("does not route current-area survey through the legacy survey event id", () => {
+    const survey = universalActions.find((action) => action.id === "universal:survey");
+    expect(survey).toBeDefined();
+    expect(survey?.event_id).not.toBe("legacy.survey");
+  });
 });
