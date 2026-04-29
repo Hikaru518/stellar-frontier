@@ -6,7 +6,7 @@ import { createMovePreview, deriveCrewActionViewModel, formatMoveRoute, type Cre
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
 import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
 import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
-import { formatDuration, getRemainingSeconds } from "../timeSystem";
+import { formatDuration } from "../timeSystem";
 
 interface MapPageProps {
   tiles: MapTile[];
@@ -364,11 +364,7 @@ function crewTiming(
     .join(" / ");
 }
 
-function memberTiming(member: CrewMember, actionView: CrewActionViewModel, elapsedGameSeconds: number) {
-  if (member.emergencyEvent && !member.emergencyEvent.settled) {
-    return `紧急剩余 ${formatDuration(getRemainingSeconds(member.emergencyEvent.deadlineTime, elapsedGameSeconds))}`;
-  }
-
+function memberTiming(_member: CrewMember, actionView: CrewActionViewModel, _elapsedGameSeconds: number) {
   return actionView.timingText;
 }
 

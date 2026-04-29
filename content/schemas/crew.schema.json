@@ -168,50 +168,6 @@
         }
       }
     },
-    "activeAction": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["actionType", "status", "targetTile", "durationSeconds"],
-      "properties": {
-        "actionType": {
-          "type": "string",
-          "enum": ["move", "gather", "build", "survey", "standby", "event"]
-        },
-        "status": {
-          "type": "string",
-          "enum": ["pending", "inProgress", "completed", "interrupted", "failed"]
-        },
-        "targetTile": {
-          "type": "string",
-          "pattern": "^[0-9]+-[0-9]+$"
-        },
-        "durationSeconds": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "resourceId": {
-          "$ref": "#/$defs/id"
-        }
-      }
-    },
-    "emergencyEvent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["eventId", "dangerStage", "deadlineSeconds"],
-      "properties": {
-        "eventId": {
-          "$ref": "#/$defs/id"
-        },
-        "dangerStage": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "deadlineSeconds": {
-          "type": "integer",
-          "minimum": 1
-        }
-      }
-    },
     "crewMember": {
       "type": "object",
       "additionalProperties": false,
@@ -249,7 +205,7 @@
         },
         "status": {
           "type": "string",
-          "enum": ["idle", "moving", "working", "inEvent", "lost", "dead"]
+          "enum": ["idle", "moving", "working", "lost", "dead"]
         },
         "statusTone": {
           "type": "string",
@@ -302,12 +258,6 @@
         "lastContactTime": {
           "type": "integer",
           "minimum": 0
-        },
-        "activeAction": {
-          "$ref": "#/$defs/activeAction"
-        },
-        "emergencyEvent": {
-          "$ref": "#/$defs/emergencyEvent"
         },
         "unavailable": {
           "type": "boolean"

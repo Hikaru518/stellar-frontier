@@ -102,4 +102,15 @@ describe("crew content exports", () => {
       expect("summary" in member).toBe(false);
     }
   });
+
+  it("does not expose removed crew emergency fields", async () => {
+    const { crewDefinitions } = await import("./contentData");
+    const removedEmergencyField = ["emergency", "Event"].join("");
+    const removedEventStatus = ["in", "Event"].join("");
+
+    for (const member of crewDefinitions) {
+      expect(removedEmergencyField in member).toBe(false);
+      expect(member.status).not.toBe(removedEventStatus);
+    }
+  });
 });

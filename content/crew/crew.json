@@ -67,21 +67,15 @@
         }
       ],
       "canCommunicate": true,
-      "lastContactTime": 0,
-      "activeAction": {
-        "actionType": "move",
-        "status": "inProgress",
-        "targetTile": "2-1",
-        "durationSeconds": 60
-      }
+      "lastContactTime": 0
     },
     {
       "crewId": "amy",
       "name": "Amy",
       "role": "千金大小姐",
       "currentTile": "2-3",
-      "status": "inEvent",
-      "statusTone": "danger",
+      "status": "idle",
+      "statusTone": "neutral",
       "attributes": {
         "physical": 2,
         "agility": 3,
@@ -126,12 +120,7 @@
         }
       ],
       "canCommunicate": true,
-      "lastContactTime": 0,
-      "emergencyEvent": {
-        "eventId": "emergency_forest_beast",
-        "dangerStage": 0,
-        "deadlineSeconds": 120
-      }
+      "lastContactTime": 0
     },
     {
       "crewId": "garry",
@@ -192,14 +181,7 @@
         }
       ],
       "canCommunicate": true,
-      "lastContactTime": 0,
-      "activeAction": {
-        "actionType": "gather",
-        "status": "inProgress",
-        "targetTile": "3-3",
-        "durationSeconds": 300,
-        "resourceId": "iron_ore"
-      }
+      "lastContactTime": 0
     }
   ]
 }

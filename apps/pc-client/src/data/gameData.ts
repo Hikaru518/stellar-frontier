@@ -58,17 +58,6 @@ export interface ActiveAction {
   params?: Record<string, unknown>;
 }
 
-export interface EmergencyEvent {
-  instanceId: string;
-  eventId: string;
-  createdAt: number;
-  callReceivedTime: number;
-  dangerStage: number;
-  nextEscalationTime: number;
-  deadlineTime: number;
-  settled: boolean;
-}
-
 export interface CrewMember {
   id: CrewId;
   name: string;
@@ -91,7 +80,6 @@ export interface CrewMember {
   canCommunicate: boolean;
   lastContactTime: number;
   activeAction?: ActiveAction;
-  emergencyEvent?: EmergencyEvent;
   unavailable?: boolean;
 }
 
@@ -288,7 +276,7 @@ export const initialLogs: SystemLog[] = [
 
 export const facilities: Facility[] = [
   { id: "window", label: "外部观察", subLabel: "占位入口", variant: "large" },
-  { id: "station", label: "通讯台", subLabel: "1 条来电 · Amy" },
+  { id: "station", label: "通讯台", subLabel: "查看通讯录" },
   { id: "radar", label: "卫星雷达", subLabel: "打开地图" },
   { id: "console", label: "中控台", subLabel: "资源 / 状态 / 统计" },
   { id: "research", label: "研究台", subLabel: "未供电", variant: "locked" },
@@ -307,8 +295,6 @@ export const garryActions: ActionOption[] = [
 ];
 
 function createInitialCrewMember(member: CrewDefinition): CrewMember {
-  const activeAction = member.activeAction ? createInitialAction(member, member.activeAction) : undefined;
-
   return {
     id: member.crewId,
     name: member.name,
@@ -327,10 +313,9 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     expertise: member.expertise,
     diaryEntries: member.diaryEntries,
     conditions: [],
-    hasIncoming: Boolean(member.emergencyEvent),
+    hasIncoming: false,
     canCommunicate: member.canCommunicate,
     lastContactTime: member.lastContactTime,
-    activeAction,
     unavailable: member.unavailable,
   };
 }
@@ -346,34 +331,12 @@ function getMapTileDisplayCoord(tileId: string) {
   return `(${coord.displayX},${coord.displayY})`;
 }
 
-function createInitialAction(member: CrewDefinition, action: NonNullable<CrewDefinition["activeAction"]>): ActiveAction {
-  return {
-    id: `${member.crewId}-${action.actionType}-${action.targetTile}`,
-    actionType: action.actionType,
-    status: action.status,
-    startTime: 0,
-    durationSeconds: action.durationSeconds,
-    finishTime: action.durationSeconds,
-    fromTile: member.currentTile,
-    targetTile: action.targetTile,
-    route: action.actionType === "move" ? [action.targetTile] : undefined,
-    routeStepIndex: action.actionType === "move" ? 0 : undefined,
-    stepStartedAt: action.actionType === "move" ? 0 : undefined,
-    stepFinishTime: action.actionType === "move" ? action.durationSeconds : undefined,
-    totalDurationSeconds: action.actionType === "move" ? action.durationSeconds : undefined,
-    resource: action.resourceId,
-    perRoundYield: action.resourceId === "iron_ore" ? 5 : undefined,
-  };
-}
-
 function getInitialStatus(member: CrewDefinition) {
   switch (member.status) {
     case "moving":
       return "正在前往目标地点，行进中。";
     case "working":
-      return member.activeAction?.actionType === "gather" ? "在矿床，采矿中。" : "工作中。";
-    case "inEvent":
-      return "遭遇紧急事件，等待指令。";
+      return "工作中。";
     case "lost":
       return "失联。";
     case "dead":

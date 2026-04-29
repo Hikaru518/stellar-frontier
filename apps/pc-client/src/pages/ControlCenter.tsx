@@ -33,8 +33,9 @@ export function ControlCenter({
 }: ControlCenterProps) {
   const [modal, setModal] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
-  const incomingCount = crew.filter((member) => member.hasIncoming).length;
-  const amy = crew.find((member) => member.id === "amy");
+  const incomingCrew = crew.filter((member) => member.hasIncoming);
+  const incomingCount = incomingCrew.length;
+  const incomingNames = incomingCrew.map((member) => member.name).join("、");
   const report = reportId ? map.investigationReportsById[reportId] : undefined;
   const visibleEventLogs = eventLogs
     .filter((log) => log.visibility === "player_visible")
@@ -82,7 +83,7 @@ export function ControlCenter({
               ["能源", resources.energy],
               ["铁矿", resources.iron],
               ["基地完整度", `${resources.baseIntegrity}%`],
-              ["通讯提示", incomingCount ? `${amy?.name ?? "未知"} 正在请求接入` : "暂无新的通讯请求。"],
+              ["通讯提示", incomingCount ? `${incomingNames || "未知队员"} 正在请求接入` : "暂无新的通讯请求。"],
             ]}
           />
         </Panel>
@@ -97,7 +98,7 @@ export function ControlCenter({
             >
               <span className="facility-label">{facility.label}</span>
               <span className={facility.id === "station" && incomingCount ? "facility-alert" : "facility-sub"}>
-                {facility.id === "station" && incomingCount ? `${incomingCount} 条来电 · Amy` : facility.subLabel}
+                {facility.id === "station" && incomingCount ? `${incomingCount} 条来电 · ${incomingNames || "未知队员"}` : facility.subLabel}
               </span>
             </button>
           ))}

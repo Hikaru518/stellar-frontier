@@ -12,12 +12,7 @@ import {
 } from "./generated/eventContentManifest";
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
-export type CrewStatus = "idle" | "moving" | "working" | "inEvent" | "lost" | "dead";
-export type EventType = "arrival" | "survey" | "idle" | "gather" | "build" | "emergency" | "story" | "reminder";
-export type EventScope = "crew" | "tile" | "global";
-export type TriggerSource = "arrival" | "surveyComplete" | "gatherComplete" | "buildComplete" | "idleTime" | "callChoice";
-export type ActionType = "move" | "gather" | "build" | "survey" | "standby" | "event";
-export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
+export type CrewStatus = "idle" | "moving" | "working" | "lost" | "dead";
 export type DiaryAvailability = "delivered" | "pending" | "lostBlocked" | "recovered";
 export type MapVisibility = "onDiscovered" | "onInvestigated" | "hidden";
 export type MapRadiationLevel = "none" | "low" | "medium" | "high" | "critical";
@@ -62,78 +57,6 @@ export interface DiaryEntryDefinition {
   availability: DiaryAvailability;
 }
 
-export interface EventEffectDefinition {
-  type:
-    | "addResource"
-    | "removeResource"
-    | "discoverResource"
-    | "updateTile"
-    | "updateCrewStatus"
-    | "addCrewCondition"
-    | "startEmergency"
-    | "addLog"
-    | "addItem"
-    | "useItemByTag";
-  resource?: string;
-  itemId?: string;
-  itemTag?: string;
-  target?: "crewInventory" | "baseInventory";
-  amount?: number;
-  quality?: string;
-  field?: string;
-  value?: unknown;
-  status?: CrewStatus;
-  condition?: string;
-  text?: string;
-  tone?: Tone;
-}
-
-export interface EventChoiceDefinition {
-  choiceId: string;
-  text: string;
-  hint?: string;
-  tone?: Tone;
-  baseSuccessChance?: number;
-  dangerStageModifier?: number;
-  durationSeconds?: number;
-  unavailableHint?: string;
-  successEffects?: EventEffectDefinition[];
-  failureEffects?: EventEffectDefinition[];
-  effects?: EventEffectDefinition[];
-}
-
-export interface EventDefinition {
-  eventId: string;
-  title: string;
-  type: EventType;
-  priority: number;
-  scope: EventScope;
-  repeatable: boolean;
-  cooldownSeconds: number;
-  trigger: {
-    source: TriggerSource;
-    tileTypes?: string[];
-    actionTypes?: ActionType[];
-    minIdleSeconds?: number;
-    surveyLevel?: "quick" | "standard" | "deep";
-    choiceId?: string;
-  };
-  conditions: string[];
-  baseChance: number;
-  modifiers: Array<{ condition: string; chance: number }>;
-  durationSeconds: number;
-  effects: EventEffectDefinition[];
-  choices: EventChoiceDefinition[];
-  emergency?: {
-    firstWaitSeconds: number;
-    escalationIntervalSeconds: number;
-    deadlineSeconds: number;
-    autoResolveResult: string;
-  } | null;
-  resultText: Record<string, string>;
-  tags: string[];
-}
-
 export type CrewDefinitionId = "mike" | "amy" | "garry";
 
 export interface CrewDefinition {
@@ -153,18 +76,6 @@ export interface CrewDefinition {
   diaryEntries: DiaryEntryDefinition[];
   canCommunicate: boolean;
   lastContactTime: number;
-  activeAction?: {
-    actionType: ActionType;
-    status: ActionStatus;
-    targetTile: string;
-    durationSeconds: number;
-    resourceId?: string;
-  };
-  emergencyEvent?: {
-    eventId: string;
-    dangerStage: number;
-    deadlineSeconds: number;
-  };
   unavailable?: boolean;
 }
 

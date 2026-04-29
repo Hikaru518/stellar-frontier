@@ -19,6 +19,21 @@ describe("mapObjects content", () => {
     expect(mainlineObjects.length).toBeGreaterThan(0);
   });
 
+  it("does not load removed migration-only object content", () => {
+    const removedObjectIds = [
+      "broken-relay",
+      "deep-rift-signal",
+      "echo-cave",
+      "intermittent-signal",
+      "iron-mine-two",
+      "mercury-thermometer-cache",
+      "reed-waterline",
+      "scanner-residue",
+      "shallow-lake",
+    ];
+    expect(mapObjectDefinitions.map((definition) => definition.id)).not.toEqual(expect.arrayContaining(removedObjectIds));
+  });
+
   it("indexes every loaded definition by id", () => {
     expect(mapObjectDefinitionById.size).toBe(mapObjectDefinitions.length);
     const sampleId = mapObjectDefinitions[0]?.id;
@@ -122,22 +137,22 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("does not route current-area survey through a retired event id", () => {
+  it("does not route current-area survey through a removed event id", () => {
     const survey = universalActions.find((action) => action.id === "universal:survey");
     expect(survey).toBeDefined();
-    expect(survey?.event_id).not.toBe(retiredEventId("survey"));
+    expect(survey?.event_id).not.toBe(removedEventId("survey"));
   });
 
-  it("does not route any universal action through a retired event id", () => {
-    expect(universalActions.every((action) => !isRetiredEventId(action.event_id))).toBe(true);
+  it("does not route any universal action through a removed event id", () => {
+    expect(universalActions.every((action) => !isRemovedEventId(action.event_id))).toBe(true);
   });
 
-  it("does not route any map-object action through a retired event id", () => {
+  it("does not route any map-object action through a removed event id", () => {
     const eventIds = mapObjectDefinitions.flatMap((definition) => definition.actions.map((action) => action.event_id));
-    expect(eventIds.every((eventId) => !isRetiredEventId(eventId))).toBe(true);
+    expect(eventIds.every((eventId) => !isRemovedEventId(eventId))).toBe(true);
   });
 
-  it("rejects retired universal action ids and removed event ids at the schema boundary", () => {
+  it("rejects removed universal action ids and removed event ids at the schema boundary", () => {
     const ajv = new Ajv2020({ allErrors: true });
     const validate = ajv.compile(universalActionsSchema);
 
@@ -163,7 +178,7 @@ describe("mapObjects content", () => {
             category: "universal",
             label: "移动到指定区域",
             conditions: [],
-            event_id: retiredEventId("move"),
+            event_id: removedEventId("move"),
           },
         ],
       }),
@@ -171,12 +186,12 @@ describe("mapObjects content", () => {
   });
 });
 
-function retiredEventId(verb: string) {
+function removedEventId(verb: string) {
   return [removedPrefix(), verb].join(".");
 }
 
-function isRetiredEventId(eventId: string) {
-  return eventId.startsWith(`${retiredEventId("")}`);
+function isRemovedEventId(eventId: string) {
+  return eventId.startsWith(`${removedEventId("")}`);
 }
 
 function removedField(suffix: string) {

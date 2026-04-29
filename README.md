@@ -184,7 +184,7 @@ https://<用户名>.github.io/stellar-frontier/
 
 ## 开发说明
 
-- 页面流转和事件结算集中在 `apps/pc-client/src/App.tsx`；具体规则按系统拆分到 `crewSystem.ts` / `eventSystem.ts` / `diarySystem.ts` / `timeSystem.ts`。
+- 页面流转和事件结算集中在 `apps/pc-client/src/App.tsx`；具体规则按系统拆分到 `crewSystem.ts` / `events/*` / `diarySystem.ts` / `timeSystem.ts`。
 - 队员、事件、物品、地图的内容数据位于 `content/*.json`，并在 `apps/pc-client/src/content/contentData.ts` 中加载；改动后请运行 `npm run validate:content`。
 - Rush 由 `rush.json` 固定版本，pnpm 由 `pnpmVersion` 固定版本；不要新增 npm workspace 配置或提交 root `package-lock.json`。
 - 地图页面只负责展示信息；对队员的移动、建设、调查和停止工作等指令通过通讯台和通话页面完成。

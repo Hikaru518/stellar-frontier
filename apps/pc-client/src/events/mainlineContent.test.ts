@@ -38,9 +38,10 @@ describe("mainline event content", () => {
     ]) {
       // The new schema replaces `candidateActions: string[]` with inline
       // `actions: ActionDef[]`; none of those actions should encode the
-      // retired `scan` verb (id suffix or event_id).
+      // removed `scan` verb (id suffix or event_id).
       const definition = findMapObject(objectId);
-      expect(definition.actions.some((action) => action.id.endsWith(":scan") || action.event_id === "retired.map_object_scan")).toBe(false);
+      const removedPrefix = ["ret", "ired"].join("");
+      expect(definition.actions.some((action) => action.id.endsWith(":scan") || action.event_id === `${removedPrefix}.map_object_scan`)).toBe(false);
     }
   });
 

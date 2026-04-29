@@ -51,7 +51,7 @@ test("PS-001 opens basic normal-call actions for Mike, Amy, and Garry", async ({
   }
 });
 
-test("PS-002 keeps retired object actions hidden after current-area survey", async ({ page }) => {
+test("PS-002 keeps removed object actions hidden after current-area survey", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("mike", "5-3", { status: "林地边缘待命。" })],
@@ -122,7 +122,7 @@ test("PS-003 resolves Amy's beast emergency and shows the urgent countdown", asy
   await page.goto("/");
   await page.getByRole("button", { name: /通讯台/ }).click();
   await startNormalCrewCall(page, "Amy，千金大小姐");
-  await page.getByRole("button", { name: "原地待命" }).click();
+  await page.getByRole("button", { name: "调查当前区域" }).click();
   await page.getByRole("button", { name: "结束通话" }).last().click();
 
   const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
@@ -279,26 +279,32 @@ test("moves a crew member along intermediate route steps instead of jumping to t
         coord: "(-3,2)",
         status: "正在前往目标地点，行进中。",
         statusTone: "muted",
-        activeAction: {
-          id: "mike-move-4-5",
-          actionType: "move",
-          status: "inProgress",
-          startTime: 0,
-          durationSeconds: 360,
-          finishTime: 360,
-          fromTile: "2-1",
-          targetTile: "4-5",
-          route: ["4-5"],
-          routeStepIndex: 0,
-          stepStartedAt: 0,
-          stepFinishTime: 360,
-          totalDurationSeconds: 360,
-        },
       }),
     ],
     map: createMapWithDiscoveredTiles("2-1"),
     logs: initialLogs,
     resources: initialResources,
+    crew_actions: {
+      "mike-move-4-5": runtimeCrewAction({
+        id: "mike-move-4-5",
+        crew_id: "mike",
+        source: "player_command",
+        type: "move",
+        from_tile_id: "2-1",
+        to_tile_id: "4-5",
+        target_tile_id: "4-5",
+        path_tile_ids: ["2-2", "2-3", "3-3", "4-3", "4-4", "4-5"],
+        started_at: 0,
+        ends_at: 630,
+        duration_seconds: 630,
+        action_params: {
+          route_step_index: 0,
+          step_started_at: 0,
+          step_finish_time: 60,
+          step_durations_seconds: [60, 120, 90, 120, 60, 180],
+        },
+      }),
+    },
   });
 
   await page.goto("/");
@@ -362,10 +368,10 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await page.getByRole("button", { name: /地图二级菜单/ }).click();
   const grid = page.getByLabel(/雷达可见矩形/);
   await expect(grid.getByRole("button", { name: /坠毁西缘/ })).toBeVisible();
-  await expect(grid.getByRole("button")).toHaveCount(25);
+  await expect(grid.getByRole("button")).toHaveCount(12);
 });
 
-test("does not create the legacy Garry mine anomaly call from the default survey path", async ({ page }) => {
+test("does not create the removed Garry mine anomaly call from the default survey path", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("garry", "3-3", { status: "矿带待命。" })],
@@ -479,15 +485,6 @@ test("completes a seeded assigned objective when its crew action finishes", asyn
         status: "复核火山灰轨迹中。",
         statusTone: "accent",
         hasIncoming: false,
-        activeAction: {
-          id: actionId,
-          actionType: "survey",
-          status: "inProgress",
-          startTime: 0,
-          durationSeconds: 1,
-          finishTime: 1,
-          targetTile: "4-3",
-        },
       },
     ],
     tiles: volcanicTiles(),
@@ -495,6 +492,21 @@ test("completes a seeded assigned objective when its crew action finishes", asyn
     resources: initialResources,
     active_events: eventState.active_events,
     objectives: eventState.objectives,
+    crew_actions: {
+      [actionId]: runtimeCrewAction({
+        id: actionId,
+        crew_id: "amy",
+        source: "event_action_request",
+        parent_event_id: eventId,
+        objective_id: objectiveId,
+        action_request_id: "ash_cross_crew_objective",
+        type: "survey",
+        target_tile_id: "4-3",
+        started_at: 0,
+        ends_at: 1,
+        duration_seconds: 1,
+      }),
+    },
   });
 
   await page.goto("/");
@@ -936,6 +948,31 @@ function createEmptyEventRuntimeState() {
     crew_actions: {},
     inventories: {},
     rng_state: null,
+  };
+}
+
+function runtimeCrewAction(overrides: Record<string, unknown>) {
+  return {
+    id: "runtime-action",
+    crew_id: "mike",
+    type: "move",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: null,
+    to_tile_id: null,
+    target_tile_id: null,
+    path_tile_ids: [],
+    started_at: 0,
+    ends_at: null,
+    progress_seconds: 0,
+    duration_seconds: 0,
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+    action_params: {},
+    ...overrides,
   };
 }
 

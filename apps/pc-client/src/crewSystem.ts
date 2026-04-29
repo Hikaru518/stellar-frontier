@@ -80,10 +80,6 @@ export function createMovePreview(member: CrewMember, targetTileId: string, tile
     return blockedPreview(member, targetTileId, "信号中断，无法下达指令。");
   }
 
-  if (member.activeAction?.actionType === "move" && member.activeAction.status === "inProgress") {
-    return blockedPreview(member, targetTileId, "移动中不能直接改派目标，需要先停止当前行动。");
-  }
-
   if (fromTileId === targetTileId) {
     return blockedPreview(member, targetTileId, "队员已在此处。");
   }
@@ -115,7 +111,7 @@ export function createMovePreview(member: CrewMember, targetTileId: string, tile
     route,
     steps,
     totalDurationSeconds: steps.reduce((total, step) => total + step.durationSeconds, 0),
-    interruptionWarning: getInterruptionWarning(member),
+    interruptionWarning: undefined,
   };
 }
 
@@ -572,17 +568,27 @@ export function normalizeCrewMember(member: CrewMember, initialMember: CrewMembe
 
   return {
     ...initialMember,
-    ...member,
+    id: member.id ?? initialMember.id,
+    name: member.name ?? initialMember.name,
+    role: member.role ?? initialMember.role,
     attributes: hasCurrentAttributes ? member.attributes : initialMember.attributes,
+    skills: member.skills ?? initialMember.skills,
+    inventory: member.inventory ?? initialMember.inventory,
     profile: member.profile ?? initialMember.profile,
     voiceTone: member.voiceTone ?? initialMember.voiceTone,
     personalityTags: member.personalityTags ?? initialMember.personalityTags,
     expertise: member.expertise ?? initialMember.expertise,
     diaryEntries: member.diaryEntries ?? initialMember.diaryEntries,
     currentTile: member.currentTile ?? initialMember.currentTile,
+    location: member.location ?? initialMember.location,
+    coord: member.coord ?? initialMember.coord,
+    status: member.status ?? initialMember.status,
+    statusTone: member.statusTone ?? initialMember.statusTone,
+    conditions: member.conditions ?? initialMember.conditions,
+    hasIncoming: member.hasIncoming ?? initialMember.hasIncoming,
     canCommunicate: member.canCommunicate ?? !member.unavailable,
     lastContactTime: member.lastContactTime ?? 0,
-    emergencyEvent: undefined,
+    unavailable: member.unavailable ?? initialMember.unavailable,
   };
 }
 
@@ -738,25 +744,6 @@ function isAdjacentTile(fromTileId: string, targetTileId: string, tiles: MapTile
   }
 
   return Math.abs(fromTile.row - targetTile.row) + Math.abs(fromTile.col - targetTile.col) === 1;
-}
-
-function getInterruptionWarning(member: CrewMember) {
-  const action = member.activeAction;
-  if (action?.status !== "inProgress") {
-    return undefined;
-  }
-
-  if (action.actionType === "gather") {
-    return `${member.name} 正在采集。本次移动会中断当前采集，未完成的一轮不会结算。`;
-  }
-  if (action.actionType === "build") {
-    return `${member.name} 正在建设。本次移动会中断建设，MVP 默认不返还材料。`;
-  }
-  if (action.actionType === "survey") {
-    return `${member.name} 正在调查。本次移动会中断调查。`;
-  }
-
-  return undefined;
 }
 
 function updateCrewTile(member: CrewMember, tileId: string, tile?: MapTile) {

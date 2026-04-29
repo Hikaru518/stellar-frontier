@@ -83,7 +83,6 @@ maintained_by: organize-wiki
 | `idle` | 原地待命，没有执行主行动。 | 是 |
 | `moving` | 正在移动到目标地点。 | 否，需要先停止当前行动。 |
 | `working` | 正在调查或处理剧情行动。 | 是，但会中断当前工作。 |
-| `inEvent` | 正在处理紧急事件或剧情事件。 | 否，需先处理事件。 |
 | `lost` | 失联，无法正常通讯。 | 否 |
 | `dead` | 死亡或不可用。 | 否 |
 
@@ -289,7 +288,7 @@ stepStartedAt = startTime
 stepFinishTime = startTime + 第一格耗时
 finishTime = startTime + totalDurationSeconds
 crew.status = moving
-crew.currentAction = move
+crew_actions[moveActionId] = move
 ```
 
 如果队员原本正在执行可中断行动，先中断原行动，再创建移动行动。
@@ -321,8 +320,7 @@ if elapsedGameSeconds >= stepFinishTime:
 ```text
 crew.currentTile = targetTile
 crew.status = idle
-crew.currentAction.status = completed
-crew.currentAction = null
+crew_actions[moveActionId].status = completed
 ```
 
 移动完成后，队员原地待命，不会自动调查或执行剧情动作。
@@ -386,8 +384,8 @@ crew.currentAction = null
 | `name` | 字符串 | 队员显示名，例如 `Amy`、`Garry`。 |
 | `role` | 字符串 | 队员身份或职业的短展示文本。 |
 | `currentTile` | 坐标 | 队员当前所在地块。逐格移动时，该字段会随着移动进度更新。 |
-| `status` | 枚举 | 队员总状态，例如 `idle`、`moving`、`working`、`inEvent`、`lost`、`dead`。 |
-| `currentAction` | 对象或空 | 当前正在执行的主行动。 |
+| `status` | 枚举 | 队员初始状态，例如 `idle`、`moving`、`working`、`lost`、`dead`；事件占用状态由 `crew_actions` 和 `active_calls` 表示。 |
+| `crew_actions` | 运行时行动表 | 当前正在执行的主行动；`CrewMember` 不再保存静态 `currentAction`。 |
 | `canCommunicate` | 布尔 | 当前是否可被通讯台联系。 |
 | `lastContactTime` | 游戏秒 | 最近一次成功通讯时间。 |
 

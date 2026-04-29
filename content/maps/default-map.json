@@ -182,9 +182,7 @@
         "atmosphericPressureKpa": 94
       },
       "specialStates": [],
-      "objectIds": [
-        "shallow-lake"
-      ]
+      "objectIds": []
     },
     {
       "id": "2-2",
@@ -202,9 +200,7 @@
         "atmosphericPressureKpa": 95
       },
       "specialStates": [],
-      "objectIds": [
-        "reed-waterline"
-      ]
+      "objectIds": []
     },
     {
       "id": "2-3",
@@ -314,7 +310,6 @@
       },
       "specialStates": [],
       "objectIds": [
-        "echo-cave",
         "mainline-hive-entrance",
         "mainline-hive-hatchery"
       ]
@@ -391,9 +386,7 @@
       "specialStates": [],
       "objectIds": [
         "iron-ridge-deposit",
-        "mainline-rare-ore-strata",
-        "iron-mine-two",
-        "mercury-thermometer-cache"
+        "mainline-rare-ore-strata"
       ]
     },
     {
@@ -506,8 +499,7 @@
       "specialStates": [],
       "objectIds": [
         "abandoned-medical-pod",
-        "mainline-medical-docs",
-        "scanner-residue"
+        "mainline-medical-docs"
       ]
     },
     {
@@ -534,10 +526,7 @@
           "startsActive": true
         }
       ],
-      "objectIds": [
-        "broken-relay",
-        "intermittent-signal"
-      ]
+      "objectIds": []
     },
     {
       "id": "4-3",
@@ -1218,9 +1207,7 @@
         "atmosphericPressureKpa": 85
       },
       "specialStates": [],
-      "objectIds": [
-        "deep-rift-signal"
-      ]
+      "objectIds": []
     },
     {
       "id": "8-7",
