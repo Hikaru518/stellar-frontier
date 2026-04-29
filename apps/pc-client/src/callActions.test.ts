@@ -134,35 +134,34 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 
 describe("buildCallView", () => {
   it("groups universal actions without exposing removed object actions", () => {
-    // tile `2-3` exists in default-map.json and lists `black-pine-stand` as one
-    // of its objectIds. Its old object actions are intentionally no longer
-    // call decisions; current-area survey owns the structured investigation path.
-    const tile = createTile("2-3");
-    const blackPine = mapObjectDefinitionById.get("black-pine-stand");
-    expect(blackPine).toBeDefined();
+    // Mainline objects without inline actions should not create empty object
+    // groups; current-area survey owns the structured investigation path.
+    const tile = createTile("4-4");
+    const warpPod = mapObjectDefinitionById.get("mainline-damaged-warp-pod");
+    expect(warpPod).toBeDefined();
     const gameState = createGameState({
-      crew: [createMember()],
+      crew: [createMember({ currentTile: "4-4" })],
       map: {
         ...createGameState().map,
-        discoveredTileIds: ["2-3"],
+        discoveredTileIds: ["4-4"],
         tilesById: {
-          "2-3": {
+          "4-4": {
             discovered: true,
             investigated: false,
-            revealedObjectIds: ["black-pine-stand"],
+            revealedObjectIds: ["mainline-damaged-warp-pod"],
           },
         },
       },
     });
 
-    const view = buildCallView({ member: createMember(), tile, gameState });
+    const view = buildCallView({ member: createMember({ currentTile: "4-4" }), tile, gameState });
 
     expect(view.groups[0].title).toBe("基础行动");
     expect(view.groups[0].actions.map((action) => action.id)).toEqual(
       universalActions.filter((action) => action.id !== "universal:stop").map((action) => action.id),
     );
 
-    expect(view.groups.find((group) => group.title === blackPine!.name)).toBeUndefined();
+    expect(view.groups.find((group) => group.title === warpPod!.name)).toBeUndefined();
   });
 
   it("does not render removed generic object action buttons", () => {
@@ -189,15 +188,15 @@ describe("buildCallView", () => {
   });
 
   it("does not render an object's actions before its visibility is satisfied", () => {
-    // tile `5-3` carries `southwest-timber` with visibility=onInvestigated; the
-    // group should not appear until the tile is investigated.
+    // `mainline-medical-docs` has an inline repeat-learning action, but its
+    // onInvestigated visibility keeps the group hidden before investigation.
     const gameState = createGameState({
-      crew: [createMember({ currentTile: "5-3" })],
+      crew: [createMember({ currentTile: "4-1" })],
       map: {
         ...createGameState().map,
-        discoveredTileIds: ["5-3"],
+        discoveredTileIds: ["4-1"],
         tilesById: {
-          "5-3": {
+          "4-1": {
             discovered: true,
             investigated: false,
             revealedObjectIds: [],
@@ -207,12 +206,12 @@ describe("buildCallView", () => {
     });
 
     const view = buildCallView({
-      member: createMember({ currentTile: "5-3" }),
-      tile: createTile("5-3", { investigated: false }),
+      member: createMember({ currentTile: "4-1" }),
+      tile: createTile("4-1", { investigated: false }),
       gameState,
     });
 
-    expect(view.groups.map((group) => group.title)).not.toContain("潮湿木材");
+    expect(view.groups.map((group) => group.title)).not.toContain("医疗文档");
   });
 
   it("returns the member's active runtime call without injecting runtime options into action groups", () => {
@@ -241,7 +240,7 @@ describe("buildCallView", () => {
             discovered: true,
             investigated: false,
             // include a known good id plus an unknown id (e.g. removed content)
-            revealedObjectIds: ["black-pine-stand", "ghost-object"],
+            revealedObjectIds: ["mainline-alien-village", "ghost-object"],
           },
         },
       },
@@ -249,7 +248,7 @@ describe("buildCallView", () => {
 
     expect(() => buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState })).not.toThrow();
     const view = buildCallView({ member: createMember({ currentTile: "2-3" }), tile: createTile("2-3"), gameState });
-    expect(view.groups.map((group) => group.title)).not.toContain("黑松木材带");
+    expect(view.groups.map((group) => group.title)).not.toContain("外星村落");
     expect(view.groups.map((group) => group.title)).not.toContain("ghost-object");
   });
 

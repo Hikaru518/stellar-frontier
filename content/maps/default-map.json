@@ -137,15 +137,7 @@
         "toxicityLevel": "low",
         "atmosphericPressureKpa": 89
       },
-      "specialStates": [
-        {
-          "id": "static-front",
-          "name": "静电锋面",
-          "visibility": "hidden",
-          "severity": "medium",
-          "startsActive": true
-        }
-      ],
+      "specialStates": [],
       "objectIds": []
     },
     {
@@ -217,22 +209,8 @@
         "toxicityLevel": "none",
         "atmosphericPressureKpa": 93
       },
-      "specialStates": [
-        {
-          "id": "beast-approach",
-          "name": "大型野兽接近",
-          "visibility": "onDiscovered",
-          "severity": "high",
-          "dangerTags": [
-            "beast_tracks"
-          ],
-          "startsActive": true
-        }
-      ],
-      "objectIds": [
-        "black-pine-stand",
-        "animal-tracks"
-      ]
+      "specialStates": [],
+      "objectIds": []
     },
     {
       "id": "2-4",
@@ -251,7 +229,6 @@
       },
       "specialStates": [],
       "objectIds": [
-        "fallen-timber",
         "mainline-alien-village",
         "mainline-alien-trader",
         "mainline-village-residents"
@@ -517,15 +494,7 @@
         "toxicityLevel": "none",
         "atmosphericPressureKpa": 95
       },
-      "specialStates": [
-        {
-          "id": "unknown-echo",
-          "name": "异常回波",
-          "visibility": "onDiscovered",
-          "severity": "low",
-          "startsActive": true
-        }
-      ],
+      "specialStates": [],
       "objectIds": []
     },
     {
@@ -700,9 +669,7 @@
         "atmosphericPressureKpa": 95
       },
       "specialStates": [],
-      "objectIds": [
-        "southwest-timber"
-      ]
+      "objectIds": []
     },
     {
       "id": "5-4",
@@ -809,17 +776,8 @@
         "toxicityLevel": "medium",
         "atmosphericPressureKpa": 96
       },
-      "specialStates": [
-        {
-          "id": "acid-rain-pool",
-          "name": "酸雨积水",
-          "visibility": "onInvestigated",
-          "severity": "medium",
-          "startsActive": true
-        }
-      ],
+      "specialStates": [],
       "objectIds": [
-        "acidic-marsh",
         "mainline-marsh-decoy-source"
       ]
     },
@@ -894,7 +852,6 @@
       },
       "specialStates": [],
       "objectIds": [
-        "fracture-vent",
         "mainline-damaged-forge"
       ]
     },
@@ -1022,9 +979,7 @@
         "atmosphericPressureKpa": 94
       },
       "specialStates": [],
-      "objectIds": [
-        "needlewood-stand"
-      ]
+      "objectIds": []
     },
     {
       "id": "7-5",

@@ -16,7 +16,7 @@ source:
 |---|---------|------|------|---------|
 | 1 | T001 | 建立可玩内容边界审计与基线断言 | completed | 1 |
 | 2 | T002 | 删除非主线结构化事件资产并重生成 manifest 模块 | completed | 1 |
-| 3 | T003 | 清理默认地图与旧地图对象 | pending | 0 |
+| 3 | T003 | 清理默认地图与旧地图对象 | completed | 1 |
 | 4 | T004 | 迁移事件系统测试样例到测试 fixture | pending | 0 |
 | 5 | T005 | 加强 content 校验防止非主线内容回流 | pending | 0 |
 | 6 | T006 | 验证主线 15 步闭环仍完整可玩 | pending | 0 |
@@ -42,4 +42,12 @@ source:
 - 完成时间: 2026-04-30 01:11
 - 尝试次数: 1
 - Monkey summary: runtime event manifest 仅保留 mainline domains，旧结构化事件 assets 已删除并重生成 PC manifest 模块；相关测试已同步。
+- 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 通过；`ReadLints` 未发现新增诊断。
+
+### T003: 清理默认地图与旧地图对象
+- 状态: completed
+- 开始时间: 2026-04-30 01:12
+- 完成时间: 2026-04-30 01:13
+- 尝试次数: 1
+- Monkey summary: 清理默认地图旧对象引用与危险状态，清空旧 resources / hazards map-object 演示文件，并补充主线地图边界测试。
 - 质量检查: `npm run validate:content`、`npm run lint`、`npm run test` 通过；`ReadLints` 未发现新增诊断。

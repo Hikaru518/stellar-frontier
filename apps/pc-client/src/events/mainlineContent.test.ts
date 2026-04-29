@@ -5,6 +5,7 @@ import hiveContent from "../../../../content/events/definitions/mainline_hive.js
 import medicalContent from "../../../../content/events/definitions/mainline_medical.json";
 import resourcesContent from "../../../../content/events/definitions/mainline_resources.json";
 import villageContent from "../../../../content/events/definitions/mainline_village.json";
+import defaultMap from "../../../../content/maps/default-map.json";
 import { mapObjectDefinitionById } from "../content/mapObjects";
 
 type JsonRecord = Record<string, unknown>;
@@ -17,8 +18,69 @@ type JsonDefinition = JsonRecord & {
 };
 
 type JsonContent = { event_definitions: JsonDefinition[] };
+type DefaultMapTile = {
+  objectIds: string[];
+  specialStates: Array<{ id: string; dangerTags?: string[] }>;
+};
+
+const legacyDemoMapObjectIds = [
+  "black-pine-stand",
+  "fallen-timber",
+  "needlewood-stand",
+  "southwest-timber",
+  "acidic-marsh",
+  "animal-tracks",
+  "fracture-vent",
+] as const;
+
+const requiredMainlineMapObjectIds = [
+  "abandoned-medical-pod",
+  "crash-site-wreckage",
+  "iron-ridge-deposit",
+  "iron-ridge-outcrop",
+  "mainline-alien-trader",
+  "mainline-alien-village",
+  "mainline-basic-radar",
+  "mainline-damaged-forge",
+  "mainline-damaged-warp-pod",
+  "mainline-dead-cockpit",
+  "mainline-hive-entrance",
+  "mainline-hive-hatchery",
+  "mainline-injured-villager",
+  "mainline-injured-villager-camp",
+  "mainline-marsh-decoy-source",
+  "mainline-medical-docs",
+  "mainline-obsidian-vein",
+  "mainline-old-ship-wreck",
+  "mainline-rare-ore-strata",
+  "mainline-repair-docs",
+  "mainline-rosetta-device",
+  "mainline-village-residents",
+  "mainline-volcanic-vent",
+] as const;
 
 describe("mainline event content", () => {
+  it("keeps the default map object boundary limited to mainline objects", () => {
+    const defaultMapObjectIds = collectDefaultMapObjectIds();
+    const legacySpecialStateIds = new Set(["static-front", "beast-approach", "unknown-echo", "acid-rain-pool"]);
+
+    for (const objectId of defaultMapObjectIds) {
+      const definition = findMapObject(objectId);
+      expect(definition.tags).toContain("mainline");
+    }
+
+    expect(defaultMapObjectIds).toEqual(expect.arrayContaining([...requiredMainlineMapObjectIds]));
+    expect(defaultMapObjectIds).toEqual(expect.not.arrayContaining([...legacyDemoMapObjectIds]));
+    expect(collectDefaultMapSpecialStateIds()).toEqual(expect.not.arrayContaining([...legacySpecialStateIds]));
+    expect(collectDefaultMapDangerTags()).not.toContain("beast_tracks");
+  });
+
+  it("does not expose legacy demo map objects through the runtime loader", () => {
+    for (const objectId of legacyDemoMapObjectIds) {
+      expect(mapObjectDefinitionById.has(objectId)).toBe(false);
+    }
+  });
+
   it("keeps MVP mainline information flow survey-only instead of exposing scan", () => {
     const mainlineDefinitions = [crashSiteContent, endingContent, medicalContent, resourcesContent, villageContent];
 
@@ -371,4 +433,16 @@ function findMapObject(id: string) {
   const object = mapObjectDefinitionById.get(id);
   expect(object).toBeTruthy();
   return object!;
+}
+
+function collectDefaultMapObjectIds() {
+  return (defaultMap.tiles as DefaultMapTile[]).flatMap((tile) => tile.objectIds);
+}
+
+function collectDefaultMapSpecialStateIds() {
+  return (defaultMap.tiles as DefaultMapTile[]).flatMap((tile) => tile.specialStates.map((state) => state.id));
+}
+
+function collectDefaultMapDangerTags() {
+  return (defaultMap.tiles as DefaultMapTile[]).flatMap((tile) => tile.specialStates.flatMap((state) => state.dangerTags ?? []));
 }

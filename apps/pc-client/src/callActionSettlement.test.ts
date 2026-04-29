@@ -128,17 +128,16 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
 
 describe("settleAction", () => {
   it("reveals onInvestigated objects and emits an action_complete trigger with tile and object tags", () => {
-    // tile `5-3` carries `southwest-timber` (visibility: onInvestigated) per the
-    // migrated default-map.json — surveying it should flip that object into
-    // revealedObjectIds.
-    const tileId = "5-3";
-    const investigatedObject = mapObjectDefinitionById.get("southwest-timber");
+    // The default map keeps mainline-only onInvestigated objects; surveying the
+    // tile should flip that object into revealedObjectIds and include its tags.
+    const tileId = "4-1";
+    const investigatedObject = mapObjectDefinitionById.get("mainline-medical-docs");
     expect(investigatedObject).toBeDefined();
 
-    const tile = createTile(tileId, { tags: ["forest_marsh"] });
+    const tile = createTile(tileId, { tags: ["medical_outpost"] });
     const member = createMember({ currentTile: tileId });
     const action = createCrewAction({
-      id: "amy-survey-5-3",
+      id: "amy-survey-4-1",
       type: "survey",
       target_tile_id: tileId,
       action_params: { surveyLevel: "standard" },
@@ -155,7 +154,7 @@ describe("settleAction", () => {
       logs: [],
     });
 
-    expect(patch.map.tilesById[tileId]?.revealedObjectIds).toContain("southwest-timber");
+    expect(patch.map.tilesById[tileId]?.revealedObjectIds).toContain("mainline-medical-docs");
     expect(patch.triggerContexts).toEqual([
       expect.objectContaining({
         trigger_type: "action_complete",
@@ -163,9 +162,9 @@ describe("settleAction", () => {
         source: "crew_action",
         crew_id: "amy",
         tile_id: tileId,
-        action_id: "amy-survey-5-3",
+        action_id: "amy-survey-4-1",
         payload: expect.objectContaining({
-          tags: expect.arrayContaining(["forest_marsh"]),
+          tags: expect.arrayContaining(["medical_outpost", "field_first_aid"]),
         }),
       }),
     ]);
