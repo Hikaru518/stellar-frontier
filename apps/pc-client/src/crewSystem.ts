@@ -59,7 +59,7 @@ export function createMovePreview(member: CrewMember, targetTileId: string, tile
 
   const steps = route.map((tileId) => {
     const tile = getTile(tiles, tileId);
-    const durationSeconds = tile ? getTerrainMoveCost(tile) : 60;
+    const durationSeconds = getMoveStepDuration(member, tile);
     return {
       tileId,
       coord: tile?.coord ?? tileId,
@@ -194,7 +194,7 @@ export function advanceCrewMovement(
     }
 
     const nextTile = getTile(tiles, action.route[routeStepIndex]);
-    const nextStepDuration = nextTile ? getTerrainMoveCost(nextTile) : 60;
+    const nextStepDuration = getMoveStepDuration(nextMember, nextTile);
     stepStartedAt = stepFinishTime;
     stepFinishTime = stepStartedAt + nextStepDuration;
     nextMember = {
@@ -241,7 +241,7 @@ export function hydrateMoveActionRoute(member: CrewMember, tiles: MapTile[], _el
       route: hydratedRoute,
       routeStepIndex: 0,
       stepStartedAt,
-      stepFinishTime: stepStartedAt + getTerrainMoveCost(firstStep),
+      stepFinishTime: stepStartedAt + getMoveStepDuration(member, firstStep),
     },
   };
 }
@@ -382,6 +382,11 @@ function getTerrainMoveCost(tile: MapTile) {
     return 150;
   }
   return 60;
+}
+
+function getMoveStepDuration(member: CrewMember, tile?: MapTile) {
+  const baseDuration = tile ? getTerrainMoveCost(tile) : 60;
+  return member.conditions.includes("wounded") ? baseDuration * 1.5 : baseDuration;
 }
 
 function isTilePassable(tile: MapTile) {

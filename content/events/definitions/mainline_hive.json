@@ -1,0 +1,58 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_hive_entrance_and_hatchery",
+      "version": 1,
+      "domain": "mainline_hive",
+      "title": "巢穴入口与孵化室燃料",
+      "summary": "巢穴入口消耗第一个 decoy 引开守卫；孵化室在入口完成后消耗第二个 decoy 并取得 alien_slime_fuel。两段高风险推进均禁止 wounded 队员执行。",
+      "tags": ["mainline", "hive", "decoy", "alien_slime_fuel", "high_risk"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "2-7" } },
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-hive-entrance" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.object_id", "value": "mainline-hive-hatchery" } }
+        ] }
+      ] },
+      "candidate_selection": { "priority": 84, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "crew", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_hive_entrance_and_hatchery:{crew_id}", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "hive_call", "nodes": [
+        { "id": "hive_call", "type": "call", "title": "外星生物巢穴", "call_template_id": "mainline_hive_entrance_and_hatchery.call.hive", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [
+          { "id": "lure_guard", "requirements": [
+            { "type": "inventory_has_item", "target": { "type": "crew_inventory" }, "value": "decoy", "params": { "min_quantity": 1 } },
+            { "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "wounded" }] }
+          ], "effect_refs": ["hive_entrance_rewards"] },
+          { "id": "collect_slime_fuel", "requirements": [
+            { "type": "world_flag_equals", "field": "hive_entrance_guard_lured", "value": true },
+            { "type": "inventory_has_item", "target": { "type": "crew_inventory" }, "value": "decoy", "params": { "min_quantity": 1 } },
+            { "type": "not", "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "wounded" }] }
+          ], "effect_refs": ["hive_hatchery_rewards"] },
+          { "id": "observe", "is_default": true }
+        ], "option_node_mapping": { "lure_guard": "entrance_end", "collect_slime_fuel": "hatchery_end", "observe": "observe_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+        { "id": "entrance_end", "type": "end", "title": "入口守卫已引开", "resolution": "resolved", "result_key": "hive_entrance_guard_lured", "event_log_template_id": "hive_entrance_guard_lured_log", "history_writes": [{ "key_template": "mainline_hive:entrance:{crew_id}", "scope": "crew", "value": "hive_entrance_guard_lured" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } },
+        { "id": "hatchery_end", "type": "end", "title": "外星粘液燃料已取得", "resolution": "resolved", "result_key": "alien_slime_fuel_obtained", "event_log_template_id": "alien_slime_fuel_obtained_log", "history_writes": [{ "key_template": "mainline_hive:hatchery:{crew_id}", "scope": "crew", "value": "alien_slime_fuel_obtained" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } },
+        { "id": "observe_end", "type": "end", "title": "等待诱饵或恢复", "resolution": "resolved", "result_key": "hive_requirements_noted", "event_log_template_id": "hive_requirements_noted_log", "history_writes": [{ "key_template": "mainline_hive:observe:{crew_id}", "scope": "crew", "value": "hive_requirements_noted" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["entrance_end", "hatchery_end", "observe_end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "hive_entrance_rewards", "effects": [
+          { "id": "consume_decoy_for_hive_entrance", "type": "remove_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "decoy", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "hive_entrance_guard_lured_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "hive_entrance_guard_lured", "value": true, "tags": ["mainline", "hive"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "hive_hatchery_rewards", "effects": [
+          { "id": "consume_decoy_for_hatchery", "type": "remove_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "decoy", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "add_alien_slime_fuel", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "alien_slime_fuel", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "alien_slime_fuel_obtained_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "alien_slime_fuel_obtained", "value": true, "tags": ["mainline", "hive", "fuel"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [
+        { "id": "hive_entrance_guard_lured_log", "summary": "巢穴入口守卫已被诱饵引开", "importance": "major", "visibility": "player_visible" },
+        { "id": "alien_slime_fuel_obtained_log", "summary": "外星粘液燃料已取得", "importance": "major", "visibility": "player_visible" },
+        { "id": "hive_requirements_noted_log", "summary": "巢穴推进需要诱饵且 wounded 队员不能执行", "importance": "normal", "visibility": "player_visible" }
+      ],
+      "content_refs": { "call_template_ids": ["mainline_hive_entrance_and_hatchery.call.hive"], "item_ids": ["decoy", "alien_slime_fuel"] },
+      "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 2160, "source": "crew_action", "crew_id": "amy", "tile_id": "2-7", "action_id": "extract:mainline-hive-entrance:2-7:120", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "extract", "object_id": "mainline-hive-entrance", "tags": ["mainline", "mainline_hive", "high_risk"] } }]
+    }
+  ]
+}

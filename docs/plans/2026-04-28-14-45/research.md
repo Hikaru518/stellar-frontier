@@ -23,7 +23,7 @@ source:
 
 ### 2.1 已有玩法系统（Existing Gameplay Systems）
 
-- **事件系统**：事件以结构化资产、白名单 handler、静态校验、graph 与 option id 为核心；通话只是表现层，不应把逻辑埋入文本（证据：`docs/gameplay/event-system/event-system.md`、`src/events/`）。
+- **事件系统**：事件以结构化资产、白名单 handler、静态校验、graph 与 option id 为核心；通话只是表现层，不应把逻辑埋入文本（证据：`docs/gameplay/event-system/event-system.md`、`apps/pc-client/src/events/`）。
 - **内容驱动运行时**：游戏内容在 `content/`，设计说明在 `docs/`；修改 `content/` 后必须通过 `npm run validate:content`（证据：`AGENTS.md`、`scripts/validate-content.mjs`）。
 
 ### 2.2 现存叙事设定与角色（Existing Narrative & Crew）
@@ -47,9 +47,9 @@ source:
 
 - **事件内容结构**：`content/events/definitions/<domain>.json` 使用 `event_definitions`；`content/events/call_templates/<domain>.json` 使用 `call_templates`；另有 `handler_registry.json`、`presets/` 与 `content/schemas/events/*.schema.json`。
 - **legacy 与结构化资产并存**：仍存在 `content/events/events.json` 和 `content/schemas/events.schema.json`，编辑器需要决定是否只支持结构化事件，或同时只读展示 legacy。
-- **校验入口已有**：`scripts/validate-content.mjs` 使用 Ajv2020，并调用 `src/events/validation.ts` 的 `validateEventContentLibrary` 做跨文件引用校验；`VALIDATE_CONTENT_ROOT` 可用于替代根目录。
-- **加载清单耦合**：`src/content/contentData.ts` 显式 import definitions、call_templates、presets；新增 domain 或 preset 文件后，游戏可能不会自动加载。
-- **工程入口限制**：当前 Vite 是单入口 `index.html -> src/main.tsx`，`tsconfig.json` 只 include `src`；根级 `editor/` 需要单独配置或扩展配置。
+- **校验入口已有**：`scripts/validate-content.mjs` 使用 Ajv2020，并调用 `apps/pc-client/src/events/validation.ts` 的 `validateEventContentLibrary` 做跨文件引用校验；`VALIDATE_CONTENT_ROOT` 可用于替代根目录。
+- **加载清单耦合**：`apps/pc-client/src/content/contentData.ts` 显式 import definitions、call_templates、presets；新增 domain 或 preset 文件后，游戏可能不会自动加载。
+- **工程入口限制**：当前 Vite 是单入口 `index.html -> src/main.tsx`，`tsconfig.json` 只 include `src`；独立 `apps/editor/` app 需要单独配置并接入 Rush。
 - **浏览器写回限制**：纯前端页面不能安全直接写 git 工作区；MVP 必须在"导出 JSON / diff"、"本地 Node helper"、"桌面壳"等写回模式中选一个。
 
 ## 3. Best Practice Findings（互联网发现）
@@ -82,7 +82,7 @@ source:
 
 - **独立 editor 的优势**：符合"策划工具不是玩家玩法"的边界；未来 character/map/item editor 可共享入口；不污染游戏页面流转。
 - **复用游戏入口的优势**：更容易复用 `src` 状态和样式，初期配置少。
-- **建议**：选择根级 `editor/` 独立入口，但复用 `src/events` 的类型、校验和预览逻辑；不要挂载游戏 `App`。
+- **建议**：选择 `apps/editor/` 独立入口，但复用 `apps/pc-client/src/events` 的类型、校验和预览逻辑；不要挂载游戏 `App`。
 
 ### Trade-off 2：直接写回 content vs 导出 diff / 本地 helper
 
@@ -108,8 +108,8 @@ source:
 - `content/events/` — 事件 definitions、call templates、handler registry、presets。
 - `content/schemas/events/` — 结构化事件 JSON Schema。
 - `scripts/validate-content.mjs` — 内容校验入口。
-- `src/events/validation.ts` — 跨文件程序校验。
-- `src/content/contentData.ts` — 游戏内容加载清单。
+- `apps/pc-client/src/events/validation.ts` — 跨文件程序校验。
+- `apps/pc-client/src/content/contentData.ts` — 游戏内容加载清单。
 
 ### 5.2 外部链接（External Links）
 
@@ -125,7 +125,7 @@ source:
 
 - **Q1**：本轮 MVP 的写回策略是什么：只导出 JSON / diff，还是提供本地 Node helper 写入 `content/`？
 - **Q2**：MVP 是否只支持结构化事件 definitions 与 call templates，还是也要展示 legacy `events.json`？
-- **Q3**：editor 是否允许创建新 domain / preset 文件？如果允许，如何同步 `src/content/contentData.ts` 的加载清单？
+- **Q3**：editor 是否允许创建新 domain / preset 文件？如果允许，如何同步 `apps/pc-client/src/content/contentData.ts` 的加载清单？
 - **Q4**：哪些编辑器元数据允许存在？若需要布局、草稿备注、review 状态，是否存 localStorage、侧车文件，还是本轮不做？
 - **Q5**：event editor 的首要使用场景是"查阅理解"、"修改已有事件"、"新增事件"，还是"校验与排错"？
 

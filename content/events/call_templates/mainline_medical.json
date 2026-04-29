@@ -1,0 +1,82 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_medical_pod_survey.call.report",
+      "version": 1,
+      "domain": "mainline_medical",
+      "event_definition_id": "mainline_medical_pod_survey",
+      "node_id": "medical_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "medical_pod_opening", "text": "{{crew_display_name}} 打开了废弃医疗舱的残存储格。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "medical_pod_body", "text": "医疗舱内仍有可用药品，终端中也保存着野外急救流程。当前队员取得 medicine 并学习 knows_field_first_aid。", "priority": 0 }] }],
+      "option_lines": { "collect": { "selection": "best_match", "variants": [{ "id": "medical_pod_collect", "text": "收集药品并保存医疗文档。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_medical_docs_repeat_learning.call.learn",
+      "version": 1,
+      "domain": "mainline_medical",
+      "event_definition_id": "mainline_medical_docs_repeat_learning",
+      "node_id": "repeat_aid_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "medical_repeat_opening", "text": "{{crew_display_name}} 正在读取医疗舱保存的急救文档。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "medical_repeat_body", "text": "文档足够完整，缺少 knows_field_first_aid 的队员可在这里重复学习野外急救。", "priority": 0 }] }],
+      "option_lines": { "learn": { "selection": "best_match", "variants": [{ "id": "medical_repeat_learn", "text": "学习野外急救。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_wounded_recovery_options.call.recover",
+      "version": 1,
+      "domain": "mainline_medical",
+      "event_definition_id": "mainline_wounded_recovery_options",
+      "node_id": "recovery_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "wounded_recovery_opening", "text": "{{crew_display_name}} 的 wounded 状态需要处理。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "wounded_recovery_body", "text": "可以消耗当前队员背包中的 medicine 恢复，也可以由掌握 knows_field_first_aid 的当前队员进行野外急救。", "priority": 0 }] }],
+      "option_lines": {
+        "use_medicine": { "selection": "best_match", "variants": [{ "id": "wounded_recovery_medicine", "text": "使用药品治疗受伤。", "priority": 0 }] },
+        "field_first_aid": { "selection": "best_match", "variants": [{ "id": "wounded_recovery_first_aid", "text": "使用野外急救处理受伤。", "priority": 0 }] },
+        "wait": { "selection": "best_match", "variants": [{ "id": "wounded_recovery_wait", "text": "暂不治疗。", "priority": 0 }] }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_injured_villager_rescue_decoy.call.rescue",
+      "version": 1,
+      "domain": "mainline_medical",
+      "event_definition_id": "mainline_injured_villager_rescue_decoy",
+      "node_id": "rescue_call",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "camp_rescue_opening", "text": "{{crew_display_name}} 找到受伤村民营地。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "camp_rescue_body", "text": "救援需要药品或野外急救。该救援属于高风险现场操作，wounded 队员不能提交救援选项；成功后可得到第一个诱饵。", "priority": 0 }] }],
+      "option_lines": {
+        "use_medicine": { "selection": "best_match", "variants": [{ "id": "camp_rescue_medicine", "text": "使用药品救援村民，换取诱饵。", "priority": 0 }] },
+        "field_first_aid": { "selection": "best_match", "variants": [{ "id": "camp_rescue_first_aid", "text": "使用野外急救救援村民，换取诱饵。", "priority": 0 }] },
+        "observe": { "selection": "best_match", "variants": [{ "id": "camp_rescue_observe", "text": "暂不冒险，等待药品或急救条件。", "priority": 0 }] }
+      },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "mainline_marsh_decoy_source.call.obtain",
+      "version": 1,
+      "domain": "mainline_medical",
+      "event_definition_id": "mainline_marsh_decoy_source",
+      "node_id": "marsh_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "marsh_decoy_opening", "text": "{{crew_display_name}} 在浅滩湿地发现可用的小型生物诱饵来源。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "marsh_decoy_body", "text": "这里可稳定取得额外 decoy，作为巢穴路线需要的第二个诱饵来源。", "priority": 0 }] }],
+      "option_lines": { "collect": { "selection": "best_match", "variants": [{ "id": "marsh_decoy_collect", "text": "收集湿地诱饵。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    }
+  ]
+}

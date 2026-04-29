@@ -105,6 +105,7 @@ export function dryRunApprovedSampleEvents(): SampleDryRunReport[] {
 
 function sampleEventContentLibrary() {
   return {
+    domains: ["forest", "mountain", "desert", "crew_kael"],
     event_definitions: [
       ...readDefinitions(forestDefinitionsContent),
       ...readDefinitions(mountainDefinitionsContent),

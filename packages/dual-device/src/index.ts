@@ -524,7 +524,7 @@ export function validateDualDeviceMessage(value: unknown): value is DualDeviceMe
 
 const dualDeviceMessageSchema = {
   type: "object",
-  required: ["type", "roomId", "clientId", "sequence", "sentAt", "payload"],
+  required: ["type", "roomId", "clientId", "sequence", "sentAt", "payload"] as string[],
   properties: {
     type: { type: "string" },
     roomId: { type: "string", minLength: 1 },

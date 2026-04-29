@@ -43,6 +43,20 @@ npm run dev:mobile
 
 默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Yuan Host 为 `ws://localhost:8888/`。
 
+启动本地 Game Editor / Event Editor。先开一个终端运行 helper：
+
+```bash
+npm run editor:helper
+```
+
+再开一个终端启动 editor：
+
+```bash
+npm run editor:dev
+```
+
+Editor 是 Rush app 项目 `apps/editor`。helper 只监听 `127.0.0.1`，负责读取、校验和保存 `content/events/`。
+
 双设备真实联调需要先启动 Yuan Host。若使用本地 Yuan 仓库，可运行：
 
 ```bash
@@ -148,7 +162,8 @@ https://<用户名>.github.io/stellar-frontier/
 │   ├── pc-client/           # PC 权威游戏客户端（原 React/Vite app）
 │   │   ├── src/             # 页面、系统规则、内容加载、组件测试
 │   │   └── tests/e2e/       # Playwright 端到端测试
-│   └── mobile-client/       # 手机 companion terminal 浏览器客户端
+│   ├── mobile-client/       # 手机 companion terminal 浏览器客户端
+│   └── editor/              # 本地 Game Editor / Event Editor 工具与 editor 专属脚本
 ├── packages/
 │   └── dual-device/         # PC/mobile 共享的配对、Yuan message 映射、typed events 与 fallback 规则
 ├── common/config/rush/      # Rush + pnpm 配置与 lockfile

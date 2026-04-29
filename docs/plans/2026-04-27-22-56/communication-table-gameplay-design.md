@@ -7,8 +7,15 @@ source:
   initial: docs/plans/2026-04-27-22-56/initial.md
   research: docs/plans/2026-04-27-22-56/research.md
   interview: docs/plans/2026-04-27-22-56/communication-table-gameplay-interview.md
-target_wiki: docs/gameplay/event-system/event-system.md
-merged_into: docs/gameplay/communication-table/communication-table.md
+target_wiki: docs/gameplay/communication-table/communication-table.md
+merged_into:
+  - docs/gameplay/communication-table/communication-table.md
+  - docs/gameplay/event-system/event-system.md
+  - docs/gameplay/map-system/map-system.md
+  - docs/game_model/call-action.md
+  - docs/game_model/map.md
+  - docs/game_model/event-integration.md
+  - docs/game_model/crew.md
 merged_at: 2026-04-28T14:25:00+08:00
 ---
 

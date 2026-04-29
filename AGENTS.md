@@ -8,7 +8,7 @@
 - `docs/core-ideas.md` 是特殊的全局核心想法与设计原则页，保持短小、指导性，不使用普通子系统 wiki 的 10 章模板；任何对它的更新都必须先获得人类确认，agent 不得在未确认的情况下自动改写核心原则。
 - `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品/地图的具体配置写在 `content/`。
 - 仓库使用 Rush + pnpm monorepo；不要恢复 npm workspaces，也不要提交 root `package-lock.json`。
-- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
+- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src`、`apps/editor/src`、`apps/editor/helper` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
 
 ## docs/ 知识库结构
 
@@ -127,7 +127,8 @@
 │   │   ├── src/App.tsx                    # 页面流转、全局 GameState、游戏循环、事件结算汇总
 │   │   ├── src/*System.ts                 # crew / diary / event / time / inventory / map 系统
 │   │   └── tests/e2e/app.spec.ts          # Playwright 端到端流程测试
-│   └── mobile-client/                    # 手机 companion terminal 浏览器客户端
+│   ├── mobile-client/                    # 手机 companion terminal 浏览器客户端
+│   └── editor/                           # 本地 Game Editor / Event Editor 工具，含独立 Vite app、localhost helper 与 editor 专属脚本
 ├── packages/
 │   └── dual-device/                      # PC/mobile 共享的配对、真实 Yuan Terminal adapter、typed events 与 fallback 规则
 ├── common/config/rush/                   # Rush + pnpm 配置、command-line、pnpm lock、repo state
