@@ -140,6 +140,7 @@ describe("structured effect executor", () => {
     );
 
     expect(result.status).toBe("success");
+    expect(result.state.crew.amy.current_action_id).toBe("dispatch:action");
     expect(result.state.crew_actions["dispatch:action"]).toMatchObject({
       id: "dispatch:action",
       crew_id: "amy",
@@ -151,6 +152,49 @@ describe("structured effect executor", () => {
       target_tile_id: "base",
       action_params: { reason: "event order" },
     });
+  });
+
+  it("rejects crew actions when the target crew already has an active current action", () => {
+    const state = createState();
+    const busyState: EffectGameState = {
+      ...state,
+      crew: {
+        ...state.crew,
+        amy: {
+          ...state.crew.amy,
+          status: "acting",
+          current_action_id: "act_survey",
+        },
+      },
+      crew_actions: {
+        act_survey: crewAction("act_survey", "survey"),
+      },
+    };
+
+    const result = executeEffects(
+      [
+        effect("dispatch", "create_crew_action", { type: "primary_crew" }, {
+          action_id: "act_move",
+          type: "move",
+          target_tile_id: "base",
+          duration_seconds: 45,
+        }),
+      ],
+      createContext(busyState),
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.errors).toEqual([
+      expect.objectContaining({
+        code: "invalid_effect",
+        effect_id: "dispatch",
+        path: "effects[0].params.action_id",
+        message: expect.stringContaining("already has active crew action act_survey"),
+      }),
+    ]);
+    expect(result.state.crew.amy.current_action_id).toBe("act_survey");
+    expect(result.state.crew_actions.act_survey).toEqual(busyState.crew_actions.act_survey);
+    expect(result.state.crew_actions.act_move).toBeUndefined();
   });
 
   it("calls only registered effect handlers and returns clear handler errors", () => {
@@ -275,7 +319,7 @@ function createState(): EffectGameState {
         expertise_tags: ["scout"],
         condition_tags: ["tired"],
         communication_state: "available",
-        current_action_id: "act_survey",
+        current_action_id: null,
         background_event_ids: [],
         inventory_id: "inv_amy",
         diary_entry_ids: [],
@@ -378,6 +422,30 @@ function createState(): EffectGameState {
     world_history: {},
     world_flags: {},
     rng_state: null,
+  };
+}
+
+function crewAction(id: string, type: "move" | "survey") {
+  return {
+    id,
+    crew_id: "amy",
+    type,
+    status: "active" as const,
+    source: "event_action_request" as const,
+    parent_event_id: "evt_beast",
+    objective_id: "obj_rescue",
+    action_request_id: null,
+    from_tile_id: "2-3",
+    to_tile_id: type === "move" ? "base" : undefined,
+    target_tile_id: type === "move" ? "base" : "2-3",
+    path_tile_ids: [],
+    started_at: 100,
+    ends_at: 160,
+    progress_seconds: 20,
+    duration_seconds: 60,
+    action_params: {},
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
   };
 }
 

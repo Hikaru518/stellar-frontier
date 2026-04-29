@@ -636,10 +636,13 @@ function hasActiveMutexGroup(state: GraphRunnerGameState, index: EventContentInd
 function hasAvailableBlockingSlot(state: GraphRunnerGameState, context: TriggerContext): boolean {
   const crewId = context.crew_id;
   const crew = crewId ? state.crew[crewId] : undefined;
-  if (!crew) {
+  if (!crewId || !crew) {
     return false;
   }
   if (crew.blocking_event_id || crew.blocking_call_id || crew.communication_state === "blocked" || crew.communication_state === "busy_call") {
+    return false;
+  }
+  if (crew.current_action_id || hasActiveCrewAction(state, crewId)) {
     return false;
   }
   const crewHasBlockingEvent = Object.values(state.active_events).some(
@@ -649,6 +652,10 @@ function hasAvailableBlockingSlot(state: GraphRunnerGameState, context: TriggerC
     (call) => call.crew_id === crewId && ACTIVE_CALL_STATUSES.has(call.status) && Boolean(call.blocking_claim_id),
   );
   return !crewHasBlockingEvent && !crewHasBlockingCall;
+}
+
+function hasActiveCrewAction(state: GraphRunnerGameState, crewId: Id): boolean {
+  return Object.values(state.crew_actions).some((action) => action.crew_id === crewId && action.status === "active");
 }
 
 function candidateRollSeed(context: TriggerContext): string {

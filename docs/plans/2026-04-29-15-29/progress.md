@@ -21,7 +21,7 @@ source:
 | 5 | T005 | 删除 legacy event 内容入口 | completed | 1 |
 | 6 | T006 | 删除 editor legacy event 展示 | completed | 1 |
 | 7 | T007 | 建立 crew_actions 派生视图模型 | completed | 1 |
-| 8 | T008 | 强化阻塞与单主行动约束 | pending | 0 |
+| 8 | T008 | 强化阻塞与单主行动约束 | completed | 1 |
 | 9 | T009 | 迁移时间推进到 crew_actions | pending | 0 |
 | 10 | T010 | 迁移移动行动到 crew_actions | pending | 0 |
 | 11 | T011 | 迁移停止与待命行动到事件 runtime | pending | 0 |
@@ -98,3 +98,10 @@ source:
 - 完成时间: 2026-04-29 17:17
 - 尝试次数: 1
 - Monkey summary: 新增 `crew_actions` 派生 view model，覆盖 idle、moving、waiting call、blocked action 等状态，并让 PC 页面读取派生行动标题、进度、通讯可用性和阻塞原因。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T008: 强化阻塞与单主行动约束
+- 状态: completed
+- 开始时间: 2026-04-29 17:18
+- 完成时间: 2026-04-29 17:19
+- 尝试次数: 1
+- Monkey summary: 为 `create_crew_action` 添加 active `current_action_id` / active `crew_actions` 占用检查，event candidate blocking slot 判断纳入当前主行动占用，并补充 blocking event/call 冲突与非阻塞背景候选测试。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
