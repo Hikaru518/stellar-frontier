@@ -1,14 +1,16 @@
 ---
 source_design: docs/plans/2026-04-27-22-56/communication-table-gameplay-design.md
+technical_design: docs/plans/2026-04-27-22-56/communication-table-gameplay-technical-design.md
 target_wiki: docs/gameplay/communication-table/communication-table.md
 related_updates:
   - docs/gameplay/event-system/event-system.md
   - docs/gameplay/map-system/map-system.md
+  - docs/game_model/call-action.md
   - docs/game_model/map.md
   - docs/game_model/event-integration.md
   - docs/game_model/crew.md
-backup: docs/plans/2026-04-27-22-56/wiki-backup-20260428-142500.md
 date: 2026-04-28 14:25
+reaudited_at: 2026-04-29
 ---
 
 # Wiki Merge Diff: communication-table-gameplay
@@ -20,6 +22,7 @@ date: 2026-04-28 14:25
 - [章节 5 机制与规则] 新增当前代码口径的 call-actions 规则：通用行动来自 `content/call-actions/basic-actions.json`，对象行动来自 `content/call-actions/object-actions.json`。
 - [章节 5.3 参数与默认值] 新增当前实现耗时表：调查 `120 秒`、对象调查 `120 秒`、采集 `180 秒`、建设 `300 秒`、回收 `180 秒`、扫描 `90 秒`、待命即时结算、停止处理器即时结算。
 - [章节 7 关键场景] 新增主动调查、通话派遣移动、对象交互、事件来电、紧急事件处理 5 个场景。
+- [docs/game_model/call-action.md] 新增通话行动模型，记录 `content/call-actions/*.json`、按钮生成、行动结算、handler 白名单和事件 runtime call 的边界。
 
 ## 2. 更新（Updated）
 
@@ -86,8 +89,15 @@ date: 2026-04-28 14:25
 
 - `docs/gameplay/event-system/event-system.md` 保留事件图、runtime event/call/objective、condition/effect、handler registry、生产级校验和原有样例事件池。
 - `docs/game_model/event.md` 未修改；当前设计没有新增触发类型、节点类型、runtime event 字段或 call template 字段。
-- `docs/index.md` 未手工修改；该文件由 `audit-wiki` 自动维护。
+- 初次 merge 未修改 `docs/index.md`；2026-04-29 重新审计时已按 audit-wiki 索引职责同步入口。
 
 ## 5. 失败记录（如有）
 
 *（暂无）*
+
+## 6. 重新审计记录（2026-04-29）
+
+- 主目标 `docs/gameplay/communication-table/communication-table.md` 仍保留策划案章节 1-9 的当前态合入结果，未发现章节 10-11 的阶段化内容残留。
+- related updates 仍保留在 `docs/gameplay/event-system/event-system.md`、`docs/gameplay/map-system/map-system.md`、`docs/game_model/map.md`、`docs/game_model/event-integration.md` 和 `docs/game_model/crew.md` 中。
+- `docs/game_model/call-action.md` 已作为本轮 technical design 的数据契约补充存在，原 diff 漏列，已补入 related updates。
+- `docs/index.md` 在本次重新审计前缺少通讯台 Gameplay 与通话行动模型入口；本次已同步更新索引页。
