@@ -1,6 +1,6 @@
 # 事件集成状态边界
 
-本文描述事件系统会读写的外部 game model 边界。事件核心资产、事件图、runtime event/call/objective、condition/effect 和校验规则见 `docs/game_model/event.md`。地图配置、运行时地图状态、坐标与 legacy tile 投影见 `docs/game_model/map.md`。
+本文描述事件系统会读写的外部 game model 边界。事件核心资产、事件图、runtime event/call/objective、condition/effect 和校验规则见 `docs/game_model/event.md`。地图配置、运行时地图状态、坐标和调查报告见 `docs/game_model/map.md`。
 
 事件引擎只通过结构化 condition/effect 读写这些状态；它不直接绕过目标模型任意修改 `GameState`。
 
@@ -52,7 +52,7 @@
 | --- | --- | --- |
 | `id` | `string` | 行动实例 ID。 |
 | `crew_id` | `string` | 执行动作的队员。 |
-| `type` | `move` / `survey` / `gather` / `build` / `extract` / `scan` / `return_to_base` / `event_waiting` / `guarding_event_site` | 行动类型。当前内容层的初始 `ActiveAction` 类型仍以 `move`、`survey`、`gather`、`build`、`standby`、`event` 为主；通讯台对象行动结算层额外支持 `extract` 与 `scan`。 |
+| `type` | `move` / `standby` / `stop` / `survey` / event-defined type | 行动类型。基础行动只包含移动、待命、停止和调查；剧情动作由结构化事件或目标定义。 |
 | `status` | `queued` / `active` / `paused` / `completed` / `failed` / `interrupted` / `cancelled` | 行动状态。 |
 | `source` | `player_command` / `event_action_request` / `objective` / `system` | 行动来源。 |
 | `parent_event_id` | `string | null` | 请求该行动的事件。 |
@@ -74,8 +74,8 @@
 - `objective` 可以要求某类行动完成后推进 parent event。
 - 行动完成后用 `action_complete` 或 `objective_completed` 触发事件推进。
 - 事件不能把行动执行进度藏在事件节点内部；行动耗时、路径、中断和完成状态由行动系统维护。
-- 通讯台普通行动由 `content/call-actions/*.json` 定义并创建真实行动；事件系统消费 `arrival`、`action_complete`、`idle_time` 或 `call_choice`，而不是把每个普通按钮都建成事件图节点。
-- 地块对象行动当前通过 `candidateActions` 与 call-actions 定义映射到 `survey`、`gather`、`build`、`extract` 或 `scan`，完成后以 `action_complete` payload 携带 action type、object id 和 tags。
+- 通讯台基础行动由 `content/universal-actions/universal-actions.json` 定义并创建真实行动；事件系统消费 `arrival`、`action_complete`、`idle_time` 或 `call_choice`，而不是把每个普通按钮都建成事件图节点。
+- 地块对象通过类型、标签和可见性参与结构化地点事件条件；剧情动作由事件选项、`action_request` 或 objective 提供。
 
 ## 4. `tile_state` 事件可访问字段
 
@@ -96,7 +96,7 @@
 | `current_crew_ids` | `string[]` | 当前在地块上的队员。 |
 | `resource_nodes` | `tile_resource_node[]` | 由已可见 / 已揭示的 `resourceNode` 地块对象派生。 |
 | `site_objects` | `site_object[]` | 由已可见 / 已揭示的地块对象派生，例如遗物、营地痕迹、异常设备。 |
-| `buildings` | `building_state[]` | 由玩家设施或 legacy building 投影派生。 |
+| `facilities` | `facility_state[]` | 由已揭示地块对象或事件写入状态派生。 |
 | `environment` | `object | null` | 调查报告中的环境读数；未调查时不可直接泄露。 |
 | `event_marks` | `event_mark[]` | 事件写入的地块标记。 |
 | `history_keys` | `string[]` | 地块级历史索引。 |
@@ -112,7 +112,7 @@
 
 事件系统区分三类 target：`crew_inventory`、`base_inventory` / `base_resources`、`tile_resources`。
 
-通讯台对象交互产生的简单携带物复用队员 inventory。当前规则只记录物品 / 资源 ID 与数量，不引入重量、容量、丢弃、交付回基地或运输链；如后续需要这些规则，应扩展 inventory model，而不是把隐性字段塞进事件日志。
+结构化事件结算产生的简单携带物复用队员 inventory。当前规则只记录物品 / 资源 ID 与数量，不引入重量、容量、丢弃、交付回基地或运输链；如后续需要这些规则，应扩展 inventory model，而不是把隐性字段塞进事件日志。
 
 ### 5.1 `item_definition`
 
@@ -226,7 +226,6 @@
 | `crew` | `Record<crew_id, crew_state>` | 队员状态。 |
 | `crew_actions` | `Record<action_id, crew_action_state>` | 队员行动状态。 |
 | `map` | `map_state` | 地图运行时事实源，包含发现 / 调查状态、对象 / 状态揭示和调查报告索引。 |
-| `tiles` | `Record<tile_id, tile_state>` | 兼容投影，可由 `map` 派生；不应作为长期事实源。 |
 | `inventories` | `Record<inventory_id, inventory_state>` | 背包与资源容器。 |
 | `active_events` | `Record<event_id, event>` | 只保存未结束事件。 |
 | `active_calls` | `Record<call_id, call>` | 只保存未结束 call。 |

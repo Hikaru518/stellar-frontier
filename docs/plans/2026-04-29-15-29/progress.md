@@ -33,7 +33,7 @@ source:
 | 17 | T017 | 删除 deriveLegacyTiles 与旧 MapTile 投影 | completed | 1 |
 | 18 | T018 | 清理 PC UI mock 文案 | completed | 1 |
 | 19 | T019 | 清理 mobile UI mock 文案 | completed | 1 |
-| 20 | T020 | 更新正式项目文档 | pending | 0 |
+| 20 | T020 | 更新正式项目文档 | completed | 1 |
 | 21 | T021 | 全仓关键词审计与生成产物同步 | pending | 0 |
 | 22 | T022 | 集成验证与收口 | pending | 0 |
 
@@ -182,3 +182,10 @@ source:
 - 完成时间: 2026-04-29 18:17
 - 尝试次数: 1
 - Monkey summary: 移除 mobile UI 中的 demo/live/armed 与固定求救文案，连接卡片改为真实连接状态，无私密来电时显示“暂无私密来电”中性空状态；未修改 shared transport 逻辑。验证：`npm --prefix apps/mobile-client run lint` 通过；`npm --prefix apps/mobile-client run test` 通过。
+
+### T020: 更新正式项目文档
+- 状态: completed
+- 开始时间: 2026-04-29 18:18
+- 完成时间: 2026-04-29 18:28
+- 尝试次数: 1
+- Monkey summary: 同步正式 Markdown 文档为 Mike、Amy、Garry 三人队伍、四类基础行动、`crew_actions` 唯一行动事实源和结构化事件入口；移除正式文档中的旧事件入口、旧对象行动与旧地图投影表述。验证：文档范围关键词审计通过；`docs/core-ideas.md` 按规则未修改。

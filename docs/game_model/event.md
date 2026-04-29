@@ -52,7 +52,7 @@
 | `schema_version` | `string` | 内容结构版本；校验器用它选择 schema。 |
 | `id` | `string` | 全局唯一事件定义 ID。 |
 | `version` | `number` | 事件定义版本；runtime event 记录创建时使用的版本。 |
-| `domain` | `string` | 资产所属 domain，例如 `forest`、`volcano`、`crew_kael`。 |
+| `domain` | `string` | 资产所属 domain，例如 `forest`、`volcano`、`crew_mike`。 |
 | `title` | `string` | 内部与内容生产可读标题；是否展示给玩家由 UI 决定。 |
 | `summary` | `string` | 事件意图摘要，用于 review、日志模板选择和 dry-run 说明。 |
 | `tags` | `string[]` | 搜索、筛选、触发索引用标签。 |
@@ -388,7 +388,7 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 | `forest_trace_small_camp` 普通发现不打断 | `action_complete`；`log_only -> end`，可选非阻塞 `call` 作为自动回报。 | `tile_state.event_marks`、`event_log`、`world_history`、非 blocking event。 | 事件可作为世界反馈存在，不抢占队员行动或通讯。 |
 | `forest_beast_encounter` 紧急多通话 | `action_complete` 或 `proximity`；`call -> wait -> call -> random -> end`。 | blocking event、blocking call、`selected_options`、`random_results`、`crew_state.condition_tags`、`tile_state.danger_tags`。 | 一个 event 可生成多次 call；call 文案不决定分支，`option_id` 决定分支。 |
 | `mountain_signal_probe` 等待节点与时间压力 | `arrival` 或 `action_complete`；`call -> wait -> check/random -> call -> end`。 | `next_wakeup_at`、`time_wakeup`、`event_node_finished`、`crew_action_state.event_waiting`。 | 等待是事件图一等节点，时间系统能推进事件。 |
-| `volcanic_ash_trace` 跨队员 objective | `action_complete`；`call -> objective -> wait/waiting_objective -> end`。 | runtime `objective`、任意符合条件队员执行、`objective_completed`、parent event 回写。 | 事件能生成独立目标；Kael 完成行动后推进 Lin Xia 的 parent event。 |
+| `volcanic_ash_trace` 跨队员 objective | `action_complete`；`call -> objective -> wait/waiting_objective -> end`。 | runtime `objective`、任意符合条件队员执行、`objective_completed`、parent event 回写。 | 事件能生成独立目标；Mike、Amy 或 Garry 完成行动后推进 parent event。 |
 | `lost_relic_argument` 长期角色和世界后果 | `arrival` 或 `action_complete`；`call -> wait -> call -> check -> 多个 end`。 | `call_template` 变体、`personality_tags` 改变、`site_objects` 删除、`world_flags`、`spawn_event` / `unlock_event_definition`、日记追加。 | 最终选项能改变角色、地图、后续事件池和玩家可见摘要。 |
 
 ## 8. 模型边界与后续扩展

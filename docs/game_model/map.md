@@ -1,6 +1,6 @@
 # 地图模型
 
-本文描述可配置地图系统的核心 game model。地图既是静态内容配置，也是运行时探索状态的事实源；UI、队员行动、调查报告和事件兼容层都应从同一套地图模型读取或派生状态。
+本文描述可配置地图系统的核心 game model。地图既是静态内容配置，也是运行时探索状态的事实源；UI、队员行动、调查报告和结构化事件都应从同一套地图模型读取或派生状态。
 
 地图的玩法规则与玩家体验见 `docs/gameplay/map-system/map-system.md`。事件可访问的地块投影边界见 `docs/game_model/event-integration.md`。
 
@@ -8,11 +8,11 @@
 
 | 规则 | 说明 |
 | --- | --- |
-| `scope` | 覆盖静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换、可见窗口、调查报告、legacy tile 投影、存档 reset 边界。 |
-| `out_of_scope` | 不定义地图编辑器 UI，不定义随机地图生成，不实现天气模拟，不定义对象级通话菜单，不重构事件系统语义。 |
+| `scope` | 覆盖静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换、可见窗口、调查报告和存档 reset 边界。 |
+| `out_of_scope` | 不定义地图编辑器 UI，不定义随机地图生成，不实现天气模拟，不定义对象级通用行动菜单，不重构事件系统语义。 |
 | `content_source_of_truth` | 地图静态内容来自 `content/maps/default-map.json`。地形、区域名、天气、环境属性、地块对象与特殊状态定义不保存在运行时状态里。 |
 | `runtime_source_of_truth` | 玩家发现、调查、揭示对象、揭示状态、活跃状态和调查报告索引来自 `GameState.map`。 |
-| `compatibility_policy` | 旧 `GameState.tiles` / `MapTile` 只作为兼容投影存在，不再作为地图事实源。 |
+| `compatibility_policy` | 研发期不迁移旧地图视图或旧存档；当前事实源统一为地图配置和 `GameState.map`。 |
 | `save_policy` | 固定 `4 x 4` 旧存档与配置驱动地图不兼容；读取时应 reset 或使用新的 save 版本 / save key。 |
 
 ## 2. 模型分层
@@ -24,9 +24,8 @@ flowchart TD
   InitialMap --> GameMapState["GameMapState"]
   GameMapState --> VisibleWindow["visible tile window"]
   GameMapState --> InvestigationReport["InvestigationReport"]
-  GameMapState --> LegacyTiles["legacy MapTile projection"]
-  LegacyTiles --> EventCompat["eventSystem compatibility"]
   GameMapState --> CrewLocation["crew location labels"]
+  GameMapState --> EventRuntime["structured event runtime"]
 ```
 
 | 模型 | 代码名称 | 中文名 | 来源 | 介绍 |
@@ -34,7 +33,6 @@ flowchart TD
 | 内容文件 | `content/maps/default-map.json` | 默认地图内容配置 | JSON | 地图编辑 / 内容生产应读写的文件，包含尺寸、origin、初始发现地块和完整地图块定义。 |
 | 内容定义 | `MapConfig` | 地图配置 | `src/content/contentData.ts` | TypeScript 对地图内容的描述，运行时初始化和查询 helper 读取它。 |
 | 运行时状态 | `GameMapState` | 地图运行时状态 | `GameState.map` | 保存玩家探索进度、调查状态、对象 / 状态揭示和调查报告索引。 |
-| 兼容投影 | `MapTile` / `deriveLegacyTiles` | 旧地块视图 | helper 派生 | 给旧事件系统或过渡期组件读取的派生视图，不应被视为事实源。 |
 
 ## 3. 静态内容模型
 
@@ -67,7 +65,7 @@ flowchart TD
 
 ### 3.3 `tile_object_definition`
 
-地块对象统一承载资源点、结构、信号、危险、设施、遗迹和地标。对象可以声明未来候选行动，但行动菜单如何生成仍由通话 / 行动系统单独设计。
+地块对象统一承载资源点、结构、信号、危险、设施、遗迹和地标。对象通过类型、标签和可见性参与结构化地点事件；地图本身不生成资源获取、设施处理、回收或扫描等通用按钮。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -76,11 +74,7 @@ flowchart TD
 | `name` | `string` | 玩家可见名称。 |
 | `description` | `string` | 详情描述，可选。 |
 | `visibility` | `onDiscovered` / `onInvestigated` | 对象在发现地块时显示，或调查后显示。 |
-| `tags` | `string[]` | 规则和内容标签，供后续事件 / 行动条件使用。 |
-| `legacyResource` | `string | null` | 供旧事件系统派生 `resources`。 |
-| `legacyBuilding` | `string | null` | 供旧 UI / 旧事件派生 `buildings`。 |
-| `legacyInstrument` | `string | null` | 供旧 UI 派生 `instruments`。 |
-| `candidateActions` | `string[]` | 可由已揭示对象提供的通话候选行动。schema 当前允许 `move`、`survey`、`gather`、`build`、`standby`、`extract`、`scan`；对象按钮生成只解析 `content/call-actions/*.json` 中 `category = object_action` 的定义，并要求对象类型匹配。 |
+| `tags` | `string[]` | 规则和内容标签，供结构化事件、地点条件和调查入口使用。 |
 
 ### 3.4 `tile_special_state_definition`
 
@@ -96,7 +90,6 @@ flowchart TD
 | `tags` | `string[]` | 规则和内容标签。 |
 | `startsActive` | `boolean` | 是否开局 active。 |
 | `durationGameSeconds` | `number | null` | 可选持续时间。 |
-| `legacyDanger` | `string | null` | 供旧事件系统派生 `danger`。 |
 
 ### 3.5 `tile_environment`
 
@@ -172,7 +165,7 @@ type RuntimeTileState = {
 - 内部 tile id 继续为 `row-col`。
 - `row` 和 `col` 从 `1` 开始。
 - 内部边界由 `GameMapState.rows` 和 `GameMapState.cols` 决定。
-- 移动、路径、事件兼容层可以继续使用内部 `row` / `col`，降低迁移成本。
+- 移动、路径和结构化事件可以继续使用内部 `row` / `col`。
 
 ### 5.2 玩家显示坐标
 
@@ -252,27 +245,7 @@ type InvestigationReport = {
 7. 向系统日志追加一条调查摘要，日志项关联 `reportId`。
 8. 保持既有调查完成事件触发逻辑。
 
-## 8. Legacy `MapTile` 投影
-
-过渡期可保留 `GameState.tiles`，但它应由 `GameState.map` 派生，或在单一 helper 中集中同步。业务逻辑不应把 legacy tile 当作地图事实源继续写入。
-
-派生规则：
-
-| Legacy 字段 | 派生来源 |
-| --- | --- |
-| `id` | 静态 tile `id`。 |
-| `coord` | 内部 `(row,col)` 兼容字段；玩家坐标不得从该字段直接显示。 |
-| `terrain` | 静态 tile `terrain`。 |
-| `resources` | 已可见 / 已揭示对象的 `legacyResource`。 |
-| `buildings` | 已可见 / 已揭示对象的 `legacyBuilding`。 |
-| `instruments` | 已可见 / 已揭示对象的 `legacyInstrument`。 |
-| `danger` | active 且 revealed 的特殊状态 `legacyDanger`。 |
-| `status` | 可由 discovered、investigated 和 active special state 简化派生。 |
-| `investigated` | `RuntimeTileState.investigated`。 |
-
-旧事件 effects 若修改 `tile.status` 或 `tile.danger`，短期可以写回 runtime special state 的兼容状态或保存在 legacy overlay 中。长期应移除旧 `resources/buildings/instruments/danger/status` 作为事实源。
-
-## 9. 系统关系
+## 8. 系统关系
 
 ### 队员系统
 
@@ -286,12 +259,12 @@ type InvestigationReport = {
 - 通讯台和队员卡片展示区域名与行动状态。
 - 通话移动目标列表可包含已发现地块和 `frontier` 地块。
 - 未探索目标显示为“未探索信号（x,y）”，不得泄露真实区域名、地形、天气、对象或特殊状态。
-- 已揭示地块对象可通过 `candidateActions` 生成通话动态按钮；按钮定义、耗时、handler、对象类型约束来自 `content/call-actions/*.json`。
+- 已揭示地块对象可作为结构化地点事件的条件、展示上下文或调查线索；剧情动作由事件选项提供，不由地图对象直接生成通用按钮。
 
 ### 事件系统
 
-- 当前事件系统通过 legacy tile 投影继续读取 `terrain/resources/danger/status/investigated`。
-- 天气、特殊状态、环境属性和地块对象可作为后续事件条件、概率修正或分支的语义来源。
+- 当前事件系统通过地图配置和 `GameState.map` 读取地形、发现状态、调查状态、对象、特殊状态和调查报告。
+- 天气、特殊状态、环境属性和地块对象可作为事件条件、概率修正或分支的语义来源。
 - 事件系统不应绕过地图模型任意写 `GameState.map`；应通过结构化 effect 修改发现、调查、状态、对象和历史。
 
 ### 存档
@@ -301,7 +274,7 @@ type InvestigationReport = {
 - 备选策略是在存档内新增 `saveVersion: 2`；读取时若缺失或版本过低，则丢弃旧存档并创建新状态。
 - reset 内容包括旧 `tiles`、队员旧位置、旧行动目标、旧事件队列、紧急事件和旧日志。
 
-## 10. 校验规则
+## 9. 校验规则
 
 地图内容校验至少覆盖：
 
@@ -314,16 +287,14 @@ type InvestigationReport = {
 - 默认地图 `tiles` 覆盖所有合法格；如果未来允许稀疏地图，需要先定义 blocked / void 规则。
 - 地块对象 `id` 在地图内唯一。
 - 特殊状态 `id` 在单 tile 内唯一。
-- `legacyResource`、`legacyBuilding`、`legacyInstrument` 如引用内容 ID，应校验对应内容存在；如果仍使用中文显示名，至少校验为字符串并记录内容 ID 化需求。
 
-## 11. 后续扩展记录
+## 10. 后续扩展记录
 
 - 事件系统与地图对象联调：事件条件可直接引用 `object.kind`、`object.tags`、`object.id`。
 - 事件系统与天气联调：天气参与事件触发、概率修正或行动风险。
 - 事件系统与特殊状态联调：明确状态来源、持续时间、过期、刷新、揭示和日志规则。
 - 事件系统与环境属性联调：温度、湿度、磁场、辐射等结构化读数可进入事件条件。
-- 地块对象行动元数据扩展：当前对象只声明 `candidateActions`，行动定义集中在 `content/call-actions/*.json`；未来如果需要每个对象覆盖耗时、消耗或工具需求，需要扩展内容模型。
-- 移除 legacy `MapTile` 事实源：统一由地图配置和 `GameState.map` 派生。
+- 地点剧情动作元数据扩展：当前基础行动只包含移动、待命、停止和调查；未来如果需要每个对象覆盖耗时、消耗或工具需求，应通过结构化事件或目标模型扩展。
 
 ## 来源
 
