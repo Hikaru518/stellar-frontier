@@ -11,8 +11,6 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
       "@stellar-frontier/dual-device": ["../../packages/dual-device/src/index.ts"]
     },
