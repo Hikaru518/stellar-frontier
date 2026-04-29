@@ -499,12 +499,30 @@ function settleGameTime(state: GameState): GameState {
   let tiles = state.tiles;
   let logs = state.logs;
   let baseInventory = state.baseInventory;
+  let crewActions = materializeLegacyActiveActions(state);
+  changed = changed || crewActions !== state.crew_actions;
   const triggerContexts: TriggerContext[] = [];
+  const dueActionsByCrew = collectDueCrewActions(crewActions, state.elapsedGameSeconds);
 
   const crew = state.crew.map((member) => {
     let nextMember = member;
+    const dueAction = dueActionsByCrew.get(member.id);
 
-    if (member.activeAction?.actionType === "move") {
+    if (dueAction) {
+      const settled = settleCrewActionState(dueAction, member, state.elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
+      nextMember = settled.member;
+      resources = settled.resources;
+      tiles = settled.tiles;
+      logs = settled.logs;
+      map = settled.map;
+      baseInventory = settled.baseInventory ?? baseInventory;
+      crewActions = {
+        ...crewActions,
+        [dueAction.id]: completeCrewActionState(dueAction, state.elapsedGameSeconds),
+      };
+      triggerContexts.push(...settled.triggerContexts);
+      changed = true;
+    } else if (member.activeAction?.actionType === "move") {
       const movingMember = hydrateMoveActionRoute(member, tiles, state.elapsedGameSeconds);
       const settled = advanceCrewMovement(movingMember, tiles, logs, state.elapsedGameSeconds);
       nextMember = settled.member;
@@ -533,23 +551,13 @@ function settleGameTime(state: GameState): GameState {
           },
         });
       }
-    } else if (member.activeAction?.status === "inProgress" && state.elapsedGameSeconds >= member.activeAction.finishTime) {
-      const settled = settleCrewAction(member, state.elapsedGameSeconds, resources, baseInventory, tiles, logs, map);
-      nextMember = settled.member;
-      resources = settled.resources;
-      tiles = settled.tiles;
-      logs = settled.logs;
-      map = settled.map;
-      baseInventory = settled.baseInventory ?? baseInventory;
-      triggerContexts.push(...settled.triggerContexts);
-      changed = true;
     }
 
     return nextMember;
   });
 
   const syncedMap = syncMapCrew(map, crew);
-  let nextState = changed ? { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs } : state;
+  let nextState = changed ? { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs, crew_actions: crewActions } : state;
   nextState = processObjectiveCompletions(nextState, triggerContexts);
 
   for (const context of triggerContexts) {
@@ -557,6 +565,230 @@ function settleGameTime(state: GameState): GameState {
   }
 
   return processAppEventWakeups(nextState);
+}
+
+type LegacySettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" };
+
+function materializeLegacyActiveActions(state: GameState): Record<Id, CrewActionState> {
+  let crewActions = state.crew_actions;
+
+  for (const member of state.crew) {
+    const action = member.activeAction;
+    const actionType = action ? toCrewActionType(action.actionType) : null;
+    if (!action || action.status !== "inProgress" || !actionType || crewActions[action.id]) {
+      continue;
+    }
+
+    crewActions = {
+      ...crewActions,
+      [action.id]: createCrewActionStateFromActiveAction(state, member, action, actionType),
+    };
+  }
+
+  return crewActions;
+}
+
+function toCrewActionType(actionType: ActiveAction["actionType"]): CrewActionState["type"] | null {
+  switch (actionType) {
+    case "survey":
+    case "gather":
+    case "build":
+      return actionType;
+    case "move":
+      return null;
+    case "event":
+      return "event_waiting";
+    case "standby":
+      return "event_waiting";
+    default:
+      return null;
+  }
+}
+
+function createCrewActionStateFromActiveAction(
+  state: GameState,
+  member: CrewMember,
+  action: ActiveAction,
+  actionType: CrewActionState["type"],
+): CrewActionState {
+  const actionRecord = action as ActiveAction & {
+    objectId?: string;
+    handler?: string;
+    actionDefId?: string;
+  };
+  const candidateObject =
+    action.actionType === "gather" || action.actionType === "build"
+      ? findCandidateObject(action.targetTile ?? member.currentTile, action.actionType, state.map)
+      : undefined;
+  const objectId = stringParam(actionRecord.objectId) ?? candidateObject?.id;
+  const perRoundYield = typeof action.perRoundYield === "number" ? action.perRoundYield : undefined;
+  return {
+    id: action.id,
+    crew_id: member.id,
+    type: actionType,
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: action.fromTile ?? member.currentTile,
+    to_tile_id: action.actionType === "move" ? action.targetTile ?? null : null,
+    target_tile_id: action.targetTile ?? member.currentTile,
+    path_tile_ids: action.route,
+    started_at: action.startTime,
+    ends_at: action.startTime + action.durationSeconds,
+    progress_seconds: 0,
+    duration_seconds: action.durationSeconds,
+    action_params: {
+      ...action.params,
+      ...(action.resource
+        ? {
+            resource_id: action.resource,
+            perRoundYieldByResource: {
+              [action.resource]: perRoundYield ?? 1,
+            },
+          }
+        : {}),
+      ...(perRoundYield ? { per_round_yield: perRoundYield } : {}),
+      ...(objectId ? { object_id: objectId } : {}),
+      ...(typeof actionRecord.handler === "string" ? { handler: actionRecord.handler } : {}),
+      ...(typeof actionRecord.actionDefId === "string" ? { action_def_id: actionRecord.actionDefId } : {}),
+    },
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+  };
+}
+
+function collectDueCrewActions(crewActions: Record<Id, CrewActionState>, elapsedGameSeconds: number): Map<Id, CrewActionState> {
+  const dueActions = Object.values(crewActions)
+    .filter((action) => action.status === "active" && typeof action.ends_at === "number" && action.ends_at <= elapsedGameSeconds)
+    .sort((left, right) => (left.ends_at ?? 0) - (right.ends_at ?? 0) || left.id.localeCompare(right.id));
+  const byCrew = new Map<Id, CrewActionState>();
+
+  for (const action of dueActions) {
+    if (!byCrew.has(action.crew_id)) {
+      byCrew.set(action.crew_id, action);
+    }
+  }
+
+  return byCrew;
+}
+
+function completeCrewActionState(action: CrewActionState, elapsedGameSeconds: number): CrewActionState {
+  return {
+    ...action,
+    status: "completed",
+    ends_at: action.ends_at ?? elapsedGameSeconds,
+    progress_seconds: action.duration_seconds,
+  };
+}
+
+function settleCrewActionState(
+  action: CrewActionState,
+  member: CrewMember,
+  elapsedGameSeconds: number,
+  resources: ResourceSummary,
+  baseInventory: GameState["baseInventory"],
+  tiles: MapTile[],
+  logs: SystemLog[],
+  map: GameMapState,
+): ActionSettlementPatch {
+  if (canSettleWithLegacyHandler(action)) {
+    const settled = settleAction({
+      member,
+      action: createSettlementActionFromCrewAction(member, action),
+      occurredAt: elapsedGameSeconds,
+      resources,
+      baseInventory,
+      tiles,
+      map,
+      logs,
+    });
+
+    return {
+      ...settled,
+      triggerContexts: settled.triggerContexts.length > 0 ? settled.triggerContexts : [createCrewActionCompleteTrigger(action, member, elapsedGameSeconds)],
+    };
+  }
+
+  const nextMember = {
+    ...member,
+    status: action.type === "event_waiting" ? "待命中。" : "行动完成，待命中。",
+    statusTone: (action.type === "event_waiting" ? "muted" : "neutral") as Tone,
+    activeAction: member.activeAction?.id === action.id ? undefined : member.activeAction,
+    unavailable: action.type === "event_waiting" ? false : member.unavailable,
+    canCommunicate: action.type === "event_waiting" ? true : member.canCommunicate,
+  };
+
+  return {
+    member: nextMember,
+    resources,
+    baseInventory,
+    tiles,
+    map,
+    logs: appendLogEntry(logs, `${member.name} 的行动已完成。`, "neutral", elapsedGameSeconds),
+    triggerContexts: [createCrewActionCompleteTrigger(action, member, elapsedGameSeconds)],
+  };
+}
+
+function canSettleWithLegacyHandler(
+  action: CrewActionState,
+): action is LegacySettleableCrewAction {
+  return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract";
+}
+
+function createSettlementActionFromCrewAction(member: CrewMember, action: LegacySettleableCrewAction): SettlementActiveAction {
+  const startedAt = action.started_at ?? 0;
+  const targetTile = action.target_tile_id ?? action.to_tile_id ?? member.currentTile;
+
+  return {
+    id: action.id,
+    actionType: action.type,
+    status: "inProgress",
+    startTime: startedAt,
+    durationSeconds: action.duration_seconds,
+    finishTime: action.ends_at ?? startedAt + action.duration_seconds,
+    fromTile: action.from_tile_id ?? member.currentTile,
+    targetTile,
+    route: action.path_tile_ids,
+    resource: stringParam(action.action_params.resource_id),
+    perRoundYield: numberParam(action.action_params.per_round_yield),
+    params: action.action_params,
+    objectId: stringParam(action.action_params.object_id),
+    handler: stringParam(action.action_params.handler),
+    actionDefId: action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract" ? action.type : undefined,
+  };
+}
+
+function createCrewActionCompleteTrigger(action: CrewActionState, member: CrewMember, elapsedGameSeconds: number): TriggerContext {
+  return {
+    trigger_type: "action_complete",
+    occurred_at: elapsedGameSeconds,
+    source: "crew_action",
+    crew_id: action.crew_id,
+    tile_id: action.target_tile_id ?? action.to_tile_id ?? member.currentTile,
+    action_id: action.id,
+    event_id: action.objective_id ? null : action.parent_event_id ?? null,
+    node_id: action.action_request_id ?? null,
+    objective_id: action.objective_id ?? null,
+    payload: {
+      action_type: action.type,
+      object_id: stringParam(action.action_params.object_id) ?? null,
+      tags: readStringArray(action.action_params.tags),
+    },
+  };
+}
+
+function stringParam(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function numberParam(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function settleCrewAction(

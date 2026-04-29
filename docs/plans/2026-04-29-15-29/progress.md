@@ -22,7 +22,7 @@ source:
 | 6 | T006 | 删除 editor legacy event 展示 | completed | 1 |
 | 7 | T007 | 建立 crew_actions 派生视图模型 | completed | 1 |
 | 8 | T008 | 强化阻塞与单主行动约束 | completed | 1 |
-| 9 | T009 | 迁移时间推进到 crew_actions | pending | 0 |
+| 9 | T009 | 迁移时间推进到 crew_actions | completed | 1 |
 | 10 | T010 | 迁移移动行动到 crew_actions | pending | 0 |
 | 11 | T011 | 迁移停止与待命行动到事件 runtime | pending | 0 |
 | 12 | T012 | 迁移调查当前区域到地点事件入口 | pending | 0 |
@@ -105,3 +105,10 @@ source:
 - 完成时间: 2026-04-29 17:19
 - 尝试次数: 1
 - Monkey summary: 为 `create_crew_action` 添加 active `current_action_id` / active `crew_actions` 占用检查，event candidate blocking slot 判断纳入当前主行动占用，并补充 blocking event/call 冲突与非阻塞背景候选测试。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。
+
+### T009: 迁移时间推进到 crew_actions
+- 状态: completed
+- 开始时间: 2026-04-29 17:21
+- 完成时间: 2026-04-29 17:32
+- 尝试次数: 1
+- Monkey summary: 将 `settleGameTime` 的到期行动结算切到 active `crew_actions`，完成后标记 action completed、清理旧 activeAction 显示并发出 `action_complete` trigger；objective completion 测试改为基于 `crew_actions`。调度层修复了 `event_waiting` action completion 保留 unavailable 的集成问题。验证：`npm --prefix apps/pc-client run test -- App.test.tsx` 通过；`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。

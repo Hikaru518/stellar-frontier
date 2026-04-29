@@ -1107,6 +1107,20 @@ describe("App", () => {
   it("completes a seeded volcanic runtime objective when its crew action finishes", () => {
     vi.useFakeTimers();
     const { eventId, objectiveId, actionId, eventState } = createVolcanicObjectiveState();
+    const action = eventCrewAction({
+      id: actionId,
+      crew_id: "amy",
+      type: "survey",
+      source: "objective",
+      parent_event_id: eventId,
+      objective_id: objectiveId,
+      from_tile_id: "4-3",
+      target_tile_id: "4-3",
+      started_at: 0,
+      ends_at: 1,
+      duration_seconds: 1,
+      action_params: { duration_seconds: 1 },
+    });
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -1130,15 +1144,7 @@ describe("App", () => {
             status: "复核火山灰轨迹中。",
             statusTone: "accent",
             hasIncoming: false,
-            activeAction: {
-              id: actionId,
-              actionType: "survey",
-              status: "inProgress",
-              startTime: 0,
-              durationSeconds: 1,
-              finishTime: 1,
-              targetTile: "4-3",
-            },
+            activeAction: null,
           },
         ],
         tiles: volcanicTiles(),
@@ -1146,6 +1152,7 @@ describe("App", () => {
         resources: initialResources,
         active_events: eventState.active_events,
         objectives: eventState.objectives,
+        crew_actions: { [action.id]: action },
       })),
     );
 
@@ -1156,6 +1163,11 @@ describe("App", () => {
     });
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.crew_actions[actionId]).toMatchObject({
+      status: "completed",
+      progress_seconds: 1,
+    });
+    expect(savedCrew(saved, "amy").activeAction).toBeUndefined();
     expect(saved.objectives[objectiveId].status).toBe("completed");
     expect(saved.active_events[eventId].status).toBe("resolved");
     expect(saved.active_events[eventId].current_node_id).toBe("ash_mapped_end");
