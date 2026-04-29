@@ -160,6 +160,29 @@ function App() {
       return;
     }
 
+    // Runtime calls dispatch the raw option_id from the EventDefinition; no
+    // translation. Handled before the legacy-dispatch translator so its
+    // unknown-id warning doesn't fire for valid event choice ids.
+    if (currentCall.runtimeCallId) {
+      if (currentCall.settled) {
+        return;
+      }
+      setGameState((state) =>
+        mergeEventRuntimeState(
+          state,
+          selectCallOption({
+            state: toEventEngineState(state),
+            index: eventContentIndex,
+            call_id: currentCall.runtimeCallId!,
+            option_id: actionId,
+            occurred_at: state.elapsedGameSeconds,
+          }).state,
+        ),
+      );
+      setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
+      return;
+    }
+
     // Translate the new schema's action ids back to the legacy "verb[:objectId]"
     // shape `applyImmediateOrCreateAction` understands. See
     // `docs/plans/2026-04-29-01-40/technical-design.md` §7.2 — the migrated
@@ -186,23 +209,6 @@ function App() {
     }
 
     if (currentCall.settled) {
-      return;
-    }
-
-    if (currentCall.runtimeCallId) {
-      setGameState((state) =>
-        mergeEventRuntimeState(
-          state,
-          selectCallOption({
-            state: toEventEngineState(state),
-            index: eventContentIndex,
-            call_id: currentCall.runtimeCallId!,
-            option_id: actionId,
-            occurred_at: state.elapsedGameSeconds,
-          }).state,
-        ),
-      );
-      setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
       return;
     }
 
