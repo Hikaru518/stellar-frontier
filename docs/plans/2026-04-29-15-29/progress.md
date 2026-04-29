@@ -1,7 +1,7 @@
 ---
 plan: "game-system-demock"
 started: "2026-04-29 16:35"
-status: "in_progress"
+status: "completed"
 branch: "feature/game-system-demock"
 source:
   implementation_plan: "docs/plans/2026-04-29-15-29/game-system-demock-implementation-plan.md"
@@ -35,7 +35,7 @@ source:
 | 19 | T019 | 清理 mobile UI mock 文案 | completed | 1 |
 | 20 | T020 | 更新正式项目文档 | completed | 1 |
 | 21 | T021 | 全仓关键词审计与生成产物同步 | completed | 1 |
-| 22 | T022 | 集成验证与收口 | pending | 0 |
+| 22 | T022 | 集成验证与收口 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -196,3 +196,10 @@ source:
 - 完成时间: 2026-04-29 18:39
 - 尝试次数: 1
 - Monkey summary: 完成全仓关键词审计清理，删除一次性旧迁移脚本，更新 content 校验以基于当前 crew content 校验结构化事件 crew 引用，并重跑 event manifest 生成器。剩余命中仅限历史 plans、Pencil 源文件、工具链/API 名或当前正式模型字段。验证：`npm run validate:content`、PC lint/test、mobile lint/test、editor 目标测试均通过。
+
+### T022: 集成验证与收口
+- 状态: completed
+- 开始时间: 2026-04-29 18:40
+- 完成时间: 2026-04-29 18:45
+- 尝试次数: 1
+- Monkey summary: 完成最终集成验证；同步 Rush 依赖后 root `npm run validate:content`、`npm run lint`、`npm run test` 全部通过，并修复 editor App 测试在 Node 25 下的 localStorage warning。`npm run test:e2e` 因本机 Playwright Chromium executable 缺失未能完成浏览器级验证。
