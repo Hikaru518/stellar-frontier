@@ -20,7 +20,7 @@ source:
 | 4 | T004 | 三人化地图、初始状态与测试 fixture | completed | 1 |
 | 5 | T005 | 删除 legacy event 内容入口 | completed | 1 |
 | 6 | T006 | 删除 editor legacy event 展示 | completed | 1 |
-| 7 | T007 | 建立 crew_actions 派生视图模型 | in_progress | 1 |
+| 7 | T007 | 建立 crew_actions 派生视图模型 | completed | 1 |
 | 8 | T008 | 强化阻塞与单主行动约束 | pending | 0 |
 | 9 | T009 | 迁移时间推进到 crew_actions | pending | 0 |
 | 10 | T010 | 迁移移动行动到 crew_actions | pending | 0 |
@@ -93,6 +93,8 @@ source:
 - Monkey summary: 删除 editor `legacy_event` asset type 与 UI 渲染路径，并让 editor library/browser 支持结构化 presets、handlers、schemas。验证：`npm --prefix apps/editor run test -- src/event-editor/EventBrowser.test.tsx helper/contentStore.test.mjs` 通过；完整 editor lint/test 仍因既有 graph 依赖 `@xyflow/react` / `@dagrejs/dagre` 缺失受阻。
 
 ### T007: 建立 crew_actions 派生视图模型
-- 状态: in_progress
+- 状态: completed
 - 开始时间: 2026-04-29 17:12
+- 完成时间: 2026-04-29 17:17
 - 尝试次数: 1
+- Monkey summary: 新增 `crew_actions` 派生 view model，覆盖 idle、moving、waiting call、blocked action 等状态，并让 PC 页面读取派生行动标题、进度、通讯可用性和阻塞原因。验证：`npm --prefix apps/pc-client run lint` 通过；`npm --prefix apps/pc-client run test` 通过。

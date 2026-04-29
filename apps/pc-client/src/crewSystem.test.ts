@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, startCrewMove } from "./crewSystem";
+import { advanceCrewMovement, createActiveActionFromCrewAction, createMovePreview, deriveCrewActionViewModel, startCrewMove } from "./crewSystem";
 import type { CrewMember, MapTile } from "./data/gameData";
 import { initialCrew } from "./data/gameData";
-import type { CrewActionState } from "./events/types";
+import type { CrewActionState, CrewState, RuntimeCall } from "./events/types";
 
 describe("createActiveActionFromCrewAction", () => {
   it("maps event move crew actions to active move actions with timing", () => {
@@ -62,6 +62,133 @@ describe("createActiveActionFromCrewAction", () => {
       finishTime: 300,
       targetTile: "2-3",
       params: { reason: "beast_tracks" },
+    });
+  });
+});
+
+describe("deriveCrewActionViewModel", () => {
+  it("derives idle display state when no crew action or call is active", () => {
+    const member = { ...crewMember("mike", "1-1"), status: "待命中。", statusTone: "neutral" as const };
+
+    const view = deriveCrewActionViewModel({
+      member,
+      crewActions: {},
+      activeCalls: {},
+      elapsedGameSeconds: 40,
+      tiles: [tile("1-1", "平原")],
+    });
+
+    expect(view).toMatchObject({
+      crewId: "mike",
+      actionStatus: "idle",
+      actionTitle: "原地待命",
+      statusText: "待命中。",
+      timingText: "无进行中的计时行动",
+      progressPercent: null,
+      canCommunicate: true,
+      canStartCall: true,
+    });
+    expect(view.blockingReason).toBeUndefined();
+  });
+
+  it("derives moving progress from crew_actions", () => {
+    const member = crewMember("mike", "1-1");
+    const action = crewAction({
+      id: "move-1",
+      crew_id: "mike",
+      type: "move",
+      from_tile_id: "1-1",
+      target_tile_id: "1-2",
+      started_at: 10,
+      ends_at: 70,
+      progress_seconds: 30,
+      duration_seconds: 60,
+    });
+
+    const view = deriveCrewActionViewModel({
+      member,
+      runtimeCrew: crewRuntime({ current_action_id: action.id }),
+      crewActions: { [action.id]: action },
+      activeCalls: {},
+      elapsedGameSeconds: 40,
+      tiles: [tile("1-1", "平原"), tile("1-2", "丘陵")],
+    });
+
+    expect(view).toMatchObject({
+      actionStatus: "moving",
+      actionTitle: "移动至 (1,2)",
+      statusText: "正在前往 (1,2)。",
+      timingText: "移动剩余 00:30",
+      progressPercent: 50,
+      canCommunicate: true,
+      canStartCall: true,
+    });
+  });
+
+  it("derives waiting-call display from active calls", () => {
+    const member = crewMember("amy", "2-3");
+    const call = runtimeCall({
+      id: "call-1",
+      crew_id: "amy",
+      status: "incoming",
+      expires_at: 130,
+      rendered_lines: [{ template_variant_id: "line-1", text: "森林频道请求接入。", speaker_crew_id: "amy" }],
+    });
+
+    const view = deriveCrewActionViewModel({
+      member,
+      crewActions: {},
+      activeCalls: { [call.id]: call },
+      elapsedGameSeconds: 100,
+      tiles: [tile("2-3", "森林 / 山")],
+    });
+
+    expect(view).toMatchObject({
+      actionStatus: "waiting_call",
+      actionTitle: "等待通讯接入",
+      statusText: "森林频道请求接入。",
+      timingText: "事件通话剩余 00:30",
+      progressPercent: null,
+      canCommunicate: true,
+      canStartCall: true,
+      activeCallId: "call-1",
+    });
+  });
+
+  it("derives blocked action state from runtime crew claims", () => {
+    const member = crewMember("garry", "3-3");
+    const action = crewAction({
+      id: "blocked-1",
+      crew_id: "garry",
+      type: "guarding_event_site",
+      parent_event_id: "event-1",
+      target_tile_id: "3-3",
+      can_interrupt: false,
+      duration_seconds: 120,
+    });
+
+    const view = deriveCrewActionViewModel({
+      member,
+      runtimeCrew: crewRuntime({
+        id: "garry",
+        current_action_id: action.id,
+        communication_state: "blocked",
+        blocking_event_id: "event-1",
+      }),
+      crewActions: { [action.id]: action },
+      activeCalls: {},
+      elapsedGameSeconds: 30,
+      tiles: [tile("3-3", "丘陵")],
+    });
+
+    expect(view).toMatchObject({
+      actionStatus: "blocked",
+      actionTitle: "事件行动锁定",
+      statusText: "事件占用主要行动。",
+      progressPercent: 25,
+      canCommunicate: false,
+      canStartCall: false,
+      blockingReason: "事件 event-1 占用主要行动。",
     });
   });
 });
@@ -136,6 +263,55 @@ function crewAction(overrides: Partial<CrewActionState>): CrewActionState {
     can_interrupt: true,
     interrupt_duration_seconds: 10,
     action_params: {},
+    ...overrides,
+  };
+}
+
+function crewRuntime(overrides: Partial<CrewState>): CrewState {
+  return {
+    id: "mike",
+    display_name: "Mike",
+    tile_id: "1-1",
+    status: "idle",
+    attributes: {
+      strength: 3,
+      agility: 3,
+      intelligence: 3,
+      perception: 3,
+      luck: 3,
+    },
+    personality_tags: [],
+    expertise_tags: [],
+    condition_tags: [],
+    communication_state: "available",
+    current_action_id: null,
+    blocking_event_id: null,
+    blocking_call_id: null,
+    background_event_ids: [],
+    inventory_id: "inv_mike",
+    diary_entry_ids: [],
+    event_history_keys: [],
+    ...overrides,
+  };
+}
+
+function runtimeCall(overrides: Partial<RuntimeCall>): RuntimeCall {
+  return {
+    id: "call-1",
+    event_id: "event-1",
+    event_node_id: "node-1",
+    call_template_id: "template-1",
+    crew_id: "mike",
+    status: "incoming",
+    created_at: 0,
+    connected_at: null,
+    ended_at: null,
+    expires_at: null,
+    render_context_snapshot: {},
+    rendered_lines: [],
+    available_options: [],
+    selected_option_id: null,
+    blocking_claim_id: null,
     ...overrides,
   };
 }

@@ -336,10 +336,12 @@ function App() {
     return (
       <CommunicationStation
         crew={crew}
+        crewActions={gameState.crew_actions}
         activeCalls={gameState.active_calls}
         objectives={gameState.objectives}
         eventLogs={gameState.event_logs}
         elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
         gameTimeLabel={gameTimeLabel}
         onBack={() => setPage("control")}
         onStartCall={startCall}
@@ -375,6 +377,8 @@ function App() {
           tiles={tiles}
           map={map}
           crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
           eventLogs={gameState.event_logs}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}

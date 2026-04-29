@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig, type MapSpecialStateDefinition } from "../content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition } from "../content/mapObjects";
-import { createMovePreview, formatMoveRoute, getCrewActionTiming } from "../crewSystem";
+import { createMovePreview, deriveCrewActionViewModel, formatMoveRoute, type CrewActionViewModel } from "../crewSystem";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
-import type { EventLog } from "../events/types";
+import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
 import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
@@ -12,6 +12,8 @@ interface MapPageProps {
   tiles: MapTile[];
   map: GameMapState;
   crew: CrewMember[];
+  crewActions: Record<string, CrewActionState>;
+  activeCalls: Record<string, RuntimeCall>;
   eventLogs: EventLog[];
   elapsedGameSeconds: number;
   gameTimeLabel: string;
@@ -26,6 +28,8 @@ export function MapPage({
   tiles,
   map,
   crew,
+  crewActions,
+  activeCalls,
   eventLogs,
   elapsedGameSeconds,
   gameTimeLabel,
@@ -48,6 +52,22 @@ export function MapPage({
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),
     [crew],
+  );
+  const crewActionViews = useMemo(
+    () =>
+      Object.fromEntries(
+        crew.map((member) => [
+          member.id,
+          deriveCrewActionViewModel({
+            member,
+            crewActions,
+            activeCalls,
+            elapsedGameSeconds,
+            tiles,
+          }),
+        ]),
+      ) as Record<CrewId, CrewActionViewModel>,
+    [activeCalls, crew, crewActions, elapsedGameSeconds, tiles],
   );
 
   return (
@@ -107,9 +127,10 @@ export function MapPage({
                     <small>状态：{specialStateSummary(revealedSpecialStates(cell, runtimeTile))}</small>
                     {tile.crew.map((crewId) => {
                       const member = crewById.get(crewId);
+                      const actionView = member ? crewActionViews[member.id] : undefined;
                       return member ? (
-                        <small key={crewId} className={member.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(member.status)}
+                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
+                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
                         </small>
                       ) : null;
                     })}
@@ -127,9 +148,10 @@ export function MapPage({
                     <small>天气：{cell.tile.weather}</small>
                     {visibleCrewIds.map((crewId) => {
                       const member = crewById.get(crewId);
+                      const actionView = member ? crewActionViews[member.id] : undefined;
                       return member ? (
-                        <small key={crewId} className={member.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(member.status)}
+                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
+                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
                         </small>
                       ) : null;
                     })}
@@ -162,8 +184,8 @@ export function MapPage({
                 ["天气", selectedCell.tile?.weather ?? "未知天气"],
                 ["已揭示对象", objectSummary(revealedObjects(selectedCell, map.tilesById[selectedCell.id]))],
                 ["特殊状态", specialStateSummary(revealedSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
-                ["手下状态", crewStatus(selectedTile, crewById)],
-                ["计时状态", crewTiming(selectedTile, crewById, elapsedGameSeconds)],
+                ["手下状态", crewStatus(selectedTile, crewById, crewActionViews)],
+                ["计时状态", crewTiming(selectedTile, crewById, crewActionViews, elapsedGameSeconds)],
                 ["危险", selectedTile.danger],
                 ["危险标签", formatList(selectedTile.dangerTags)],
                 ["事件标记", formatEventMarks(selectedTile)],
@@ -178,8 +200,8 @@ export function MapPage({
                 ["信号状态", "队员回传"],
                 ["地形", selectedCell.tile.terrain],
                 ["天气", selectedCell.tile.weather],
-                ["手下状态", crewStatus({ ...selectedTile, crew: crewIdsForCell(map.tilesById[selectedCell.id], selectedTile) }, crewById)],
-                ["计时状态", crewTiming({ ...selectedTile, crew: crewIdsForCell(map.tilesById[selectedCell.id], selectedTile) }, crewById, elapsedGameSeconds)],
+                ["手下状态", crewStatus({ ...selectedTile, crew: crewIdsForCell(map.tilesById[selectedCell.id], selectedTile) }, crewById, crewActionViews)],
+                ["计时状态", crewTiming({ ...selectedTile, crew: crewIdsForCell(map.tilesById[selectedCell.id], selectedTile) }, crewById, crewActionViews, elapsedGameSeconds)],
                 ["行动提示", "队员可回传粗略环境；需要调查后确认对象与特殊状态详情"],
                 ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
               ]}
@@ -217,13 +239,16 @@ export function MapPage({
         </Panel>
 
         <Panel title="手下状态" className="crew-map-panel">
-          {crew.map((member) => (
-            <p key={member.id}>
-              <StatusTag tone={member.statusTone}>{member.name}</StatusTag> {crewMapLocation(member, map)}，{member.status}
-              <br />
-              <span className="muted-text">{memberTiming(member, elapsedGameSeconds)}</span>
-            </p>
-          ))}
+          {crew.map((member) => {
+            const actionView = crewActionViews[member.id];
+            return (
+              <p key={member.id}>
+                <StatusTag tone={actionView.statusTone}>{member.name}</StatusTag> {crewMapLocation(member, map)}，{actionView.statusText}
+                <br />
+                <span className="muted-text">{memberTiming(member, actionView, elapsedGameSeconds)}</span>
+              </p>
+            );
+          })}
         </Panel>
 
         <Panel title="返回目标" className="return-panel">
@@ -319,7 +344,7 @@ function formatEventSummaries(eventLogs: EventLog[]) {
   return eventLogs.length ? eventLogs.map((log) => log.summary).join(" / ") : "暂无事件摘要";
 }
 
-function crewStatus(tile: MapTile, crewById: Map<string, CrewMember>) {
+function crewStatus(tile: MapTile, crewById: Map<string, CrewMember>, crewActionViews: Record<CrewId, CrewActionViewModel>) {
   if (tile.crew.length === 0) {
     return "无手下驻留";
   }
@@ -327,12 +352,17 @@ function crewStatus(tile: MapTile, crewById: Map<string, CrewMember>) {
   return tile.crew
     .map((crewId) => {
       const member = crewById.get(crewId);
-      return member ? `${member.name}：${member.status}` : crewId;
+      return member ? `${member.name}：${crewActionViews[member.id].statusText}` : crewId;
     })
     .join(" / ");
 }
 
-function crewTiming(tile: MapTile, crewById: Map<string, CrewMember>, elapsedGameSeconds: number) {
+function crewTiming(
+  tile: MapTile,
+  crewById: Map<string, CrewMember>,
+  crewActionViews: Record<CrewId, CrewActionViewModel>,
+  elapsedGameSeconds: number,
+) {
   if (tile.crew.length === 0) {
     return "无手下计时状态";
   }
@@ -340,21 +370,17 @@ function crewTiming(tile: MapTile, crewById: Map<string, CrewMember>, elapsedGam
   return tile.crew
     .map((crewId) => {
       const member = crewById.get(crewId);
-      return member ? `${member.name}：${memberTiming(member, elapsedGameSeconds)}` : crewId;
+      return member ? `${member.name}：${memberTiming(member, crewActionViews[member.id], elapsedGameSeconds)}` : crewId;
     })
     .join(" / ");
 }
 
-function memberTiming(member: CrewMember, elapsedGameSeconds: number) {
+function memberTiming(member: CrewMember, actionView: CrewActionViewModel, elapsedGameSeconds: number) {
   if (member.emergencyEvent && !member.emergencyEvent.settled) {
     return `紧急剩余 ${formatDuration(getRemainingSeconds(member.emergencyEvent.deadlineTime, elapsedGameSeconds))}`;
   }
 
-  if (member.activeAction?.status === "inProgress") {
-    return getCrewActionTiming(member, elapsedGameSeconds);
-  }
-
-  return "无进行中的计时行动";
+  return actionView.timingText;
 }
 
 function moveSelectionText(preview: ReturnType<typeof createMovePreview> | null) {

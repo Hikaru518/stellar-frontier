@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
   createDualDeviceMessage,
@@ -19,9 +19,9 @@ import {
 } from "@stellar-frontier/dual-device";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
-import { getCrewActionTiming } from "../crewSystem";
-import type { CrewId, CrewMember } from "../data/gameData";
-import type { EventLog, Objective, RuntimeCall } from "../events/types";
+import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
+import type { CrewId, CrewMember, MapTile } from "../data/gameData";
+import type { CrewActionState, EventLog, Objective, RuntimeCall } from "../events/types";
 import { getInventoryView, type InventoryItemView } from "../inventorySystem";
 import { getTileLocationLabel } from "../mapSystem";
 import { CrewDetail } from "./CrewDetail";
@@ -32,10 +32,12 @@ type PrivateSignalStatus = "idle" | "sent" | "read" | "answered" | "fallback";
 
 interface CommunicationStationProps {
   crew: CrewMember[];
+  crewActions: Record<string, CrewActionState>;
   activeCalls: Record<string, RuntimeCall>;
   objectives: Record<string, Objective>;
   eventLogs: EventLog[];
   elapsedGameSeconds: number;
+  tiles: MapTile[];
   gameTimeLabel: string;
   onBack: () => void;
   onStartCall: (crewId: CrewId) => void;
@@ -43,10 +45,12 @@ interface CommunicationStationProps {
 
 export function CommunicationStation({
   crew,
+  crewActions,
   activeCalls,
   objectives,
   eventLogs,
   elapsedGameSeconds,
+  tiles,
   gameTimeLabel,
   onBack,
   onStartCall,
@@ -68,7 +72,24 @@ export function CommunicationStation({
   const openObjectives = Object.values(objectives)
     .filter((objective) => objective.status === "available" || objective.status === "assigned" || objective.status === "in_progress")
     .sort((left, right) => left.created_at - right.created_at || left.id.localeCompare(right.id));
+  const crewActionViews = useMemo(
+    () =>
+      Object.fromEntries(
+        crew.map((member) => [
+          member.id,
+          deriveCrewActionViewModel({
+            member,
+            crewActions,
+            activeCalls,
+            elapsedGameSeconds,
+            tiles,
+          }),
+        ]),
+      ) as Record<CrewId, CrewActionViewModel>,
+    [activeCalls, crew, crewActions, elapsedGameSeconds, tiles],
+  );
   const detailCrew = crew.find((member) => member.id === detailCrewId);
+  const detailCrewView = detailCrew ? crewActionViews[detailCrew.id] : undefined;
   const inventoryCrew = crew.find((member) => member.id === inventoryCrewId);
   const latestRuntimeLine = activeRuntimeCalls[0]?.rendered_lines[0]?.text;
   const recentEventLogs = eventLogs
@@ -257,7 +278,7 @@ export function CommunicationStation({
                 <CrewCard
                   key={member.id}
                   member={member}
-                  elapsedGameSeconds={elapsedGameSeconds}
+                  actionView={crewActionViews[member.id]}
                   hasRuntimeCall={activeCallCrewIds.has(member.id)}
                   onOpenDetail={() => setDetailCrewId(member.id)}
                   onOpenInventory={() => setInventoryCrewId(member.id)}
@@ -398,8 +419,9 @@ export function CommunicationStation({
             rows={[
               ["身份", detailCrew.role],
               ["位置", getCrewLocationLabel(detailCrew)],
-              ["当前状态", detailCrew.status],
-              ["时间状态", getCrewTiming(detailCrew, elapsedGameSeconds)],
+              ["当前状态", detailCrewView?.statusText ?? detailCrew.status],
+              ["行动", detailCrewView?.actionTitle ?? "原地待命"],
+              ["时间状态", detailCrewView?.timingText ?? "无进行中的计时行动"],
             ]}
           />
           <CrewDetail member={detailCrew} eventLogs={eventLogs} />
@@ -417,21 +439,21 @@ export function CommunicationStation({
 
 function CrewCard({
   member,
-  elapsedGameSeconds,
+  actionView,
   hasRuntimeCall,
   onOpenDetail,
   onOpenInventory,
   onStartCall,
 }: {
   member: CrewMember;
-  elapsedGameSeconds: number;
+  actionView: CrewActionViewModel;
   hasRuntimeCall: boolean;
   onOpenDetail: () => void;
   onOpenInventory: () => void;
   onStartCall: () => void;
 }) {
-  const hasCallEntry = member.hasIncoming || hasRuntimeCall;
-  const callDisabled = member.unavailable && !hasRuntimeCall;
+  const hasCallEntry = member.hasIncoming || hasRuntimeCall || Boolean(actionView.activeCallId);
+  const callDisabled = !actionView.canStartCall;
   return (
     <article className={`crew-card ${hasCallEntry ? "crew-card-alert" : ""}`}>
       <div className="avatar-box">头像</div>
@@ -440,17 +462,18 @@ function CrewCard({
           <h3>
             {member.name}，{member.role}
           </h3>
-          {hasCallEntry ? <StatusTag tone={hasRuntimeCall ? "accent" : "danger"}>来电</StatusTag> : <StatusTag tone={member.statusTone}>在线</StatusTag>}
+          {hasCallEntry ? <StatusTag tone={hasRuntimeCall ? "accent" : "danger"}>来电</StatusTag> : <StatusTag tone={actionView.statusTone}>在线</StatusTag>}
         </div>
-        <p className={`crew-status status-${member.statusTone}`}>{member.status}</p>
+        <p className={`crew-status status-${actionView.statusTone}`}>{actionView.statusText}</p>
         <p className="muted-text">位置：{getCrewLocationLabel(member)}</p>
-        <p className="muted-text">{getCrewTiming(member, elapsedGameSeconds)}</p>
+        <p className="muted-text">行动：{actionView.actionTitle}</p>
+        <p className="muted-text">{actionView.blockingReason ?? actionView.timingText}</p>
       </div>
       <div className="crew-actions">
         {hasCallEntry ? (
           <>
             <button type="button" className="primary-button" disabled={callDisabled} onClick={onStartCall}>
-              {callDisabled ? "信号中断" : hasRuntimeCall ? "接通" : "通话"}
+              {callDisabled ? "不可通讯" : hasRuntimeCall ? "接通" : "通话"}
             </button>
             <button type="button" className="secondary-button" onClick={onOpenInventory}>
               查看背包
@@ -464,7 +487,7 @@ function CrewCard({
             <button type="button" className="secondary-button" onClick={onOpenInventory}>
               查看背包
             </button>
-            <button type="button" className="secondary-button" disabled={member.unavailable} onClick={onStartCall}>
+            <button type="button" className="secondary-button" disabled={callDisabled} onClick={onStartCall}>
               通话
             </button>
           </>
@@ -515,14 +538,6 @@ function formatBoolean(value: boolean) {
 
 function getCrewLocationLabel(member: CrewMember) {
   return getTileLocationLabel(defaultMapConfig, member.currentTile);
-}
-
-function getCrewTiming(member: CrewMember, elapsedGameSeconds: number) {
-  if (member.activeAction?.status === "inProgress") {
-    return getCrewActionTiming(member, elapsedGameSeconds);
-  }
-
-  return "无进行中的计时行动";
 }
 
 function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {

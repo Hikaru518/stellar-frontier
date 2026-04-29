@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { buildCallView } from "../callActions";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
-import { createMovePreview, formatMoveRoute } from "../crewSystem";
+import { createMovePreview, deriveCrewActionViewModel } from "../crewSystem";
 import type { ActionOption, CallContext, CrewMember, GameMapState, GameState, MapTile } from "../data/gameData";
 import type { RuntimeCall } from "../events/types";
 import { getTileLocationLabel, getVisibleTileWindow, type VisibleTileCell } from "../mapSystem";
@@ -74,12 +74,29 @@ export function CallPage({
   const callClosed = Boolean(call?.settled || runtimeCallClosed);
   const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
   const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
+  const crewActionViews = useMemo(
+    () =>
+      Object.fromEntries(
+        crew.map((item) => [
+          item.id,
+          deriveCrewActionViewModel({
+            member: item,
+            crewActions: gameState.crew_actions,
+            activeCalls,
+            elapsedGameSeconds,
+            tiles,
+          }),
+        ]),
+      ),
+    [activeCalls, crew, elapsedGameSeconds, gameState.crew_actions, tiles],
+  );
+  const memberActionView = member ? crewActionViews[member.id] : null;
   const visibleMoveCells = getVisibleTileWindow(defaultMapConfig, map).cells.filter(
     (cell) => cell.status === "discovered" || cell.status === "frontier",
   );
 
   const callView = useMemo<CallView | null>(() => {
-    if (!call || !member) {
+    if (!call || !member || !memberActionView) {
       return null;
     }
 
@@ -128,16 +145,20 @@ export function CallPage({
       title: `通话页面：${member.name} 状态确认`,
       subtitle: "当前只处理这一条通话。其他队员可以查看，但不能接入第二条通话。",
       scene: "通话中的图片 / 常规频道 / 当前坐标回传",
-      lines: [member.activeAction ? `${member.name} 正在执行行动，通讯台只开放可用指令。` : `${member.name} 正在等待新的行动指令。`],
-      meta: `地点：${currentLocation} / 状态：${member.status}`,
+      lines: [
+        memberActionView.actionStatus === "idle"
+          ? `${member.name} 正在等待新的行动指令。`
+          : `${member.name} 当前状态：${memberActionView.statusText}`,
+      ],
+      meta: `地点：${currentLocation} / 行动：${memberActionView.actionTitle}`,
       actions: [] satisfies CallActionOption[],
       actionGroups: actionGroups satisfies CallActionGroupView[],
       badge: "普通通话",
       isRuntime: false,
     };
-  }, [activeCalls, call, elapsedGameSeconds, gameState, map, member, runtimeCall, tiles]);
+  }, [activeCalls, call, elapsedGameSeconds, gameState, map, member, memberActionView, runtimeCall, tiles]);
 
-  if (!call || !member || !callView) {
+  if (!call || !member || !callView || !memberActionView) {
     return (
       <ConsoleShell title="通话页面" subtitle="没有活动通话。" gameTimeLabel={gameTimeLabel}>
         <Panel>
@@ -169,7 +190,7 @@ export function CallPage({
       <div className="call-layout">
         <div className="image-placeholder call-scene">{callView.scene}</div>
 
-        <Panel className="call-panel" tone={member.statusTone}>
+        <Panel className="call-panel" tone={memberActionView.statusTone}>
           <div className="call-person">
             <div className="avatar-box">头像</div>
             <div>
@@ -192,7 +213,7 @@ export function CallPage({
           </blockquote>
 
           <p className="muted-text">
-            {callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : getCallTiming(member, elapsedGameSeconds)}
+            {callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : memberActionView.timingText}
           </p>
 
           {!callView.isRuntime ? (
@@ -266,7 +287,7 @@ export function CallPage({
                 <span>
                   {item.name}，{item.role}
                 </span>
-                <StatusTag tone={item.statusTone}>{item.status}</StatusTag>
+                <StatusTag tone={crewActionViews[item.id].statusTone}>{crewActionViews[item.id].statusText}</StatusTag>
               </div>
             ))}
           </Panel>
@@ -464,15 +485,6 @@ function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMov
       return step.coord;
     })
     .join(" → ");
-}
-
-function getCallTiming(member: CrewMember, elapsedGameSeconds: number) {
-  if (member.activeAction?.status === "inProgress") {
-    const remaining = getRemainingSeconds(member.activeAction.finishTime, elapsedGameSeconds);
-    return `当前行动剩余 ${formatDuration(remaining)}`;
-  }
-
-  return "当前通话没有强制倒计时。";
 }
 
 function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {
