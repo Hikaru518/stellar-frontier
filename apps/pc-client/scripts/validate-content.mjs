@@ -10,8 +10,7 @@ const root = process.env.VALIDATE_CONTENT_ROOT
   : sourceRoot;
 const { validateEventContentLibrary } = await loadEventValidation();
 
-const legacyPairs = [
-  ["content/events/events.json", "content/schemas/events.schema.json"],
+const contentFilePairs = [
   ["content/crew/crew.json", "content/schemas/crew.schema.json"],
   ["content/items/items.json", "content/schemas/items.schema.json"],
   ["content/maps/default-map.json", "content/schemas/maps.schema.json"],
@@ -54,7 +53,7 @@ const eventAssetFiles = [
 
 const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
 const schemaPaths = new Set([
-  ...legacyPairs.map(([, schemaPath]) => schemaPath),
+  ...contentFilePairs.map(([, schemaPath]) => schemaPath),
   ...contentAssetGroups.map(({ schemaPath }) => schemaPath),
   ...eventSchemaPaths,
 ]);
@@ -63,9 +62,7 @@ for (const schema of Object.values(schemasByPath)) {
   ajv.addSchema(schema);
 }
 
-const loaded = Object.fromEntries(legacyPairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
-const validItemTags = new Set(["food", "light", "medical", "signal", "clue"]);
-const validAddItemTargets = new Set(["crewInventory", "baseInventory"]);
+const loaded = Object.fromEntries(contentFilePairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
 
 let failed = false;
 let eventSchemaFailed = false;
@@ -76,7 +73,7 @@ if (eventManifestResult.issues.length > 0) {
   failed = true;
 }
 
-for (const [dataPath, schemaPath] of legacyPairs) {
+for (const [dataPath, schemaPath] of contentFilePairs) {
   failed = validateJsonFile(dataPath, schemaPath, loaded[dataPath]) || failed;
 }
 
@@ -275,12 +272,10 @@ function escapeJsonPointer(value) {
 
 function validateReferences(data) {
   let hasError = false;
-  const events = data["content/events/events.json"].events;
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
   const defaultMap = data["content/maps/default-map.json"];
 
-  const eventIds = new Set();
   const itemIds = new Set();
   const crewIds = new Set();
 
@@ -299,53 +294,6 @@ function validateReferences(data) {
       if (!itemIds.has(entry.itemId)) {
         hasError = report(`Unknown itemId in crew ${member.crewId}: ${entry.itemId}`);
       }
-    }
-  }
-
-  for (const event of events) {
-    if (!addUnique(eventIds, event.eventId)) {
-      hasError = report(`Duplicate eventId: ${event.eventId}`);
-    }
-
-    const choiceIds = new Set(event.choices.map((choice) => choice.choiceId));
-    if (event.emergency && !choiceIds.has(event.emergency.autoResolveResult)) {
-      hasError = report(`Unknown autoResolveResult in event ${event.eventId}: ${event.emergency.autoResolveResult}`);
-    }
-
-    for (const effect of event.effects) {
-      hasError = validateEffectReference(event.eventId, effect, itemIds) || hasError;
-    }
-
-    for (const choice of event.choices) {
-      const owner = `${event.eventId}.${choice.choiceId}`;
-      if (choice.usesItemTag && !validItemTags.has(choice.usesItemTag)) {
-        hasError = report(`Invalid usesItemTag in ${owner}: ${choice.usesItemTag}`) || hasError;
-      }
-
-      const choiceEffects = [
-        ...(choice.effects ?? []),
-        ...(choice.successEffects ?? []),
-        ...(choice.failureEffects ?? []),
-      ];
-      if (choice.usesItemTag && !choiceEffects.some((effect) => effect.type === "useItemByTag" && effect.itemTag === choice.usesItemTag)) {
-        hasError = report(`Choice ${owner} usesItemTag '${choice.usesItemTag}' but has no matching useItemByTag effect`) || hasError;
-      }
-
-      for (const effect of choice.effects ?? []) {
-        hasError = validateEffectReference(owner, effect, itemIds) || hasError;
-      }
-      for (const effect of choice.successEffects ?? []) {
-        hasError = validateEffectReference(`${owner}.success`, effect, itemIds) || hasError;
-      }
-      for (const effect of choice.failureEffects ?? []) {
-        hasError = validateEffectReference(`${owner}.failure`, effect, itemIds) || hasError;
-      }
-    }
-  }
-
-  for (const member of crew) {
-    if (member.emergencyEvent && !eventIds.has(member.emergencyEvent.eventId)) {
-      hasError = report(`Unknown emergency eventId in crew ${member.crewId}: ${member.emergencyEvent.eventId}`);
     }
   }
 
@@ -451,29 +399,6 @@ function validateMap(map, knownObjectIds) {
   }
 
   return hasError;
-}
-
-function validateEffectReference(owner, effect, itemIds) {
-  if ((effect.type === "addResource" || effect.type === "removeResource" || effect.type === "discoverResource") && !itemIds.has(effect.resource)) {
-    return report(`Unknown resource item in ${owner}: ${effect.resource}`);
-  }
-
-  if (effect.type === "addItem") {
-    let hasError = false;
-    if (!itemIds.has(effect.itemId)) {
-      hasError = report(`Unknown addItem.itemId in ${owner}: ${effect.itemId}`) || hasError;
-    }
-    if (!validAddItemTargets.has(effect.target)) {
-      hasError = report(`Invalid addItem.target in ${owner}: ${effect.target}`) || hasError;
-    }
-    return hasError;
-  }
-
-  if (effect.type === "useItemByTag" && !validItemTags.has(effect.itemTag)) {
-    return report(`Invalid useItemByTag.itemTag in ${owner}: ${effect.itemTag}`);
-  }
-
-  return false;
 }
 
 function addUnique(set, value) {

@@ -1,4 +1,3 @@
-import eventsContent from "../../../../content/events/events.json";
 import handlerRegistryContent from "../../../../content/events/handler_registry.json";
 import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
@@ -243,13 +242,11 @@ export const eventContentLibrary: EventContentLibrary = {
   presets: presetDefinitions,
 };
 
-export const eventDefinitions = eventsContent.events as unknown as EventDefinition[];
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
 
 export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigDefinition);
 
-export const eventDefinitionById = new Map(eventDefinitions.map((event) => [event.eventId, event]));
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));
 
 export function formatInventory(entries: Array<{ itemId: string; quantity: number }>) {

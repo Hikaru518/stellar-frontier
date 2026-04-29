@@ -61,6 +61,13 @@ describe("generated event content exports", () => {
 
     expect(serializedStructuredContent).not.toMatch(/\b(?:crew_kael|lin_xia|kael)\b/);
   });
+
+  it("does not expose legacy event content exports", async () => {
+    const contentData = await import("./contentData");
+
+    expect("eventDefinitions" in contentData).toBe(false);
+    expect("eventDefinitionById" in contentData).toBe(false);
+  });
 });
 
 describe("default map config", () => {

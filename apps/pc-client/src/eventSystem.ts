@@ -1,4 +1,4 @@
-import { eventDefinitionById, eventDefinitions, itemDefinitionById, type EventChoiceDefinition, type EventDefinition, type EventEffectDefinition, type TriggerSource } from "./content/contentData";
+import { itemDefinitionById, type EventChoiceDefinition, type EventDefinition, type EventEffectDefinition, type TriggerSource } from "./content/contentData";
 import type { ActiveAction, CrewMember, MapTile, ResourceSummary, SystemLog, Tone } from "./data/gameData";
 import { addInventoryItem, useInventoryItemByTag, type InventoryEntry } from "./inventorySystem";
 import { formatGameTime } from "./timeSystem";

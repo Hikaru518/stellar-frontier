@@ -28,6 +28,17 @@ describe("validate-content", () => {
     expect(result.output).toContain("/event_definitions/0/title");
   });
 
+  it("does not require the retired legacy event asset or schema", () => {
+    const root = createContentRoot();
+    fs.rmSync(path.join(root, "content/events/events.json"), { force: true });
+    fs.rmSync(path.join(root, "content/schemas/events.schema.json"), { force: true });
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("Content validation passed.");
+  });
+
   it("reports forbidden editor and runtime fields with concrete paths", () => {
     const root = createContentRoot();
     const definition = minimalEventDefinition();

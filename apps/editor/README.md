@@ -38,7 +38,7 @@ node ../../common/scripts/install-run-rushx.js dev
 ## 保存与校验边界
 
 - 可编辑内容只包括 `content/events/definitions/*.json` 和 `content/events/call_templates/*.json`。
-- `content/events/events.json` 是 legacy readonly 内容，Editor 只展示，不提供保存入口。
+- 结构化事件是唯一事件内容入口；Editor 不再读取 legacy `events.json`。
 - 保存已有 asset 时，helper 会先在临时目录应用 draft 并运行内容校验；校验失败不会写入最终 content 文件。
 - 新建 domain 会同时生成 `definitions/<domain>.json`、`call_templates/<domain>.json`，更新 `content/events/manifest.json`，并刷新 `apps/pc-client/src/content/generated/eventContentManifest.ts`。
 - PC 玩家侧通过 `apps/pc-client/src/content/contentData.ts` 的 `eventContentLibrary` 加载生成模块；新建 domain 必须出现在 manifest、生成模块和 `eventContentLibrary.domains` 中。

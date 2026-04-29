@@ -106,7 +106,6 @@
 ├── content/                              # 数据驱动的游戏内容（与代码解耦）
 │   ├── crew/crew.json                    # 队员档案、属性、标签、专长、日记节点定义
 │   ├── events/
-│   │   ├── events.json                   # 兼容层事件内容片段
 │   │   ├── definitions/<domain>.json     # 结构化事件定义
 │   │   ├── call_templates/<domain>.json  # 通话模板
 │   │   ├── presets/<domain>.json         # 可复用 condition / effect preset
@@ -114,7 +113,7 @@
 │   ├── items/items.json                  # 物品定义
 │   ├── maps/default-map.json             # 默认可配置地图内容
 │   └── schemas/
-│       ├── *.schema.json                 # crew / items / legacy events / maps 等顶层 schema
+│       ├── *.schema.json                 # crew / items / maps 等顶层 schema
 │       └── events/*.schema.json          # 结构化事件资产 schema
 ├── scripts/
 │   └── validate-content.mjs              # `npm run validate:content` 入口；校验 schema + 跨文件引用

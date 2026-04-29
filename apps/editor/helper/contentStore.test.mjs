@@ -28,13 +28,14 @@ describe("contentStore", () => {
         editable: false,
       }),
     );
-    expect(Object.keys(library.schemas)).toEqual(
+    const schemaPaths = Object.keys(library.schemas);
+    expect(schemaPaths).toEqual(
       expect.arrayContaining([
         "content/schemas/events/event-definition.schema.json",
         "content/schemas/events/call-template.schema.json",
         "content/schemas/events/handler-registry.schema.json",
-        "content/schemas/events.schema.json",
       ]),
     );
+    expect(schemaPaths).not.toContain("content/schemas/events.schema.json");
   });
 });

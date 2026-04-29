@@ -6,7 +6,6 @@ const EVENT_ROOT = "content/events";
 const SCHEMA_ROOT = "content/schemas";
 const MANIFEST_PATH = "content/events/manifest.json";
 const SCHEMA_PATHS = [
-  "content/schemas/events.schema.json",
   "content/schemas/events/condition.schema.json",
   "content/schemas/events/effect.schema.json",
   "content/schemas/events/event-graph.schema.json",
