@@ -43,6 +43,21 @@ describe("MapScene", () => {
     expect(scene.cameras.main.centerOn).toHaveBeenLastCalledWith(TILE_SIZE + TILE_GAP, TILE_SIZE + TILE_GAP);
   });
 
+  it("keeps a dragged camera position across same-size state refreshes", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+    const tiles = [tileView("0-0"), tileView("0-1", { col: 1 })];
+
+    scene.updateState(sceneState(tiles));
+    scene.cameras.main.scrollX = 42;
+    scene.cameras.main.scrollY = 24;
+    scene.updateState(sceneState(tiles, { crewMarkers: [crewMarker("mike", { x: 64, y: 64 })] }));
+
+    expect(scene.cameras.main.setBounds).toHaveBeenCalledOnce();
+    expect(scene.cameras.main.centerOn).toHaveBeenCalledOnce();
+    expect(scene.cameras.main.scrollX).toBe(42);
+    expect(scene.cameras.main.scrollY).toBe(24);
+  });
+
   it("create builds the base layer from the current state", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")]) }));
 

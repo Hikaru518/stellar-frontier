@@ -184,6 +184,7 @@ interface MapSceneRuntime {
   tooltipObjects?: Array<TerrainObject | TextObject>;
   popupObjects?: Array<TerrainObject | TextObject>;
   areaLabelObjects?: TextObject[];
+  cameraBoundsKey?: string;
   getState: () => PhaserMapSceneState;
   updateState: (nextState: PhaserMapSceneState) => void;
 }
@@ -799,6 +800,11 @@ function writeCharacterTileBridge(tileId: string | null): void {
 
 function configureCamera(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
   const bounds = getWorldBounds(state.tileViews);
+  const boundsKey = `${bounds.width}x${bounds.height}`;
+  if (scene.cameraBoundsKey === boundsKey) {
+    return;
+  }
+  scene.cameraBoundsKey = boundsKey;
   scene.cameras.main.setBounds(0, 0, bounds.width, bounds.height);
   scene.cameras.main.centerOn(bounds.centerX, bounds.centerY);
 }

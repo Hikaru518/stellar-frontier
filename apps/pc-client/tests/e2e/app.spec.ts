@@ -372,6 +372,60 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await expect(semanticLayer.getByRole("button")).toHaveCount(12);
 });
 
+test("keeps the Phaser map stable while game time runs at 1x, 2x, and 4x", async ({ page }) => {
+  const consoleFailures: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleFailures.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => consoleFailures.push(error.message));
+
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("mike", "4-4", { status: "正在前往坠毁东缘。", statusTone: "muted" })],
+    map: createMapWithDiscoveredTiles("4-4", "4-5"),
+    logs: initialLogs,
+    resources: initialResources,
+    crew_actions: {
+      "mike-move-4-5": runtimeCrewAction({
+        id: "mike-move-4-5",
+        crew_id: "mike",
+        source: "player_command",
+        type: "move",
+        from_tile_id: "4-4",
+        to_tile_id: "4-5",
+        target_tile_id: "4-5",
+        path_tile_ids: ["4-5"],
+        started_at: 0,
+        ends_at: 60,
+        duration_seconds: 60,
+        action_params: {
+          route_step_index: 0,
+          step_started_at: 0,
+          step_finish_time: 60,
+          step_durations_seconds: [60],
+        },
+      }),
+    },
+  });
+
+  await page.goto("/");
+  await setDebugTimeMultiplier(page, "1x");
+  await setDebugTimeMultiplier(page, "2x");
+  await setDebugTimeMultiplier(page, "4x");
+  await page.getByRole("button", { name: /卫星雷达/ }).click();
+
+  const stage = page.locator(".phaser-map-stage");
+  await expect(stage).toHaveAttribute("data-zoom-level", "1");
+  await page.clock.runFor(15_000);
+  await page.waitForFunction((key) => {
+    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "4-5";
+  }, GAME_SAVE_KEY);
+  expect(consoleFailures).toEqual([]);
+});
+
 test("does not create the removed Garry mine anomaly call from the default survey path", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
@@ -561,6 +615,12 @@ async function clickPhaserMapTile(page: Page, tileId: string) {
   const tile = page.locator(`.phaser-map-fallback-tile[data-tile-id="${tileId}"]`);
   await tile.focus();
   await page.keyboard.press("Enter");
+}
+
+async function setDebugTimeMultiplier(page: Page, multiplierLabel: "1x" | "2x" | "4x") {
+  await page.getByRole("button", { name: "[DEBUG]" }).click();
+  await page.getByRole("button", { name: multiplierLabel }).click();
+  await page.getByRole("button", { name: "关闭" }).click();
 }
 
 function idleCrew(

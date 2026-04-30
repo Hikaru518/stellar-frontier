@@ -33,7 +33,7 @@ source:
 | 7 | TASK-007 | 实现人物标记与 Tween 移动动画 + 轨迹绘制 | completed | 1 |
 | 8 | TASK-008 | MapPage 集成 PhaserMapCanvas + e2e 测试桥接 | completed | 1 |
 | 9 | TASK-009 | 实现区域名标签（depth 13）与缩放级别 UI | completed | 1 |
-| 10 | TASK-010 | MVP 验收与回归测试 | pending | 0 |
+| 10 | TASK-010 | MVP 验收与回归测试 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -114,4 +114,13 @@ source:
 - 完成时间: 2026-05-01 04:17
 - 尝试次数: 1
 - Monkey summary: 成功；为 `PhaserMapTileView` 补充 `areaName` 并在 `MapScene` 绘制 depth 13 区域标签（按 row/col 最小格锚定，zoom < 0.7 隐藏），同时在 MapPage 添加 4 个 zoom pip 与 `.zoom-level-active` 同步 UI。
+- 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS；`npm run test:e2e` PASS。
+
+### TASK-010: MVP 验收与回归测试
+- 状态: completed
+- 开始时间: 2026-05-01 04:17
+- 完成时间: 2026-05-01 04:26
+- 尝试次数: 1
+- Monkey summary: 成功；完成 MVP 10 项基线验收，修复同尺寸状态刷新反复 `centerOn` 导致右键拖拽后摄像机位置被重置的问题，并新增 camera scroll 保持与 1x/2x/4x 时间倍率地图稳定性 e2e 回归覆盖。
+- MVP 验收: 程序色块/tileset 空壳、Phaser preload/create/pixelArt、4 级 zoom/鼠标中心补偿/LOD、右键拖拽、ResizeObserver、人物 Tween+轨迹、500ms tooltip、点击联动右侧面板、HTML 语义层 pointer-events none、DOM data-* 桥接均通过。
 - 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS；`npm run test:e2e` PASS。
