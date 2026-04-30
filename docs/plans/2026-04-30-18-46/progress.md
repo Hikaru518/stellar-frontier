@@ -32,7 +32,7 @@ source:
 | 6 | TASK-006 | 实现 Hover tooltip 与左键选格 | completed | 1 |
 | 7 | TASK-007 | 实现人物标记与 Tween 移动动画 + 轨迹绘制 | completed | 1 |
 | 8 | TASK-008 | MapPage 集成 PhaserMapCanvas + e2e 测试桥接 | completed | 1 |
-| 9 | TASK-009 | 实现区域名标签（depth 13）与缩放级别 UI | pending | 0 |
+| 9 | TASK-009 | 实现区域名标签（depth 13）与缩放级别 UI | completed | 1 |
 | 10 | TASK-010 | MVP 验收与回归测试 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -106,4 +106,12 @@ source:
 - 完成时间: 2026-05-01 04:11
 - 尝试次数: 1
 - Monkey summary: 成功；MapPage 移除旧 `.map-grid` 并集成 `PhaserMapCanvas`，从 visibleWindow/GameState 派生 `tileViews`、`tileCenters`、`crewMarkers`，保留右侧面板与候选移动逻辑；更新样式、单元测试和 e2e，使用 `.phaser-map-stage`、`data-zoom-level` 与 fallback 语义层断言。
+- 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS；`npm run test:e2e` PASS。
+
+### TASK-009: 实现区域名标签（depth 13）与缩放级别 UI
+- 状态: completed
+- 开始时间: 2026-05-01 04:11
+- 完成时间: 2026-05-01 04:17
+- 尝试次数: 1
+- Monkey summary: 成功；为 `PhaserMapTileView` 补充 `areaName` 并在 `MapScene` 绘制 depth 13 区域标签（按 row/col 最小格锚定，zoom < 0.7 隐藏），同时在 MapPage 添加 4 个 zoom pip 与 `.zoom-level-active` 同步 UI。
 - 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS；`npm run test:e2e` PASS。

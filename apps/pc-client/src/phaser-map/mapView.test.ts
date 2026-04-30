@@ -105,6 +105,7 @@ describe("mapView", () => {
           displayCoord: "(0,0)",
           fillColor: "#2f8f46",
           label: "营地",
+          areaName: "营地",
           crewLabels: ["M"],
           isSelected: true,
           isRoute: true,

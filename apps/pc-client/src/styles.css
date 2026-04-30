@@ -693,6 +693,45 @@ blockquote {
   gap: 18px 32px;
 }
 
+.map-canvas-shell {
+  grid-area: grid;
+  position: relative;
+  min-width: 0;
+}
+
+.zoom-level-bar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid #171a1c;
+  background: rgb(244 234 223 / 92%);
+  box-shadow: 3px 3px 0 rgb(23 26 28 / 45%);
+}
+
+.zoom-level-pip {
+  min-width: 42px;
+  padding: 4px 6px;
+  border: 1px solid #8c8174;
+  background: #d7cfbf;
+  color: #24384f;
+  font-size: 0.72rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.zoom-level-active {
+  border-color: #171a1c;
+  background: #24384f;
+  color: #f4eadf;
+}
+
 .phaser-map-canvas {
   grid-area: grid;
   position: relative;

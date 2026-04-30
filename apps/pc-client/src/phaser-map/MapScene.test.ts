@@ -148,7 +148,7 @@ describe("MapScene", () => {
 
     expect(onSelectTile).not.toHaveBeenCalled();
     expect(scene.time.delayedCall).not.toHaveBeenCalled();
-    expect(scene.createdTexts).toHaveLength(0);
+    expect(scene.createdTexts.map((text) => text.content)).not.toContain("前往此位置");
   });
 
   it("disables the browser context menu for right-button map drag", () => {
@@ -192,6 +192,39 @@ describe("MapScene", () => {
 
     expect(scene.createdLayers[0]?.setVisible).toHaveBeenLastCalledWith(true);
     expect(scene.createdLayers[1]?.setVisible).toHaveBeenLastCalledWith(true);
+  });
+
+  it("draws one area label at the top-left anchor tile for each area above terrain trails", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+    const tiles = [
+      tileView("1-2", { row: 1, col: 2, areaName: "北部玄武高地" }),
+      tileView("0-2", { row: 0, col: 2, areaName: "北部玄武高地" }),
+      tileView("0-1", { row: 0, col: 1, areaName: "北部玄武高地" }),
+      tileView("2-0", { row: 2, col: 0, areaName: "南部裂谷" }),
+      tileView("0-0", { row: 0, col: 0, status: "unknownHole", label: "?" }),
+    ];
+
+    scene.updateState(sceneState(tiles));
+
+    const areaLabels = scene.createdTexts.filter((text) => ["北部玄武高地", "南部裂谷"].includes(text.content));
+    expect(areaLabels).toHaveLength(2);
+    expect(areaLabels[0]).toMatchObject({ content: "北部玄武高地", x: TILE_SIZE + TILE_GAP + TILE_SIZE / 2, y: 12 });
+    expect(areaLabels[0]?.setDepth).toHaveBeenCalledWith(13);
+    expect(areaLabels[0]?.setVisible).toHaveBeenLastCalledWith(true);
+    expect(areaLabels[1]?.content).toBe("南部裂谷");
+  });
+
+  it("hides area labels at global zoom and destroys stale labels on state update", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0", { areaName: "北部玄武高地" })]) }));
+
+    (scene.create as unknown as () => void).call(scene);
+    const firstLabel = scene.createdTexts.find((text) => text.content === "北部玄武高地");
+    scene.inputHandlers.wheel({ x: 64, y: 48 }, {}, 0, 1, 0);
+    scene.updateState(sceneState([tileView("0-1", { col: 1, areaName: "东侧平原" })]));
+
+    expect(firstLabel?.setVisible).toHaveBeenLastCalledWith(false);
+    expect(firstLabel?.destroy).toHaveBeenCalledOnce();
+    expect(scene.createdTexts.find((text) => text.content === "东侧平原")?.setVisible).toHaveBeenLastCalledWith(false);
   });
 
   it("keeps the pointer world coordinate stable while wheel zooming", () => {
@@ -303,6 +336,7 @@ function tileView(id: string, overrides: Partial<PhaserMapCanvasProps["tileViews
     fillColor: "#2f8f46",
     tooltip: "营地 | 森林 | (0,0)",
     label: "营地",
+    areaName: "营地",
     terrain: "森林",
     semanticLines: ["营地", "森林"],
     crewLabels: [],
@@ -334,9 +368,12 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
     destroy: ReturnType<typeof vi.fn>;
   }> = [];
   const createdTexts: Array<{
+    x: number;
+    y: number;
     content: string;
     setOrigin: ReturnType<typeof vi.fn>;
     setDepth: ReturnType<typeof vi.fn>;
+    setVisible: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
   }> = [];
   const createdCircles: Array<{
@@ -375,7 +412,7 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
   const sceneWithDoubles = scene as MapScene & {
     add: {
       rectangle: ReturnType<typeof vi.fn<(x: number, y: number, width: number, height: number, fillColor: number) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; setAlpha: ReturnType<typeof vi.fn>; setStrokeStyle: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
-      text: ReturnType<typeof vi.fn<(x: number, y: number, content: string, style?: Record<string, unknown>) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
+      text: ReturnType<typeof vi.fn<(x: number, y: number, content: string, style?: Record<string, unknown>) => { x: number; y: number; setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
       circle: ReturnType<typeof vi.fn>;
       graphics: ReturnType<typeof vi.fn>;
       container: ReturnType<typeof vi.fn>;
@@ -400,8 +437,8 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       createdRectangles.push(rectangle);
       return rectangle;
     }),
-    text: vi.fn((_x: number, _y: number, content: string) => {
-      const text = { content, setOrigin: vi.fn(), setDepth: vi.fn(), destroy: vi.fn() };
+    text: vi.fn((x: number, y: number, content: string) => {
+      const text = { x, y, content, setOrigin: vi.fn(), setDepth: vi.fn(), setVisible: vi.fn(), destroy: vi.fn() };
       createdTexts.push(text);
       return text;
     }),

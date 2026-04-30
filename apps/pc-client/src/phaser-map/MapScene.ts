@@ -25,6 +25,7 @@ const POPUP_BACKGROUND_DEPTH = 30;
 const POPUP_TEXT_DEPTH = 31;
 const PATH_DEPTH = 11;
 const TRAIL_DEPTH = 12;
+const AREA_LABEL_DEPTH = 13;
 const CREW_MARKER_DEPTH = 20;
 const HOVER_DELAY_MS = 500;
 export const STEP_DURATION_MS = 250;
@@ -33,6 +34,7 @@ export const INITIAL_ZOOM_LEVEL_INDEX = 1;
 export const ZOOM_TWEEN_DURATION_MS = 350;
 export const LOD_DETAIL_THRESHOLD = 0.9;
 export const LOD_GRID_THRESHOLD = 1.2;
+export const AREA_LABEL_ZOOM_THRESHOLD = 0.7;
 const KEYBOARD_PAN_SPEED = 400;
 const tilesetRegistry = tilesetRegistryContent as TilesetRegistry;
 const CREW_MARKER_OFFSETS = [
@@ -53,6 +55,7 @@ interface TerrainObject {
 interface TextObject {
   setOrigin: (x: number, y: number) => TextObject;
   setDepth: (depth: number) => TextObject;
+  setVisible?: (visible: boolean) => TextObject;
   destroy: () => void;
 }
 
@@ -180,6 +183,7 @@ interface MapSceneRuntime {
   hoverTimer?: TimerEventLike | null;
   tooltipObjects?: Array<TerrainObject | TextObject>;
   popupObjects?: Array<TerrainObject | TextObject>;
+  areaLabelObjects?: TextObject[];
   getState: () => PhaserMapSceneState;
   updateState: (nextState: PhaserMapSceneState) => void;
 }
@@ -230,6 +234,7 @@ export class MapScene {
     hideTooltip(runtime);
     hideInlinePopup(runtime);
     redrawTerrain(runtime, nextState);
+    redrawAreaLabels(runtime, nextState);
     redrawRoutePreview(runtime, nextState);
     syncCrewMarkers(runtime, nextState);
     configureCamera(runtime, nextState);
@@ -251,6 +256,7 @@ function initializeCameraInteractionState(scene: MapSceneRuntime): void {
   scene.crewTrails ??= new Map<string, Point[]>();
   scene.tooltipObjects ??= [];
   scene.popupObjects ??= [];
+  scene.areaLabelObjects ??= [];
   updateLodVisibility(scene);
 }
 
@@ -509,6 +515,9 @@ function updateLodVisibility(scene: MapSceneRuntime): void {
   const zoom = scene.cameras.main.zoom;
   scene.detailLayer?.setVisible(zoom >= LOD_DETAIL_THRESHOLD);
   scene.gridLineLayer?.setVisible(zoom >= LOD_GRID_THRESHOLD);
+  for (const label of scene.areaLabelObjects ?? []) {
+    label.setVisible?.(zoom >= AREA_LABEL_ZOOM_THRESHOLD);
+  }
 }
 
 function panCameraWithKeyboard(scene: MapSceneRuntime, delta: number): void {
@@ -560,6 +569,53 @@ function clearTerrainObjects(scene: MapSceneRuntime): void {
     object.destroy();
   }
   scene.terrainObjects = [];
+}
+
+function redrawAreaLabels(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
+  clearAreaLabels(scene);
+  const anchorTiles = findAreaLabelAnchors(state.tileViews);
+  scene.areaLabelObjects = anchorTiles
+    .map((tile) => {
+      const label = tile.areaName?.trim();
+      if (!label) {
+        return null;
+      }
+      const text = scene.add.text?.(tile.col * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2, tile.row * (TILE_SIZE + TILE_GAP) + 12, label, {
+        color: "#f4eadf",
+        fontFamily: "monospace",
+        fontSize: "16px",
+        fontStyle: "bold",
+        stroke: "#24384f",
+        strokeThickness: 4,
+      });
+      text?.setOrigin(0.5, 0);
+      text?.setDepth(AREA_LABEL_DEPTH);
+      text?.setVisible?.(scene.cameras.main.zoom >= AREA_LABEL_ZOOM_THRESHOLD);
+      return text ?? null;
+    })
+    .filter((text): text is TextObject => Boolean(text));
+}
+
+function clearAreaLabels(scene: MapSceneRuntime): void {
+  for (const label of scene.areaLabelObjects ?? []) {
+    label.destroy();
+  }
+  scene.areaLabelObjects = [];
+}
+
+function findAreaLabelAnchors(tileViews: PhaserMapTileView[]): PhaserMapTileView[] {
+  const anchorsByArea = new Map<string, PhaserMapTileView>();
+  for (const tile of tileViews) {
+    const areaName = tile.areaName?.trim();
+    if (!areaName) {
+      continue;
+    }
+    const current = anchorsByArea.get(areaName);
+    if (!current || tile.row < current.row || (tile.row === current.row && tile.col < current.col)) {
+      anchorsByArea.set(areaName, tile);
+    }
+  }
+  return Array.from(anchorsByArea.values()).sort((a, b) => a.row - b.row || a.col - b.col);
 }
 
 function redrawRoutePreview(scene: MapSceneRuntime, state: PhaserMapSceneState): void {

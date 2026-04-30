@@ -26,6 +26,7 @@ export interface PhaserMapTileView {
   fillColor: string;
   tooltip: string;
   label: string;
+  areaName?: string;
   terrain?: string;
   semanticLines: string[];
   crewLabels: string[];
@@ -211,6 +212,7 @@ export function buildPhaserTileViews(visibleWindow: VisibleTileWindow, context: 
       fillColor: getTerrainFillColor(terrain, cell.status),
       tooltip: getTileTooltipText(displayCoord, cell.status, terrain, areaName),
       label: isDiscovered ? areaName ?? cell.id : "?",
+      areaName: isDiscovered ? areaName : undefined,
       terrain,
       semanticLines:
         !isDiscovered && crewIds.length > 0 && cell.tile

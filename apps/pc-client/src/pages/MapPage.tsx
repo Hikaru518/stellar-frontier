@@ -10,6 +10,8 @@ import { PhaserMapCanvas } from "../phaser-map/PhaserMapCanvas";
 import { buildPhaserCrewMarkers, buildPhaserTileViews, buildTileCenters } from "../phaser-map/mapView";
 import { formatDuration } from "../timeSystem";
 
+const ZOOM_LEVEL_LABELS = ["全局", "区域", "地块", "精细"] as const;
+
 interface MapPageProps {
   tiles: MapTile[];
   map: GameMapState;
@@ -43,7 +45,7 @@ export function MapPage({
 }: MapPageProps) {
   const visibleWindow = useMemo(() => getVisibleTileWindow(defaultMapConfig, map), [map]);
   const [selectedId, setSelectedId] = useState(map.originTileId);
-  const [, setMapZoomLevel] = useState(1);
+  const [mapZoomLevel, setMapZoomLevel] = useState(1);
   const selectedCell = visibleWindow.cells.find((cell) => cell.id === selectedId) ?? visibleWindow.cells[0];
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
   const selectedIsDiscovered = selectedCell?.status === "discovered";
@@ -114,13 +116,22 @@ export function MapPage({
       }
     >
       <div className="map-layout">
-        <PhaserMapCanvas
-          columns={visibleColumns}
-          tileViews={tileViews}
-          crewMarkers={crewMarkers}
-          onSelectTile={setSelectedId}
-          setZoomLevelInReact={setMapZoomLevel}
-        />
+        <div className="map-canvas-shell">
+          <ul className="zoom-level-bar" aria-label="地图缩放级别">
+            {ZOOM_LEVEL_LABELS.map((label, index) => (
+              <li key={label} className={index === mapZoomLevel ? "zoom-level-pip zoom-level-active" : "zoom-level-pip"}>
+                {label}
+              </li>
+            ))}
+          </ul>
+          <PhaserMapCanvas
+            columns={visibleColumns}
+            tileViews={tileViews}
+            crewMarkers={crewMarkers}
+            onSelectTile={setSelectedId}
+            setZoomLevelInReact={setMapZoomLevel}
+          />
+        </div>
 
         <Panel className="map-legend">
           <p>
