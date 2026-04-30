@@ -6,6 +6,8 @@ import { createMovePreview, deriveCrewActionViewModel, formatMoveRoute, type Cre
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
 import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
 import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
+import { PhaserMapCanvas } from "../phaser-map/PhaserMapCanvas";
+import { buildPhaserCrewMarkers, buildPhaserTileViews, buildTileCenters } from "../phaser-map/mapView";
 import { formatDuration } from "../timeSystem";
 
 interface MapPageProps {
@@ -41,6 +43,7 @@ export function MapPage({
 }: MapPageProps) {
   const visibleWindow = useMemo(() => getVisibleTileWindow(defaultMapConfig, map), [map]);
   const [selectedId, setSelectedId] = useState(map.originTileId);
+  const [, setMapZoomLevel] = useState(1);
   const selectedCell = visibleWindow.cells.find((cell) => cell.id === selectedId) ?? visibleWindow.cells[0];
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
   const selectedIsDiscovered = selectedCell?.status === "discovered";
@@ -48,6 +51,31 @@ export function MapPage({
   const movePreview = moveSelectionMember && selectedCell ? createMovePreview(moveSelectionMember, selectedCell.id, tiles) : null;
   const visibleColumns = Math.max(1, visibleWindow.maxCol - visibleWindow.minCol + 1);
   const selectedTileLogs = selectedTile ? getTileEventLogs(eventLogs, selectedTile.id) : [];
+  const crewPositions = useMemo(
+    () =>
+      Object.fromEntries(
+        visibleWindow.cells.map((cell) => {
+          const tile = tiles.find((item) => item.id === cell.id);
+          return [cell.id, crewIdsForCell(map.tilesById[cell.id], tile)];
+        }),
+      ),
+    [map.tilesById, tiles, visibleWindow.cells],
+  );
+  const tileViews = useMemo(
+    () =>
+      buildPhaserTileViews(visibleWindow, {
+        selectedId: selectedCell?.id,
+        selectedMoveTargetId,
+        movePreviewRoute: movePreview?.route,
+        crewPositions,
+      }),
+    [crewPositions, movePreview?.route, selectedCell?.id, selectedMoveTargetId, visibleWindow],
+  );
+  const tileCenters = useMemo(() => buildTileCenters(tileViews), [tileViews]);
+  const crewMarkers = useMemo(
+    () => buildPhaserCrewMarkers(crew, crewActions, tileCenters, elapsedGameSeconds),
+    [crew, crewActions, elapsedGameSeconds, tileCenters],
+  );
 
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),
@@ -86,83 +114,13 @@ export function MapPage({
       }
     >
       <div className="map-layout">
-        <section
-          className="map-grid"
-          aria-label={`雷达可见矩形：玩家坐标 ${formatWindowCoord(visibleWindow.minRow, visibleWindow.minCol)} 到 ${formatWindowCoord(
-            visibleWindow.maxRow,
-            visibleWindow.maxCol,
-          )}`}
-          style={{ gridTemplateColumns: `repeat(${visibleColumns}, minmax(0, 1fr))` }}
-        >
-          {visibleWindow.cells.map((cell) => {
-            const tile = tiles.find((item) => item.id === cell.id);
-            const runtimeTile = map.tilesById[cell.id];
-            const isDiscovered = cell.status === "discovered";
-            const visibleCrewIds = crewIdsForCell(runtimeTile, tile);
-            const hasCrewSignal = !isDiscovered && Boolean(cell.tile) && visibleCrewIds.length > 0;
-            const visibleSpecialStates = revealedSpecialStates(cell, runtimeTile);
-            const hasDanger = isDiscovered && visibleSpecialStates.some((state) => state.severity === "high");
-            const isRouteTile = movePreview?.route.includes(cell.id) ?? false;
-            const isMoveTarget = selectedMoveTargetId === cell.id;
-            const hasCurrentCrew = visibleCrewIds.length > 0;
-            const firstEventMark = tile?.eventMarks?.[0];
-            return (
-              <button
-                type="button"
-                key={cell.id}
-                className={`map-cell ${selectedCell?.id === cell.id ? "map-cell-selected" : ""} ${
-                  isDiscovered ? "" : "map-cell-unknown"
-                } ${hasDanger ? "map-cell-danger" : ""} ${isRouteTile ? "map-cell-route" : ""} ${isMoveTarget ? "map-cell-target" : ""} ${
-                  hasCurrentCrew ? "map-cell-crew-current" : ""
-                }`}
-                onClick={() => setSelectedId(cell.id)}
-              >
-                <strong>{formatCellCoord(cell)}</strong>
-                {isDiscovered && cell.tile && tile ? (
-                  <>
-                    <span>{cell.tile.areaName}</span>
-                    <small>地形：{cell.tile.terrain}</small>
-                    <small>天气：{cell.tile.weather}</small>
-                    <small>对象：{objectSummary(revealedObjects(cell, runtimeTile))}</small>
-                    <small>状态：{specialStateSummary(visibleSpecialStates)}</small>
-                    {tile.crew.map((crewId) => {
-                      const member = crewById.get(crewId);
-                      const actionView = member ? crewActionViews[member.id] : undefined;
-                      return member ? (
-                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
-                        </small>
-                      ) : null;
-                    })}
-                    {firstEventMark ? <small className="route-text">{firstEventMark.label}</small> : null}
-                  </>
-                ) : hasCrewSignal && cell.tile ? (
-                  <>
-                    <span>队员回传</span>
-                    <small>地形：{cell.tile.terrain}</small>
-                    <small>天气：{cell.tile.weather}</small>
-                    {visibleCrewIds.map((crewId) => {
-                      const member = crewById.get(crewId);
-                      const actionView = member ? crewActionViews[member.id] : undefined;
-                      return member ? (
-                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
-                        </small>
-                      ) : null;
-                    })}
-                  </>
-                ) : (
-                  <>
-                    <span>未探索区域</span>
-                    <small>详情未确认</small>
-                  </>
-                )}
-                {isRouteTile ? <small className="route-text">候选路线</small> : null}
-                {isMoveTarget ? <small className="route-text">已标记目标</small> : null}
-              </button>
-            );
-          })}
-        </section>
+        <PhaserMapCanvas
+          columns={visibleColumns}
+          tileViews={tileViews}
+          crewMarkers={crewMarkers}
+          onSelectTile={setSelectedId}
+          setZoomLevelInReact={setMapZoomLevel}
+        />
 
         <Panel className="map-legend">
           <p>
@@ -254,12 +212,6 @@ export function MapPage({
 
 function formatCellCoord(cell: Pick<VisibleTileCell, "displayX" | "displayY">) {
   return `(${cell.displayX},${cell.displayY})`;
-}
-
-function formatWindowCoord(row: number, col: number) {
-  const origin = parseTileId(defaultMapConfig.originTileId);
-  const coord = origin ? getDisplayCoord({ row, col }, origin) : { displayX: col, displayY: row };
-  return `(${coord.displayX},${coord.displayY})`;
 }
 
 function revealedObjects(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapObjectDefinition[] {
@@ -378,20 +330,4 @@ function moveSelectionText(preview: ReturnType<typeof createMovePreview> | null)
   }
 
   return `${formatMoveRoute(preview)} / 预计 ${formatDuration(preview.totalDurationSeconds)}`;
-}
-
-function shortStatus(status: string) {
-  if (status.includes("熊")) {
-    return "危险";
-  }
-
-  if (status.includes("采矿")) {
-    return "采矿中";
-  }
-
-  if (status.includes("行进")) {
-    return "行进中";
-  }
-
-  return status.slice(0, 8);
 }

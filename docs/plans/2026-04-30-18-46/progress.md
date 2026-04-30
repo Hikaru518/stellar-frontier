@@ -31,7 +31,7 @@ source:
 | 5 | TASK-005 | 实现摄像机交互：Zoom、拖拽、WASD 平移 | completed | 1 |
 | 6 | TASK-006 | 实现 Hover tooltip 与左键选格 | completed | 1 |
 | 7 | TASK-007 | 实现人物标记与 Tween 移动动画 + 轨迹绘制 | completed | 1 |
-| 8 | TASK-008 | MapPage 集成 PhaserMapCanvas + e2e 测试桥接 | pending | 0 |
+| 8 | TASK-008 | MapPage 集成 PhaserMapCanvas + e2e 测试桥接 | completed | 1 |
 | 9 | TASK-009 | 实现区域名标签（depth 13）与缩放级别 UI | pending | 0 |
 | 10 | TASK-010 | MVP 验收与回归测试 | pending | 0 |
 
@@ -99,3 +99,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功；实现人物 marker container（头/身圆形、depth 20）、按 crewId 复用与 250ms Tween、旧 tween 取消、`data-char-tile` 桥接、蓝色路线预览、橙色轨迹线/节点，以及同格多人偏移。
 - 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
+
+### TASK-008: MapPage 集成 PhaserMapCanvas + e2e 测试桥接
+- 状态: completed
+- 开始时间: 2026-05-01 04:02
+- 完成时间: 2026-05-01 04:11
+- 尝试次数: 1
+- Monkey summary: 成功；MapPage 移除旧 `.map-grid` 并集成 `PhaserMapCanvas`，从 visibleWindow/GameState 派生 `tileViews`、`tileCenters`、`crewMarkers`，保留右侧面板与候选移动逻辑；更新样式、单元测试和 e2e，使用 `.phaser-map-stage`、`data-zoom-level` 与 fallback 语义层断言。
+- 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS；`npm run test:e2e` PASS。

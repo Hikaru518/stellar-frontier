@@ -1678,16 +1678,17 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
 
-    const grid = screen.getByLabelText(/雷达可见矩形/);
-    const amyTile = within(grid).getByRole("button", { name: /\(-1,2\)/ });
-    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
-    expect(within(amyTile).getByText("地形：森林 / 山")).toBeInTheDocument();
-    expect(within(amyTile).getByText("天气：薄雾")).toBeInTheDocument();
-    expect(within(amyTile).getByText("Amy：等待指令。")).toBeInTheDocument();
+    expect(document.querySelector(".map-grid")).not.toBeInTheDocument();
+    expect(document.querySelector(".phaser-map-stage")).toBeInTheDocument();
+    const semanticLayer = screen.getByLabelText("地图语义层");
+    const amyTile = within(semanticLayer).getByRole("button", { name: /队员回传.*\(-1,2\)/ });
+    expect(amyTile).toHaveTextContent("队员回传");
+    expect(amyTile).toHaveTextContent("地形：森林 / 山");
+    expect(amyTile).toHaveTextContent("天气：薄雾");
     expect(within(amyTile).queryByText("黑松木材带")).not.toBeInTheDocument();
 
     fireEvent.click(amyTile);
-    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "坐标详情：(-1,2)" })).toBeInTheDocument();
     expect(screen.getByText("地形")).toBeInTheDocument();
     expect(screen.getAllByText("森林 / 山").length).toBeGreaterThan(0);
     expect(screen.getByText("天气")).toBeInTheDocument();
@@ -2011,13 +2012,13 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
     expect(screen.queryByText(/4x4|4 x 4/)).not.toBeInTheDocument();
 
-    const grid = screen.getByLabelText(/雷达可见矩形/);
-    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
-    expect(screen.getAllByRole("button", { name: /未探索区域/ })).toHaveLength(7);
-    expect(screen.getByRole("button", { name: /\(-1,1\).*队员回传/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
-    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("天气：阴天");
-    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("对象：坠毁残骸");
+    expect(document.querySelector(".map-grid")).not.toBeInTheDocument();
+    expect(document.querySelector(".phaser-map-stage")).toBeInTheDocument();
+    const semanticLayer = screen.getByLabelText("地图语义层");
+    expect(within(semanticLayer).getAllByRole("button")).toHaveLength(9);
+    expect(within(semanticLayer).getAllByRole("button", { name: /未探索区域/ })).toHaveLength(7);
+    expect(within(semanticLayer).getByRole("button", { name: /队员回传.*\(-1,1\)/ })).toBeInTheDocument();
+    expect(within(semanticLayer).getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
     expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
     expect(screen.queryByText("未发现即时危险")).not.toBeInTheDocument();
   });
@@ -2043,12 +2044,13 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
 
-    const grid = screen.getByLabelText(/雷达可见矩形/);
-    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" });
+    expect(document.querySelector(".map-grid")).not.toBeInTheDocument();
+    expect(document.querySelector(".phaser-map-stage")).toBeInTheDocument();
+    const semanticLayer = screen.getByLabelText("地图语义层");
     expect(screen.queryByText("东侧砾原")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /未探索区域/ }).length).toBeGreaterThan(0);
+    expect(within(semanticLayer).getAllByRole("button", { name: /未探索区域/ }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索区域/ }));
+    fireEvent.click(within(semanticLayer).getByRole("button", { name: /未探索区域.*\(2,0\)/ }));
     const detailPanel = screen.getByRole("heading", { name: "坐标详情：(2,0)" }).closest("section");
     expect(detailPanel).not.toBeNull();
     expect(within(detailPanel as HTMLElement).getByText("暂无已确认信息")).toBeInTheDocument();

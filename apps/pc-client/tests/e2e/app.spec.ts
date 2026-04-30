@@ -230,15 +230,17 @@ test("shows only the crash site and frontier window on a new map", async ({ page
 
   await page.getByRole("button", { name: /卫星雷达/ }).click();
 
-  const grid = page.getByLabel(/雷达可见矩形/);
-  await expect(grid).toBeVisible();
-  await expect(grid.getByRole("button")).toHaveCount(9);
-  await expect(grid.getByRole("button", { name: /坠毁区域/ })).toBeVisible();
-  await expect(grid.getByRole("button", { name: /未探索区域/ })).toHaveCount(7);
-  await expect(grid.getByRole("button", { name: /队员回传/ })).toHaveCount(1);
+  await expect(page.locator(".map-grid")).toHaveCount(0);
+  const stage = page.locator(".phaser-map-stage");
+  await expect(stage).toBeVisible();
+  await expect(stage).toHaveAttribute("data-zoom-level", "1");
+  const semanticLayer = page.getByLabel("地图语义层");
+  await expect(semanticLayer.getByRole("button")).toHaveCount(9);
+  await expect(semanticLayer.getByRole("button", { name: /坠毁区域/ })).toBeVisible();
+  await expect(semanticLayer.getByRole("button", { name: /未探索区域/ })).toHaveCount(7);
   await expect(page.getByText(/4x4|4 x 4/)).toHaveCount(0);
-  await expect(grid.getByText("坠毁西缘")).toHaveCount(0);
-  await expect(grid.getByText("北部玄武高地")).toHaveCount(0);
+  await expect(semanticLayer.getByText("坠毁西缘")).toHaveCount(0);
+  await expect(semanticLayer.getByText("北部玄武高地")).toHaveCount(0);
 });
 
 test("shows crew-returned coarse info on an occupied frontier tile without revealing objects", async ({ page }) => {
@@ -253,16 +255,15 @@ test("shows crew-returned coarse info on an occupied frontier tile without revea
   await page.goto("/");
   await page.getByRole("button", { name: /卫星雷达/ }).click();
 
-  const grid = page.getByLabel(/雷达可见矩形/);
-  const amyTile = grid.getByRole("button", { name: /\(-1,2\)/ });
-  await expect(amyTile.getByText("队员回传")).toBeVisible();
-  await expect(amyTile.getByText("地形：森林 / 山")).toBeVisible();
-  await expect(amyTile.getByText("天气：薄雾")).toBeVisible();
-  await expect(amyTile.getByText("Amy：等待指令。")).toBeVisible();
-  await expect(amyTile.getByText("黑松木材带")).toHaveCount(0);
+  await expect(page.locator(".map-grid")).toHaveCount(0);
+  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "1");
+  const semanticLayer = page.getByLabel("地图语义层");
+  await expect(semanticLayer.getByRole("button", { name: /\(-1,2\)/ })).toBeVisible();
+  await expect(page.getByText("黑松木材带")).toHaveCount(0);
 
-  await amyTile.click();
+  await clickPhaserMapTile(page, "2-3");
   const detail = page.locator(".map-detail");
+  await expect(detail.getByText("坐标详情：(-1,2)")).toBeVisible();
   await expect(detail.getByText("队员回传")).toBeVisible();
   await expect(detail.getByText("森林 / 山")).toBeVisible();
   await expect(detail.getByText("薄雾")).toBeVisible();
@@ -366,9 +367,9 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await expect(page.getByText(/地点：坠毁西缘 \(-1,0\)/)).toBeVisible();
 
   await page.getByRole("button", { name: /地图二级菜单/ }).click();
-  const grid = page.getByLabel(/雷达可见矩形/);
-  await expect(grid.getByRole("button", { name: /坠毁西缘/ })).toBeVisible();
-  await expect(grid.getByRole("button")).toHaveCount(12);
+  const semanticLayer = page.getByLabel("地图语义层");
+  await expect(semanticLayer.getByRole("button", { name: /坠毁西缘/ })).toBeVisible();
+  await expect(semanticLayer.getByRole("button")).toHaveCount(12);
 });
 
 test("does not create the removed Garry mine anomaly call from the default survey path", async ({ page }) => {
@@ -553,6 +554,13 @@ async function readSave(page: Page) {
 async function startNormalCrewCall(page: Page, crewLabel: string) {
   const crewCard = page.getByText(crewLabel).locator("xpath=ancestor::article[1]");
   await crewCard.getByRole("button", { name: "通话" }).click();
+}
+
+async function clickPhaserMapTile(page: Page, tileId: string) {
+  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "1");
+  const tile = page.locator(`.phaser-map-fallback-tile[data-tile-id="${tileId}"]`);
+  await tile.focus();
+  await page.keyboard.press("Enter");
 }
 
 function idleCrew(

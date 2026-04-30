@@ -212,7 +212,12 @@ export function buildPhaserTileViews(visibleWindow: VisibleTileWindow, context: 
       tooltip: getTileTooltipText(displayCoord, cell.status, terrain, areaName),
       label: isDiscovered ? areaName ?? cell.id : "?",
       terrain,
-      semanticLines: buildTileSemanticLines(cell.status, displayCoord, terrain, areaName),
+      semanticLines:
+        !isDiscovered && crewIds.length > 0 && cell.tile
+          ? ["队员回传", terrain ? `地形：${terrain}` : undefined, cell.tile.weather ? `天气：${cell.tile.weather}` : undefined, displayCoord].filter(
+              (line): line is string => Boolean(line),
+            )
+          : buildTileSemanticLines(cell.status, displayCoord, terrain, areaName),
       crewLabels: crewIds.map((crewId) => getCrewMarkerLabel({ id: crewId, name: crewId } as CrewMember)),
       isDanger: isDiscovered && Boolean(cell.tile?.specialStates.some((state) => state.severity === "high" && state.startsActive)),
       isRoute: routeIds.has(cell.id),
@@ -286,9 +291,11 @@ function buildTileSemanticLines(status: VisibleTileStatus, displayCoord: string,
     return ["未探索区域", displayCoord];
   }
 
-  return [areaName, terrain ? `地形：${terrain}` : undefined, displayCoord, status === "frontier" ? "边境未调查" : undefined].filter(
-    (line): line is string => Boolean(line),
-  );
+  if (status === "frontier") {
+    return ["未探索区域", terrain ? `地形：${terrain}` : undefined, displayCoord, "边境未调查"].filter((line): line is string => Boolean(line));
+  }
+
+  return [areaName, terrain ? `地形：${terrain}` : undefined, displayCoord].filter((line): line is string => Boolean(line));
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -693,71 +693,24 @@ blockquote {
   gap: 18px 32px;
 }
 
-.map-grid {
+.phaser-map-canvas {
   grid-area: grid;
-  display: grid;
+  position: relative;
+  min-width: 0;
+  min-height: 430px;
   border: 1px solid #171a1c;
   background: #77736b;
-  gap: 1px;
   overflow: hidden;
-  min-width: 0;
 }
 
-.map-cell {
-  display: flex;
-  min-height: 144px;
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 5px;
-  border: 0;
-  padding: 12px;
-  background: #ebe7de;
-  text-align: left;
+.phaser-map-stage {
+  width: 100%;
+  min-height: 430px;
+  height: 100%;
 }
 
-.map-cell strong {
-  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-}
-
-.map-cell small {
-  color: #46505a;
-}
-
-.map-cell-selected {
-  outline: 3px solid #b45b13;
-  outline-offset: -4px;
-  background: #f4eadf;
-}
-
-.map-cell-unknown {
-  color: #7b8085;
-  background: #dfdbd2;
-}
-
-.map-cell-danger {
-  color: #9d3d1f;
-}
-
-.map-cell-route {
-  box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.35);
-}
-
-.map-cell-target {
-  background: #f4eadf;
-}
-
-.map-cell-crew-current {
-  border-left: 4px solid #24384f;
-  background: #f4eadf;
-  color: #24384f;
-}
-
-.route-text {
-  color: #24384f !important;
-  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-weight: 700;
+.phaser-map-fallback {
+  pointer-events: none;
 }
 
 .map-legend {

@@ -132,9 +132,10 @@ export function PhaserMapCanvas(props: PhaserMapCanvasProps) {
             type="button"
             className="phaser-map-fallback-tile"
             style={getFallbackTileStyle(tile)}
-            aria-label={[tile.label, tile.displayCoord, tile.tooltip].filter(Boolean).join(" | ")}
+            aria-label={[...tile.semanticLines, tile.tooltip].filter(Boolean).join(" | ")}
             data-tile-id={tile.id}
             data-selected={tile.isSelected ? "true" : undefined}
+            onClick={() => props.onSelectTile(tile.id)}
           >
             <span>{tile.semanticLines.join(" ")}</span>
           </button>
