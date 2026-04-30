@@ -28,7 +28,7 @@ source:
 | 2 | TASK-002 | 实现 mapView.ts 纯函数与单元测试 | completed | 1 |
 | 3 | TASK-003 | 实现 PhaserMapCanvas.tsx React 外壳 | completed | 2 |
 | 4 | TASK-004 | 实现 MapScene.ts 基础图层与地形色块渲染 | completed | 1 |
-| 5 | TASK-005 | 实现摄像机交互：Zoom、拖拽、WASD 平移 | pending | 0 |
+| 5 | TASK-005 | 实现摄像机交互：Zoom、拖拽、WASD 平移 | completed | 1 |
 | 6 | TASK-006 | 实现 Hover tooltip 与左键选格 | pending | 0 |
 | 7 | TASK-007 | 实现人物标记与 Tween 移动动画 + 轨迹绘制 | pending | 0 |
 | 8 | TASK-008 | MapPage 集成 PhaserMapCanvas + e2e 测试桥接 | pending | 0 |
@@ -74,4 +74,12 @@ source:
 - 完成时间: 2026-05-01 03:39
 - 尝试次数: 1
 - Monkey summary: 成功；实现 Phaser-compatible `MapScene`，包含空 registry preload、create 初始绘制、`updateState` 全量清理重绘地形色块、按 row/col 与 `TILE_SIZE/TILE_GAP` 计算坐标、camera bounds 与 center 配置，并新增轻量单测。
+- 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
+
+### TASK-005: 实现摄像机交互：Zoom、拖拽、WASD 平移
+- 状态: completed
+- 开始时间: 2026-05-01 03:39
+- 完成时间: 2026-05-01 03:46
+- 尝试次数: 1
+- Monkey summary: 成功；实现 4 级离散 zoom、滚轮/键盘缩放、Tween 防重入与鼠标中心补偿、右键拖拽平移、右键菜单禁用、WASD 平移、LOD layer 可见性切换，以及 `setZoomLevelInReact` / `data-zoom-level` 桥接。
 - 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
