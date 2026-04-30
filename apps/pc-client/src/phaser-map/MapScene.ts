@@ -1,6 +1,6 @@
 import tilesetRegistryContent from "../../../../content/maps/tilesets/registry.json";
 import type { PhaserMapSceneState } from "./PhaserMapCanvas";
-import { TILE_GAP, TILE_SIZE, type PhaserMapTileView } from "./mapView";
+import { TILE_GAP, TILE_SIZE, type PhaserCrewMarkerView, type PhaserMapTileView, type Point } from "./mapView";
 
 interface SceneStateRef {
   current: PhaserMapSceneState;
@@ -23,7 +23,11 @@ const TOOLTIP_BACKGROUND_DEPTH = 30;
 const TOOLTIP_TEXT_DEPTH = 31;
 const POPUP_BACKGROUND_DEPTH = 30;
 const POPUP_TEXT_DEPTH = 31;
+const PATH_DEPTH = 11;
+const TRAIL_DEPTH = 12;
+const CREW_MARKER_DEPTH = 20;
 const HOVER_DELAY_MS = 500;
+export const STEP_DURATION_MS = 250;
 export const ZOOM_LEVELS = [0.35, 0.7, 1.5, 3.0] as const;
 export const INITIAL_ZOOM_LEVEL_INDEX = 1;
 export const ZOOM_TWEEN_DURATION_MS = 350;
@@ -31,6 +35,12 @@ export const LOD_DETAIL_THRESHOLD = 0.9;
 export const LOD_GRID_THRESHOLD = 1.2;
 const KEYBOARD_PAN_SPEED = 400;
 const tilesetRegistry = tilesetRegistryContent as TilesetRegistry;
+const CREW_MARKER_OFFSETS = [
+  { x: 0, y: 0 },
+  { x: 18, y: 0 },
+  { x: -18, y: 0 },
+  { x: 0, y: 18 },
+] as const;
 
 interface TerrainObject {
   setOrigin: (x: number, y: number) => TerrainObject;
@@ -54,6 +64,38 @@ interface TimerEventLike {
 interface LayerHolder {
   setDepth?: (depth: number) => LayerHolder;
   setVisible: (visible: boolean) => LayerHolder;
+}
+
+interface CircleObject {
+  setStrokeStyle?: (lineWidth: number, color: number) => CircleObject;
+  destroy?: () => void;
+}
+
+interface ContainerObject extends LayerHolder {
+  x: number;
+  y: number;
+  add?: (children: unknown[] | unknown) => ContainerObject;
+  destroy?: () => void;
+}
+
+interface GraphicsObject {
+  setDepth: (depth: number) => GraphicsObject;
+  clear: () => GraphicsObject;
+  lineStyle: (lineWidth: number, color: number, alpha?: number) => GraphicsObject;
+  beginPath?: () => GraphicsObject;
+  moveTo: (x: number, y: number) => GraphicsObject;
+  lineTo: (x: number, y: number) => GraphicsObject;
+  strokePath: () => GraphicsObject;
+  strokeCircle?: (x: number, y: number, radius: number) => GraphicsObject;
+  fillStyle?: (color: number, alpha?: number) => GraphicsObject;
+  fillCircle?: (x: number, y: number, radius: number) => GraphicsObject;
+  destroy?: () => void;
+}
+
+interface CrewMarkerRuntime {
+  container: ContainerObject;
+  target: Point;
+  targetTileId: string | null;
 }
 
 interface PointerLike {
@@ -83,7 +125,9 @@ interface MapSceneRuntime {
   add: {
     rectangle: (x: number, y: number, width: number, height: number, fillColor: number) => TerrainObject;
     text?: (x: number, y: number, text: string, style?: Record<string, unknown>) => TextObject;
-    container?: (x: number, y: number) => LayerHolder;
+    circle?: (x: number, y: number, radius: number, fillColor: number) => CircleObject;
+    container?: (x: number, y: number) => ContainerObject;
+    graphics?: () => GraphicsObject;
   };
   cameras: {
     main: {
@@ -106,13 +150,16 @@ interface MapSceneRuntime {
   };
   tweens?: {
     add: (config: {
-      targets: { zoom: number };
-      zoom: number;
+      targets: { zoom?: number; x?: number; y?: number };
+      zoom?: number;
+      x?: number;
+      y?: number;
       duration: number;
       ease: string;
       onUpdate?: () => void;
       onComplete?: () => void;
     }) => unknown;
+    killTweensOf?: (targets: unknown) => void;
   };
   time?: {
     delayedCall?: (delay: number, callback: () => void) => TimerEventLike;
@@ -126,6 +173,10 @@ interface MapSceneRuntime {
   panKeys?: PanKeys;
   detailLayer?: LayerHolder;
   gridLineLayer?: LayerHolder;
+  pathGraphics?: GraphicsObject;
+  trailGraphics?: GraphicsObject;
+  crewMarkerObjects?: Map<string, CrewMarkerRuntime>;
+  crewTrails?: Map<string, Point[]>;
   hoverTimer?: TimerEventLike | null;
   tooltipObjects?: Array<TerrainObject | TextObject>;
   popupObjects?: Array<TerrainObject | TextObject>;
@@ -179,6 +230,8 @@ export class MapScene {
     hideTooltip(runtime);
     hideInlinePopup(runtime);
     redrawTerrain(runtime, nextState);
+    redrawRoutePreview(runtime, nextState);
+    syncCrewMarkers(runtime, nextState);
     configureCamera(runtime, nextState);
     syncZoomBridge(runtime);
   }
@@ -192,6 +245,10 @@ function initializeCameraInteractionState(scene: MapSceneRuntime): void {
   scene.cameras.main.setZoom?.(ZOOM_LEVELS[scene.zoomLevelIndex]);
   scene.detailLayer ??= createLayerHolder(scene, DETAIL_DEPTH);
   scene.gridLineLayer ??= createLayerHolder(scene, GRID_DEPTH);
+  scene.pathGraphics ??= createGraphics(scene, PATH_DEPTH);
+  scene.trailGraphics ??= createGraphics(scene, TRAIL_DEPTH);
+  scene.crewMarkerObjects ??= new Map<string, CrewMarkerRuntime>();
+  scene.crewTrails ??= new Map<string, Point[]>();
   scene.tooltipObjects ??= [];
   scene.popupObjects ??= [];
   updateLodVisibility(scene);
@@ -206,6 +263,23 @@ function createLayerHolder(scene: MapSceneRuntime, depth: number): LayerHolder {
 function createEmptyLayerHolder(): LayerHolder {
   return {
     setVisible: () => createEmptyLayerHolder(),
+  };
+}
+
+function createGraphics(scene: MapSceneRuntime, depth: number): GraphicsObject {
+  const graphics = scene.add.graphics?.() ?? createEmptyGraphics();
+  graphics.setDepth(depth);
+  return graphics;
+}
+
+function createEmptyGraphics(): GraphicsObject {
+  return {
+    setDepth: () => createEmptyGraphics(),
+    clear: () => createEmptyGraphics(),
+    lineStyle: () => createEmptyGraphics(),
+    moveTo: () => createEmptyGraphics(),
+    lineTo: () => createEmptyGraphics(),
+    strokePath: () => createEmptyGraphics(),
   };
 }
 
@@ -486,6 +560,185 @@ function clearTerrainObjects(scene: MapSceneRuntime): void {
     object.destroy();
   }
   scene.terrainObjects = [];
+}
+
+function redrawRoutePreview(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
+  const graphics = scene.pathGraphics;
+  if (!graphics) {
+    return;
+  }
+
+  graphics.clear();
+  const routePoints = state.tileViews.filter((tile) => tile.isRoute).map(getTileCenter);
+  if (routePoints.length < 2) {
+    return;
+  }
+
+  graphics.lineStyle(2, 0x90b0c8, 0.55);
+  graphics.beginPath?.();
+  graphics.moveTo(routePoints[0].x, routePoints[0].y);
+  for (const point of routePoints.slice(1)) {
+    graphics.lineTo(point.x, point.y);
+  }
+  graphics.strokePath();
+}
+
+function syncCrewMarkers(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
+  const markerObjects = scene.crewMarkerObjects ?? new Map<string, CrewMarkerRuntime>();
+  scene.crewMarkerObjects = markerObjects;
+  scene.crewTrails ??= new Map<string, Point[]>();
+
+  const targetMarkers = applySameTileOffsets(state.crewMarkers, state.tileViews);
+  const incomingCrewIds = new Set(targetMarkers.map((marker) => marker.crewId));
+
+  for (const [crewId, markerRuntime] of markerObjects.entries()) {
+    if (!incomingCrewIds.has(crewId)) {
+      scene.tweens?.killTweensOf?.(markerRuntime.container);
+      markerRuntime.container.destroy?.();
+      markerObjects.delete(crewId);
+      scene.crewTrails.delete(crewId);
+    }
+  }
+
+  for (const marker of targetMarkers) {
+    const existing = markerObjects.get(marker.crewId);
+    if (!existing) {
+      const container = createCrewMarkerContainer(scene, marker);
+      const targetTileId = findNearestTileId(marker.rawTarget, state.tileViews);
+      markerObjects.set(marker.crewId, { container, target: { x: marker.x, y: marker.y }, targetTileId });
+      scene.crewTrails.set(marker.crewId, [{ x: marker.x, y: marker.y }]);
+      writeCharacterTileBridge(targetTileId);
+      continue;
+    }
+
+    const nextTarget = { x: marker.x, y: marker.y };
+    const targetChanged = existing.target.x !== nextTarget.x || existing.target.y !== nextTarget.y;
+    const nextTargetTileId = findNearestTileId(marker.rawTarget, state.tileViews);
+    if (!targetChanged) {
+      existing.targetTileId = nextTargetTileId;
+      writeCharacterTileBridge(nextTargetTileId);
+      continue;
+    }
+
+    scene.tweens?.killTweensOf?.(existing.container);
+    existing.target = nextTarget;
+    existing.targetTileId = nextTargetTileId;
+    scene.tweens?.add({
+      targets: existing.container,
+      x: nextTarget.x,
+      y: nextTarget.y,
+      duration: STEP_DURATION_MS,
+      ease: "Linear",
+      onComplete: () => {
+        appendTrailPoint(scene, marker.crewId, nextTarget);
+        refreshTrail(scene);
+        writeCharacterTileBridge(nextTargetTileId);
+      },
+    });
+  }
+}
+
+function createCrewMarkerContainer(scene: MapSceneRuntime, marker: PhaserCrewMarkerView): ContainerObject {
+  const container = scene.add.container?.(marker.x, marker.y) ?? createEmptyContainer(marker.x, marker.y);
+  container.setDepth?.(CREW_MARKER_DEPTH);
+  const body = scene.add.circle?.(0, 3, 8, 0x24384f);
+  const head = scene.add.circle?.(0, -9, 6, 0xf4eadf);
+  head?.setStrokeStyle?.(2, 0x24384f);
+  container.add?.([body, head].filter(Boolean));
+  return container;
+}
+
+function createEmptyContainer(x: number, y: number): ContainerObject {
+  return {
+    x,
+    y,
+    setVisible: () => createEmptyContainer(x, y),
+    setDepth: () => createEmptyContainer(x, y),
+  };
+}
+
+function appendTrailPoint(scene: MapSceneRuntime, crewId: string, point: Point): void {
+  const trails = scene.crewTrails ?? new Map<string, Point[]>();
+  scene.crewTrails = trails;
+  const trail = trails.get(crewId) ?? [];
+  const lastPoint = trail[trail.length - 1];
+  if (!lastPoint || lastPoint.x !== point.x || lastPoint.y !== point.y) {
+    trail.push(point);
+  }
+  trails.set(crewId, trail);
+}
+
+function refreshTrail(scene: MapSceneRuntime): void {
+  const graphics = scene.trailGraphics;
+  if (!graphics) {
+    return;
+  }
+
+  graphics.clear();
+  for (const trail of scene.crewTrails?.values() ?? []) {
+    if (trail.length < 2) {
+      continue;
+    }
+    graphics.lineStyle(4, 0xb45b13, 0.9);
+    graphics.beginPath?.();
+    graphics.moveTo(trail[0].x, trail[0].y);
+    for (const point of trail.slice(1)) {
+      graphics.lineTo(point.x, point.y);
+    }
+    graphics.strokePath();
+    for (const point of trail) {
+      graphics.strokeCircle?.(point.x, point.y, 3);
+    }
+  }
+}
+
+function applySameTileOffsets(
+  markers: PhaserCrewMarkerView[],
+  tileViews: PhaserMapTileView[],
+): Array<PhaserCrewMarkerView & { rawTarget: Point }> {
+  const groups = new Map<string, PhaserCrewMarkerView[]>();
+  for (const marker of markers) {
+    const tileId = findNearestTileId(marker, tileViews) ?? `${marker.x},${marker.y}`;
+    groups.set(tileId, [...(groups.get(tileId) ?? []), marker]);
+  }
+
+  const adjustedMarkers: Array<PhaserCrewMarkerView & { rawTarget: Point }> = [];
+  for (const group of groups.values()) {
+    const positionCounts = new Map<string, number>();
+    for (const marker of group) {
+      const positionKey = `${Math.round(marker.x)},${Math.round(marker.y)}`;
+      const offsetIndex = positionCounts.get(positionKey) ?? 0;
+      positionCounts.set(positionKey, offsetIndex + 1);
+      const offset = CREW_MARKER_OFFSETS[offsetIndex % CREW_MARKER_OFFSETS.length];
+      adjustedMarkers.push({ ...marker, rawTarget: { x: marker.x, y: marker.y }, x: marker.x + offset.x, y: marker.y + offset.y });
+    }
+  }
+  return adjustedMarkers;
+}
+
+function getTileCenter(tile: PhaserMapTileView): Point {
+  return {
+    x: tile.col * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2,
+    y: tile.row * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2,
+  };
+}
+
+function findNearestTileId(point: Point, tileViews: PhaserMapTileView[]): string | null {
+  let nearest: { id: string; distance: number } | null = null;
+  for (const tile of tileViews) {
+    const center = getTileCenter(tile);
+    const distance = (center.x - point.x) ** 2 + (center.y - point.y) ** 2;
+    if (!nearest || distance < nearest.distance) {
+      nearest = { id: tile.id, distance };
+    }
+  }
+  return nearest?.id ?? null;
+}
+
+function writeCharacterTileBridge(tileId: string | null): void {
+  if (tileId) {
+    document.querySelector(".phaser-map-stage")?.setAttribute("data-char-tile", tileId);
+  }
 }
 
 function configureCamera(scene: MapSceneRuntime, state: PhaserMapSceneState): void {

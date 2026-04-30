@@ -214,6 +214,73 @@ describe("MapScene", () => {
     expect(scene.cameras.main.zoom).toBe(ZOOM_LEVELS[2]);
     expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("2");
   });
+
+  it("draws crew marker containers with head and body circles at depth 20", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")]) }));
+
+    scene.updateState(sceneState([tileView("0-0")], { crewMarkers: [crewMarker("mike", { x: 64, y: 64 })] }));
+
+    const markerContainer = scene.createdContainers.find((container) => container.x === 64 && container.y === 64);
+    expect(markerContainer?.setDepth).toHaveBeenCalledWith(20);
+    expect(scene.add.circle).toHaveBeenCalledWith(0, 3, 8, 0x24384f);
+    expect(scene.add.circle).toHaveBeenCalledWith(0, -9, 6, 0xf4eadf);
+    expect(scene.createdCircles.find((circle) => circle.radius === 6)?.setStrokeStyle).toHaveBeenCalledWith(2, 0x24384f);
+    expect(markerContainer?.add).toHaveBeenCalledWith(expect.arrayContaining(scene.createdCircles));
+  });
+
+  it("tweens crew markers to changed targets over 250ms and writes data-char-tile", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("0-1", { col: 1 })]) }));
+
+    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 64, y: 64 })] }));
+    const markerContainer = scene.createdContainers.find((container) => container.x === 64 && container.y === 64);
+    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 194, y: 64 })] }));
+
+    expect(scene.tweens.killTweensOf).toHaveBeenCalledWith(markerContainer);
+    expect(scene.tweens.add).toHaveBeenLastCalledWith(expect.objectContaining({ targets: markerContainer, x: 194, y: 64, duration: 250 }));
+    expect(markerContainer?.x).toBe(194);
+    expect(markerContainer?.y).toBe(64);
+    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-char-tile")).toBe("0-1");
+  });
+
+  it("draws and clears the route preview from route tile views", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+    const tiles = [tileView("0-0"), tileView("0-1", { col: 1, isRoute: true }), tileView("0-2", { col: 2, isRoute: true })];
+
+    scene.updateState(sceneState(tiles));
+    const pathGraphics = scene.createdGraphics[0];
+    scene.updateState(sceneState(tiles.map((tile) => ({ ...tile, isRoute: false }))));
+
+    expect(pathGraphics?.setDepth).toHaveBeenCalledWith(11);
+    expect(pathGraphics?.lineStyle).toHaveBeenCalledWith(2, 0x90b0c8, 0.55);
+    expect(pathGraphics?.lineTo).toHaveBeenCalledWith(2 * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2, TILE_SIZE / 2);
+    expect(pathGraphics?.clear).toHaveBeenCalledTimes(2);
+  });
+
+  it("draws orange trail segments after crew movement completes", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("0-1", { col: 1 })]) }));
+
+    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 64, y: 64 })] }));
+    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 194, y: 64 })] }));
+    const trailGraphics = scene.createdGraphics[1];
+
+    expect(trailGraphics?.setDepth).toHaveBeenCalledWith(12);
+    expect(trailGraphics?.lineStyle).toHaveBeenCalledWith(4, 0xb45b13, 0.9);
+    expect(trailGraphics?.lineTo).toHaveBeenCalledWith(194, 64);
+    expect(trailGraphics?.strokeCircle).toHaveBeenCalledWith(64, 64, 3);
+    expect(trailGraphics?.strokeCircle).toHaveBeenCalledWith(194, 64, 3);
+  });
+
+  it("offsets multiple crew markers in the same tile to avoid overlap", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")]) }));
+
+    scene.updateState(sceneState([tileView("0-0")], { crewMarkers: [crewMarker("mike", { x: 64, y: 64 }), crewMarker("amy", { x: 64, y: 64 })] }));
+    const markerContainers = scene.createdContainers.filter((container) => container.children.length > 0);
+
+    expect(markerContainers.map((container) => [container.x, container.y])).toEqual([
+      [64, 64],
+      [82, 64],
+    ]);
+  });
 });
 
 function sceneState(tileViews: PhaserMapCanvasProps["tileViews"], overrides: Partial<PhaserMapSceneState> = {}): PhaserMapSceneState {
@@ -247,6 +314,16 @@ function tileView(id: string, overrides: Partial<PhaserMapCanvasProps["tileViews
   };
 }
 
+function crewMarker(crewId: string, overrides: Partial<PhaserMapCanvasProps["crewMarkers"][number]> = {}): PhaserMapCanvasProps["crewMarkers"][number] {
+  return {
+    crewId,
+    label: crewId[0]?.toUpperCase() ?? "?",
+    x: 0,
+    y: 0,
+    ...overrides,
+  };
+}
+
 function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; keys?: Record<string, { isDown?: boolean }> } = {}) {
   const createdRectangles: Array<{
     fillColor: number;
@@ -262,6 +339,35 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
     setDepth: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
   }> = [];
+  const createdCircles: Array<{
+    x: number;
+    y: number;
+    radius: number;
+    fillColor: number;
+    setStrokeStyle: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+  }> = [];
+  const createdContainers: Array<{
+    x: number;
+    y: number;
+    children: unknown[];
+    setDepth: ReturnType<typeof vi.fn>;
+    setVisible: ReturnType<typeof vi.fn>;
+    add: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+  }> = [];
+  const createdGraphics: Array<{
+    setDepth: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+    lineStyle: ReturnType<typeof vi.fn>;
+    beginPath: ReturnType<typeof vi.fn>;
+    moveTo: ReturnType<typeof vi.fn>;
+    lineTo: ReturnType<typeof vi.fn>;
+    strokePath: ReturnType<typeof vi.fn>;
+    strokeCircle: ReturnType<typeof vi.fn>;
+    fillStyle: ReturnType<typeof vi.fn>;
+    fillCircle: ReturnType<typeof vi.fn>;
+  }> = [];
   const createdLayers: Array<{ setDepth: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn> }> = [];
   const pendingDelayedCalls: Array<{ callback: () => void; remove: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> = [];
   const inputHandlers: Record<string, (...args: unknown[]) => void> = {};
@@ -270,15 +376,20 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
     add: {
       rectangle: ReturnType<typeof vi.fn<(x: number, y: number, width: number, height: number, fillColor: number) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; setAlpha: ReturnType<typeof vi.fn>; setStrokeStyle: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
       text: ReturnType<typeof vi.fn<(x: number, y: number, content: string, style?: Record<string, unknown>) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
-      container: ReturnType<typeof vi.fn<(x: number, y: number) => { setDepth: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn> }>>;
+      circle: ReturnType<typeof vi.fn>;
+      graphics: ReturnType<typeof vi.fn>;
+      container: ReturnType<typeof vi.fn>;
     };
     cameras: { main: { setBounds: ReturnType<typeof vi.fn>; centerOn: ReturnType<typeof vi.fn>; setZoom: ReturnType<typeof vi.fn>; zoom: number; scrollX: number; scrollY: number } };
     input: { on: ReturnType<typeof vi.fn>; mouse: { disableContextMenu: ReturnType<typeof vi.fn> }; keyboard: { addKeys: ReturnType<typeof vi.fn> } };
-    tweens: { add: ReturnType<typeof vi.fn> };
+    tweens: { add: ReturnType<typeof vi.fn>; killTweensOf: ReturnType<typeof vi.fn> };
     time: { delayedCall: ReturnType<typeof vi.fn> };
     inputHandlers: typeof inputHandlers;
     createdRectangles: typeof createdRectangles;
     createdTexts: typeof createdTexts;
+    createdCircles: typeof createdCircles;
+    createdContainers: typeof createdContainers;
+    createdGraphics: typeof createdGraphics;
     createdLayers: typeof createdLayers;
     pendingDelayedCalls: typeof pendingDelayedCalls;
   };
@@ -294,10 +405,43 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       createdTexts.push(text);
       return text;
     }),
-    container: vi.fn(() => {
-      const layer = { setDepth: vi.fn(), setVisible: vi.fn() };
-      createdLayers.push(layer);
-      return layer;
+    circle: vi.fn((x: number, y: number, radius: number, fillColor: number) => {
+      const circle = { x, y, radius, fillColor, setStrokeStyle: vi.fn(), destroy: vi.fn() };
+      createdCircles.push(circle);
+      return circle;
+    }),
+    graphics: vi.fn(() => {
+      const graphics = {
+        setDepth: vi.fn(),
+        clear: vi.fn(),
+        lineStyle: vi.fn(),
+        beginPath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        strokePath: vi.fn(),
+        strokeCircle: vi.fn(),
+        fillStyle: vi.fn(),
+        fillCircle: vi.fn(),
+      };
+      createdGraphics.push(graphics);
+      return graphics;
+    }),
+    container: vi.fn((x: number, y: number) => {
+      const container = {
+        x,
+        y,
+        children: [] as unknown[],
+        setDepth: vi.fn(),
+        setVisible: vi.fn(),
+        add: vi.fn((children: unknown[] | unknown) => {
+          container.children.push(...(Array.isArray(children) ? children : [children]));
+          return container;
+        }),
+        destroy: vi.fn(),
+      };
+      createdContainers.push(container);
+      createdLayers.push(container);
+      return container;
     }),
   };
   sceneWithDoubles.cameras = {
@@ -321,14 +465,23 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
     keyboard: { addKeys: vi.fn(() => options.keys ?? {}) },
   };
   sceneWithDoubles.tweens = {
-    add: vi.fn((config: { targets: { zoom: number }; zoom: number; onUpdate?: () => void; onComplete?: () => void }) => {
+    add: vi.fn((config: { targets: { zoom?: number; x?: number; y?: number }; zoom?: number; x?: number; y?: number; onUpdate?: () => void; onComplete?: () => void }) => {
       if (!options.holdTweens) {
-        config.targets.zoom = config.zoom;
+        if (typeof config.zoom === "number") {
+          config.targets.zoom = config.zoom;
+        }
+        if (typeof config.x === "number") {
+          config.targets.x = config.x;
+        }
+        if (typeof config.y === "number") {
+          config.targets.y = config.y;
+        }
         config.onUpdate?.();
         config.onComplete?.();
       }
       return config;
     }),
+    killTweensOf: vi.fn(),
   };
   sceneWithDoubles.time = {
     delayedCall: vi.fn((_delay: number, callback: () => void) => {
@@ -340,6 +493,9 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
   sceneWithDoubles.inputHandlers = inputHandlers;
   sceneWithDoubles.createdRectangles = createdRectangles;
   sceneWithDoubles.createdTexts = createdTexts;
+  sceneWithDoubles.createdCircles = createdCircles;
+  sceneWithDoubles.createdContainers = createdContainers;
+  sceneWithDoubles.createdGraphics = createdGraphics;
   sceneWithDoubles.createdLayers = createdLayers;
   sceneWithDoubles.pendingDelayedCalls = pendingDelayedCalls;
   return sceneWithDoubles;

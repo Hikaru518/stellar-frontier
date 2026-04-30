@@ -30,7 +30,7 @@ source:
 | 4 | TASK-004 | 实现 MapScene.ts 基础图层与地形色块渲染 | completed | 1 |
 | 5 | TASK-005 | 实现摄像机交互：Zoom、拖拽、WASD 平移 | completed | 1 |
 | 6 | TASK-006 | 实现 Hover tooltip 与左键选格 | completed | 1 |
-| 7 | TASK-007 | 实现人物标记与 Tween 移动动画 + 轨迹绘制 | pending | 0 |
+| 7 | TASK-007 | 实现人物标记与 Tween 移动动画 + 轨迹绘制 | completed | 1 |
 | 8 | TASK-008 | MapPage 集成 PhaserMapCanvas + e2e 测试桥接 | pending | 0 |
 | 9 | TASK-009 | 实现区域名标签（depth 13）与缩放级别 UI | pending | 0 |
 | 10 | TASK-010 | MVP 验收与回归测试 | pending | 0 |
@@ -90,4 +90,12 @@ source:
 - 完成时间: 2026-05-01 03:57
 - 尝试次数: 1
 - Monkey summary: 成功；实现 500ms hover tooltip、鼠标移动/点击/右键拖拽清理、左键选格通过最新 `stateRef.current.onSelectTile(tileId)` 回调、内联 popup，以及 pointer world 坐标 hit detection；右键点击/拖拽不会触发选择或 tooltip。
+- 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
+
+### TASK-007: 实现人物标记与 Tween 移动动画 + 轨迹绘制
+- 状态: completed
+- 开始时间: 2026-05-01 03:58
+- 完成时间: 2026-05-01 04:02
+- 尝试次数: 1
+- Monkey summary: 成功；实现人物 marker container（头/身圆形、depth 20）、按 crewId 复用与 250ms Tween、旧 tween 取消、`data-char-tile` 桥接、蓝色路线预览、橙色轨迹线/节点，以及同格多人偏移。
 - 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
