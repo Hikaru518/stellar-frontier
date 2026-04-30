@@ -91,6 +91,66 @@ describe("MapScene", () => {
     expect(onSelectTile).not.toHaveBeenCalled();
   });
 
+  it("shows a top-level tooltip after hovering a discovered tile for 500ms", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("1-2", { row: 1, col: 2, tooltip: "森林 | 北部营地 | (2,1)" })]) }));
+
+    (scene.create as unknown as () => void).call(scene);
+    scene.inputHandlers.pointermove({ x: 10, y: 10, worldX: 2 * (TILE_SIZE + TILE_GAP) + 10, worldY: TILE_SIZE + TILE_GAP + 10 });
+    scene.pendingDelayedCalls[0]?.callback();
+    const tooltipText = scene.createdTexts[scene.createdTexts.length - 1];
+    const tooltipBackground = scene.createdRectangles[scene.createdRectangles.length - 1];
+
+    expect(scene.time.delayedCall).toHaveBeenCalledWith(500, expect.any(Function));
+    expect(tooltipText?.content).toBe("森林 | 北部营地 | (2,1)");
+    expect(tooltipBackground?.fillColor).toBe(0xf4eadf);
+    expect(tooltipBackground?.setAlpha).toHaveBeenCalledWith(0.96);
+    expect(tooltipBackground?.setStrokeStyle).toHaveBeenCalledWith(1, 0x24384f);
+    expect(tooltipText?.setDepth).toHaveBeenCalledWith(31);
+  });
+
+  it("hides the tooltip and resets the hover timer when the pointer moves", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("0-1", { col: 1, tooltip: "平原 | 东侧 | (1,0)" })]) }));
+
+    (scene.create as unknown as () => void).call(scene);
+    scene.inputHandlers.pointermove({ x: 10, y: 10 });
+    scene.pendingDelayedCalls[0]?.callback();
+    const tooltipText = scene.createdTexts[scene.createdTexts.length - 1];
+    scene.inputHandlers.pointermove({ x: 20, y: 10, worldX: TILE_SIZE + TILE_GAP + 10, worldY: 10 });
+
+    expect(tooltipText?.destroy).toHaveBeenCalledOnce();
+    expect(scene.pendingDelayedCalls[0]?.remove).toHaveBeenCalledWith(false);
+    expect(scene.time.delayedCall).toHaveBeenCalledTimes(2);
+  });
+
+  it("left-clicking a tile selects it through the latest state ref and opens an inline popup", () => {
+    const oldSelectTile = vi.fn();
+    const latestSelectTile = vi.fn();
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")], { onSelectTile: oldSelectTile }) }));
+
+    (scene.create as unknown as () => void).call(scene);
+    scene.stateRef.current = sceneState([tileView("0-0", { terrain: "森林", label: "营地", tooltip: "营地 | 森林 | (0,0)" })], { onSelectTile: latestSelectTile });
+    scene.inputHandlers.pointerdown({ button: 0, x: 10, y: 10 });
+
+    expect(oldSelectTile).not.toHaveBeenCalled();
+    expect(latestSelectTile).toHaveBeenCalledWith("0-0");
+    expect(scene.createdTexts.map((text) => text.content)).toEqual(expect.arrayContaining([expect.stringContaining("森林"), expect.stringContaining("营地"), "前往此位置"]));
+  });
+
+  it("right-clicking or dragging does not select tiles or show hover tooltip", () => {
+    const onSelectTile = vi.fn();
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")], { onSelectTile }) }));
+
+    (scene.create as unknown as () => void).call(scene);
+    scene.inputHandlers.pointerdown({ button: 2, x: 10, y: 10 });
+    scene.inputHandlers.pointermove({ button: 2, x: 30, y: 10 });
+    scene.pendingDelayedCalls.forEach((call) => call.callback());
+    scene.inputHandlers.pointerup({ button: 2 });
+
+    expect(onSelectTile).not.toHaveBeenCalled();
+    expect(scene.time.delayedCall).not.toHaveBeenCalled();
+    expect(scene.createdTexts).toHaveLength(0);
+  });
+
   it("disables the browser context menu for right-button map drag", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")]) }));
 
@@ -188,28 +248,51 @@ function tileView(id: string, overrides: Partial<PhaserMapCanvasProps["tileViews
 }
 
 function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; keys?: Record<string, { isDown?: boolean }> } = {}) {
-  const createdRectangles: Array<{ setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> = [];
+  const createdRectangles: Array<{
+    fillColor: number;
+    setOrigin: ReturnType<typeof vi.fn>;
+    setDepth: ReturnType<typeof vi.fn>;
+    setAlpha: ReturnType<typeof vi.fn>;
+    setStrokeStyle: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+  }> = [];
+  const createdTexts: Array<{
+    content: string;
+    setOrigin: ReturnType<typeof vi.fn>;
+    setDepth: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+  }> = [];
   const createdLayers: Array<{ setDepth: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn> }> = [];
+  const pendingDelayedCalls: Array<{ callback: () => void; remove: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> = [];
   const inputHandlers: Record<string, (...args: unknown[]) => void> = {};
   document.body.innerHTML = '<div class="phaser-map-stage"></div>';
   const sceneWithDoubles = scene as MapScene & {
     add: {
-      rectangle: ReturnType<typeof vi.fn<(x: number, y: number, width: number, height: number, fillColor: number) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
+      rectangle: ReturnType<typeof vi.fn<(x: number, y: number, width: number, height: number, fillColor: number) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; setAlpha: ReturnType<typeof vi.fn>; setStrokeStyle: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
+      text: ReturnType<typeof vi.fn<(x: number, y: number, content: string, style?: Record<string, unknown>) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
       container: ReturnType<typeof vi.fn<(x: number, y: number) => { setDepth: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn> }>>;
     };
     cameras: { main: { setBounds: ReturnType<typeof vi.fn>; centerOn: ReturnType<typeof vi.fn>; setZoom: ReturnType<typeof vi.fn>; zoom: number; scrollX: number; scrollY: number } };
     input: { on: ReturnType<typeof vi.fn>; mouse: { disableContextMenu: ReturnType<typeof vi.fn> }; keyboard: { addKeys: ReturnType<typeof vi.fn> } };
     tweens: { add: ReturnType<typeof vi.fn> };
+    time: { delayedCall: ReturnType<typeof vi.fn> };
     inputHandlers: typeof inputHandlers;
     createdRectangles: typeof createdRectangles;
+    createdTexts: typeof createdTexts;
     createdLayers: typeof createdLayers;
+    pendingDelayedCalls: typeof pendingDelayedCalls;
   };
 
   sceneWithDoubles.add = {
-    rectangle: vi.fn(() => {
-      const rectangle = { setOrigin: vi.fn(), setDepth: vi.fn(), destroy: vi.fn() };
+    rectangle: vi.fn((_x: number, _y: number, _width: number, _height: number, fillColor: number) => {
+      const rectangle = { fillColor, setOrigin: vi.fn(), setDepth: vi.fn(), setAlpha: vi.fn(), setStrokeStyle: vi.fn(), destroy: vi.fn() };
       createdRectangles.push(rectangle);
       return rectangle;
+    }),
+    text: vi.fn((_x: number, _y: number, content: string) => {
+      const text = { content, setOrigin: vi.fn(), setDepth: vi.fn(), destroy: vi.fn() };
+      createdTexts.push(text);
+      return text;
     }),
     container: vi.fn(() => {
       const layer = { setDepth: vi.fn(), setVisible: vi.fn() };
@@ -247,8 +330,17 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       return config;
     }),
   };
+  sceneWithDoubles.time = {
+    delayedCall: vi.fn((_delay: number, callback: () => void) => {
+      const delayedCall = { callback, remove: vi.fn(), destroy: vi.fn() };
+      pendingDelayedCalls.push(delayedCall);
+      return delayedCall;
+    }),
+  };
   sceneWithDoubles.inputHandlers = inputHandlers;
   sceneWithDoubles.createdRectangles = createdRectangles;
+  sceneWithDoubles.createdTexts = createdTexts;
   sceneWithDoubles.createdLayers = createdLayers;
+  sceneWithDoubles.pendingDelayedCalls = pendingDelayedCalls;
   return sceneWithDoubles;
 }
