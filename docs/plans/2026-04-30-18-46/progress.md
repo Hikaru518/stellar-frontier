@@ -26,7 +26,7 @@ source:
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 安装 Phaser 依赖 + 建立目录与空壳文件 | completed | 1 |
 | 2 | TASK-002 | 实现 mapView.ts 纯函数与单元测试 | completed | 1 |
-| 3 | TASK-003 | 实现 PhaserMapCanvas.tsx React 外壳 | pending | 0 |
+| 3 | TASK-003 | 实现 PhaserMapCanvas.tsx React 外壳 | completed | 2 |
 | 4 | TASK-004 | 实现 MapScene.ts 基础图层与地形色块渲染 | pending | 0 |
 | 5 | TASK-005 | 实现摄像机交互：Zoom、拖拽、WASD 平移 | pending | 0 |
 | 6 | TASK-006 | 实现 Hover tooltip 与左键选格 | pending | 0 |
@@ -55,4 +55,15 @@ source:
 - 完成时间: 2026-05-01 03:11
 - 尝试次数: 1
 - Monkey summary: 成功；使用 TDD 新增 `mapView.test.ts`，实现地形颜色、tooltip、队员标记、游戏时间插值坐标、BFS 4 邻域寻路、tile view 与 crew marker 派生等纯函数。
+- 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
+
+### TASK-003: 实现 PhaserMapCanvas.tsx React 外壳
+- 状态: completed
+- 开始时间: 2026-05-01 03:11
+- 完成时间: 2026-05-01 03:32
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: Monkey 返回成功且质量检查通过，但调度层复核发现实现不完整：`PhaserMapCanvasProps` 缺少设计要求的 `columns` 与 `onSelectTile`，Phaser Game config 未注册/传入 `MapScene` 与 `stateRef`，后续 TASK-004 无法仅通过修改 `MapScene.ts` 接入 Scene。
+  - 尝试 2: 成功；补齐 SceneState/props、Game config 注册 `MapScene` 并传入 `stateRef`，保留 test mode 跳过真实 Phaser 初始化、cleanup、ResizeObserver、语义层与 null-safe `updateState()`。
+- Monkey summary: 成功；实现 `PhaserMapCanvas` React 外壳并完成 `MapScene` 最小可编译空壳以支持后续接入，不含地图绘制逻辑。
 - 质量检查: `npm run lint` PASS；`npm run test` PASS；`npm run validate:content` PASS。
