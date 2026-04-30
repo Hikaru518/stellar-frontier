@@ -2,7 +2,7 @@
 plan: "phaser-map"
 branch: "feature/phaser-map"
 started: "2026-05-01 02:59"
-status: "in_progress"
+status: "completed"
 source:
   implementation_plan: "docs/plans/2026-04-30-18-46/phaser-map-implementation-plan.md"
   tasks_json: "docs/plans/2026-04-30-18-46/phaser-map-tasks.json"
@@ -14,11 +14,17 @@ source:
 
 ### 完成内容与验收要点
 
-执行中。
+- 已完成 Phaser 地图 MVP：`MapPage` 由旧 `.map-grid` DOM 网格切换为 `PhaserMapCanvas` + `MapScene` 渲染，保留右侧地图详情、图例、队员面板、返回面板与候选移动确认逻辑。
+- 已建立 `src/phaser-map/` 分层：`mapView.ts` 纯函数、`PhaserMapCanvas.tsx` React 生命周期桥接、`MapScene.ts` Phaser 渲染与输入交互。
+- 已实现程序生成地形色块、tileset registry/public 空壳、4 级离散 zoom、鼠标中心缩放补偿、LOD 切换、右键拖拽、WASD 平移、500ms hover tooltip、左键选格、人物 marker/Tween/轨迹、路线预览、区域名标签与 React zoom pip。
+- 已补充 DOM/e2e 桥接：`.phaser-map-stage[data-zoom-level]`、`data-char-tile`、HTML fallback 语义层（`pointer-events: none`），并更新相关 unit/e2e 测试。
+- 验收时重点关注：地图页面加载后 `.map-grid` 不再存在；`.phaser-map-stage` 初始 `data-zoom-level="1"`；点击/键盘选择格子会更新右侧详情；滚轮 zoom 会同步 zoom pip；移动中的队员 marker、路线预览和轨迹显示正常。
 
 ### 实现与设计的差异
 
-执行中。
+- 与设计一致：直接替换 DOM Grid，无 feature flag；MVP 阶段使用程序色块而非真实 tileset PNG；React ↔ Phaser 采用 `stateRef + updateState`；人物视觉动画由 Phaser Tween 驱动；e2e 采用 DOM `data-*` 桥接。
+- 自动化覆盖替代人工验收：initial.md §10 的 10 项 MVP 基线通过 unit/e2e/质量门禁覆盖；未额外引入 Later 范围的 `window.__mapTestState` 或截图基线。
+- 保留后续扩展点：`content/maps/tilesets/registry.json` 当前仍为空数组，`public/maps/tilesets/.gitkeep` 保留；真实 PNG tileset 可在后续轮次接入。
 
 ## 任务状态
 
