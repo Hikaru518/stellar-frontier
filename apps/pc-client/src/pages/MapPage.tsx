@@ -7,6 +7,17 @@ import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from 
 import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
 import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
 import { formatDuration } from "../timeSystem";
+import { PhaserMapCanvas, PHASER_MAP_TILE_GAP, PHASER_MAP_TILE_SIZE } from "./PhaserMapCanvas";
+import { PhaserMapPerformanceDemo } from "./PhaserMapPerformanceDemo";
+import {
+  getCrewMarkerLabel,
+  getCrewMarkerPosition,
+  getTerrainFillColor,
+  getTileTooltipText,
+  type PhaserCrewMarkerView,
+  type PhaserMapTileView,
+  type TileCenter,
+} from "./phaserMapView";
 
 interface MapPageProps {
   tiles: MapTile[];
@@ -41,6 +52,7 @@ export function MapPage({
 }: MapPageProps) {
   const visibleWindow = useMemo(() => getVisibleTileWindow(defaultMapConfig, map), [map]);
   const [selectedId, setSelectedId] = useState(map.originTileId);
+  const [performanceDemoOpen, setPerformanceDemoOpen] = useState(false);
   const selectedCell = visibleWindow.cells.find((cell) => cell.id === selectedId) ?? visibleWindow.cells[0];
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
   const selectedIsDiscovered = selectedCell?.status === "discovered";
@@ -69,6 +81,51 @@ export function MapPage({
       ) as Record<CrewId, CrewActionViewModel>,
     [activeCalls, crew, crewActions, elapsedGameSeconds, tiles],
   );
+  const phaserTileViews = useMemo(
+    () =>
+      visibleWindow.cells.map((cell) =>
+        buildPhaserTileView({
+          cell,
+          gridRow: cell.row - visibleWindow.minRow,
+          gridCol: cell.col - visibleWindow.minCol,
+          tile: tiles.find((item) => item.id === cell.id),
+          runtimeTile: map.tilesById[cell.id],
+          selectedCellId: selectedCell?.id,
+          selectedMoveTargetId,
+          moveRoute: movePreview?.route ?? [],
+          crewById,
+          crewActionViews,
+        }),
+      ),
+    [crewActionViews, crewById, map.tilesById, movePreview?.route, selectedCell?.id, selectedMoveTargetId, tiles, visibleWindow.cells, visibleWindow.minCol, visibleWindow.minRow],
+  );
+  const phaserCrewMarkers = useMemo(
+    () =>
+      buildPhaserCrewMarkers({
+        tileViews: phaserTileViews,
+        crew,
+        crewActions,
+        elapsedGameSeconds,
+      }),
+    [crew, crewActions, elapsedGameSeconds, phaserTileViews],
+  );
+
+  if (performanceDemoOpen) {
+    return (
+      <ConsoleShell
+        title="卫星雷达地图 / 地块 Demo"
+        subtitle="3x3 大地图 + 20x20 地块内地图 / 不影响正式 GameState"
+        gameTimeLabel={gameTimeLabel}
+        actions={
+          <button type="button" className="primary-button" onClick={() => setPerformanceDemoOpen(false)}>
+            返回正式地图
+          </button>
+        }
+      >
+        <PhaserMapPerformanceDemo onClose={() => setPerformanceDemoOpen(false)} />
+      </ConsoleShell>
+    );
+  }
 
   return (
     <ConsoleShell
@@ -80,89 +137,27 @@ export function MapPage({
       }
       gameTimeLabel={gameTimeLabel}
       actions={
-        <button type="button" className="primary-button" onClick={onReturn}>
-          {returnTarget === "call" ? "返回当前通话" : "返回控制中心"}
-        </button>
+        <>
+          <button type="button" className="secondary-button" onClick={() => setPerformanceDemoOpen(true)}>
+            3x3 地块 Demo
+          </button>
+          <button type="button" className="primary-button" onClick={onReturn}>
+            {returnTarget === "call" ? "返回当前通话" : "返回控制中心"}
+          </button>
+        </>
       }
     >
       <div className="map-layout">
-        <section
-          className="map-grid"
-          aria-label={`雷达可见矩形：玩家坐标 ${formatWindowCoord(visibleWindow.minRow, visibleWindow.minCol)} 到 ${formatWindowCoord(
+        <PhaserMapCanvas
+          ariaLabel={`雷达可见矩形：玩家坐标 ${formatWindowCoord(visibleWindow.minRow, visibleWindow.minCol)} 到 ${formatWindowCoord(
             visibleWindow.maxRow,
             visibleWindow.maxCol,
           )}`}
-          style={{ gridTemplateColumns: `repeat(${visibleColumns}, minmax(0, 1fr))` }}
-        >
-          {visibleWindow.cells.map((cell) => {
-            const tile = tiles.find((item) => item.id === cell.id);
-            const runtimeTile = map.tilesById[cell.id];
-            const isDiscovered = cell.status === "discovered";
-            const visibleCrewIds = crewIdsForCell(runtimeTile, tile);
-            const hasCrewSignal = !isDiscovered && Boolean(cell.tile) && visibleCrewIds.length > 0;
-            const visibleSpecialStates = revealedSpecialStates(cell, runtimeTile);
-            const hasDanger = isDiscovered && visibleSpecialStates.some((state) => state.severity === "high");
-            const isRouteTile = movePreview?.route.includes(cell.id) ?? false;
-            const isMoveTarget = selectedMoveTargetId === cell.id;
-            const hasCurrentCrew = visibleCrewIds.length > 0;
-            const firstEventMark = tile?.eventMarks?.[0];
-            return (
-              <button
-                type="button"
-                key={cell.id}
-                className={`map-cell ${selectedCell?.id === cell.id ? "map-cell-selected" : ""} ${
-                  isDiscovered ? "" : "map-cell-unknown"
-                } ${hasDanger ? "map-cell-danger" : ""} ${isRouteTile ? "map-cell-route" : ""} ${isMoveTarget ? "map-cell-target" : ""} ${
-                  hasCurrentCrew ? "map-cell-crew-current" : ""
-                }`}
-                onClick={() => setSelectedId(cell.id)}
-              >
-                <strong>{formatCellCoord(cell)}</strong>
-                {isDiscovered && cell.tile && tile ? (
-                  <>
-                    <span>{cell.tile.areaName}</span>
-                    <small>地形：{cell.tile.terrain}</small>
-                    <small>天气：{cell.tile.weather}</small>
-                    <small>对象：{objectSummary(revealedObjects(cell, runtimeTile))}</small>
-                    <small>状态：{specialStateSummary(visibleSpecialStates)}</small>
-                    {tile.crew.map((crewId) => {
-                      const member = crewById.get(crewId);
-                      const actionView = member ? crewActionViews[member.id] : undefined;
-                      return member ? (
-                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
-                        </small>
-                      ) : null;
-                    })}
-                    {firstEventMark ? <small className="route-text">{firstEventMark.label}</small> : null}
-                  </>
-                ) : hasCrewSignal && cell.tile ? (
-                  <>
-                    <span>队员回传</span>
-                    <small>地形：{cell.tile.terrain}</small>
-                    <small>天气：{cell.tile.weather}</small>
-                    {visibleCrewIds.map((crewId) => {
-                      const member = crewById.get(crewId);
-                      const actionView = member ? crewActionViews[member.id] : undefined;
-                      return member ? (
-                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
-                        </small>
-                      ) : null;
-                    })}
-                  </>
-                ) : (
-                  <>
-                    <span>未探索区域</span>
-                    <small>详情未确认</small>
-                  </>
-                )}
-                {isRouteTile ? <small className="route-text">候选路线</small> : null}
-                {isMoveTarget ? <small className="route-text">已标记目标</small> : null}
-              </button>
-            );
-          })}
-        </section>
+          columns={visibleColumns}
+          tileViews={phaserTileViews}
+          crewMarkers={phaserCrewMarkers}
+          onSelectTile={setSelectedId}
+        />
 
         <Panel className="map-legend">
           <p>
@@ -260,6 +255,196 @@ function formatWindowCoord(row: number, col: number) {
   const origin = parseTileId(defaultMapConfig.originTileId);
   const coord = origin ? getDisplayCoord({ row, col }, origin) : { displayX: col, displayY: row };
   return `(${coord.displayX},${coord.displayY})`;
+}
+
+interface PhaserTileViewInput {
+  cell: VisibleTileCell;
+  gridRow: number;
+  gridCol: number;
+  tile?: MapTile;
+  runtimeTile: GameMapState["tilesById"][string];
+  selectedCellId?: string;
+  selectedMoveTargetId?: string;
+  moveRoute: string[];
+  crewById: Map<string, CrewMember>;
+  crewActionViews: Record<CrewId, CrewActionViewModel>;
+}
+
+function buildPhaserTileView({
+  cell,
+  gridRow,
+  gridCol,
+  tile,
+  runtimeTile,
+  selectedCellId,
+  selectedMoveTargetId,
+  moveRoute,
+  crewById,
+  crewActionViews,
+}: PhaserTileViewInput): PhaserMapTileView {
+  const isDiscovered = cell.status === "discovered";
+  const visibleCrewIds = crewIdsForCell(runtimeTile, tile);
+  const hasCrewSignal = !isDiscovered && Boolean(cell.tile) && visibleCrewIds.length > 0;
+  const visibleSpecialStates = revealedSpecialStates(cell, runtimeTile);
+  const isDanger = isDiscovered && visibleSpecialStates.some((state) => state.severity === "high");
+  const displayCoord = formatCellCoord(cell);
+  const terrain = cell.tile?.terrain;
+  const semanticLines = buildPhaserSemanticLines({
+    cell,
+    tile,
+    runtimeTile,
+    isDiscovered,
+    hasCrewSignal,
+    visibleCrewIds,
+    visibleSpecialStates,
+    crewById,
+    crewActionViews,
+    isRouteTile: moveRoute.includes(cell.id),
+    isMoveTarget: selectedMoveTargetId === cell.id,
+  });
+
+  return {
+    id: cell.id,
+    row: gridRow,
+    col: gridCol,
+    displayCoord,
+    status: cell.status,
+    fillColor: getTerrainFillColor({ status: cell.status, terrain, hasCrewSignal }),
+    tooltip: getTileTooltipText({ displayCoord, status: cell.status, terrain, hasCrewSignal }),
+    label: isDiscovered && cell.tile ? cell.tile.areaName : hasCrewSignal ? "队员回传" : "未探索区域",
+    terrain,
+    semanticLines,
+    crewLabels: visibleCrewIds
+      .map((crewId) => crewById.get(crewId))
+      .filter((member): member is CrewMember => Boolean(member))
+      .map((member) => getCrewMarkerLabel(member)),
+    isDanger,
+    isRoute: moveRoute.includes(cell.id),
+    isSelected: selectedCellId === cell.id,
+    isTarget: selectedMoveTargetId === cell.id,
+  };
+}
+
+interface PhaserSemanticLinesInput {
+  cell: VisibleTileCell;
+  tile?: MapTile;
+  runtimeTile: GameMapState["tilesById"][string];
+  isDiscovered: boolean;
+  hasCrewSignal: boolean;
+  visibleCrewIds: CrewId[];
+  visibleSpecialStates: MapSpecialStateDefinition[];
+  crewById: Map<string, CrewMember>;
+  crewActionViews: Record<CrewId, CrewActionViewModel>;
+  isRouteTile: boolean;
+  isMoveTarget: boolean;
+}
+
+function buildPhaserSemanticLines({
+  cell,
+  tile,
+  runtimeTile,
+  isDiscovered,
+  hasCrewSignal,
+  visibleCrewIds,
+  visibleSpecialStates,
+  crewById,
+  crewActionViews,
+  isRouteTile,
+  isMoveTarget,
+}: PhaserSemanticLinesInput) {
+  const lines: string[] = [];
+  if (isDiscovered && cell.tile && tile) {
+    lines.push(`地形：${cell.tile.terrain}`);
+    lines.push(`天气：${cell.tile.weather}`);
+    lines.push(`对象：${objectSummary(revealedObjects(cell, runtimeTile))}`);
+    lines.push(`状态：${specialStateSummary(visibleSpecialStates)}`);
+    lines.push(...crewSummaryLines(tile.crew, crewById, crewActionViews));
+    const firstEventMark = tile.eventMarks?.[0];
+    if (firstEventMark) {
+      lines.push(firstEventMark.label);
+    }
+  } else if (hasCrewSignal && cell.tile) {
+    lines.push(`地形：${cell.tile.terrain}`);
+    lines.push(`天气：${cell.tile.weather}`);
+    lines.push(...crewSummaryLines(visibleCrewIds, crewById, crewActionViews));
+  } else {
+    lines.push("详情未确认");
+  }
+
+  if (isRouteTile) {
+    lines.push("候选路线");
+  }
+  if (isMoveTarget) {
+    lines.push("已标记目标");
+  }
+  return lines;
+}
+
+function crewSummaryLines(crewIds: CrewId[], crewById: Map<string, CrewMember>, crewActionViews: Record<CrewId, CrewActionViewModel>) {
+  return crewIds.flatMap((crewId) => {
+    const member = crewById.get(crewId);
+    if (!member) {
+      return [];
+    }
+    return [`${member.name}：${shortStatus(crewActionViews[member.id]?.statusText ?? member.status)}`];
+  });
+}
+
+function buildPhaserCrewMarkers({
+  tileViews,
+  crew,
+  crewActions,
+  elapsedGameSeconds,
+}: {
+  tileViews: PhaserMapTileView[];
+  crew: CrewMember[];
+  crewActions: Record<string, CrewActionState>;
+  elapsedGameSeconds: number;
+}): PhaserCrewMarkerView[] {
+  const tileCenters = buildTileCenters(tileViews);
+  return crew.reduce<PhaserCrewMarkerView[]>((markers, member, index) => {
+    const action = Object.values(crewActions).find((item) => item.crew_id === member.id && item.type === "move" && item.status === "active");
+    const basePosition = getCrewMarkerPosition({
+      currentTileId: member.currentTile,
+      action,
+      tileCenters,
+      elapsedGameSeconds,
+    });
+    const currentCenter = tileCenters[member.currentTile];
+    if (!currentCenter && !action?.path_tile_ids?.some((tileId) => tileCenters[tileId])) {
+      return markers;
+    }
+    const offset = markerOffset(index);
+    markers.push({
+      crewId: member.id,
+      label: getCrewMarkerLabel(member),
+      x: basePosition.x + offset.x,
+      y: basePosition.y + offset.y,
+    });
+    return markers;
+  }, []);
+}
+
+function buildTileCenters(tileViews: PhaserMapTileView[]): Record<string, TileCenter> {
+  return Object.fromEntries(
+    tileViews.map((tile) => [
+      tile.id,
+      {
+        x: tile.col * (PHASER_MAP_TILE_SIZE + PHASER_MAP_TILE_GAP) + PHASER_MAP_TILE_SIZE / 2,
+        y: tile.row * (PHASER_MAP_TILE_SIZE + PHASER_MAP_TILE_GAP) + PHASER_MAP_TILE_SIZE / 2,
+      },
+    ]),
+  );
+}
+
+function markerOffset(index: number) {
+  const offsets = [
+    { x: 0, y: 0 },
+    { x: 18, y: 0 },
+    { x: -18, y: 0 },
+    { x: 0, y: 18 },
+  ];
+  return offsets[index % offsets.length];
 }
 
 function revealedObjects(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapObjectDefinition[] {

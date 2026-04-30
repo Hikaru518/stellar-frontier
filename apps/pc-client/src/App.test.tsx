@@ -2022,6 +2022,19 @@ describe("App", () => {
     expect(screen.queryByText("未发现即时危险")).not.toBeInTheDocument();
   });
 
+  it("opens the 3x3 Phaser map drilldown demo from the map page", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
+    fireEvent.click(screen.getByRole("button", { name: "3x3 地块 Demo" }));
+
+    expect(screen.getByRole("heading", { name: "3x3 / 20x20 Phaser 地图 Demo" })).toBeInTheDocument();
+    expect(screen.getByText(/外层只有 3x3 大地块/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭 Demo" }));
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+  });
+
   it("keeps frontier and unknown-hole map cells redacted", () => {
     const map = createInitialMapState();
     map.discoveredTileIds = ["4-4", "4-8"];

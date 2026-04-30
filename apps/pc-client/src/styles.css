@@ -703,6 +703,136 @@ blockquote {
   min-width: 0;
 }
 
+.phaser-map-canvas {
+  grid-area: grid;
+  position: relative;
+  display: block;
+  min-width: 0;
+  border: 1px solid #171a1c;
+  background: #77736b;
+  overflow: hidden;
+}
+
+.phaser-map-stage {
+  min-height: 432px;
+  background: #77736b;
+}
+
+.phaser-map-stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.phaser-map-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: inherit;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.phaser-map-fallback-tile {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 5px;
+  border: 0;
+  padding: 12px;
+  background: transparent;
+  opacity: 0;
+  text-align: left;
+}
+
+.phaser-map-fallback-tile strong {
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.phaser-map-fallback-tile small {
+  color: #46505a;
+}
+
+.phaser-demo-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.phaser-demo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid #a9a49a;
+  padding-bottom: 16px;
+}
+
+.phaser-demo-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 18px;
+  align-items: start;
+}
+
+.phaser-demo-stage {
+  min-height: 620px;
+  border: 1px solid #171a1c;
+  background: #1f536b;
+  overflow: hidden;
+}
+
+.phaser-demo-stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.phaser-demo-detail-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #77736b;
+  background: #f4eadf;
+  padding: 16px;
+}
+
+.phaser-demo-detail-panel h3,
+.phaser-demo-detail-panel h4 {
+  margin: 0;
+}
+
+.phaser-demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.zoom-level-bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.zoom-level-pip,
+.zoom-level-active {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  border: 1px solid #b9a99a;
+  background: #f4eadf;
+  color: #77736b;
+}
+
+.zoom-level-active {
+  background: #24384f;
+  color: #f4eadf;
+  border-color: #24384f;
+  font-weight: bold;
+}
+
 .map-cell {
   display: flex;
   min-height: 144px;
@@ -922,7 +1052,8 @@ blockquote {
   .control-layout,
   .station-layout,
   .call-layout,
-  .map-layout {
+  .map-layout,
+  .phaser-demo-body {
     display: grid;
     grid-template-columns: 1fr;
     grid-template-areas: none;
