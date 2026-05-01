@@ -1,11 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel } from "../../components/Layout";
 import { logger } from "../../logger";
 import type { LogStatus, LoggerFacade } from "../../logger";
-import type { LogSource } from "../../logger/types";
+import type { LogEntry, LogSource } from "../../logger/types";
 
 type Mode = "current" | "archive";
 type SourceFilter = "all" | LogSource;
+
+/**
+ * Maximum number of entries kept in the panel state. Aligned with the logger
+ * ring buffer's default capacity; we still cap defensively here so the
+ * component cannot grow unbounded if the upstream buffer is misconfigured.
+ */
+const ENTRY_CAP = 2000;
+
+/** Max characters for the inline payload preview before truncation. */
+const PAYLOAD_PREVIEW_MAX = 200;
 
 export interface LogPanelProps {
   /** Optional injection seam for tests; defaults to the production singleton. */
@@ -17,17 +27,49 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [status, setStatus] = useState<LogStatus>(() => facade.getStatus());
+  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Subscribe so banners stay in sync when worker transitions to memory_only or
-  // (post TASK-015) writerRole flips. Real-time tail rendering is TASK-012.
+  // Mount: seed from snapshot, then subscribe for incremental deltas.
+  // Subscription also keeps the status banners in sync (worker fatal,
+  // writerRole flip post TASK-015, etc).
   useEffect(() => {
-    const unsubscribe = facade.subscribe(() => {
+    setEntries(facade.getRingBufferSnapshot());
+    const unsubscribe = facade.subscribe(({ entries: delta }) => {
+      if (delta.length > 0) {
+        setEntries((prev) => {
+          const next = prev.concat(delta);
+          return next.length > ENTRY_CAP ? next.slice(next.length - ENTRY_CAP) : next;
+        });
+      }
       setStatus(facade.getStatus());
     });
     return unsubscribe;
   }, [facade]);
 
+  // Derived view: filter by type prefix + exact source.
+  const visibleEntries = useMemo(() => {
+    if (!typeFilter && sourceFilter === "all") {
+      return entries;
+    }
+    return entries.filter((e) => {
+      if (typeFilter && !e.type.startsWith(typeFilter)) return false;
+      if (sourceFilter !== "all" && e.source !== sourceFilter) return false;
+      return true;
+    });
+  }, [entries, typeFilter, sourceFilter]);
+
+  // Auto-scroll to bottom on every change. MVP: always pin to bottom.
+  // TODO: respect "user scrolled up" so live tail does not interrupt manual
+  // inspection (e.g. only auto-scroll when distance-to-bottom < 50px).
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [visibleEntries]);
+
   const isMemoryOnly = status.mode === "memory_only";
+  const hasFilter = typeFilter !== "" || sourceFilter !== "all";
 
   return (
     <Panel title="游戏日志">
@@ -89,10 +131,70 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
         </button>
       </div>
 
-      <div className="log-panel-list" aria-label="日志列表">
-        {/* TASK-012 implements the real-time tail; TASK-018 implements the archive list. */}
-        <div className="muted-text">（实时 tail 与历史列表将在后续 task 中接入）</div>
-      </div>
+      {mode === "current" ? (
+        <div
+          ref={listRef}
+          className="log-panel-list"
+          style={{ maxHeight: 360, overflowY: "auto" }}
+          aria-label="日志列表"
+        >
+          {visibleEntries.length === 0 ? (
+            <div className="muted-text">
+              {hasFilter ? "暂无日志（过滤后无匹配）" : "暂无日志"}
+            </div>
+          ) : (
+            visibleEntries.map((entry) => (
+              <div
+                key={`${entry.run_id}#${entry.seq}`}
+                className="log-panel-row"
+                data-type={entry.type}
+                data-source={entry.source}
+              >
+                <span className="log-panel-seq">#{entry.seq}</span>{" "}
+                <span className="log-panel-time">
+                  {formatHms(entry.occurred_at_real_time)}
+                </span>{" "}
+                <span className="log-panel-type-chip">{entry.type}</span>{" "}
+                <span className="log-panel-source">{entry.source}</span>{" "}
+                <span
+                  className="log-panel-payload"
+                  title={safeStringify(entry.payload)}
+                >
+                  {truncate(safeStringify(entry.payload), PAYLOAD_PREVIEW_MAX)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="log-panel-list muted-text">
+          （历史 run 列表将在 TASK-018 接入）
+        </div>
+      )}
     </Panel>
   );
+}
+
+/**
+ * Extract the `HH:MM:SS` segment from an ISO 8601 timestamp. Falls back to the
+ * raw string if the regex does not match (defensive — `occurred_at_real_time`
+ * is always populated via `Date.toISOString()`).
+ */
+function formatHms(iso: string): string {
+  const m = /T(\d{2}:\d{2}:\d{2})/.exec(iso);
+  return m ? m[1] : iso;
+}
+
+/** JSON.stringify guarded against circular structures. */
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** Cap a string at `max` chars, replacing the tail with `...` when needed. */
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 3) + "...";
 }

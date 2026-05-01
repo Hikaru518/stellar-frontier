@@ -35,7 +35,7 @@ source:
 | 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | completed | 1       |
 | 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | completed | 1       |
 | 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | completed | 1       |
-| 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | pending   | 0       |
+| 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | completed | 1       |
 | 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | pending   | 0       |
 | 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | pending   | 0       |
 | 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | pending   | 0       |
@@ -184,3 +184,15 @@ source:
   - 修改 `DebugToolbox.tsx`：在最末尾插入 `<LogPanel />`
   - LogStatus / LoggerFacade 已 export，LogSource 从 `../../logger/types` 直接 import（避免改 logger 模块）
 - 质量检查: lint PASS；test PASS（38 files / 305 tests，新增 1 文件 7 用例）
+
+### TASK-012: LogPanel 实时 tail 与过滤
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:17
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 LogPanel.tsx：mount 时 getRingBufferSnapshot 初始化 entries；subscribe delta 增量；ENTRY_CAP=2000；visibleEntries useMemo 派生（type 前缀 + source 精确，all 跳过）；列表 maxHeight 360 / overflowY auto；自动滚到底；archive mode 渲染 placeholder
+  - 模块级辅助：formatHms（ISO → HH:MM:SS）/ safeStringify（JSON 循环引用回退）/ truncate（200 字符 + ...）
+  - 优化：useMemo 无过滤时直接返回 entries 引用；subscribe 0 长度 delta 不 setEntries
+  - 测试新增 10 用例 + 保留 TASK-011 全部 7 用例（共 17）
+- 质量检查: lint PASS；test PASS（38 files / 315 tests，新增 10 用例）
