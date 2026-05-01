@@ -13,6 +13,8 @@ export interface RingBuffer<T> {
   snapshot(): T[];
   /** Number of currently buffered items. */
   size(): number;
+  /** Discard every buffered entry without notifying subscribers. */
+  clear(): void;
   /** Subscribe to delta notifications; returns an idempotent unsubscribe. */
   subscribe(listener: RingBufferListener<T>): () => void;
 }
@@ -80,6 +82,11 @@ export function createRingBuffer<T>(options: { capacity: number }): RingBuffer<T
     },
     size() {
       return items.length;
+    },
+    clear() {
+      // Drop in place; subscribers are not notified — `clear` is a state
+      // reset, not a delta event.
+      items.length = 0;
     },
     subscribe(listener: RingBufferListener<T>) {
       listeners.add(listener);

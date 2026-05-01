@@ -30,7 +30,7 @@ source:
 | 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | completed | 1       |
 | 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | completed | 1       |
 | 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | completed | 1       |
-| 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | pending   | 0       |
+| 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | completed | 1       |
 | 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | pending   | 0       |
 | 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | pending   | 0       |
 | 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | pending   | 0       |
@@ -124,3 +124,16 @@ source:
   - 设计要点：LogInputWithContext 用 distributive conditional & 而非 interface extends（兼容 LogInput 的 distributive Pick）；workerFactory 失败 try/catch → memory_only + warn 一次；fatal 清空 waitingFlushers 避免 flush 永久挂起；flushPending 守卫 mode==="ok"；gameSeconds 默认 0 + // TODO(TASK-008) 注释
   - 占位：rotate/listRuns/readRun/deleteRun/exportCurrent/exportRun 留给 TASK-007
 - 质量检查: lint PASS；test PASS（32 files / 258 tests，新增 1 文件 8 用例）
+
+### TASK-007: logger facade — rotate / 读 / 删 / 列表 / 导出
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:39
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/download.ts`（triggerDownload — 同步 createObjectURL/click/revoke）
+  - 扩展 `apps/pc-client/src/logger/index.ts`：facade 加 rotate / listRuns / readRun / deleteRun / exportCurrent / exportRun
+  - 修改 `apps/pc-client/src/logger/ringBuffer.ts`：RingBuffer 接口加 `clear()`（rotate 时清空但不 notify）
+  - 创建 `__tests__/download.test.ts`（覆盖 createObjectURL/click/revoke 顺序）+ `facade.rotate.test.ts`（4 条 AC + memory_only 回退 + 各方法）
+  - 设计要点：rotate 用 rotateInFlight 单例 promise 串行化；deleteRun fire-and-forget（worker error 走 console.warn）；exportCurrent 真的 await flush 后再 readRun；fatal 时统一 reject 所有 pending readRun/listRun
+- 质量检查: lint PASS；test PASS（34 files / 270 tests，新增 2 文件 12+ 用例 + 修改 ringBuffer）
