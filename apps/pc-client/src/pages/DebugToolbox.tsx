@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal, Panel, StatusTag } from "../components/Layout";
+import { LogPanel } from "./DebugToolbox/LogPanel";
 
 export type TimeMultiplier = 1 | 2 | 4 | 8;
 
@@ -60,6 +61,8 @@ export function DebugToolbox({ timeMultiplier, onSetTimeMultiplier, onResetGame,
             </button>
           )}
         </Panel>
+
+        <LogPanel />
       </div>
     </Modal>
   );

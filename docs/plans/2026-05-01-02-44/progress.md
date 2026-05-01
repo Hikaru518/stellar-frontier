@@ -34,7 +34,7 @@ source:
 | 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | completed | 1       |
 | 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | completed | 1       |
 | 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | completed | 1       |
-| 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | pending   | 0       |
+| 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | completed | 1       |
 | 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | pending   | 0       |
 | 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | pending   | 0       |
 | 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | pending   | 0       |
@@ -172,3 +172,15 @@ source:
   - 创建 `__tests__/eventEngineMiddleware.integration.test.tsx`（6 静态源码断言 + 5 行为模拟，共 11 用例）
   - 设计要点：events/* 完全未改（零侵入 ADR-004）；EventLog.event_definition_id 实际为必需字段（types.ts L738-751 确认）；result_key/summary 用 ?? null 归一
 - 质量检查: lint PASS；test PASS（37 files / 298 tests，新增 1 文件 11 用例）
+
+### TASK-011: DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:09
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/pages/DebugToolbox/LogPanel.tsx`（骨架：Panel "游戏日志" + mode 切换实时/历史 + OPFS 红色横幅 + reader 蓝色横幅 + type 输入框 + source 下拉 + 导出按钮 disabled state；导出/列表实际功能留 stubs）
+  - 创建 `LogPanel.test.tsx`（7 用例覆盖 AC1..AC4 + 订阅生命周期 + 导出按钮 disabled tooltip）
+  - 修改 `DebugToolbox.tsx`：在最末尾插入 `<LogPanel />`
+  - LogStatus / LoggerFacade 已 export，LogSource 从 `../../logger/types` 直接 import（避免改 logger 模块）
+- 质量检查: lint PASS；test PASS（38 files / 305 tests，新增 1 文件 7 用例）
