@@ -28,7 +28,7 @@ source:
 | 2  | TASK-002 | logger 模块类型定义骨架（LogEntry / 协议）                        | completed | 1       |
 | 3  | TASK-003 | 信封自动填充与内存环形缓冲（envelope + ringBuffer）                | completed | 1       |
 | 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | completed | 1       |
-| 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | pending   | 0       |
+| 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | completed | 1       |
 | 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | pending   | 0       |
 | 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | pending   | 0       |
 | 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | pending   | 0       |
@@ -100,3 +100,15 @@ source:
   - 设计要点：created_at_real_time 直接从 runId 字符串解析（不依赖 OPFS lastModified）；rotate 用 `archives.length + 1 > maxArchives` 显式 eviction
   - **环境提示**：本 monorepo 是 Rush + pnpm，不是 npm workspaces；测试命令应在 `apps/pc-client/` 内直接 `npm run lint` / `npm run test`（脚本本身相同）
 - 质量检查: lint PASS；test PASS（30 files / 241 tests，新增 1 文件 12 用例）
+
+### TASK-005: logger.worker.ts 入口与消息处理
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:19
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/logger.worker.ts`（init/append/flush/rotate/list_runs/read_run/delete_run 全部 case；维护 currentRunId/lastSeqWritten；read_run 用 transferable list 转 ArrayBuffer 所有权）
+  - 创建 `__tests__/logger.worker.test.ts`（9 用例覆盖 4 条 AC + not_initialized + ack 行为 + delete fire-and-forget）
+  - 设计要点：暴露 `__INTERNAL.handleMessage(cmd, emit)` 让 jsdom 测试绕过真 Worker；生产路径 `self.onmessage = (e) => handleMessage(e.data, workerEmit)`，测试路径自带 emit；handleMessage 是唯一事实之源
+  - 关键行为：delete_run 当目标=currentRunId 时**先于** store.deleteRun 拒绝（spy 验证 store 未被调用）；rotate 后 lastSeqWritten 归零；任何异常被 catch 后回 `error` event，worker 不挂掉
+- 质量检查: lint PASS；test PASS（31 files / 250 tests，新增 1 文件 9 用例）
