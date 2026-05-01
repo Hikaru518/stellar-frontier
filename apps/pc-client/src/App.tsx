@@ -1048,24 +1048,111 @@ function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: G
   );
 }
 
+/**
+ * 对前/后两份 event_logs 做 id 集合差集，对每条新增 EventLog 写一条
+ * `event.resolved`。R2（design §13）：用 EventLog.id 集合做差集，绝不能用
+ * 数组长度判断。
+ */
+function diffEventLogsAndLog(
+  prev: GameState["event_logs"],
+  next: GameState["event_logs"],
+  gameSeconds: number,
+): void {
+  const prevIds = new Set(prev.map((log) => log.id));
+  for (const log of next) {
+    if (prevIds.has(log.id)) continue;
+    logger.log({
+      type: "event.resolved",
+      source: "event_engine",
+      payload: {
+        event_log_id: log.id,
+        event_id: log.event_id,
+        event_definition_id: log.event_definition_id,
+        result_key: log.result_key ?? null,
+        summary: log.summary ?? null,
+        importance: log.importance,
+      },
+      gameSeconds,
+    });
+  }
+}
+
 function processAppEventTrigger(state: GameState, context: TriggerContext): GameState {
+  // 1) 写 event.trigger（在调原 processTrigger 之前；ADR-004 / design §9）
+  logger.log({
+    type: "event.trigger",
+    source: "event_engine",
+    payload: { trigger: context },
+    gameSeconds: state.elapsedGameSeconds,
+  });
+
+  // 2) 调原引擎
   const result = processTrigger({
     state: toEventEngineState(state),
     index: eventContentIndex,
     context,
   });
 
-  return mergeEventRuntimeState(state, result.state);
+  // 3) 写 event.node.enter（每个 transition 一条；ADR-004）。
+  // result.graph_result 与 result.graph_results 不一定同时存在。
+  if (result.graph_result) {
+    const eventId = result.event?.id ?? result.graph_result.event.id;
+    for (const t of result.graph_result.transitions) {
+      logger.log({
+        type: "event.node.enter",
+        source: "event_engine",
+        payload: { event_id: eventId, from_node_id: t.from_node_id, to_node_id: t.to_node_id },
+        gameSeconds: state.elapsedGameSeconds,
+      });
+    }
+  }
+  if (result.graph_results) {
+    for (const r of result.graph_results) {
+      for (const t of r.transitions) {
+        logger.log({
+          type: "event.node.enter",
+          source: "event_engine",
+          payload: { event_id: r.event.id, from_node_id: t.from_node_id, to_node_id: t.to_node_id },
+          gameSeconds: state.elapsedGameSeconds,
+        });
+      }
+    }
+  }
+
+  // 4) 合并 state，做 event_logs diff，写 event.resolved。
+  const merged = mergeEventRuntimeState(state, result.state);
+  diffEventLogsAndLog(state.event_logs, merged.event_logs, state.elapsedGameSeconds);
+
+  return merged;
 }
 
 function processAppEventWakeups(state: GameState): GameState {
+  // wakeups 不写 event.trigger（trigger 概念是显式 dispatch；wakeups 是定时
+  // 唤醒）。这是 design §9 的语义约定。
   const result = processEventWakeups({
     state: toEventEngineState(state),
     index: eventContentIndex,
     elapsed_game_seconds: state.elapsedGameSeconds,
   });
 
-  return mergeEventRuntimeState(state, result.state);
+  // 写 event.node.enter（来自所有 graph_results）
+  if (result.graph_results) {
+    for (const r of result.graph_results) {
+      for (const t of r.transitions) {
+        logger.log({
+          type: "event.node.enter",
+          source: "event_engine",
+          payload: { event_id: r.event.id, from_node_id: t.from_node_id, to_node_id: t.to_node_id },
+          gameSeconds: state.elapsedGameSeconds,
+        });
+      }
+    }
+  }
+
+  const merged = mergeEventRuntimeState(state, result.state);
+  diffEventLogsAndLog(state.event_logs, merged.event_logs, state.elapsedGameSeconds);
+
+  return merged;
 }
 
 function triggerCurrentAreaSurvey(state: GameState, crewId: CrewId): { state: GameState; createdEvent: boolean } {

@@ -33,7 +33,7 @@ source:
 | 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | completed | 1       |
 | 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | completed | 1       |
 | 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | completed | 1       |
-| 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | pending   | 0       |
+| 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | completed | 1       |
 | 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | pending   | 0       |
 | 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | pending   | 0       |
 | 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | pending   | 0       |
@@ -160,3 +160,15 @@ source:
   - universal:move 跳过验证：grep App.tsx 中所有 logger.log 行号确认 L243-256 区间无；切片源码断言不命中 logger.log
   - 接受语义：confirmMove 即便后续校验失败也写入意图日志（与"全量记录玩家指令"目标一致）
 - 质量检查: lint PASS；test PASS（36 files / 287 tests，新增 1 文件 9 用例）
+
+### TASK-010: App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:02
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 `apps/pc-client/src/App.tsx`：包装 processAppEventTrigger（写 event.trigger 在调原引擎之前 + 遍历 result.transitions 写 event.node.enter + diff event_logs 写 event.resolved）；processAppEventWakeups 类似但不写 trigger
+  - 新增模块级 helper `diffEventLogsAndLog(prev, next, gameSeconds)`（用 EventLog.id 集合做差集，避免 design R3 的"等长但 id 不同"边界）
+  - 创建 `__tests__/eventEngineMiddleware.integration.test.tsx`（6 静态源码断言 + 5 行为模拟，共 11 用例）
+  - 设计要点：events/* 完全未改（零侵入 ADR-004）；EventLog.event_definition_id 实际为必需字段（types.ts L738-751 确认）；result_key/summary 用 ?? null 归一
+- 质量检查: lint PASS；test PASS（37 files / 298 tests，新增 1 文件 11 用例）
