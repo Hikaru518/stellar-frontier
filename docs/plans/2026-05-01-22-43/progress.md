@@ -33,7 +33,7 @@ source:
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 扩展地图 visual schema 与 Kenney tileset registry | completed | 1 |
-| 2 | TASK-002 | 实现 helper 地图库读取与 authoritative validation | pending | 0 |
+| 2 | TASK-002 | 实现 helper 地图库读取与 authoritative validation | completed | 1 |
 | 3 | TASK-003 | 新增 Map Editor helper HTTP API 与资产服务 | pending | 0 |
 | 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | pending | 0 |
 | 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | pending | 0 |
@@ -65,3 +65,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 `map-tilesets.schema.json`，扩展 map schema 的 `visual.layers`，注册 Kenney Tiny Battle packed tilesheet，复制 public runtime PNG，并让 content validation 覆盖所有 map JSON 与 tileset registry。子 agent 验证 `npm run validate:content` 通过，pc-client targeted test/lint 通过；全量 `npm run test`/`npm run lint` 在子 agent 环境中曾被 Rush `ps` 探测阻断。
 - Main verification: `git diff --check` 通过；PNG source/public sha256 一致；registry Kenney 元数据为 16x16、columns=18、tileCount=198，分类 tile indexes 全部在范围内且覆盖 198 个 index；`npm run validate:content` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 244 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过。
+
+### TASK-002: 实现 helper 地图库读取与 authoritative validation
+- 状态: completed
+- 开始时间: 2026-05-02 00:27
+- 完成时间: 2026-05-02 00:31
+- 尝试次数: 1
+- Monkey summary: 成功。新增 `mapContentStore.mjs` 与 `mapValidation.mjs`，并补充 helper 单元测试；library 返回 maps、tileset_registry、map_objects、schemas；validation 覆盖 origin、initial discovered、objectIds、visual cell tileId、tilesetId、tileIndex，且缺失 visual 或空 visual layers 合法。子 agent 验证 `npm run editor:test` 通过（11 files / 37 tests）。
+- Main verification: `git diff --check` 通过；`npm run editor:test` 通过（11 files / 37 tests）；`npm run lint` 与 `npm run test` 在当前 Rush/Node 环境被 `ERROR: Unexpected output from "ps" command` 阻断；针对受影响 package 执行 `node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
