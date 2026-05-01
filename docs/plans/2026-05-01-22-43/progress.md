@@ -35,7 +35,7 @@ source:
 | 1 | TASK-001 | 扩展地图 visual schema 与 Kenney tileset registry | completed | 1 |
 | 2 | TASK-002 | 实现 helper 地图库读取与 authoritative validation | completed | 1 |
 | 3 | TASK-003 | 新增 Map Editor helper HTTP API 与资产服务 | completed | 1 |
-| 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | pending | 0 |
+| 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | completed | 1 |
 | 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | pending | 0 |
 | 6 | TASK-006 | 实现新建地图、地图网格与基础图层面板 | pending | 0 |
 | 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | pending | 0 |
@@ -81,3 +81,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 `GET /api/map-editor/library`、`POST /api/map-editor/validate`、`POST /api/map-editor/save`、`GET /api/map-editor/assets`，支持 JSON body、OPTIONS preflight、保存前 authoritative validation 和受限 assets PNG 服务，旧 `/api/health` 与 `/api/event-editor/library` 行为保持通过测试。子 agent 验证 `npm run editor:test` 通过（11 files / 45 tests），editor lint 通过。
 - Main verification: `git diff --check` 通过；复核 save path 只允许 `content/maps/<id>.json`，assets path 只允许 normalized `assets/*.png` 并经 path guard 解析；`npm run editor:test` 通过（11 files / 45 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-004: 建立 Map Editor 前端模型、commands 与 visual layer 操作
+- 状态: completed
+- 开始时间: 2026-05-02 00:37
+- 完成时间: 2026-05-02 00:42
+- 尝试次数: 1
+- Monkey summary: 成功。新增 map editor 前端类型、draft 创建、reducer/history 和 visual layer 纯操作；实现 brush、eraser、bucket fill、rectangle fill、locked layer no-op、visual command undo/redo，history 限制 100 步。子 agent 验证 `npm run editor:test` 通过（14 files / 55 tests），editor lint 通过。
+- Main verification: 发现并修复 `createInitialMapEditorState` 在旧地图缺失 `visual` 字段时 active layer 读取未 normalize 的边界问题，补充测试；`git diff --check` 通过；`npm run editor:test` 通过（14 files / 56 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
