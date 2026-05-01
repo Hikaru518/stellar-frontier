@@ -32,6 +32,41 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
         ...state,
         activeLayerId: command.layerId,
       };
+    case "layer/add": {
+      const nextState = commitDraftChange(state, {
+        ...state.draft,
+        visual: {
+          ...state.draft.visual,
+          layers: [...state.draft.visual.layers, command.layer],
+        },
+      });
+      return {
+        ...nextState,
+        activeLayerId: command.layer.id,
+      };
+    }
+    case "layer/rename":
+      return commitLayerChange(state, command.layerId, (layer) => {
+        const name = command.name.trim();
+        return layer.name === name || name.length === 0 ? layer : { ...layer, name };
+      });
+    case "layer/move":
+      return moveLayer(state, command.layerId, command.direction);
+    case "layer/delete":
+      return deleteLayer(state, command.layerId);
+    case "layer/setVisible":
+      return commitLayerChange(state, command.layerId, (layer) =>
+        layer.visible === command.visible ? layer : { ...layer, visible: command.visible },
+      );
+    case "layer/setLocked":
+      return commitLayerChange(state, command.layerId, (layer) =>
+        layer.locked === command.locked ? layer : { ...layer, locked: command.locked },
+      );
+    case "layer/setOpacity":
+      return commitLayerChange(state, command.layerId, (layer) => {
+        const opacity = Math.max(0, Math.min(1, command.opacity));
+        return layer.opacity === opacity ? layer : { ...layer, opacity };
+      });
     case "history/undo":
       return undo(state);
     case "history/redo":
@@ -39,6 +74,83 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
     default:
       return state;
   }
+}
+
+function commitLayerChange(
+  state: MapEditorState,
+  layerId: string,
+  updateLayer: (layer: MapEditorDraft["visual"]["layers"][number]) => MapEditorDraft["visual"]["layers"][number],
+): MapEditorState {
+  const layerIndex = state.draft.visual.layers.findIndex((layer) => layer.id === layerId);
+  if (layerIndex < 0) {
+    return state;
+  }
+
+  const currentLayer = state.draft.visual.layers[layerIndex];
+  if (!currentLayer) {
+    return state;
+  }
+
+  const nextLayer = updateLayer(currentLayer);
+  if (nextLayer === currentLayer) {
+    return state;
+  }
+
+  return commitDraftChange(state, {
+    ...state.draft,
+    visual: {
+      ...state.draft.visual,
+      layers: state.draft.visual.layers.map((layer, index) => (index === layerIndex ? nextLayer : layer)),
+    },
+  });
+}
+
+function moveLayer(state: MapEditorState, layerId: string, direction: "up" | "down"): MapEditorState {
+  const layerIndex = state.draft.visual.layers.findIndex((layer) => layer.id === layerId);
+  const targetIndex = direction === "up" ? layerIndex - 1 : layerIndex + 1;
+  if (layerIndex < 0 || targetIndex < 0 || targetIndex >= state.draft.visual.layers.length) {
+    return state;
+  }
+
+  const nextLayers = [...state.draft.visual.layers];
+  const [layer] = nextLayers.splice(layerIndex, 1);
+  if (!layer) {
+    return state;
+  }
+  nextLayers.splice(targetIndex, 0, layer);
+
+  return commitDraftChange(state, {
+    ...state.draft,
+    visual: {
+      ...state.draft.visual,
+      layers: nextLayers,
+    },
+  });
+}
+
+function deleteLayer(state: MapEditorState, layerId: string): MapEditorState {
+  const layerIndex = state.draft.visual.layers.findIndex((layer) => layer.id === layerId);
+  if (layerIndex < 0) {
+    return state;
+  }
+
+  const nextLayers = state.draft.visual.layers.filter((layer) => layer.id !== layerId);
+  const nextState = commitDraftChange(state, {
+    ...state.draft,
+    visual: {
+      ...state.draft.visual,
+      layers: nextLayers,
+    },
+  });
+
+  if (state.activeLayerId !== layerId) {
+    return nextState;
+  }
+
+  return {
+    ...nextState,
+    activeLayerId: nextLayers[Math.min(layerIndex, nextLayers.length - 1)]?.id ?? null,
+  };
 }
 
 function commitDraftChange(state: MapEditorState, nextDraft: MapEditorDraft): MapEditorState {

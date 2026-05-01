@@ -120,6 +120,39 @@ export type MapEditorCommand =
       layerId: string | null;
     }
   | {
+      type: "layer/add";
+      layer: MapVisualLayerDefinition;
+    }
+  | {
+      type: "layer/rename";
+      layerId: string;
+      name: string;
+    }
+  | {
+      type: "layer/move";
+      layerId: string;
+      direction: "up" | "down";
+    }
+  | {
+      type: "layer/delete";
+      layerId: string;
+    }
+  | {
+      type: "layer/setVisible";
+      layerId: string;
+      visible: boolean;
+    }
+  | {
+      type: "layer/setLocked";
+      layerId: string;
+      locked: boolean;
+    }
+  | {
+      type: "layer/setOpacity";
+      layerId: string;
+      opacity: number;
+    }
+  | {
       type: "history/undo";
     }
   | {

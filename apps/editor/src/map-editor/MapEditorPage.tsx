@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MapEditorApiError, HELPER_START_COMMAND, loadMapEditorLibrary } from "./apiClient";
 import { createInitialMapEditorState, normalizeMapEditorDraft } from "./mapEditorModel";
-import type { MapEditorLibraryMap, MapEditorLibraryResponse } from "./apiClient";
-import type { MapEditorDraft, MapEditorState } from "./types";
+import { mapEditorReducer } from "./mapEditorReducer";
+import LayerPanel from "./LayerPanel";
+import MapFilePanel from "./MapFilePanel";
+import MapGrid from "./MapGrid";
+import Toolbar from "./Toolbar";
+import type { MapEditorLibraryResponse } from "./apiClient";
+import type { MapEditorCommand, MapEditorDraft, MapEditorState } from "./types";
 
 type LoadLibrary = () => Promise<MapEditorLibraryResponse>;
 
@@ -15,6 +20,10 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
   const [library, setLibrary] = useState<MapEditorLibraryResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
+  const [editorState, setEditorState] = useState<MapEditorState | null>(null);
+  const [activeMapFilePath, setActiveMapFilePath] = useState<string | null>(null);
+  const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
+  const [soloLayerId, setSoloLayerId] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -28,7 +37,12 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
         }
 
         setLibrary(nextLibrary);
-        setSelectedMapId(nextLibrary.maps[0]?.id ?? null);
+        const firstMap = nextLibrary.maps[0] ?? null;
+        setSelectedMapId(firstMap?.id ?? null);
+        setEditorState(firstMap ? createInitialMapEditorState(toDraft(firstMap.data)) : null);
+        setActiveMapFilePath(firstMap?.file_path ?? null);
+        setSelectedTileId(firstMap?.data.originTileId ?? null);
+        setSoloLayerId(null);
         setStatus("loaded");
       })
       .catch((nextError: unknown) => {
@@ -45,11 +59,42 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
     };
   }, [loadLibrary]);
 
-  const selectedMap = useMemo(
-    () => library?.maps.find((map) => map.id === selectedMapId) ?? library?.maps[0] ?? null,
-    [library, selectedMapId],
-  );
-  const selectedMapState = useMemo(() => (selectedMap ? createInitialMapEditorState(toDraft(selectedMap.data)) : null), [selectedMap]);
+  function selectMap(mapId: string) {
+    const map = library?.maps.find((candidate) => candidate.id === mapId);
+    if (!map) {
+      return;
+    }
+
+    const nextState = createInitialMapEditorState(toDraft(map.data));
+    setSelectedMapId(map.id);
+    setEditorState(nextState);
+    setActiveMapFilePath(map.file_path);
+    setSelectedTileId(nextState.draft.originTileId);
+    setSoloLayerId(null);
+  }
+
+  function createMap(draft: MapEditorDraft) {
+    const nextState = createInitialMapEditorState(draft);
+    setSelectedMapId(draft.id);
+    setEditorState(nextState);
+    setActiveMapFilePath(`content/maps/${draft.id}.json`);
+    setSelectedTileId(draft.originTileId);
+    setSoloLayerId(null);
+  }
+
+  function dispatch(command: MapEditorCommand) {
+    setEditorState((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextState = mapEditorReducer(current, command);
+      if (command.type === "layer/delete" && soloLayerId === command.layerId) {
+        setSoloLayerId(null);
+      }
+      return nextState;
+    });
+  }
 
   if (status === "loading") {
     return (
@@ -79,29 +124,31 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
     return null;
   }
 
-  if (library.maps.length === 0) {
-    return (
-      <section className="panel panel-accent editor-main">
-        <Header statusLabel="EMPTY" />
-        <div className="editor-state-card">
-          <h3>No map files found</h3>
-          <p className="muted-text">The helper responded, but the map library did not include content/maps JSON files.</p>
-        </div>
-      </section>
-    );
-  }
-
   return (
     <section className="panel panel-accent editor-main">
-      <Header statusLabel="READY" />
+      <Header statusLabel={library.maps.length === 0 ? "EMPTY" : "READY"} />
       <MapLibraryStatusBar library={library} />
 
       <div className="map-editor-workspace">
-        <MapFilePanel maps={library.maps} selectedMapId={selectedMap?.id ?? null} onSelectMap={setSelectedMapId} />
+        <MapFilePanel maps={library.maps} selectedMapId={selectedMapId} onSelectMap={selectMap} onCreateMap={createMap} />
 
-        <MapCanvasShell selectedMap={selectedMap} selectedMapState={selectedMapState} />
+        <MapCanvasShell
+          activeMapFilePath={activeMapFilePath}
+          editorState={editorState}
+          selectedTileId={selectedTileId}
+          soloLayerId={soloLayerId}
+          onSelectTile={setSelectedTileId}
+          onCommand={dispatch}
+        />
 
-        <MapSummaryPanel library={library} selectedMap={selectedMap} selectedMapState={selectedMapState} />
+        <MapSummaryPanel
+          library={library}
+          editorState={editorState}
+          selectedTileId={selectedTileId}
+          soloLayerId={soloLayerId}
+          onSoloLayerChange={setSoloLayerId}
+          onCommand={dispatch}
+        />
       </div>
     </section>
   );
@@ -131,97 +178,77 @@ function MapLibraryStatusBar({ library }: { library: MapEditorLibraryResponse })
   );
 }
 
-function MapFilePanel({
-  maps,
-  selectedMapId,
-  onSelectMap,
-}: {
-  maps: MapEditorLibraryMap[];
-  selectedMapId: string | null;
-  onSelectMap: (mapId: string) => void;
-}) {
-  return (
-    <aside className="map-file-panel" aria-label="Map file library">
-      <div className="map-panel-heading">
-        <h3>Map Files</h3>
-        <span className="status-tag status-muted">{maps.length}</span>
-      </div>
-      <ul className="map-file-list">
-        {maps.map((map) => (
-          <li key={map.file_path}>
-            <button
-              type="button"
-              className={map.id === selectedMapId ? "map-file-row map-file-row-selected" : "map-file-row"}
-              aria-label={`Select ${map.id}`}
-              aria-pressed={map.id === selectedMapId}
-              onClick={() => onSelectMap(map.id)}
-            >
-              <span className="map-file-row-title">{map.data.name || map.id}</span>
-              <code>{map.file_path}</code>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </aside>
-  );
-}
-
 function MapCanvasShell({
-  selectedMap,
-  selectedMapState,
+  activeMapFilePath,
+  editorState,
+  selectedTileId,
+  soloLayerId,
+  onSelectTile,
+  onCommand,
 }: {
-  selectedMap: MapEditorLibraryMap | null;
-  selectedMapState: MapEditorState | null;
+  activeMapFilePath: string | null;
+  editorState: MapEditorState | null;
+  selectedTileId: string | null;
+  soloLayerId: string | null;
+  onSelectTile: (tileId: string) => void;
+  onCommand: (command: MapEditorCommand) => void;
 }) {
-  if (!selectedMap || !selectedMapState) {
-    return null;
+  if (!editorState) {
+    return (
+      <section className="map-canvas-shell" aria-label="Map editor workspace">
+        <div className="editor-state-card">
+          <h3>No map draft open</h3>
+          <p className="muted-text">Create a new map or select an existing file to begin editing.</p>
+        </div>
+      </section>
+    );
   }
 
-  const { draft } = selectedMapState;
   return (
     <section className="map-canvas-shell" aria-label="Map editor workspace">
-      <div className="map-canvas-toolbar">
-        <div>
-          <h3>{draft.name}</h3>
-          <p className="muted-text">
-            <code>{selectedMap.file_path}</code>
-          </p>
-        </div>
-        <span className="status-tag status-muted">SHELL</span>
-      </div>
+      <Toolbar
+        state={editorState}
+        selectedTileId={selectedTileId}
+        soloLayerId={soloLayerId}
+        activeMapFilePath={activeMapFilePath}
+        onUndo={() => onCommand({ type: "history/undo" })}
+        onRedo={() => onCommand({ type: "history/redo" })}
+      />
 
-      <div
-        className="map-grid-placeholder"
-        aria-label={`${draft.name} grid preview placeholder`}
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(draft.size.cols, 12)}, minmax(18px, 1fr))`,
-        }}
-      >
-        {draft.tiles.slice(0, Math.min(draft.tiles.length, 96)).map((tile) => (
-          <div key={tile.id} className={tile.id === draft.originTileId ? "map-grid-cell map-grid-cell-origin" : "map-grid-cell"} title={tile.id}>
-            <span>{tile.id}</span>
-          </div>
-        ))}
-      </div>
+      <MapGrid draft={editorState.draft} selectedTileId={selectedTileId} soloLayerId={soloLayerId} onSelectTile={onSelectTile} />
     </section>
   );
 }
 
 function MapSummaryPanel({
   library,
-  selectedMap,
-  selectedMapState,
+  editorState,
+  selectedTileId,
+  soloLayerId,
+  onSoloLayerChange,
+  onCommand,
 }: {
   library: MapEditorLibraryResponse;
-  selectedMap: MapEditorLibraryMap | null;
-  selectedMapState: MapEditorState | null;
+  editorState: MapEditorState | null;
+  selectedTileId: string | null;
+  soloLayerId: string | null;
+  onSoloLayerChange: (layerId: string | null) => void;
+  onCommand: (command: MapEditorCommand) => void;
 }) {
-  if (!selectedMap || !selectedMapState) {
-    return null;
+  if (!editorState) {
+    return (
+      <aside className="map-summary-panel" aria-label="Map editor summary">
+        <section className="map-summary-card">
+          <h3>Selection</h3>
+          <p className="muted-text">No map draft open.</p>
+        </section>
+      </aside>
+    );
   }
 
-  const { draft, activeLayerId } = selectedMapState;
+  const { draft, activeLayerId } = editorState;
   const firstTileset = library.tileset_registry.tilesets[0];
+  const selectedTile = selectedTileId ? draft.tiles.find((tile) => tile.id === selectedTileId) : null;
   return (
     <aside className="map-summary-panel" aria-label="Map editor summary">
       <section className="map-summary-card">
@@ -254,6 +281,36 @@ function MapSummaryPanel({
             <dd>{activeLayerId ? <code>{activeLayerId}</code> : "None"}</dd>
           </div>
         </dl>
+      </section>
+
+      <LayerPanel state={editorState} soloLayerId={soloLayerId} onSoloLayerChange={onSoloLayerChange} onCommand={onCommand} />
+
+      <section className="map-summary-card">
+        <h3>Tile</h3>
+        {selectedTile ? (
+          <dl className="inspector-summary">
+            <div>
+              <dt>ID</dt>
+              <dd>
+                <code>{selectedTile.id}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Area</dt>
+              <dd>{selectedTile.areaName}</dd>
+            </div>
+            <div>
+              <dt>Terrain</dt>
+              <dd>{selectedTile.terrain}</dd>
+            </div>
+            <div>
+              <dt>Weather</dt>
+              <dd>{selectedTile.weather}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="muted-text">Select a tile in the grid.</p>
+        )}
       </section>
 
       <section className="map-summary-card">
