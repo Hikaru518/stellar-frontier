@@ -32,7 +32,7 @@ source:
 | 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | completed | 1       |
 | 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | completed | 1       |
 | 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | completed | 1       |
-| 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | pending   | 0       |
+| 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | completed | 1       |
 | 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | pending   | 0       |
 | 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | pending   | 0       |
 | 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | pending   | 0       |
@@ -148,3 +148,15 @@ source:
   - 创建 `__tests__/reset.integration.test.tsx`（8 条：4 AC + 4 静态源码断言）
   - 设计要点：异步 logger 调用包在 try/catch 的 IIFE，UI state reset 不阻塞；4 条静态断言（grep App.tsx 内有 logger.flush + logger.rotate("reset")）防止"等价序列"测试沉默忽略真实接入
 - 质量检查: lint PASS；test PASS（35 files / 278 tests，新增 1 文件 8 断言）
+
+### TASK-009: App.tsx 接入 — handleDecision 玩家指令日志
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:55
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 App.tsx 5 个 hook 点：事件选项 (L217 `player.call.choice`) / `universal:survey` (L262 `action.dispatch survey`) / `universal:standby` & `universal:stop` (L291 `action.dispatch standby|stop`) / `confirmMove()` (L371 `player.move.target`)；`universal:move` 按 spec MVP 跳过
+  - 创建 `__tests__/handleDecision.integration.test.tsx`（6 静态源码 grep + 3 行为模拟，共 9 用例）
+  - universal:move 跳过验证：grep App.tsx 中所有 logger.log 行号确认 L243-256 区间无；切片源码断言不命中 logger.log
+  - 接受语义：confirmMove 即便后续校验失败也写入意图日志（与"全量记录玩家指令"目标一致）
+- 质量检查: lint PASS；test PASS（36 files / 287 tests，新增 1 文件 9 用例）

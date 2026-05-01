@@ -214,6 +214,16 @@ function App() {
       if (currentCall.settled) {
         return;
       }
+      logger.log({
+        type: "player.call.choice",
+        source: "player_command",
+        payload: {
+          call_id: currentCall.runtimeCallId!,
+          choice_key: actionId,
+          crew_id: currentCall.crewId ?? null,
+        },
+        gameSeconds: gameState.elapsedGameSeconds,
+      });
       setGameState((state) =>
         mergeEventRuntimeState(
           state,
@@ -249,6 +259,16 @@ function App() {
       if (currentCall.settled) {
         return;
       }
+      logger.log({
+        type: "player.action.dispatch",
+        source: "player_command",
+        payload: {
+          crew_id: currentCall.crewId,
+          action_id: "universal:survey",
+          action_kind: "survey",
+        },
+        gameSeconds: gameState.elapsedGameSeconds,
+      });
       const applied = triggerCurrentAreaSurvey(gameState, currentCall.crewId);
       setGameState(applied.state);
       setCurrentCall((call) =>
@@ -268,6 +288,16 @@ function App() {
     }
 
     if (actionId === "universal:standby" || actionId === "universal:stop") {
+      logger.log({
+        type: "player.action.dispatch",
+        source: "player_command",
+        payload: {
+          crew_id: currentCall.crewId,
+          action_id: actionId,
+          action_kind: actionId === "universal:standby" ? "standby" : "stop",
+        },
+        gameSeconds: gameState.elapsedGameSeconds,
+      });
       setGameState((state) => {
         const nextState =
           actionId === "universal:standby"
@@ -337,6 +367,16 @@ function App() {
       appendLog("移动确认失败：没有候选目的地。", "muted");
       return;
     }
+
+    logger.log({
+      type: "player.move.target",
+      source: "player_command",
+      payload: {
+        crew_id: currentCall.crewId,
+        tile_id: currentCall.selectedTargetTileId,
+      },
+      gameSeconds: gameState.elapsedGameSeconds,
+    });
 
     setGameState((state) => {
       const member = state.crew.find((item) => item.id === currentCall.crewId);
