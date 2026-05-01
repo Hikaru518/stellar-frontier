@@ -37,7 +37,7 @@ source:
 | 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | completed | 1       |
 | 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | completed | 1       |
 | 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | completed | 1       |
-| 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | pending   | 0       |
+| 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | completed | 1       |
 | 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | pending   | 0       |
 | 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | pending   | 0       |
 | 17 | TASK-017 | App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete   | pending   | 0       |
@@ -207,3 +207,16 @@ source:
   - 测试追加 4 用例：AC1 调用顺序 + disabled / AC2 OPFS 不触发 / AC3 reject 显示错误 / AC4 fake timer 验证 10 秒清除
 - 质量检查: lint PASS；test PASS（38 files / 319 tests，新增 4 用例）
 - P0 主路径全部完成（TASK-001..013），剩 5 个 P1 task
+
+### TASK-014: 多 tab writer 选举状态机（纯模块）
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:31
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/writerElection.ts`（pending/reader/writer 三态状态机；通过 BroadcastChannelLike 结构类型注入）
+  - 创建 `__tests__/writerElection.test.ts`（InMemoryBroker + InMemoryChannel mock；7 用例覆盖 AC1..AC5 + onRoleChange unsubscribe + listener 异常隔离）
+  - 设计要点：tabId 字典序仲裁（pending 阶段 + writer 收到 held/claim 阶段双层）；timer 清理点严格（startClaimCycle/becomeWriter/becomeReader/armHolderTimeout/stop）；postYield best-effort；reader 收到 yield 立即 startClaimCycle 不等 holder timeout
+  - 验证：5 次定向 mutation testing 确认每条 AC 都真测对应行为
+  - 不做 BroadcastChannel fallback（留 TASK-015 处理）
+- 质量检查: lint PASS；test PASS（39 files / 326 tests，新增 1 文件 7 用例）
