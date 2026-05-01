@@ -38,7 +38,7 @@ source:
 | 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | completed | 1 |
 | 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | completed | 1 |
 | 6 | TASK-006 | 实现新建地图、地图网格与基础图层面板 | completed | 1 |
-| 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | pending | 0 |
+| 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | completed | 1 |
 | 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | pending | 0 |
 | 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | pending | 0 |
 | 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | pending | 0 |
@@ -105,3 +105,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 MapFilePanel、MapGrid、LayerPanel、Toolbar；Map Editor 支持 New Map 表单、CSS grid 预览、tile 选择、图层新增/重命名/排序/删除/active/visible/locked/opacity/solo。`soloLayerId` 保持在页面 local state，不进入 draft JSON。子 agent 验证 `npm run editor:test` 通过（17 files / 68 tests），editor lint 通过。
 - Main verification: 复核 reducer layer commands、LayerPanel 和 New Map 流程；修正 New Map id pattern 以匹配 content schema（允许 `_`），补充测试；确认 solo 只存在 local state；`git diff --check` 通过；`npm run editor:test` 通过（17 files / 69 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-007: 实现 tileset palette 与视觉铺图工具
+- 状态: completed
+- 开始时间: 2026-05-02 01:02
+- 完成时间: 2026-05-02 01:10
+- 尝试次数: 1
+- Monkey summary: 成功。新增 TilePalette，支持 Kenney tile index、放大预览、分类、index 搜索和最近使用；将 Brush、Eraser、Bucket Fill、Rectangle Fill、Eyedropper 接入 MapGrid pointer 交互；绘制只写 active visual layer，locked layer 显示轻量提示；MapGrid 使用 helper asset endpoint 的 spritesheet URL 渲染 visual cells。子 agent 验证 `npm run editor:test` 通过（18 files / 72 tests），editor lint 通过。
+- Main verification: 复核 helper asset URL、eyedropper 从最上层 visible layer 取 cell、locked layer no-op 与提示；将 grid 绘制事件从 mouse 改为 pointer 事件并对 pointer capture 做能力检测，补充测试仍通过；`git diff --check` 通过；`npm run editor:test` 通过（18 files / 72 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。

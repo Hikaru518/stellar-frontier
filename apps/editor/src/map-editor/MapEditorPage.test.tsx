@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MapEditorApiError } from "./apiClient";
 import MapEditorPage from "./MapEditorPage";
-import { createMapEditorDraft } from "./mapEditorModel";
+import { createMapEditorDraft, createVisualLayer } from "./mapEditorModel";
 import type { MapEditorLibraryResponse } from "./apiClient";
 
 describe("MapEditorPage", () => {
@@ -146,7 +146,77 @@ describe("MapEditorPage", () => {
     expect(screen.getByLabelText("New Map errors")).toHaveTextContent("Map cols must be at least 1");
     expect(screen.getByRole("heading", { name: "Default Map" })).toBeInTheDocument();
   });
+
+  it("paints, erases, fills, rectangle fills, and picks visible visual cells from the palette", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [createMapAsset("default-map", "Default Map", "content/maps/default-map.json", { withLayer: true })],
+        tileset_registry: createTilesetRegistry(),
+      }),
+    );
+
+    const { container } = render(<MapEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Default Map" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select tile index 3" }));
+    paintTile("1-1");
+    expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Eraser" }));
+    paintTile("1-1");
+    expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select tile index 4" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bucket Fill" }));
+    paintTile("1-1");
+    expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(6);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select tile index 5" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle Fill" }));
+    pointerDown(screen.getByRole("button", { name: "Select tile 1-1" }));
+    pointerUp(screen.getByRole("button", { name: "Select tile 2-2" }));
+    expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(6);
+
+    fireEvent.click(screen.getByRole("button", { name: "Eyedropper" }));
+    paintTile("2-2");
+    expect(screen.getByRole("button", { name: "Select tile index 5" })).toHaveAttribute("aria-pressed", "true");
+
+    function paintTile(tileId: string) {
+      const tile = screen.getByRole("button", { name: `Select tile ${tileId}` });
+      pointerDown(tile);
+      pointerUp(tile);
+    }
+  });
+
+  it("does not paint locked active layers and shows a lightweight notice", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [createMapAsset("default-map", "Default Map", "content/maps/default-map.json", { withLayer: true })],
+        tileset_registry: createTilesetRegistry(),
+      }),
+    );
+
+    const { container } = render(<MapEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Default Map" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select tile index 3" }));
+    fireEvent.click(screen.getByLabelText("Locked"));
+    const tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    pointerDown(tile);
+    pointerUp(tile);
+
+    expect(screen.getByRole("status")).toHaveTextContent('Layer "Base" is locked.');
+    expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(0);
+  });
 });
+
+function pointerDown(element: HTMLElement) {
+  fireEvent.pointerDown(element, { button: 0, pointerId: 1, pointerType: "mouse" });
+}
+
+function pointerUp(element: HTMLElement) {
+  fireEvent.pointerUp(element, { button: 0, pointerId: 1, pointerType: "mouse" });
+}
 
 function createLibraryResponse(overrides: Partial<MapEditorLibraryResponse> = {}): MapEditorLibraryResponse {
   return {
@@ -158,10 +228,37 @@ function createLibraryResponse(overrides: Partial<MapEditorLibraryResponse> = {}
   };
 }
 
-function createMapAsset(id: string, name: string, filePath: string): MapEditorLibraryResponse["maps"][number] {
+function createMapAsset(
+  id: string,
+  name: string,
+  filePath: string,
+  options: { withLayer?: boolean } = {},
+): MapEditorLibraryResponse["maps"][number] {
+  const data = createMapEditorDraft({ id, name, rows: 2, cols: 3 });
+  if (options.withLayer) {
+    data.visual.layers = [createVisualLayer("base", "Base")];
+  }
   return {
     id,
     file_path: filePath,
-    data: createMapEditorDraft({ id, name, rows: 2, cols: 3 }),
+    data,
+  };
+}
+
+function createTilesetRegistry(): MapEditorLibraryResponse["tileset_registry"] {
+  return {
+    tilesets: [
+      {
+        id: "kenney-tiny-battle",
+        name: "Kenney Tiny Battle",
+        assetPath: "assets/kenney_tiny-battle/Tilemap/tilemap_packed.png",
+        publicPath: "maps/tilesets/kenney-tiny-battle/tilemap_packed.png",
+        tileWidth: 16,
+        tileHeight: 16,
+        columns: 4,
+        tileCount: 8,
+        categories: [{ id: "terrain", name: "Terrain", tileIndexes: [0, 1, 2, 3, 4, 5, 6, 7] }],
+      },
+    ],
   };
 }

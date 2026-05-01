@@ -5,9 +5,10 @@ import { mapEditorReducer } from "./mapEditorReducer";
 import LayerPanel from "./LayerPanel";
 import MapFilePanel from "./MapFilePanel";
 import MapGrid from "./MapGrid";
-import Toolbar from "./Toolbar";
+import TilePalette from "./TilePalette";
+import Toolbar, { type MapEditorTool } from "./Toolbar";
 import type { MapEditorLibraryResponse } from "./apiClient";
-import type { MapEditorCommand, MapEditorDraft, MapEditorState } from "./types";
+import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapVisualCellDefinition } from "./types";
 
 type LoadLibrary = () => Promise<MapEditorLibraryResponse>;
 
@@ -24,6 +25,10 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
   const [activeMapFilePath, setActiveMapFilePath] = useState<string | null>(null);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [soloLayerId, setSoloLayerId] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<MapEditorTool>("select");
+  const [selectedBrush, setSelectedBrush] = useState<MapVisualCellDefinition | null>(null);
+  const [recentTiles, setRecentTiles] = useState<MapVisualCellDefinition[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -43,6 +48,7 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
         setActiveMapFilePath(firstMap?.file_path ?? null);
         setSelectedTileId(firstMap?.data.originTileId ?? null);
         setSoloLayerId(null);
+        setNotice(null);
         setStatus("loaded");
       })
       .catch((nextError: unknown) => {
@@ -71,6 +77,7 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
     setActiveMapFilePath(map.file_path);
     setSelectedTileId(nextState.draft.originTileId);
     setSoloLayerId(null);
+    setNotice(null);
   }
 
   function createMap(draft: MapEditorDraft) {
@@ -80,6 +87,7 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
     setActiveMapFilePath(`content/maps/${draft.id}.json`);
     setSelectedTileId(draft.originTileId);
     setSoloLayerId(null);
+    setNotice(null);
   }
 
   function dispatch(command: MapEditorCommand) {
@@ -135,9 +143,16 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
         <MapCanvasShell
           activeMapFilePath={activeMapFilePath}
           editorState={editorState}
+          tilesets={library.tileset_registry.tilesets}
           selectedTileId={selectedTileId}
+          activeTool={activeTool}
+          selectedBrush={selectedBrush}
           soloLayerId={soloLayerId}
+          notice={notice}
           onSelectTile={setSelectedTileId}
+          onToolChange={setActiveTool}
+          onSelectBrush={selectBrush}
+          onNotice={setNotice}
           onCommand={dispatch}
         />
 
@@ -145,13 +160,23 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
           library={library}
           editorState={editorState}
           selectedTileId={selectedTileId}
+          selectedBrush={selectedBrush}
+          recentTiles={recentTiles}
           soloLayerId={soloLayerId}
+          onSelectBrush={selectBrush}
           onSoloLayerChange={setSoloLayerId}
           onCommand={dispatch}
         />
       </div>
     </section>
   );
+
+  function selectBrush(tile: MapVisualCellDefinition) {
+    setSelectedBrush(tile);
+    setActiveTool("brush");
+    setRecentTiles((current) => [tile, ...current.filter((candidate) => !isSameVisualCell(candidate, tile))].slice(0, 8));
+    setNotice(null);
+  }
 }
 
 function Header({ statusLabel }: { statusLabel: string }) {
@@ -181,18 +206,34 @@ function MapLibraryStatusBar({ library }: { library: MapEditorLibraryResponse })
 function MapCanvasShell({
   activeMapFilePath,
   editorState,
+  tilesets,
   selectedTileId,
+  activeTool,
+  selectedBrush,
   soloLayerId,
+  notice,
   onSelectTile,
+  onToolChange,
+  onSelectBrush,
+  onNotice,
   onCommand,
 }: {
   activeMapFilePath: string | null;
   editorState: MapEditorState | null;
+  tilesets: MapEditorLibraryResponse["tileset_registry"]["tilesets"];
   selectedTileId: string | null;
+  activeTool: MapEditorTool;
+  selectedBrush: MapVisualCellDefinition | null;
   soloLayerId: string | null;
+  notice: string | null;
   onSelectTile: (tileId: string) => void;
+  onToolChange: (tool: MapEditorTool) => void;
+  onSelectBrush: (tile: MapVisualCellDefinition) => void;
+  onNotice: (message: string | null) => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
+  const [rectangleStartTileId, setRectangleStartTileId] = useState<string | null>(null);
+
   if (!editorState) {
     return (
       <section className="map-canvas-shell" aria-label="Map editor workspace">
@@ -204,34 +245,148 @@ function MapCanvasShell({
     );
   }
 
+  const state = editorState;
+
   return (
     <section className="map-canvas-shell" aria-label="Map editor workspace">
       <Toolbar
-        state={editorState}
+        state={state}
         selectedTileId={selectedTileId}
+        activeTool={activeTool}
         soloLayerId={soloLayerId}
         activeMapFilePath={activeMapFilePath}
+        onToolChange={(tool) => {
+          setRectangleStartTileId(null);
+          onToolChange(tool);
+          onNotice(null);
+        }}
         onUndo={() => onCommand({ type: "history/undo" })}
         onRedo={() => onCommand({ type: "history/redo" })}
       />
 
-      <MapGrid draft={editorState.draft} selectedTileId={selectedTileId} soloLayerId={soloLayerId} onSelectTile={onSelectTile} />
+      {notice ? (
+        <p className="map-editor-notice" role="status" aria-live="polite">
+          {notice}
+        </p>
+      ) : null}
+
+      <MapGrid
+        draft={state.draft}
+        tilesets={tilesets}
+        selectedTileId={selectedTileId}
+        soloLayerId={soloLayerId}
+        onSelectTile={onSelectTile}
+        onTilePointerDown={handleTilePointerDown}
+        onTilePointerEnter={handleTilePointerEnter}
+        onTilePointerUp={handleTilePointerUp}
+      />
     </section>
   );
+
+  function handleTilePointerDown(tileId: string) {
+    onSelectTile(tileId);
+
+    if (activeTool === "select") {
+      return;
+    }
+
+    if (activeTool === "eyedropper") {
+      const pickedCell = pickTopVisibleCell(state.draft, tileId);
+      if (pickedCell) {
+        onSelectBrush(pickedCell);
+        onNotice(`Selected tile index ${pickedCell.tileIndex}.`);
+      } else {
+        onNotice("No visible visual tile on this map cell.");
+      }
+      return;
+    }
+
+    if (activeTool === "rectangleFill") {
+      if (!canModifyActiveLayer(state, onNotice)) {
+        return;
+      }
+      if (!selectedBrush) {
+        onNotice("Select a palette tile before filling.");
+        return;
+      }
+      setRectangleStartTileId(tileId);
+      onNotice("Rectangle fill anchor set.");
+      return;
+    }
+
+    applyVisualTool(tileId);
+  }
+
+  function handleTilePointerEnter(tileId: string) {
+    if (activeTool === "brush") {
+      applyVisualTool(tileId);
+    }
+  }
+
+  function handleTilePointerUp(tileId: string) {
+    if (activeTool !== "rectangleFill" || !rectangleStartTileId) {
+      return;
+    }
+    if (!canModifyActiveLayer(state, onNotice) || !selectedBrush) {
+      setRectangleStartTileId(null);
+      return;
+    }
+
+    onCommand({ type: "visual/rectangleFill", fromTileId: rectangleStartTileId, toTileId: tileId, cell: selectedBrush });
+    onNotice(null);
+    setRectangleStartTileId(null);
+  }
+
+  function applyVisualTool(tileId: string) {
+    if (!canModifyActiveLayer(state, onNotice)) {
+      return;
+    }
+
+    if (activeTool === "brush") {
+      if (!selectedBrush) {
+        onNotice("Select a palette tile before painting.");
+        return;
+      }
+      onCommand({ type: "visual/brush", tileId, cell: selectedBrush });
+      onNotice(null);
+      return;
+    }
+
+    if (activeTool === "eraser") {
+      onCommand({ type: "visual/eraser", tileId });
+      onNotice(null);
+      return;
+    }
+
+    if (activeTool === "bucketFill") {
+      if (!selectedBrush) {
+        onNotice("Select a palette tile before filling.");
+        return;
+      }
+      onCommand({ type: "visual/bucketFill", tileId, cell: selectedBrush });
+      onNotice(null);
+    }
+  }
 }
 
 function MapSummaryPanel({
   library,
   editorState,
   selectedTileId,
+  selectedBrush,
+  recentTiles,
   soloLayerId,
+  onSelectBrush,
   onSoloLayerChange,
   onCommand,
 }: {
   library: MapEditorLibraryResponse;
   editorState: MapEditorState | null;
   selectedTileId: string | null;
+  selectedBrush: MapVisualCellDefinition | null;
+  recentTiles: MapVisualCellDefinition[];
   soloLayerId: string | null;
+  onSelectBrush: (tile: MapVisualCellDefinition) => void;
   onSoloLayerChange: (layerId: string | null) => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
@@ -284,6 +439,13 @@ function MapSummaryPanel({
       </section>
 
       <LayerPanel state={editorState} soloLayerId={soloLayerId} onSoloLayerChange={onSoloLayerChange} onCommand={onCommand} />
+
+      <TilePalette
+        registry={library.tileset_registry}
+        selectedTile={selectedBrush}
+        recentTiles={recentTiles}
+        onSelectTile={onSelectBrush}
+      />
 
       <section className="map-summary-card">
         <h3>Tile</h3>
@@ -342,4 +504,36 @@ function formatCount(count: number, singular: string): string {
 
 function isHelperUnavailable(error: Error | null): boolean {
   return error instanceof MapEditorApiError && error.code === "helper_unavailable";
+}
+
+function canModifyActiveLayer(state: MapEditorState, onNotice: (message: string | null) => void): boolean {
+  const activeLayer = state.draft.visual.layers.find((layer) => layer.id === state.activeLayerId);
+  if (!activeLayer) {
+    onNotice("Add or activate a visual layer before painting.");
+    return false;
+  }
+  if (activeLayer.locked) {
+    onNotice(`Layer "${activeLayer.name}" is locked.`);
+    return false;
+  }
+  return true;
+}
+
+function pickTopVisibleCell(draft: MapEditorDraft, tileId: string): MapVisualCellDefinition | null {
+  for (let index = draft.visual.layers.length - 1; index >= 0; index -= 1) {
+    const layer = draft.visual.layers[index];
+    if (!layer?.visible) {
+      continue;
+    }
+
+    const cell = layer.cells[tileId];
+    if (cell) {
+      return { ...cell };
+    }
+  }
+  return null;
+}
+
+function isSameVisualCell(left: MapVisualCellDefinition, right: MapVisualCellDefinition): boolean {
+  return left.tilesetId === right.tilesetId && left.tileIndex === right.tileIndex;
 }
