@@ -13,8 +13,6 @@ type SourceFilter = "all" | LogSource;
  * component cannot grow unbounded if the upstream buffer is misconfigured.
  */
 const ENTRY_CAP = 2000;
-
-/** Max characters for the inline payload preview before truncation. */
 const PAYLOAD_PREVIEW_MAX = 200;
 
 export interface LogPanelProps {
@@ -266,7 +264,7 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
         <div
           ref={listRef}
           className="log-panel-list"
-          style={{ maxHeight: 360, overflowY: "auto" }}
+          style={{ maxHeight: 360, overflow: "auto" }}
           aria-label="日志列表"
         >
           {visibleEntries.length === 0 ? (
@@ -291,7 +289,7 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
                   className="log-panel-payload"
                   title={safeStringify(entry.payload)}
                 >
-                  {truncate(safeStringify(entry.payload), PAYLOAD_PREVIEW_MAX)}
+                  {formatPayloadPreview(entry.payload)}
                 </span>
               </div>
             ))
@@ -385,7 +383,7 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
           </div>
           <div
             className="log-panel-list"
-            style={{ maxHeight: 360, overflowY: "auto" }}
+            style={{ maxHeight: 360, overflow: "auto" }}
           >
             {viewingEntries.length === 0 ? (
               <div className="muted-text">该 run 无可解析条目</div>
@@ -407,7 +405,7 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
                     className="log-panel-payload"
                     title={safeStringify(entry.payload)}
                   >
-                    {truncate(safeStringify(entry.payload), PAYLOAD_PREVIEW_MAX)}
+                    {formatPayloadPreview(entry.payload)}
                   </span>
                 </div>
               ))
@@ -438,9 +436,9 @@ function safeStringify(value: unknown): string {
   }
 }
 
-/** Cap a string at `max` chars, replacing the tail with `...` when needed. */
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 3) + "...";
+function formatPayloadPreview(value: unknown): string {
+  const text = safeStringify(value);
+  return text.length > PAYLOAD_PREVIEW_MAX ? `${text.slice(0, PAYLOAD_PREVIEW_MAX - 3)}...` : text;
 }
 
 /**
