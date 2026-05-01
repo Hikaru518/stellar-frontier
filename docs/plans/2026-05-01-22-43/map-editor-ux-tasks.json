@@ -1,0 +1,401 @@
+{
+  "topic": "map-editor-ux",
+  "created": "2026-05-01",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "扩展地图 visual schema 与 Kenney tileset registry",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": "US-002",
+      "description": "为地图 JSON 增加可选 visual.layers 模型，并为 Kenney Tiny Battle 建立首个 tileset registry。该任务只定义内容契约和素材元数据，不实现 editor UI。完成后，地图内容可以合法保存 visual layers，registry 可以被 helper、editor 和 PC runtime 读取。",
+      "files": {
+        "create": [
+          "content/schemas/map-tilesets.schema.json",
+          "apps/pc-client/public/maps/tilesets/kenney-tiny-battle/tilemap_packed.png"
+        ],
+        "modify": [
+          "content/schemas/maps.schema.json",
+          "content/maps/tilesets/registry.json",
+          "apps/pc-client/scripts/validate-content.mjs"
+        ],
+        "test": [
+          "apps/pc-client/src/content/contentData.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: `content/maps/tilesets/registry.json` 包含 `kenney-tiny-battle`，tileWidth=16、tileHeight=16、columns=18、tileCount=198，且 tileIndexes 均在合法范围内。",
+        "AC2: `content/schemas/maps.schema.json` 接受包含 `visual.layers[].cells` 的 map JSON，并拒绝 unknown visual fields。",
+        "AC3: `npm run validate:content` 会校验所有 `content/maps/*.json` 和 tileset registry。",
+        "AC4: registry 中的 publicPath 在 `apps/pc-client/public/maps/tilesets/` 下存在对应 PNG。"
+      ],
+      "tech_notes": "遵循 ADR-003、ADR-004、ADR-005、ADR-006。使用 packed spritesheet，spacing=0；不要把 Tiled .tmx/.tsx 导入流程纳入本任务。"
+    },
+    {
+      "id": "TASK-002",
+      "title": "实现 helper 地图库读取与 authoritative validation",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "user_story": "US-005",
+      "description": "新增 helper 侧 map content store 和 validation 模块，用于读取 maps、registry、map objects、schemas，并在保存前校验 gameplay tile 与 visual layer 引用。该任务不改 HTTP server route，只提供可测试的 Node 模块。",
+      "files": {
+        "create": [
+          "apps/editor/helper/mapContentStore.mjs",
+          "apps/editor/helper/mapValidation.mjs",
+          "apps/editor/helper/mapContentStore.test.mjs",
+          "apps/editor/helper/mapValidation.test.mjs"
+        ],
+        "modify": [
+          "apps/editor/package.json"
+        ],
+        "test": [
+          "apps/editor/helper/mapContentStore.test.mjs",
+          "apps/editor/helper/mapValidation.test.mjs"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: `loadMapEditorLibrary` 返回 maps、tileset_registry、map_objects、schemas，且 maps 包含 `content/maps/default-map.json`。",
+        "AC2: validation 拒绝不存在的 originTileId、initialDiscoveredTileId、objectId、visual cell tileId、tilesetId 和越界 tileIndex。",
+        "AC3: validation 对空 visual layers 或缺失 visual 字段返回 valid=true。",
+        "AC4: helper 测试使用临时 repo root 时不会读写真实仓库内容。"
+      ],
+      "tech_notes": "遵循 ADR-007。若使用 Ajv，需要把 `ajv` 加入 editor package 的依赖；validation issue shape 使用 technical design 中的 MapValidationIssue。"
+    },
+    {
+      "id": "TASK-003",
+      "title": "新增 Map Editor helper HTTP API 与资产服务",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-002"
+      ],
+      "user_story": "US-005",
+      "description": "在现有 editor helper server 上挂载 map editor API，支持 library、validate、save 和受限 assets 图片读取。该任务打通 UI 后续可调用的 HTTP 契约，并保留 Event Editor 现有 API 行为。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/editor/helper/server.mjs",
+          "apps/editor/helper/server.test.mjs"
+        ],
+        "test": [
+          "apps/editor/helper/server.test.mjs"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: `GET /api/map-editor/library` 返回地图编辑器 library shape。",
+        "AC2: `POST /api/map-editor/validate` 对非法 draft 返回 valid=false 和 errors。",
+        "AC3: `POST /api/map-editor/save` 校验失败不写文件，校验成功写入允许的 `content/maps` 路径。",
+        "AC4: `GET /api/map-editor/assets?path=assets/...png` 返回 image/png，非 assets 路径返回 path_not_allowed。",
+        "AC5: Event Editor 的 `/api/event-editor/library` 和 `/api/health` 测试仍通过。"
+      ],
+      "tech_notes": "遵循 ADR-007。server 需要支持 POST body parser 和 OPTIONS preflight；保存新地图时无 file_path 则由 data.id 生成 `content/maps/<id>.json`。"
+    },
+    {
+      "id": "TASK-004",
+      "title": "建立 Map Editor 前端模型、commands 与 visual layer 操作",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "user_story": "US-001",
+      "description": "新增 editor 前端的 map 类型、draft 创建逻辑、command reducer、undo/redo history 和 visual layer 纯操作。该任务不做复杂 UI，只确保后续组件可以复用稳定的状态和操作模型。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/types.ts",
+          "apps/editor/src/map-editor/mapEditorModel.ts",
+          "apps/editor/src/map-editor/mapEditorReducer.ts",
+          "apps/editor/src/map-editor/visualLayerOps.ts",
+          "apps/editor/src/map-editor/mapEditorModel.test.ts",
+          "apps/editor/src/map-editor/mapEditorReducer.test.ts",
+          "apps/editor/src/map-editor/visualLayerOps.test.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/editor/src/map-editor/mapEditorModel.test.ts",
+          "apps/editor/src/map-editor/mapEditorReducer.test.ts",
+          "apps/editor/src/map-editor/visualLayerOps.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 新建地图 draft 会生成 `rows x cols` 个 gameplay tiles，origin 为中心格，initial discovered 只包含 origin。",
+        "AC2: Brush、eraser、bucket fill、rectangle fill 只修改 active layer 的 visual cells。",
+        "AC3: locked layer 上的 visual 操作不会修改 draft。",
+        "AC4: 普通 visual commands 不会修改 terrain、weather、objectIds 或 specialStates。",
+        "AC5: Undo/redo 能回退和恢复一次 visual paint command。"
+      ],
+      "tech_notes": "遵循 ADR-001、ADR-002、ADR-004、ADR-005。History 限制最多 100 步；拖动绘制可在后续 UI 中合并为单次 command。"
+    },
+    {
+      "id": "TASK-005",
+      "title": "启用 editor 模块切换并加载 Map Editor shell",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-003",
+        "TASK-004"
+      ],
+      "user_story": "US-001",
+      "description": "把顶部导航从固定 Event Editor 改成 Event / Map 可切换，并新增 Map Editor 页面 shell。页面先完成 helper library 加载、错误态、空态、文件选择和工作区布局，为后续工具面板接入做基础。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/apiClient.ts",
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/map-editor/apiClient.test.ts",
+          "apps/editor/src/map-editor/MapEditorPage.test.tsx"
+        ],
+        "modify": [
+          "apps/editor/src/App.tsx",
+          "apps/editor/src/App.test.tsx",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/App.test.tsx",
+          "apps/editor/src/map-editor/apiClient.test.ts",
+          "apps/editor/src/map-editor/MapEditorPage.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 顶部 `Map Editor` 按钮不再 disabled，点击后显示 Map Editor 页面。",
+        "AC2: helper 不可用时显示 `Helper unavailable` 和 `npm run editor:helper` 提示。",
+        "AC3: library 加载成功时显示地图文件列表，默认选中第一张地图。",
+        "AC4: 切回 Event Editor 后现有 Event Editor 页面仍能加载。"
+      ],
+      "tech_notes": "沿用 EventEditorPage 的 loading/error 模式；不要在此任务实现 brush 或 inspector 细节。"
+    },
+    {
+      "id": "TASK-006",
+      "title": "实现新建地图、地图网格与基础图层面板",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-005"
+      ],
+      "user_story": "US-001",
+      "description": "在 Map Editor shell 中实现 New Map 表单、CSS grid 地图预览、tile 选择、图层新增/重命名/排序/删除/active/visible/locked/opacity/solo。完成后，策划可以从空白地图开始建立可编辑 draft，并看到不同图层状态。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/MapFilePanel.tsx",
+          "apps/editor/src/map-editor/MapGrid.tsx",
+          "apps/editor/src/map-editor/LayerPanel.tsx",
+          "apps/editor/src/map-editor/Toolbar.tsx"
+        ],
+        "modify": [
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/MapEditorPage.test.tsx",
+          "apps/editor/src/map-editor/LayerPanel.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: New Map 表单接受合法 `id/name/rows/cols` 并创建 draft。",
+        "AC2: 非法 id 或 rows/cols 小于 1 时表单显示错误且不创建 draft。",
+        "AC3: 图层面板可以新增、重命名、排序、删除、设置 active、切换 visible、切换 locked、调整 opacity。",
+        "AC4: Layer Solo 只影响 editor preview，不写入 draft JSON。"
+      ],
+      "tech_notes": "遵循 ADR-005。不要把 solo 保存进 map visual；locked 的编辑阻止逻辑由 reducer 和 UI 双层保护。"
+    },
+    {
+      "id": "TASK-007",
+      "title": "实现 tileset palette 与视觉铺图工具",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-006"
+      ],
+      "user_story": "US-002",
+      "description": "接入 Kenney tileset palette，显示 tilesheet 网格、tile index、放大预览、分类、最近使用和 index 搜索，并把 Brush、Eraser、Bucket Fill、Rectangle Fill、Eyedropper 连到 MapGrid pointer 交互。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/TilePalette.tsx",
+          "apps/editor/src/map-editor/TilePalette.test.tsx"
+        ],
+        "modify": [
+          "apps/editor/src/map-editor/MapGrid.tsx",
+          "apps/editor/src/map-editor/Toolbar.tsx",
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/TilePalette.test.tsx",
+          "apps/editor/src/map-editor/MapEditorPage.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Palette 显示 Kenney tilesheet tile index 和放大预览。",
+        "AC2: 选择 palette tile 后，Brush 点击或拖动会在 active layer 写入 visual cell。",
+        "AC3: Eraser 会删除 active layer 上对应 tileId 的 visual cell。",
+        "AC4: Bucket Fill 和 Rectangle Fill 能批量写入 visual cells。",
+        "AC5: Eyedropper 能从地图格读取最上层 visible visual cell 并选中对应 palette tile。",
+        "AC6: active layer locked 时绘制工具不会修改 draft，并显示轻量提示。"
+      ],
+      "tech_notes": "遵循 ADR-001、ADR-004。Editor 图片 URL 使用 helper asset endpoint；不要从 `assets/` 直接相对导入动态路径。"
+    },
+    {
+      "id": "TASK-008",
+      "title": "实现 gameplay inspector、semantic brush 与 Gameplay Overlay",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-006"
+      ],
+      "user_story": "US-004",
+      "description": "新增右侧 inspector 和 semantic brush，让策划可以编辑单 tile gameplay 字段或批量刷 terrain、weather、objectIds、specialStates、origin、initial discovered。Gameplay Overlay 在视觉地图上叠加语义信息，用于检查视觉和规则是否一致。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/TileInspector.tsx",
+          "apps/editor/src/map-editor/SemanticBrushPanel.tsx",
+          "apps/editor/src/map-editor/TileInspector.test.tsx",
+          "apps/editor/src/map-editor/SemanticBrushPanel.test.tsx"
+        ],
+        "modify": [
+          "apps/editor/src/map-editor/MapGrid.tsx",
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/map-editor/mapEditorReducer.ts",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/TileInspector.test.tsx",
+          "apps/editor/src/map-editor/SemanticBrushPanel.test.tsx",
+          "apps/editor/src/map-editor/mapEditorReducer.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 选中 tile 后 inspector 可编辑 areaName、terrain、weather、environment、objectIds、specialStates。",
+        "AC2: Semantic brush 可批量设置 terrain 或 weather。",
+        "AC3: Semantic brush 可设置 origin，并保证 initial discovered 包含 origin。",
+        "AC4: Semantic brush 可切换 tile 是否在 initialDiscoveredTileIds 中。",
+        "AC5: Gameplay Overlay 显示 terrain/weather/object/special/origin/discovered 信息。",
+        "AC6: 普通视觉 Brush 的测试证明 gameplay 字段不变。"
+      ],
+      "tech_notes": "遵循 ADR-002。objectIds 选择来自 map_objects library；specialStates 使用当前 map schema 枚举。"
+    },
+    {
+      "id": "TASK-009",
+      "title": "实现保存、validation panel 与 dirty/history UX",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-007",
+        "TASK-008"
+      ],
+      "user_story": "US-005",
+      "description": "把 helper validate/save API 接入 Map Editor，展示 validation panel、保存状态、dirty 状态和错误跳转。完成后，策划可以保存新建或修改后的地图，失败时看到可定位问题且 draft 不丢失。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/ValidationPanel.tsx",
+          "apps/editor/src/map-editor/ValidationPanel.test.tsx"
+        ],
+        "modify": [
+          "apps/editor/src/map-editor/apiClient.ts",
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/map-editor/Toolbar.tsx",
+          "apps/editor/src/map-editor/apiClient.test.ts",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/ValidationPanel.test.tsx",
+          "apps/editor/src/map-editor/MapEditorPage.test.tsx",
+          "apps/editor/src/map-editor/apiClient.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 有未保存修改时 UI 显示 dirty 状态，保存成功后 dirty 状态清除。",
+        "AC2: 保存前调用 helper validation；校验失败时不写文件并显示 errors。",
+        "AC3: 点击 tile/cell validation issue 会选中对应 tile 或 layer。",
+        "AC4: 新建地图保存成功后出现在文件列表中并可重新打开。",
+        "AC5: Helper 返回 `file_exists` 时 UI 显示冲突错误且不覆盖现有文件。"
+      ],
+      "tech_notes": "遵循 ADR-007。保存结果以 helper 返回为准；UI 本地校验只能作为即时提示。"
+    },
+    {
+      "id": "TASK-010",
+      "title": "让 PC content 与 mapView 派生 visual sprite layers",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "user_story": "US-006",
+      "description": "扩展 PC 侧地图内容类型和 view model，使 `buildPhaserTileViews` 能从 map visual layers 派生 discovered tile 的 sprite layers。该任务不改 Phaser 绘制，只保证 runtime view data 已包含正确的层、order、opacity 和 fallback 信息。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/content/contentData.ts",
+          "apps/pc-client/src/content/contentData.test.ts",
+          "apps/pc-client/src/phaser-map/mapView.ts",
+          "apps/pc-client/src/phaser-map/mapView.test.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/content/contentData.test.ts",
+          "apps/pc-client/src/phaser-map/mapView.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: `MapConfigDefinition` 类型包含可选 `visual.layers`。",
+        "AC2: discovered tile 的 `PhaserMapTileView` 包含 visible visual layers，顺序与 map JSON 一致。",
+        "AC3: `visible=false` layer 不会进入 tile view。",
+        "AC4: unknown/frontier tile 不暴露 visual sprite layers。",
+        "AC5: 无 visual cell 的 tile 保留现有 fillColor fallback。"
+      ],
+      "tech_notes": "遵循 ADR-008。不要在本任务改 MapScene 渲染；只做 view model 和测试。"
+    },
+    {
+      "id": "TASK-011",
+      "title": "在 PC Phaser MapScene 渲染 authored visual layers",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-010"
+      ],
+      "user_story": "US-006",
+      "description": "更新 PC Phaser MapScene，使其按 tileset registry preload spritesheet，并在 terrain fallback 上方渲染 discovered tile 的 visual sprites。多层按 order 和 opacity 叠加，现有 crew marker、route、selection、area label 不应被破坏。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/MapScene.ts",
+          "apps/pc-client/src/phaser-map/MapScene.test.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/phaser-map/MapScene.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: MapScene preload 使用 registry 中的 publicPath 加载 spritesheet。",
+        "AC2: 有 visual sprite layers 的 discovered tile 会渲染对应 frame。",
+        "AC3: 多个 visual layers 按 layer 顺序和 opacity 渲染。",
+        "AC4: 没有 visual layer 的 tile 仍渲染原 terrain rectangle。",
+        "AC5: crew marker、route preview 和 area label 的既有测试仍通过。"
+      ],
+      "tech_notes": "遵循 ADR-008。Phaser 使用 packed spritesheet，frameWidth=16、frameHeight=16、spacing=0；生产路径需要考虑 Vite base。"
+    },
+    {
+      "id": "TASK-012",
+      "title": "收尾验证地图编辑器端到端闭环",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-009",
+        "TASK-011"
+      ],
+      "user_story": null,
+      "description": "完成测试补齐、文档核对和手动验收清单，确保 Map Editor 从新建、铺图、编辑 gameplay、保存、重新打开到 PC runtime 展示形成完整闭环。该任务不增加新功能，只修复集成缝隙和遗漏测试。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/editor/src/styles.css",
+          "docs/plans/2026-05-01-22-43/map-editor-ux-implementation-plan.md",
+          "docs/plans/2026-05-01-22-43/map-editor-ux-tasks.json"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/MapEditorPage.test.tsx",
+          "apps/editor/helper/server.test.mjs",
+          "apps/pc-client/src/phaser-map/MapScene.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: `npm run validate:content` 通过。",
+        "AC2: `npm run editor:test` 通过。",
+        "AC3: `npm run lint` 通过。",
+        "AC4: `npm run test` 通过。",
+        "AC5: 手动验收记录覆盖新建 `16 x 12` 地图、创建图层、Kenney palette 铺图、保存后重新打开、PC 地图 fallback 和 visual layer 展示。",
+        "AC6: implementation plan 包含 US-001..US-006、用户旅程、失败路径、验证命令和 Rush `ps` 环境 caveat 的最终验收映射。"
+      ],
+      "tech_notes": "不要在本任务扩大范围到 Tiled/LDtk 导入、auto-tiling、运行时地图切换或 Phaser editor preview。若根级 `npm run lint` 或 `npm run test` 被 Rush `ps` issue 阻断，记录环境 caveat，并使用 editor/pc-client package 级 lint/test 作为可行替代验证。"
+    }
+  ]
+}

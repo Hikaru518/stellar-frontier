@@ -1,3 +1,4 @@
+import type { MapVisualDefinition, MapVisualLayerDefinition } from "../content/contentData";
 import type { CrewMember, MapTile } from "../data/gameData";
 import type { CrewActionState } from "../events/types";
 import type { VisibleTileStatus, VisibleTileWindow } from "../mapSystem";
@@ -34,6 +35,16 @@ export interface PhaserMapTileView {
   isRoute: boolean;
   isSelected: boolean;
   isTarget: boolean;
+  visualLayers?: PhaserMapTileVisualLayerView[];
+}
+
+export interface PhaserMapTileVisualLayerView {
+  layerId: string;
+  layerName: string;
+  order: number;
+  opacity: number;
+  tilesetId: string;
+  tileIndex: number;
 }
 
 export interface PhaserCrewMarkerView {
@@ -48,6 +59,7 @@ interface BuildPhaserTileViewsContext {
   selectedMoveTargetId?: string | null;
   movePreviewRoute?: string[];
   crewPositions?: Record<string, string[]>;
+  visual?: MapVisualDefinition;
 }
 
 type PathTile = Pick<MapTile, "id" | "row" | "col"> & { walkable?: boolean };
@@ -196,6 +208,7 @@ export function findTilePath(tiles: PathTile[], fromId: string, toId: string): s
 
 export function buildPhaserTileViews(visibleWindow: VisibleTileWindow, context: BuildPhaserTileViewsContext = {}): PhaserMapTileView[] {
   const routeIds = new Set(context.movePreviewRoute ?? []);
+  const visualLayers = context.visual?.layers ?? [];
   return visibleWindow.cells.map((cell) => {
     const displayCoord = `(${cell.displayX},${cell.displayY})`;
     const terrain = cell.tile?.terrain;
@@ -225,7 +238,32 @@ export function buildPhaserTileViews(visibleWindow: VisibleTileWindow, context: 
       isRoute: routeIds.has(cell.id),
       isSelected: context.selectedId === cell.id,
       isTarget: context.selectedMoveTargetId === cell.id,
+      visualLayers: isDiscovered ? buildTileVisualLayers(cell.id, visualLayers) : [],
     };
+  });
+}
+
+function buildTileVisualLayers(tileId: string, layers: MapVisualLayerDefinition[]): PhaserMapTileVisualLayerView[] {
+  return layers.flatMap((layer, order) => {
+    if (!layer.visible) {
+      return [];
+    }
+
+    const cell = layer.cells[tileId];
+    if (!cell) {
+      return [];
+    }
+
+    return [
+      {
+        layerId: layer.id,
+        layerName: layer.name,
+        order,
+        opacity: layer.opacity,
+        tilesetId: cell.tilesetId,
+        tileIndex: cell.tileIndex,
+      },
+    ];
   });
 }
 

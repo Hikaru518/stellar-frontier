@@ -12,10 +12,12 @@ interface PhaserSceneModule {
 
 interface TilesetRegistry {
   tilesets: Array<{
-    key?: string;
-    url?: string;
-    imageUrl?: string;
-    assetUrl?: string;
+    id: string;
+    publicPath: string;
+    tileWidth: number;
+    tileHeight: number;
+    spacing?: number;
+    margin?: number;
   }>;
 }
 
@@ -53,6 +55,7 @@ interface TerrainObject {
   setDepth: (depth: number) => TerrainObject;
   setAlpha?: (alpha: number) => TerrainObject;
   setStrokeStyle?: (lineWidth: number, color: number) => TerrainObject;
+  setDisplaySize?: (width: number, height: number) => TerrainObject;
   destroy: () => void;
 }
 
@@ -131,6 +134,7 @@ interface MapSceneRuntime {
   terrainObjects: TerrainObject[];
   add: {
     rectangle: (x: number, y: number, width: number, height: number, fillColor: number) => TerrainObject;
+    sprite?: (x: number, y: number, texture: string, frame: number) => TerrainObject;
     text?: (x: number, y: number, text: string, style?: Record<string, unknown>) => TextObject;
     circle?: (x: number, y: number, radius: number, fillColor: number) => CircleObject;
     container?: (x: number, y: number) => ContainerObject;
@@ -175,6 +179,11 @@ interface MapSceneRuntime {
   };
   load?: {
     image: (key: string, url: string) => void;
+    spritesheet?: (
+      key: string,
+      url: string,
+      config: { frameWidth: number; frameHeight: number; spacing?: number; margin?: number },
+    ) => void;
   };
   zoomLevelIndex?: number;
   isZooming?: boolean;
@@ -214,10 +223,12 @@ export class MapScene {
 
   preload(this: MapSceneRuntime): void {
     for (const tileset of tilesetRegistry.tilesets) {
-      const assetUrl = tileset.assetUrl ?? tileset.imageUrl ?? tileset.url;
-      if (tileset.key && assetUrl) {
-        this.load?.image(tileset.key, assetUrl);
-      }
+      this.load?.spritesheet?.(tileset.id, resolvePublicAssetPath(tileset.publicPath), {
+        frameWidth: tileset.tileWidth,
+        frameHeight: tileset.tileHeight,
+        spacing: tileset.spacing ?? 0,
+        margin: tileset.margin ?? 0,
+      });
     }
   }
 
@@ -603,18 +614,53 @@ function panCameraWithKeyboard(scene: MapSceneRuntime, delta: number): void {
 function redrawTerrain(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
   clearTerrainObjects(scene);
 
-  scene.terrainObjects = state.tileViews.map((tile) => {
-    const rectangle = scene.add.rectangle(
-      tile.col * (TILE_SIZE + TILE_GAP),
-      tile.row * (TILE_SIZE + TILE_GAP),
-      TILE_SIZE,
-      TILE_SIZE,
-      hexColorToNumber(tile.fillColor),
-    );
-    rectangle.setOrigin(0, 0);
-    rectangle.setDepth(TERRAIN_DEPTH);
-    return rectangle;
+  scene.terrainObjects = state.tileViews.flatMap((tile) => {
+    const terrainRectangle = createTerrainRectangle(scene, tile);
+    const visualLayers = [...(tile.visualLayers ?? [])].sort((a, b) => a.order - b.order);
+    if (visualLayers.length > 0) {
+      const addSprite = scene.add.sprite;
+      if (!addSprite) {
+        return [terrainRectangle];
+      }
+      const sprites = visualLayers.map((layer) => {
+        const sprite = addSprite(tile.col * (TILE_SIZE + TILE_GAP), tile.row * (TILE_SIZE + TILE_GAP), layer.tilesetId, layer.tileIndex);
+        sprite.setOrigin(0, 0);
+        sprite.setDisplaySize?.(TILE_SIZE, TILE_SIZE);
+        sprite.setAlpha?.(layer.opacity);
+        sprite.setDepth(getVisualLayerDepth(layer.order));
+        return sprite;
+      });
+      return [terrainRectangle, ...sprites];
+    }
+
+    return [terrainRectangle];
   });
+}
+
+function createTerrainRectangle(scene: MapSceneRuntime, tile: PhaserMapTileView): TerrainObject {
+  const rectangle = scene.add.rectangle(
+    tile.col * (TILE_SIZE + TILE_GAP),
+    tile.row * (TILE_SIZE + TILE_GAP),
+    TILE_SIZE,
+    TILE_SIZE,
+    hexColorToNumber(tile.fillColor),
+  );
+  rectangle.setOrigin(0, 0);
+  rectangle.setDepth(TERRAIN_DEPTH);
+  return rectangle;
+}
+
+function getVisualLayerDepth(order: number): number {
+  return TERRAIN_DEPTH + 1 + order / 1000;
+}
+
+function resolvePublicAssetPath(publicPath: string): string {
+  if (/^(?:https?:)?\/\//u.test(publicPath) || publicPath.startsWith("/")) {
+    return publicPath;
+  }
+
+  const baseUrl = import.meta.env.BASE_URL || "/";
+  return `${baseUrl.replace(/\/$/u, "")}/${publicPath.replace(/^\//u, "")}`;
 }
 
 function clearTerrainObjects(scene: MapSceneRuntime): void {

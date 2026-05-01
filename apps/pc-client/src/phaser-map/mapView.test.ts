@@ -123,6 +123,77 @@ describe("mapView", () => {
 
       expect(buildTileCenters(views)["1-2"]).toEqual({ x: TILE_SIZE + TILE_GAP + TILE_SIZE / 2, y: TILE_SIZE / 2 });
     });
+
+    it("derives visible visual sprite layers for discovered tiles in map layer order", () => {
+      const views = buildPhaserTileViews(visibleWindowWithUnknown(), {
+        visual: {
+          layers: [
+            {
+              id: "base",
+              name: "Base",
+              visible: true,
+              locked: false,
+              opacity: 1,
+              cells: {
+                "1-1": { tilesetId: "kenney-tiny-battle", tileIndex: 4 },
+                "1-2": { tilesetId: "kenney-tiny-battle", tileIndex: 5 },
+                "1-3": { tilesetId: "kenney-tiny-battle", tileIndex: 6 },
+              },
+            },
+            {
+              id: "hidden-detail",
+              name: "Hidden Detail",
+              visible: false,
+              locked: false,
+              opacity: 0.4,
+              cells: {
+                "1-1": { tilesetId: "kenney-tiny-battle", tileIndex: 7 },
+              },
+            },
+            {
+              id: "detail",
+              name: "Detail",
+              visible: true,
+              locked: true,
+              opacity: 0.6,
+              cells: {
+                "1-1": { tilesetId: "kenney-tiny-battle", tileIndex: 8 },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(views.find((view) => view.id === "1-1")?.visualLayers).toEqual([
+        { layerId: "base", layerName: "Base", order: 0, opacity: 1, tilesetId: "kenney-tiny-battle", tileIndex: 4 },
+        { layerId: "detail", layerName: "Detail", order: 2, opacity: 0.6, tilesetId: "kenney-tiny-battle", tileIndex: 8 },
+      ]);
+      expect(views.find((view) => view.id === "1-2")?.visualLayers).toEqual([]);
+      expect(views.find((view) => view.id === "1-3")?.visualLayers).toEqual([]);
+    });
+
+    it("keeps terrain fill fallback when a discovered tile has no visual cell", () => {
+      const [view] = buildPhaserTileViews(visibleWindow(), {
+        visual: {
+          layers: [
+            {
+              id: "base",
+              name: "Base",
+              visible: true,
+              locked: false,
+              opacity: 1,
+              cells: {
+                "2-2": { tilesetId: "kenney-tiny-battle", tileIndex: 1 },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(view?.id).toBe("1-1");
+      expect(view?.visualLayers).toEqual([]);
+      expect(view?.fillColor).toBe("#2f8f46");
+    });
   });
 
   describe("getCrewMarkerPosition", () => {
@@ -249,6 +320,25 @@ function visibleWindow(): VisibleTileWindow {
           objectIds: [],
           specialStates: [{ id: "danger", name: "危险", severity: "high", visibility: "onDiscovered", startsActive: true }],
         },
+      },
+    ],
+  };
+}
+
+function visibleWindowWithUnknown(): VisibleTileWindow {
+  const baseWindow = visibleWindow();
+  return {
+    ...baseWindow,
+    maxCol: 3,
+    cells: [
+      ...baseWindow.cells,
+      {
+        id: "1-3",
+        row: 1,
+        col: 3,
+        displayX: 2,
+        displayY: 0,
+        status: "unknownHole",
       },
     ],
   };

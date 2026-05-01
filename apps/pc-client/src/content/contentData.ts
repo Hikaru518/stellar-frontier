@@ -113,6 +113,24 @@ export interface MapSpecialStateDefinition {
   durationGameSeconds?: number;
 }
 
+export interface MapVisualCellDefinition {
+  tilesetId: string;
+  tileIndex: number;
+}
+
+export interface MapVisualLayerDefinition {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  opacity: number;
+  cells: Record<string, MapVisualCellDefinition>;
+}
+
+export interface MapVisualDefinition {
+  layers: MapVisualLayerDefinition[];
+}
+
 export interface MapTileDefinition {
   id: string;
   row: number;
@@ -138,6 +156,7 @@ export interface MapConfigDefinition {
   originTileId: string;
   initialDiscoveredTileIds: string[];
   tiles: MapTileDefinition[];
+  visual?: MapVisualDefinition;
 }
 
 export const eventProgramDefinitions = generatedEventProgramDefinitions;
