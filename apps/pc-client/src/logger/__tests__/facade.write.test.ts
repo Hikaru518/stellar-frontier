@@ -156,7 +156,7 @@ describe("logger facade — AC2: batch flush thresholds", () => {
 });
 
 describe("logger facade — AC3: fatal degrades to memory-only", () => {
-  it("after fatal: log() does not throw, no further append, ringBuffer/subscribers still work, console.warn once", () => {
+  it("after fatal: log() does not throw, no further append, ringBuffer/subscribers still work, and test mode stays silent", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const worker = new MockWorker();
@@ -190,8 +190,7 @@ describe("logger facade — AC3: fatal degrades to memory-only", () => {
     expect(seenDeltas.length).toBe(10);
     seenDeltas.forEach((entries) => expect(entries.length).toBe(1));
 
-    // console.warn fired exactly once for the fatal degradation.
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).not.toHaveBeenCalled();
 
     unsub();
     logger._stop?.();

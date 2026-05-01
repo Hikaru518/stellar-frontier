@@ -170,7 +170,7 @@ function defaultTabId(): string {
   return `tab-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
-function shouldWarnOnWorkerUnavailable(): boolean {
+function shouldEmitLoggerWarnings(): boolean {
   return import.meta.env.MODE !== "test";
 }
 
@@ -239,6 +239,7 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
   function warnOnce(message: string, detail?: unknown): void {
     if (warnedFatalOnce) return;
     warnedFatalOnce = true;
+    if (!shouldEmitLoggerWarnings()) return;
     try {
       if (detail !== undefined) {
         console.warn(`[logger] ${message}`, detail);
@@ -253,6 +254,7 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
   function warnLogPathOnce(err: unknown): void {
     if (warnedLogPathOnce) return;
     warnedLogPathOnce = true;
+    if (!shouldEmitLoggerWarnings()) return;
     try {
       console.warn("[logger] log() error swallowed", err);
     } catch {
@@ -440,9 +442,7 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
     worker = null;
     mode = "memory_only";
     fatalReason = "worker_unavailable";
-    if (shouldWarnOnWorkerUnavailable()) {
-      warnOnce("worker unavailable; degrading to memory_only", err);
-    }
+    warnOnce("worker unavailable; degrading to memory_only", err);
     settleReady();
   }
 
