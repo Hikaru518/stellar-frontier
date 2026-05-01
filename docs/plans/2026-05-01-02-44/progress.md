@@ -29,7 +29,7 @@ source:
 | 3  | TASK-003 | 信封自动填充与内存环形缓冲（envelope + ringBuffer）                | completed | 1       |
 | 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | completed | 1       |
 | 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | completed | 1       |
-| 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | pending   | 0       |
+| 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | completed | 1       |
 | 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | pending   | 0       |
 | 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | pending   | 0       |
 | 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | pending   | 0       |
@@ -112,3 +112,15 @@ source:
   - 设计要点：暴露 `__INTERNAL.handleMessage(cmd, emit)` 让 jsdom 测试绕过真 Worker；生产路径 `self.onmessage = (e) => handleMessage(e.data, workerEmit)`，测试路径自带 emit；handleMessage 是唯一事实之源
   - 关键行为：delete_run 当目标=currentRunId 时**先于** store.deleteRun 拒绝（spy 验证 store 未被调用）；rotate 后 lastSeqWritten 归零；任何异常被 catch 后回 `error` event，worker 不挂掉
 - 质量检查: lint PASS；test PASS（31 files / 250 tests，新增 1 文件 9 用例）
+
+### TASK-006: logger facade — 日志写入主路径与降级
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:26
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/index.ts`（LoggerFacade / LogStatus / LogInputWithContext 类型 + createLogger 工厂 + logger 单例）
+  - 创建 `__tests__/facade.write.test.ts`（MockWorker harness + 8 用例覆盖 4 条 AC + extras）
+  - 设计要点：LogInputWithContext 用 distributive conditional & 而非 interface extends（兼容 LogInput 的 distributive Pick）；workerFactory 失败 try/catch → memory_only + warn 一次；fatal 清空 waitingFlushers 避免 flush 永久挂起；flushPending 守卫 mode==="ok"；gameSeconds 默认 0 + // TODO(TASK-008) 注释
+  - 占位：rotate/listRuns/readRun/deleteRun/exportCurrent/exportRun 留给 TASK-007
+- 质量检查: lint PASS；test PASS（32 files / 258 tests，新增 1 文件 8 用例）
