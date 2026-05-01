@@ -43,3 +43,14 @@
 - 是否引入 `whole-game-index` 这一 scope 暂不需要（`docs/index.md` 直接由 audit-wiki 生成、`organize-wiki` 不动它，二者职责清晰）
 
 如果未来有更复杂的索引需求（例如按 scope / 按耦合度 / 按更新时间多视图），再考虑独立 skill 或扩展 `audit-wiki/references/index-template.md`。
+
+## Phaser 地图 e2e 测试策略扩展
+
+**当前状态**：Phaser 地图 MVP（`docs/plans/2026-04-30-18-46/`）的 e2e 测试采用机制 A（DOM `data-`* 属性桥接），覆盖 zoom level、人物当前格等可观察状态。
+
+**后续要补充**：
+
+- **机制 B**：在 Phaser Scene 内设置 `window.__mapTestState`（仅 `import.meta.env.DEV` 下），Playwright 通过 `page.evaluate()` 读取，覆盖摄像机 scroll 位置（`cameraScrollX/Y`）、轨迹长度（`trailLength`）等内部状态，以验证拖拽平移和人物移动轨迹。
+- 机制 B 的测试仅在 `vite dev`（开发服务器）下运行，不在 `vite preview`（生产构建）下运行。
+
+本轮 MVP 先保证机制 A 可运行；机制 B 等 Phaser 地图功能稳定后再补充。
