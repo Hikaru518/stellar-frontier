@@ -250,7 +250,7 @@ describe("logger facade — extras", () => {
     logger._stop?.();
   });
 
-  it("worker creation failure silently degrades to memory_only", () => {
+  it("worker creation failure stays silent in test mode", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const logger = createLogger({
       workerFactory: () => {
@@ -262,7 +262,7 @@ describe("logger facade — extras", () => {
     expect(logger.getStatus().mode).toBe("memory_only");
     expect(() => logger.log(basePlayerInput("z"))).not.toThrow();
     expect(logger.getRingBufferSnapshot().length).toBe(1);
-    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
     logger._stop?.();
   });
 

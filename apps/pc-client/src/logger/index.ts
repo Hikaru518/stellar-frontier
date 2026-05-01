@@ -170,6 +170,10 @@ function defaultTabId(): string {
   return `tab-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
+function shouldWarnOnWorkerUnavailable(): boolean {
+  return import.meta.env.MODE !== "test";
+}
+
 /**
  * Build a logger facade instance. Most call-sites should use the exported
  * `logger` singleton; tests construct a fresh facade per case with a mock
@@ -436,7 +440,9 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
     worker = null;
     mode = "memory_only";
     fatalReason = "worker_unavailable";
-    warnOnce("worker unavailable; degrading to memory_only", err);
+    if (shouldWarnOnWorkerUnavailable()) {
+      warnOnce("worker unavailable; degrading to memory_only", err);
+    }
     settleReady();
   }
 
