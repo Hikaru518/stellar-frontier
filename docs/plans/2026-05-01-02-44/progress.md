@@ -27,7 +27,7 @@ source:
 | 1  | TASK-001 | 构建期注入 __APP_VERSION__ 与 worker tsconfig 准备               | completed | 1       |
 | 2  | TASK-002 | logger 模块类型定义骨架（LogEntry / 协议）                        | completed | 1       |
 | 3  | TASK-003 | 信封自动填充与内存环形缓冲（envelope + ringBuffer）                | completed | 1       |
-| 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | pending   | 0       |
+| 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | completed | 1       |
 | 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | pending   | 0       |
 | 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | pending   | 0       |
 | 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | pending   | 0       |
@@ -86,3 +86,17 @@ source:
   - 创建 `__tests__/envelope.test.ts`（10 用例）+ `__tests__/ringBuffer.test.ts`（11 用例）
   - 设计要点：snapshot 与 pushAll 防御性 slice 拷贝；pushAll([]) 早返回不通知
 - 质量检查: lint PASS；test PASS（29 files / 229 tests，新增 2 文件 21 用例，原 208 个无退化）
+
+### TASK-004: OPFS run store（Worker 内文件管理抽象）
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:12
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/opfsRunStore.ts`（init/createRun/closeCurrent/deleteRun/listRuns/readRun/rotate；用结构化 `SyncAccessHandleLike` interface 而非依赖 lib-DOM）
+  - 创建 `apps/pc-client/src/test/mocks/opfs.ts`（mock OPFS 三 handle，DOMException("NotFoundError") + tagged Error 双兼容）
+  - 创建 `__tests__/opfsRunStore.test.ts`（12 用例，覆盖 4 条 AC + 6 条额外边界）
+  - 修改 `types.ts`：扩展 LoggerErrorCode 加 `"run_already_exists"`（已记入 summary）
+  - 设计要点：created_at_real_time 直接从 runId 字符串解析（不依赖 OPFS lastModified）；rotate 用 `archives.length + 1 > maxArchives` 显式 eviction
+  - **环境提示**：本 monorepo 是 Rush + pnpm，不是 npm workspaces；测试命令应在 `apps/pc-client/` 内直接 `npm run lint` / `npm run test`（脚本本身相同）
+- 质量检查: lint PASS；test PASS（30 files / 241 tests，新增 1 文件 12 用例）

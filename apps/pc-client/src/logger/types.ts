@@ -185,6 +185,7 @@ export interface RunArchive {
 export type LoggerErrorCode =
   | "opfs_unavailable"
   | "run_not_found"
+  | "run_already_exists"
   | "writer_busy"
   | "init_failed";
 
