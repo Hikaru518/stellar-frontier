@@ -208,6 +208,27 @@ describe("MapEditorPage", () => {
     expect(screen.getByRole("status")).toHaveTextContent('Layer "Base" is locked.');
     expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(0);
   });
+
+  it("clears semantic brush when selecting a visual palette tile", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [createMapAsset("default-map", "Default Map", "content/maps/default-map.json", { withLayer: true })],
+        tileset_registry: createTilesetRegistry(),
+      }),
+    );
+
+    const { container } = render(<MapEditorPage loadLibrary={loadLibrary} />);
+
+    expect(await screen.findByRole("heading", { name: "Default Map" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Terrain brush"), { target: { value: "水" } });
+    fireEvent.click(screen.getByRole("button", { name: "Select tile index 3" }));
+    const tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    pointerDown(tile);
+    pointerUp(tile);
+
+    expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(1);
+    expect(screen.getByLabelText("Terrain")).toHaveValue("平原");
+  });
 });
 
 function pointerDown(element: HTMLElement) {

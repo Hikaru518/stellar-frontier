@@ -5,10 +5,12 @@ import { mapEditorReducer } from "./mapEditorReducer";
 import LayerPanel from "./LayerPanel";
 import MapFilePanel from "./MapFilePanel";
 import MapGrid from "./MapGrid";
+import SemanticBrushPanel from "./SemanticBrushPanel";
+import TileInspector from "./TileInspector";
 import TilePalette from "./TilePalette";
 import Toolbar, { type MapEditorTool } from "./Toolbar";
 import type { MapEditorLibraryResponse } from "./apiClient";
-import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapVisualCellDefinition } from "./types";
+import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapVisualCellDefinition, SemanticBrush } from "./types";
 
 type LoadLibrary = () => Promise<MapEditorLibraryResponse>;
 
@@ -27,6 +29,8 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
   const [soloLayerId, setSoloLayerId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<MapEditorTool>("select");
   const [selectedBrush, setSelectedBrush] = useState<MapVisualCellDefinition | null>(null);
+  const [activeSemanticBrush, setActiveSemanticBrush] = useState<SemanticBrush | null>(null);
+  const [gameplayOverlay, setGameplayOverlay] = useState(false);
   const [recentTiles, setRecentTiles] = useState<MapVisualCellDefinition[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -147,12 +151,15 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
           selectedTileId={selectedTileId}
           activeTool={activeTool}
           selectedBrush={selectedBrush}
+          activeSemanticBrush={activeSemanticBrush}
           soloLayerId={soloLayerId}
+          gameplayOverlay={gameplayOverlay}
           notice={notice}
           onSelectTile={setSelectedTileId}
-          onToolChange={setActiveTool}
+          onToolChange={changeTool}
           onSelectBrush={selectBrush}
           onNotice={setNotice}
+          onGameplayOverlayChange={setGameplayOverlay}
           onCommand={dispatch}
         />
 
@@ -161,10 +168,14 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
           editorState={editorState}
           selectedTileId={selectedTileId}
           selectedBrush={selectedBrush}
+          activeSemanticBrush={activeSemanticBrush}
           recentTiles={recentTiles}
           soloLayerId={soloLayerId}
+          gameplayOverlay={gameplayOverlay}
           onSelectBrush={selectBrush}
+          onActiveSemanticBrushChange={changeSemanticBrush}
           onSoloLayerChange={setSoloLayerId}
+          onGameplayOverlayChange={setGameplayOverlay}
           onCommand={dispatch}
         />
       </div>
@@ -174,7 +185,21 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
   function selectBrush(tile: MapVisualCellDefinition) {
     setSelectedBrush(tile);
     setActiveTool("brush");
+    setActiveSemanticBrush(null);
     setRecentTiles((current) => [tile, ...current.filter((candidate) => !isSameVisualCell(candidate, tile))].slice(0, 8));
+    setNotice(null);
+  }
+
+  function changeTool(tool: MapEditorTool) {
+    setActiveTool(tool);
+    setActiveSemanticBrush(null);
+  }
+
+  function changeSemanticBrush(brush: SemanticBrush | null) {
+    setActiveSemanticBrush(brush);
+    if (brush) {
+      setActiveTool("select");
+    }
     setNotice(null);
   }
 }
@@ -210,12 +235,15 @@ function MapCanvasShell({
   selectedTileId,
   activeTool,
   selectedBrush,
+  activeSemanticBrush,
   soloLayerId,
+  gameplayOverlay,
   notice,
   onSelectTile,
   onToolChange,
   onSelectBrush,
   onNotice,
+  onGameplayOverlayChange,
   onCommand,
 }: {
   activeMapFilePath: string | null;
@@ -224,12 +252,15 @@ function MapCanvasShell({
   selectedTileId: string | null;
   activeTool: MapEditorTool;
   selectedBrush: MapVisualCellDefinition | null;
+  activeSemanticBrush: SemanticBrush | null;
   soloLayerId: string | null;
+  gameplayOverlay: boolean;
   notice: string | null;
   onSelectTile: (tileId: string) => void;
   onToolChange: (tool: MapEditorTool) => void;
   onSelectBrush: (tile: MapVisualCellDefinition) => void;
   onNotice: (message: string | null) => void;
+  onGameplayOverlayChange: (enabled: boolean) => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
   const [rectangleStartTileId, setRectangleStartTileId] = useState<string | null>(null);
@@ -264,6 +295,29 @@ function MapCanvasShell({
         onRedo={() => onCommand({ type: "history/redo" })}
       />
 
+      <div className="map-preview-toggle" role="group" aria-label="Preview mode">
+        <button
+          type="button"
+          aria-pressed={!gameplayOverlay}
+          onClick={() => {
+            onGameplayOverlayChange(false);
+            onNotice(null);
+          }}
+        >
+          Final Art
+        </button>
+        <button
+          type="button"
+          aria-pressed={gameplayOverlay}
+          onClick={() => {
+            onGameplayOverlayChange(true);
+            onNotice(null);
+          }}
+        >
+          Gameplay Overlay
+        </button>
+      </div>
+
       {notice ? (
         <p className="map-editor-notice" role="status" aria-live="polite">
           {notice}
@@ -275,6 +329,7 @@ function MapCanvasShell({
         tilesets={tilesets}
         selectedTileId={selectedTileId}
         soloLayerId={soloLayerId}
+        gameplayOverlay={gameplayOverlay}
         onSelectTile={onSelectTile}
         onTilePointerDown={handleTilePointerDown}
         onTilePointerEnter={handleTilePointerEnter}
@@ -285,6 +340,12 @@ function MapCanvasShell({
 
   function handleTilePointerDown(tileId: string) {
     onSelectTile(tileId);
+
+    if (activeSemanticBrush) {
+      onCommand({ type: "gameplay/applySemanticBrush", tileId, brush: activeSemanticBrush });
+      onNotice(`Applied ${formatSemanticBrush(activeSemanticBrush)} to ${tileId}.`);
+      return;
+    }
 
     if (activeTool === "select") {
       return;
@@ -318,6 +379,11 @@ function MapCanvasShell({
   }
 
   function handleTilePointerEnter(tileId: string) {
+    if (activeSemanticBrush) {
+      onCommand({ type: "gameplay/applySemanticBrush", tileId, brush: activeSemanticBrush });
+      return;
+    }
+
     if (activeTool === "brush") {
       applyVisualTool(tileId);
     }
@@ -374,20 +440,28 @@ function MapSummaryPanel({
   editorState,
   selectedTileId,
   selectedBrush,
+  activeSemanticBrush,
   recentTiles,
   soloLayerId,
+  gameplayOverlay,
   onSelectBrush,
+  onActiveSemanticBrushChange,
   onSoloLayerChange,
+  onGameplayOverlayChange,
   onCommand,
 }: {
   library: MapEditorLibraryResponse;
   editorState: MapEditorState | null;
   selectedTileId: string | null;
   selectedBrush: MapVisualCellDefinition | null;
+  activeSemanticBrush: SemanticBrush | null;
   recentTiles: MapVisualCellDefinition[];
   soloLayerId: string | null;
+  gameplayOverlay: boolean;
   onSelectBrush: (tile: MapVisualCellDefinition) => void;
+  onActiveSemanticBrushChange: (brush: SemanticBrush | null) => void;
   onSoloLayerChange: (layerId: string | null) => void;
+  onGameplayOverlayChange: (enabled: boolean) => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
   if (!editorState) {
@@ -403,7 +477,6 @@ function MapSummaryPanel({
 
   const { draft, activeLayerId } = editorState;
   const firstTileset = library.tileset_registry.tilesets[0];
-  const selectedTile = selectedTileId ? draft.tiles.find((tile) => tile.id === selectedTileId) : null;
   return (
     <aside className="map-summary-panel" aria-label="Map editor summary">
       <section className="map-summary-card">
@@ -440,6 +513,21 @@ function MapSummaryPanel({
 
       <LayerPanel state={editorState} soloLayerId={soloLayerId} onSoloLayerChange={onSoloLayerChange} onCommand={onCommand} />
 
+      <section className="map-summary-card">
+        <div className="map-panel-subheading">
+          <h3>Preview</h3>
+          <span className="status-tag status-muted">{gameplayOverlay ? "Gameplay Overlay" : "Final Art"}</span>
+        </div>
+        <div className="map-preview-toggle" role="group" aria-label="Gameplay overlay toggle">
+          <button type="button" aria-pressed={!gameplayOverlay} onClick={() => onGameplayOverlayChange(false)}>
+            Final Art
+          </button>
+          <button type="button" aria-pressed={gameplayOverlay} onClick={() => onGameplayOverlayChange(true)}>
+            Gameplay Overlay
+          </button>
+        </div>
+      </section>
+
       <TilePalette
         registry={library.tileset_registry}
         selectedTile={selectedBrush}
@@ -447,33 +535,15 @@ function MapSummaryPanel({
         onSelectTile={onSelectBrush}
       />
 
-      <section className="map-summary-card">
-        <h3>Tile</h3>
-        {selectedTile ? (
-          <dl className="inspector-summary">
-            <div>
-              <dt>ID</dt>
-              <dd>
-                <code>{selectedTile.id}</code>
-              </dd>
-            </div>
-            <div>
-              <dt>Area</dt>
-              <dd>{selectedTile.areaName}</dd>
-            </div>
-            <div>
-              <dt>Terrain</dt>
-              <dd>{selectedTile.terrain}</dd>
-            </div>
-            <div>
-              <dt>Weather</dt>
-              <dd>{selectedTile.weather}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="muted-text">Select a tile in the grid.</p>
-        )}
-      </section>
+      <SemanticBrushPanel
+        draft={draft}
+        selectedTileId={selectedTileId}
+        activeBrush={activeSemanticBrush}
+        onActiveBrushChange={onActiveSemanticBrushChange}
+        onCommand={onCommand}
+      />
+
+      <TileInspector draft={draft} selectedTileId={selectedTileId} mapObjects={library.map_objects} onCommand={onCommand} />
 
       <section className="map-summary-card">
         <h3>Tilesets</h3>
@@ -536,4 +606,14 @@ function pickTopVisibleCell(draft: MapEditorDraft, tileId: string): MapVisualCel
 
 function isSameVisualCell(left: MapVisualCellDefinition, right: MapVisualCellDefinition): boolean {
   return left.tilesetId === right.tilesetId && left.tileIndex === right.tileIndex;
+}
+
+function formatSemanticBrush(brush: SemanticBrush): string {
+  if (brush.kind === "terrain" || brush.kind === "weather") {
+    return `${brush.kind} ${brush.value}`;
+  }
+  if (brush.kind === "discovered") {
+    return brush.discovered ? "initial discovered" : "initial hidden";
+  }
+  return "origin";
 }

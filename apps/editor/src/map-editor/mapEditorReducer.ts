@@ -4,7 +4,7 @@ import {
   paintVisualCell,
   rectangleFillVisualCells,
 } from "./visualLayerOps";
-import type { MapEditorCommand, MapEditorDraft, MapEditorState } from "./types";
+import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapTileDefinition, SemanticBrush } from "./types";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 100;
 
@@ -67,6 +67,14 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
         const opacity = Math.max(0, Math.min(1, command.opacity));
         return layer.opacity === opacity ? layer : { ...layer, opacity };
       });
+    case "gameplay/updateTile":
+      return updateGameplayTile(state, command.tileId, command.patch);
+    case "gameplay/setOrigin":
+      return setOriginTile(state, command.tileId);
+    case "gameplay/setDiscovered":
+      return setDiscoveredTile(state, command.tileId, command.discovered);
+    case "gameplay/applySemanticBrush":
+      return applySemanticBrush(state, command.tileId, command.brush);
     case "history/undo":
       return undo(state);
     case "history/redo":
@@ -74,6 +82,98 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
     default:
       return state;
   }
+}
+
+function updateGameplayTile(
+  state: MapEditorState,
+  tileId: string,
+  patch: Partial<Pick<MapTileDefinition, "areaName" | "terrain" | "weather" | "environment" | "objectIds" | "specialStates">>,
+): MapEditorState {
+  const tileIndex = state.draft.tiles.findIndex((tile) => tile.id === tileId);
+  if (tileIndex < 0) {
+    return state;
+  }
+
+  const currentTile = state.draft.tiles[tileIndex];
+  if (!currentTile) {
+    return state;
+  }
+
+  const nextTile: MapTileDefinition = {
+    ...currentTile,
+    ...patch,
+    areaName: patch.areaName === undefined ? currentTile.areaName : patch.areaName.trim(),
+    environment: patch.environment ? { ...currentTile.environment, ...patch.environment } : currentTile.environment,
+    objectIds: patch.objectIds ? Array.from(new Set(patch.objectIds)) : currentTile.objectIds,
+    specialStates: patch.specialStates ? patch.specialStates.map((stateDefinition) => ({ ...stateDefinition })) : currentTile.specialStates,
+  };
+
+  if (nextTile.areaName.length === 0) {
+    nextTile.areaName = currentTile.areaName;
+  }
+
+  if (areTilesEqual(currentTile, nextTile)) {
+    return state;
+  }
+
+  return commitDraftChange(state, {
+    ...state.draft,
+    tiles: state.draft.tiles.map((tile, index) => (index === tileIndex ? nextTile : tile)),
+  });
+}
+
+function setOriginTile(state: MapEditorState, tileId: string): MapEditorState {
+  if (!state.draft.tiles.some((tile) => tile.id === tileId)) {
+    return state;
+  }
+
+  const initialDiscoveredTileIds = state.draft.initialDiscoveredTileIds.includes(tileId)
+    ? state.draft.initialDiscoveredTileIds
+    : [...state.draft.initialDiscoveredTileIds, tileId];
+
+  if (state.draft.originTileId === tileId && initialDiscoveredTileIds === state.draft.initialDiscoveredTileIds) {
+    return state;
+  }
+
+  return commitDraftChange(state, {
+    ...state.draft,
+    originTileId: tileId,
+    initialDiscoveredTileIds,
+  });
+}
+
+function setDiscoveredTile(state: MapEditorState, tileId: string, discovered: boolean): MapEditorState {
+  if (!state.draft.tiles.some((tile) => tile.id === tileId)) {
+    return state;
+  }
+
+  const isDiscovered = state.draft.initialDiscoveredTileIds.includes(tileId);
+  if (isDiscovered === discovered) {
+    return state;
+  }
+
+  return commitDraftChange(state, {
+    ...state.draft,
+    initialDiscoveredTileIds: discovered
+      ? [...state.draft.initialDiscoveredTileIds, tileId]
+      : state.draft.initialDiscoveredTileIds.filter((candidate) => candidate !== tileId || candidate === state.draft.originTileId),
+  });
+}
+
+function applySemanticBrush(state: MapEditorState, tileId: string, brush: SemanticBrush): MapEditorState {
+  if (brush.kind === "origin") {
+    return setOriginTile(state, tileId);
+  }
+
+  if (brush.kind === "discovered") {
+    return setDiscoveredTile(state, tileId, brush.discovered);
+  }
+
+  if (brush.kind === "terrain") {
+    return updateGameplayTile(state, tileId, { terrain: brush.value });
+  }
+
+  return updateGameplayTile(state, tileId, { weather: brush.value });
 }
 
 function commitLayerChange(
@@ -199,4 +299,8 @@ function redo(state: MapEditorState): MapEditorState {
       future: state.history.future.slice(1),
     },
   };
+}
+
+function areTilesEqual(left: MapTileDefinition, right: MapTileDefinition): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

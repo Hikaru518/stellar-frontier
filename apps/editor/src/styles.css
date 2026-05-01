@@ -695,11 +695,29 @@ p {
 }
 
 .map-tool-segment button[aria-pressed="true"],
+.map-preview-toggle button[aria-pressed="true"],
+.semantic-brush-actions button[aria-pressed="true"],
 .tile-palette-grid button[aria-pressed="true"],
 .tile-palette-recent button[aria-pressed="true"] {
   border-color: #24384f;
   background: #dbe3e9;
   box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.18);
+}
+
+.map-preview-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.map-preview-toggle button,
+.semantic-brush-actions button,
+.tile-inspector button {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .map-editor-notice {
@@ -796,6 +814,23 @@ p {
   text-shadow: 0 1px 0 rgba(247, 244, 236, 0.78);
 }
 
+.map-grid-gameplay-overlay {
+  position: absolute;
+  inset: 2px;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  overflow: hidden;
+  background: rgba(247, 244, 236, 0.78);
+  color: #171a1c;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
+  pointer-events: none;
+}
+
 .map-summary-panel {
   display: grid;
   align-content: start;
@@ -816,6 +851,8 @@ p {
   margin-bottom: 0;
 }
 
+.semantic-brush-panel,
+.tile-inspector,
 .tile-palette {
   display: grid;
   gap: 8px;
@@ -824,13 +861,16 @@ p {
   padding: 9px;
 }
 
-.tile-palette-controls {
+.tile-palette-controls,
+.tile-inspector,
+.semantic-brush-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: 7px;
 }
 
-.tile-palette-controls label {
+.tile-palette-controls label,
+.tile-inspector label,
+.semantic-brush-panel label {
   display: grid;
   gap: 4px;
   color: #46505a;
@@ -839,12 +879,69 @@ p {
 }
 
 .tile-palette-controls select,
-.tile-palette-controls input {
+.tile-palette-controls input,
+.tile-inspector select,
+.tile-inspector input,
+.semantic-brush-panel select {
   min-width: 0;
   border: 1px solid #77736b;
   background: #f7f4ec;
   padding: 6px;
   color: #171a1c;
+}
+
+.tile-inspector fieldset {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #d0b69b;
+  padding: 8px;
+}
+
+.tile-inspector legend {
+  color: #46505a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tile-inspector-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.tile-inspector-checkbox-list,
+.tile-inspector-special-list,
+.tile-inspector-special-form,
+.semantic-brush-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.tile-inspector-checkbox-list label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.tile-inspector-checkbox-list code,
+.tile-inspector-special-list code {
+  color: #46505a;
+  font-size: 11px;
+}
+
+.tile-inspector-special-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile-inspector-special-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d0b69b;
+  background: rgba(247, 244, 236, 0.72);
+  padding: 6px;
 }
 
 .tile-palette-preview {

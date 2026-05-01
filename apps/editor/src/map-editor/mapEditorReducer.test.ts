@@ -57,6 +57,63 @@ describe("mapEditorReducer", () => {
     expect(repaintedState.draft.visual.layers[0]?.cells).toEqual({ "1-1": water });
     expect(repaintedState.history.future).toEqual([]);
   });
+
+  it("keeps gameplay fields unchanged when painting with the visual brush", () => {
+    const initialState = createState();
+    const originalTile = initialState.draft.tiles.find((tile) => tile.id === "1-1");
+
+    const nextState = mapEditorReducer(initialState, { type: "visual/brush", tileId: "1-1", cell: grass });
+
+    expect(nextState.draft.tiles.find((tile) => tile.id === "1-1")).toEqual(originalTile);
+  });
+
+  it("applies terrain and weather semantic brush commands", () => {
+    const terrainState = mapEditorReducer(createState(), {
+      type: "gameplay/applySemanticBrush",
+      tileId: "1-1",
+      brush: { kind: "terrain", value: "水" },
+    });
+    const weatherState = mapEditorReducer(terrainState, {
+      type: "gameplay/applySemanticBrush",
+      tileId: "1-2",
+      brush: { kind: "weather", value: "酸雨" },
+    });
+
+    expect(weatherState.draft.tiles.find((tile) => tile.id === "1-1")?.terrain).toBe("水");
+    expect(weatherState.draft.tiles.find((tile) => tile.id === "1-2")?.weather).toBe("酸雨");
+  });
+
+  it("sets origin and keeps it in initial discovered tiles", () => {
+    const nextState = mapEditorReducer(createState(), {
+      type: "gameplay/applySemanticBrush",
+      tileId: "1-1",
+      brush: { kind: "origin" },
+    });
+
+    expect(nextState.draft.originTileId).toBe("1-1");
+    expect(nextState.draft.initialDiscoveredTileIds).toContain("1-1");
+  });
+
+  it("toggles initial discovered tiles without removing the origin", () => {
+    let state = mapEditorReducer(createState(), {
+      type: "gameplay/applySemanticBrush",
+      tileId: "1-2",
+      brush: { kind: "discovered", discovered: true },
+    });
+    state = mapEditorReducer(state, {
+      type: "gameplay/applySemanticBrush",
+      tileId: "1-2",
+      brush: { kind: "discovered", discovered: false },
+    });
+    state = mapEditorReducer(state, {
+      type: "gameplay/applySemanticBrush",
+      tileId: state.draft.originTileId,
+      brush: { kind: "discovered", discovered: false },
+    });
+
+    expect(state.draft.initialDiscoveredTileIds).not.toContain("1-2");
+    expect(state.draft.initialDiscoveredTileIds).toContain(state.draft.originTileId);
+  });
 });
 
 function createState(): MapEditorState {

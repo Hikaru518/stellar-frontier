@@ -39,7 +39,7 @@ source:
 | 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | completed | 1 |
 | 6 | TASK-006 | 实现新建地图、地图网格与基础图层面板 | completed | 1 |
 | 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | completed | 1 |
-| 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | pending | 0 |
+| 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | completed | 1 |
 | 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | pending | 0 |
 | 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | pending | 0 |
 | 11 | TASK-011 | 在 PC Phaser MapScene 渲染 authored visual layers | pending | 0 |
@@ -113,3 +113,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 TilePalette，支持 Kenney tile index、放大预览、分类、index 搜索和最近使用；将 Brush、Eraser、Bucket Fill、Rectangle Fill、Eyedropper 接入 MapGrid pointer 交互；绘制只写 active visual layer，locked layer 显示轻量提示；MapGrid 使用 helper asset endpoint 的 spritesheet URL 渲染 visual cells。子 agent 验证 `npm run editor:test` 通过（18 files / 72 tests），editor lint 通过。
 - Main verification: 复核 helper asset URL、eyedropper 从最上层 visible layer 取 cell、locked layer no-op 与提示；将 grid 绘制事件从 mouse 改为 pointer 事件并对 pointer capture 做能力检测，补充测试仍通过；`git diff --check` 通过；`npm run editor:test` 通过（18 files / 72 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-008: 实现 gameplay inspector、semantic brush 与 Gameplay Overlay
+- 状态: completed
+- 开始时间: 2026-05-02 01:11
+- 完成时间: 2026-05-02 01:20
+- 尝试次数: 1
+- Monkey summary: 成功。新增 TileInspector 与 SemanticBrushPanel；inspector 可编辑 areaName、terrain、weather、environment、objectIds、specialStates；semantic brush 支持 terrain/weather、origin、initial discovered 开关；设置 origin 会保证 initial discovered 包含 origin；Gameplay Overlay 在 grid 上叠加 terrain/weather/object/special/origin/discovered；reducer 测试覆盖 visual brush 不修改 gameplay。子 agent 验证 `npm run editor:test` 通过（20 files / 80 tests），editor lint 通过。
+- Main verification: 复核 gameplay reducer commands、inspector/semantic brush UI 和 overlay；修复 semantic brush 与 visual palette 的模式冲突，确保选择 palette tile 会清除 semantic brush 并恢复视觉绘制，补充测试；`git diff --check` 通过；`npm run editor:test` 通过（20 files / 81 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。

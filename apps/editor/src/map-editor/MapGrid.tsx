@@ -8,6 +8,7 @@ interface MapGridProps {
   tilesets: MapEditorTileset[];
   selectedTileId: string | null;
   soloLayerId: string | null;
+  gameplayOverlay: boolean;
   onSelectTile: (tileId: string) => void;
   onTilePointerDown: (tileId: string) => void;
   onTilePointerEnter: (tileId: string) => void;
@@ -19,6 +20,7 @@ export default function MapGrid({
   tilesets,
   selectedTileId,
   soloLayerId,
+  gameplayOverlay,
   onSelectTile,
   onTilePointerDown,
   onTilePointerEnter,
@@ -92,10 +94,28 @@ export default function MapGrid({
               );
             })}
           </span>
+          {gameplayOverlay ? <GameplayOverlay draft={draft} tile={tile} /> : null}
           <span className="map-grid-cell-label">{formatTileLabel(tileById.get(tile.id) ?? tile)}</span>
         </button>
       ))}
     </div>
+  );
+}
+
+function GameplayOverlay({ draft, tile }: { draft: MapEditorDraft; tile: MapTileDefinition }) {
+  const flags = [
+    tile.objectIds.length > 0 ? "OBJ" : null,
+    tile.specialStates.length > 0 ? "SP" : null,
+    tile.id === draft.originTileId ? "ORIGIN" : null,
+    draft.initialDiscoveredTileIds.includes(tile.id) ? "DISC" : null,
+  ].filter(Boolean);
+
+  return (
+    <span className="map-grid-gameplay-overlay" aria-hidden="true">
+      <span>{tile.terrain}</span>
+      <span>{tile.weather}</span>
+      {flags.length > 0 ? <span>{flags.join(" ")}</span> : null}
+    </span>
   );
 }
 

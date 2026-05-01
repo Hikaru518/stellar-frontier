@@ -94,6 +94,23 @@ export interface MapEditorState {
 
 export type VisualPaintTool = "brush" | "eraser" | "bucketFill" | "rectangleFill";
 
+export type SemanticBrush =
+  | {
+      kind: "terrain";
+      value: string;
+    }
+  | {
+      kind: "weather";
+      value: string;
+    }
+  | {
+      kind: "origin";
+    }
+  | {
+      kind: "discovered";
+      discovered: boolean;
+    };
+
 export type MapEditorCommand =
   | {
       type: "visual/brush";
@@ -151,6 +168,25 @@ export type MapEditorCommand =
       type: "layer/setOpacity";
       layerId: string;
       opacity: number;
+    }
+  | {
+      type: "gameplay/updateTile";
+      tileId: string;
+      patch: Partial<Pick<MapTileDefinition, "areaName" | "terrain" | "weather" | "environment" | "objectIds" | "specialStates">>;
+    }
+  | {
+      type: "gameplay/setOrigin";
+      tileId: string;
+    }
+  | {
+      type: "gameplay/setDiscovered";
+      tileId: string;
+      discovered: boolean;
+    }
+  | {
+      type: "gameplay/applySemanticBrush";
+      tileId: string;
+      brush: SemanticBrush;
     }
   | {
       type: "history/undo";
