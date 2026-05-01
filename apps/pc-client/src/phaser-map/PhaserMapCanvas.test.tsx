@@ -1,11 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  PHASER_MAP_VIEW_HEIGHT,
+  PHASER_MAP_VIEW_WIDTH,
   PhaserMapCanvas,
   createMapGameConfig,
   createSceneState,
   destroyPhaserGame,
   notifyMapSceneState,
+  resizePhaserGame,
   type PhaserGameLike,
   type PhaserMapCanvasProps,
 } from "./PhaserMapCanvas";
@@ -42,15 +45,36 @@ describe("PhaserMapCanvas", () => {
     expect("gameFactory" in state).toBe(false);
   });
 
-  it("registers MapScene in the Phaser game config with access to the state ref", () => {
+  it("registers a standard Phaser scene class with a fixed initial viewport", () => {
     const state = createSceneState(propsWithTiles([tileView("1-1")]));
     const stateRef = { current: state };
 
-    const config = createMapGameConfig({ AUTO: "AUTO" }, document.createElement("div"), stateRef);
+    class FakeScene {
+      constructor(readonly config: { key: string }) {}
+    }
+    const config = createMapGameConfig({ AUTO: "AUTO", Scene: FakeScene }, document.createElement("div"), stateRef);
 
-    expect(config).toMatchObject({ type: "AUTO", parent: expect.any(HTMLDivElement) });
-    expect(config.scene).toEqual([expect.any(MapScene)]);
-    expect((config.scene as MapScene[])[0]?.getState()).toBe(state);
+    expect(config).toMatchObject({
+      type: "AUTO",
+      parent: expect.any(HTMLDivElement),
+      width: PHASER_MAP_VIEW_WIDTH,
+      height: PHASER_MAP_VIEW_HEIGHT,
+    });
+    expect(config.scene).toEqual(expect.any(Function));
+    expect(config.scene).not.toBeInstanceOf(MapScene);
+  });
+
+  it("resizes the Phaser game only for non-zero changed viewport sizes", () => {
+    const resize = vi.fn();
+    const game: PhaserGameLike = { destroy: vi.fn(), scale: { resize } };
+    const previousSize = { current: null };
+
+    expect(resizePhaserGame(game, { width: 0, height: 430 }, previousSize)).toBe(false);
+    expect(resizePhaserGame(game, { width: 640.4, height: 430.6 }, previousSize)).toBe(true);
+    expect(resizePhaserGame(game, { width: 640.4, height: 430.6 }, previousSize)).toBe(false);
+
+    expect(resize).toHaveBeenCalledOnce();
+    expect(resize).toHaveBeenCalledWith(640, 431);
   });
 
   it("destroys an initialized Phaser game with child canvas cleanup", () => {

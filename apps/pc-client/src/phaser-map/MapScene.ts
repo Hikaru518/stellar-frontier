@@ -6,6 +6,10 @@ interface SceneStateRef {
   current: PhaserMapSceneState;
 }
 
+interface PhaserSceneModule {
+  Scene: new (config: { key: string }) => object;
+}
+
 interface TilesetRegistry {
   tilesets: Array<{
     key?: string;
@@ -140,6 +144,8 @@ interface MapSceneRuntime {
       zoom: number;
       scrollX: number;
       scrollY: number;
+      width?: number;
+      height?: number;
     };
   };
   input?: {
@@ -185,6 +191,7 @@ interface MapSceneRuntime {
   popupObjects?: Array<TerrainObject | TextObject>;
   areaLabelObjects?: TextObject[];
   cameraBoundsKey?: string;
+  worldBounds?: { width: number; height: number; centerX: number; centerY: number };
   getState: () => PhaserMapSceneState;
   updateState: (nextState: PhaserMapSceneState) => void;
 }
@@ -241,6 +248,43 @@ export class MapScene {
     configureCamera(runtime, nextState);
     syncZoomBridge(runtime);
   }
+}
+
+export function createMapSceneClass(Phaser: PhaserSceneModule, stateRef: SceneStateRef) {
+  return class PhaserMapScene extends Phaser.Scene {
+    constructor() {
+      super({ key: MAP_SCENE_KEY });
+      const runtime = this as unknown as MapSceneRuntime;
+      runtime.stateRef = stateRef;
+      runtime.terrainObjects = [];
+    }
+
+    init(data?: { stateRef?: SceneStateRef }): void {
+      const runtime = this as unknown as MapSceneRuntime;
+      runtime.stateRef = data?.stateRef ?? stateRef;
+      runtime.terrainObjects ??= [];
+    }
+
+    preload(): void {
+      MapScene.prototype.preload.call(this as unknown as MapSceneRuntime);
+    }
+
+    create(): void {
+      MapScene.prototype.create.call(this as unknown as MapSceneRuntime);
+    }
+
+    update(time: number, delta: number): void {
+      MapScene.prototype.update.call(this as unknown as MapSceneRuntime, time, delta);
+    }
+
+    getState(): PhaserMapSceneState {
+      return MapScene.prototype.getState.call(this as unknown as MapSceneRuntime);
+    }
+
+    updateState(nextState: PhaserMapSceneState): void {
+      MapScene.prototype.updateState.call(this as unknown as MapSceneRuntime, nextState);
+    }
+  };
 }
 
 function initializeCameraInteractionState(scene: MapSceneRuntime): void {
@@ -327,6 +371,7 @@ function setupCameraInteractions(scene: MapSceneRuntime): void {
     const zoom = scene.cameras.main.zoom || 1;
     scene.cameras.main.scrollX = scene.dragStart.scrollX - (pointerLike.x - scene.dragStart.pointerX) / zoom;
     scene.cameras.main.scrollY = scene.dragStart.scrollY - (pointerLike.y - scene.dragStart.pointerY) / zoom;
+    clampCameraScroll(scene);
   });
   scene.input?.on("pointerup", (pointer: unknown) => {
     const pointerLike = normalizePointer(pointer);
@@ -492,10 +537,12 @@ function zoomByDirection(scene: MapSceneRuntime, direction: 1 | -1, pointer?: Po
         camera.scrollX = anchor.worldX - anchor.pointerX / camera.zoom;
         camera.scrollY = anchor.worldY - anchor.pointerY / camera.zoom;
       }
+      clampCameraScroll(scene);
       updateLodVisibility(scene);
     },
     onComplete: () => {
       camera.zoom = ZOOM_LEVELS[nextIndex];
+      clampCameraScroll(scene);
       updateLodVisibility(scene);
       scene.isZooming = false;
     },
@@ -504,6 +551,10 @@ function zoomByDirection(scene: MapSceneRuntime, direction: 1 | -1, pointer?: Po
 
 function clampZoomLevelIndex(index: number): number {
   return Math.min(ZOOM_LEVELS.length - 1, Math.max(0, index));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function syncZoomBridge(scene: MapSceneRuntime): void {
@@ -546,6 +597,7 @@ function panCameraWithKeyboard(scene: MapSceneRuntime, delta: number): void {
   if (keys.DOWN?.isDown) {
     zoomByDirection(scene, -1);
   }
+  clampCameraScroll(scene);
 }
 
 function redrawTerrain(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
@@ -800,13 +852,44 @@ function writeCharacterTileBridge(tileId: string | null): void {
 
 function configureCamera(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
   const bounds = getWorldBounds(state.tileViews);
+  scene.worldBounds = bounds;
   const boundsKey = `${bounds.width}x${bounds.height}`;
   if (scene.cameraBoundsKey === boundsKey) {
+    clampCameraScroll(scene);
     return;
   }
   scene.cameraBoundsKey = boundsKey;
   scene.cameras.main.setBounds(0, 0, bounds.width, bounds.height);
   scene.cameras.main.centerOn(bounds.centerX, bounds.centerY);
+}
+
+function clampCameraScroll(scene: MapSceneRuntime): void {
+  const bounds = scene.worldBounds;
+  if (!bounds) {
+    return;
+  }
+
+  const camera = scene.cameras.main;
+  const zoom = camera.zoom || 1;
+  const viewWidth = typeof camera.width === "number" && camera.width > 0 ? camera.width / zoom : 0;
+  const viewHeight = typeof camera.height === "number" && camera.height > 0 ? camera.height / zoom : 0;
+  const xLimits = getScrollLimits(bounds.width, viewWidth);
+  const yLimits = getScrollLimits(bounds.height, viewHeight);
+  camera.scrollX = clamp(camera.scrollX, xLimits.min, xLimits.max);
+  camera.scrollY = clamp(camera.scrollY, yLimits.min, yLimits.max);
+}
+
+function getScrollLimits(worldSize: number, viewSize: number): { min: number; max: number } {
+  if (viewSize <= 0) {
+    return { min: 0, max: worldSize };
+  }
+
+  if (worldSize <= viewSize) {
+    const centered = (worldSize - viewSize) / 2;
+    return { min: centered, max: centered };
+  }
+
+  return { min: 0, max: worldSize - viewSize };
 }
 
 function getWorldBounds(tileViews: PhaserMapSceneState["tileViews"]): { width: number; height: number; centerX: number; centerY: number } {

@@ -1,8 +1,10 @@
 import { useEffect, useRef, type CSSProperties, type MutableRefObject } from "react";
-import { MapScene } from "./MapScene";
+import { createMapSceneClass } from "./MapScene";
 import { TILE_GAP, TILE_SIZE, type PhaserCrewMarkerView, type PhaserMapTileView } from "./mapView";
 
 export const MAP_SCENE_KEY = "MapScene";
+export const PHASER_MAP_VIEW_WIDTH = 980;
+export const PHASER_MAP_VIEW_HEIGHT = 620;
 
 export interface PhaserMapCanvasProps {
   columns: number;
@@ -39,12 +41,19 @@ interface MapSceneLike {
 
 interface PhaserModuleLike {
   AUTO: unknown;
+  Scene: new (config: { key: string }) => object;
+}
+
+interface MapViewportSize {
+  width: number;
+  height: number;
 }
 
 export function PhaserMapCanvas(props: PhaserMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<PhaserGameLike | null>(null);
+  const previousSizeRef = useRef<MapViewportSize | null>(null);
   const stateRef = useRef<PhaserMapSceneState>(createSceneState(props));
   stateRef.current = createSceneState(props);
 
@@ -90,8 +99,8 @@ export function PhaserMapCanvas(props: PhaserMapCanvasProps) {
   }, [props.columns, props.tileViews, props.crewMarkers, props.onSelectTile, props.setZoomLevelInReact]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || typeof ResizeObserver === "undefined") {
+    const stage = stageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") {
       return undefined;
     }
 
@@ -102,17 +111,19 @@ export function PhaserMapCanvas(props: PhaserMapCanvasProps) {
       }
       frameId = window.requestAnimationFrame(() => {
         frameId = null;
-        gameRef.current?.scale?.resize?.(width, height);
+        if (gameRef.current) {
+          resizePhaserGame(gameRef.current, { width, height }, previousSizeRef);
+        }
       });
     };
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      const width = entry?.contentRect.width ?? container.clientWidth;
-      const height = entry?.contentRect.height ?? container.clientHeight;
+      const width = entry?.contentRect.width ?? stage.clientWidth;
+      const height = entry?.contentRect.height ?? stage.clientHeight;
       resize(width, height);
     });
 
-    observer.observe(container);
+    observer.observe(stage);
 
     return () => {
       observer.disconnect();
@@ -162,12 +173,35 @@ export function createMapGameConfig(
 ): Record<string, unknown> {
   return {
     type: Phaser.AUTO,
+    width: PHASER_MAP_VIEW_WIDTH,
+    height: PHASER_MAP_VIEW_HEIGHT,
     antialias: false,
     pixelArt: true,
     backgroundColor: "#77736b",
     parent,
-    scene: [new MapScene(stateRef)],
+    scene: createMapSceneClass(Phaser, stateRef),
   };
+}
+
+export function resizePhaserGame(
+  game: PhaserGameLike,
+  nextSize: MapViewportSize,
+  previousSizeRef: MutableRefObject<MapViewportSize | null> | { current: MapViewportSize | null },
+): boolean {
+  const width = Math.round(nextSize.width);
+  const height = Math.round(nextSize.height);
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+
+  const previousSize = previousSizeRef.current;
+  if (previousSize?.width === width && previousSize.height === height) {
+    return false;
+  }
+
+  previousSizeRef.current = { width, height };
+  game.scale?.resize?.(width, height);
+  return true;
 }
 
 export function destroyPhaserGame(game: PhaserGameLike) {

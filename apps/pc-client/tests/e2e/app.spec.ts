@@ -243,6 +243,28 @@ test("shows only the crash site and frontier window on a new map", async ({ page
   await expect(semanticLayer.getByText("北部玄武高地")).toHaveCount(0);
 });
 
+test("renders the Phaser canvas inside a stable fixed map viewport", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /卫星雷达/ }).click();
+
+  const shell = page.locator(".phaser-map-canvas");
+  const stage = page.locator(".phaser-map-stage");
+  const canvas = stage.locator("canvas");
+  await expect(canvas).toHaveCount(1);
+  const initialBox = await shell.boundingBox();
+  const canvasBox = await canvas.boundingBox();
+  expect(initialBox?.height).toBeGreaterThan(0);
+  expect(initialBox?.height).toBeLessThanOrEqual(431);
+  expect(canvasBox?.width).toBeGreaterThan(0);
+  expect(canvasBox?.height).toBeGreaterThan(0);
+
+  await page.clock.runFor(1_000);
+
+  const laterBox = await shell.boundingBox();
+  expect(laterBox?.height).toBeCloseTo(initialBox?.height ?? 0, 0);
+});
+
 test("shows crew-returned coarse info on an occupied frontier tile without revealing objects", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,

@@ -1,9 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSceneState, type PhaserMapCanvasProps, type PhaserMapSceneState } from "./PhaserMapCanvas";
-import { INITIAL_ZOOM_LEVEL_INDEX, MapScene, ZOOM_LEVELS } from "./MapScene";
+import { INITIAL_ZOOM_LEVEL_INDEX, MapScene, ZOOM_LEVELS, createMapSceneClass } from "./MapScene";
 import { TILE_GAP, TILE_SIZE } from "./mapView";
 
 describe("MapScene", () => {
+  it("creates a Phaser-compatible Scene subclass that can receive state through init", () => {
+    const state = sceneState([tileView("0-0")]);
+    class FakeScene {
+      constructor(readonly config: { key: string }) {}
+    }
+    const SceneClass = createMapSceneClass({ Scene: FakeScene }, { current: state });
+    const scene = attachSceneDoubles(new SceneClass() as unknown as MapScene);
+
+    scene.init({ stateRef: { current: state } });
+
+    expect(scene).toBeInstanceOf(FakeScene);
+    expect((scene as unknown as FakeScene).config).toEqual({ key: "MapScene" });
+    expect(scene.getState()).toBe(state);
+  });
+
   it("is configured as the Phaser MapScene and keeps the state ref current", () => {
     const state = sceneState([tileView("0-0")]);
     const scene = attachSceneDoubles(new MapScene({ current: state }));
@@ -45,7 +60,7 @@ describe("MapScene", () => {
 
   it("keeps a dragged camera position across same-size state refreshes", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
-    const tiles = [tileView("0-0"), tileView("0-1", { col: 1 })];
+    const tiles = [tileView("0-0"), tileView("5-5", { row: 5, col: 5 })];
 
     scene.updateState(sceneState(tiles));
     scene.cameras.main.scrollX = 42;
@@ -94,14 +109,14 @@ describe("MapScene", () => {
 
   it("right-button drag pans the camera without selecting a tile", () => {
     const onSelectTile = vi.fn();
-    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")], { onSelectTile }) }));
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("5-5", { row: 5, col: 5 })], { onSelectTile }) }));
 
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.pointerdown({ button: 2, x: 100, y: 100 });
-    scene.inputHandlers.pointermove({ x: 130, y: 80 });
+    scene.inputHandlers.pointermove({ x: 70, y: 80 });
     scene.inputHandlers.pointerup({ button: 2 });
 
-    expect(scene.cameras.main.scrollX).toBe(-30 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX]);
+    expect(scene.cameras.main.scrollX).toBe(30 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX]);
     expect(scene.cameras.main.scrollY).toBe(20 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX]);
     expect(onSelectTile).not.toHaveBeenCalled();
   });
@@ -190,13 +205,30 @@ describe("MapScene", () => {
 
   it("pans with WASD using screen-stable speed adjusted by zoom", () => {
     const keys = { D: { isDown: true }, S: { isDown: true } };
-    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")]) }), { keys });
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("5-5", { row: 5, col: 5 })]) }), { keys });
 
     (scene.create as unknown as () => void).call(scene);
     (scene.update as unknown as (time: number, delta: number) => void).call(scene, 0, 1000);
 
     expect(scene.cameras.main.scrollX).toBe(400 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX]);
     expect(scene.cameras.main.scrollY).toBe(400 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX]);
+  });
+
+  it("clamps keyboard pan to the current world bounds", () => {
+    const keys = { D: { isDown: true }, S: { isDown: true } };
+    const tiles = [tileView("0-0"), tileView("5-5", { row: 5, col: 5 })];
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState(tiles) }), { keys });
+    const worldSize = 6 * (TILE_SIZE + TILE_GAP);
+    const viewportSize = 100 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX];
+    const maxScroll = worldSize - viewportSize;
+
+    (scene.create as unknown as () => void).call(scene);
+    scene.cameras.main.scrollX = maxScroll - 5;
+    scene.cameras.main.scrollY = maxScroll - 5;
+    (scene.update as unknown as (time: number, delta: number) => void).call(scene, 0, 1000);
+
+    expect(scene.cameras.main.scrollX).toBe(maxScroll);
+    expect(scene.cameras.main.scrollY).toBe(maxScroll);
   });
 
   it("toggles LOD layer visibility across zoom thresholds during zoom updates", () => {
@@ -243,7 +275,7 @@ describe("MapScene", () => {
   });
 
   it("keeps the pointer world coordinate stable while wheel zooming", () => {
-    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")]) }));
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("5-5", { row: 5, col: 5 })]) }));
 
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.wheel({ x: 70, y: 35 }, {}, 0, -1, 0);
@@ -432,7 +464,8 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       graphics: ReturnType<typeof vi.fn>;
       container: ReturnType<typeof vi.fn>;
     };
-    cameras: { main: { setBounds: ReturnType<typeof vi.fn>; centerOn: ReturnType<typeof vi.fn>; setZoom: ReturnType<typeof vi.fn>; zoom: number; scrollX: number; scrollY: number } };
+    init: (data: { stateRef: { current: PhaserMapSceneState } }) => void;
+    cameras: { main: { setBounds: ReturnType<typeof vi.fn>; centerOn: ReturnType<typeof vi.fn>; setZoom: ReturnType<typeof vi.fn>; zoom: number; scrollX: number; scrollY: number; width: number; height: number } };
     input: { on: ReturnType<typeof vi.fn>; mouse: { disableContextMenu: ReturnType<typeof vi.fn> }; keyboard: { addKeys: ReturnType<typeof vi.fn> } };
     tweens: { add: ReturnType<typeof vi.fn>; killTweensOf: ReturnType<typeof vi.fn> };
     time: { delayedCall: ReturnType<typeof vi.fn> };
@@ -507,6 +540,8 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       zoom: ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX],
       scrollX: 0,
       scrollY: 0,
+      width: 100,
+      height: 100,
     },
   };
   sceneWithDoubles.input = {
