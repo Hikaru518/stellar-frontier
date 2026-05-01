@@ -45,6 +45,61 @@ describe("MapScene", () => {
     expect(scene.createdRectangles.every((rectangle) => rectangle.setDepth.mock.calls[0]?.[0] === 1)).toBe(true);
   });
 
+  it("preloads registry tilesets as packed spritesheets from public paths", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+
+    (scene.preload as unknown as () => void).call(scene);
+
+    expect(scene.load.spritesheet).toHaveBeenCalledWith("kenney-tiny-battle", "/maps/tilesets/kenney-tiny-battle/tilemap_packed.png", {
+      frameWidth: 16,
+      frameHeight: 16,
+      spacing: 0,
+      margin: 0,
+    });
+  });
+
+  it("draws discovered tile visual sprites above terrain fallback", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+
+    scene.updateState(
+      sceneState([
+        tileView("0-0", {
+          visualLayers: [{ layerId: "base", layerName: "Base", order: 0, opacity: 1, tilesetId: "kenney-tiny-battle", tileIndex: 4 }],
+        }),
+      ]),
+    );
+
+    expect(scene.add.rectangle).toHaveBeenCalledWith(0, 0, TILE_SIZE, TILE_SIZE, 0x2f8f46);
+    expect(scene.add.sprite).toHaveBeenCalledWith(0, 0, "kenney-tiny-battle", 4);
+    expect(scene.createdRectangles[0]?.setDepth).toHaveBeenCalledWith(1);
+    expect(scene.createdSprites[0]?.setOrigin).toHaveBeenCalledWith(0, 0);
+    expect(scene.createdSprites[0]?.setDisplaySize).toHaveBeenCalledWith(TILE_SIZE, TILE_SIZE);
+    expect(scene.createdSprites[0]?.setAlpha).toHaveBeenCalledWith(1);
+    expect(scene.createdSprites[0]?.setDepth).toHaveBeenCalledWith(2);
+  });
+
+  it("draws multiple visual sprite layers by order and opacity", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+
+    scene.updateState(
+      sceneState([
+        tileView("1-2", {
+          row: 1,
+          col: 2,
+          visualLayers: [
+            { layerId: "detail", layerName: "Detail", order: 2, opacity: 0.6, tilesetId: "kenney-tiny-battle", tileIndex: 8 },
+            { layerId: "base", layerName: "Base", order: 0, opacity: 1, tilesetId: "kenney-tiny-battle", tileIndex: 4 },
+          ],
+        }),
+      ]),
+    );
+
+    expect(scene.add.sprite).toHaveBeenNthCalledWith(1, 2 * (TILE_SIZE + TILE_GAP), TILE_SIZE + TILE_GAP, "kenney-tiny-battle", 4);
+    expect(scene.add.sprite).toHaveBeenNthCalledWith(2, 2 * (TILE_SIZE + TILE_GAP), TILE_SIZE + TILE_GAP, "kenney-tiny-battle", 8);
+    expect(scene.createdSprites.map((sprite) => sprite.setAlpha.mock.calls[0]?.[0])).toEqual([1, 0.6]);
+    expect(scene.createdSprites.map((sprite) => sprite.setDepth.mock.calls[0]?.[0])).toEqual([2, 2.002]);
+  });
+
   it("clears previous terrain objects and recenters camera when state changes", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
 
@@ -414,6 +469,17 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
     setStrokeStyle: ReturnType<typeof vi.fn>;
     destroy: ReturnType<typeof vi.fn>;
   }> = [];
+  const createdSprites: Array<{
+    x: number;
+    y: number;
+    texture: string;
+    frame: number;
+    setOrigin: ReturnType<typeof vi.fn>;
+    setDepth: ReturnType<typeof vi.fn>;
+    setAlpha: ReturnType<typeof vi.fn>;
+    setDisplaySize: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+  }> = [];
   const createdTexts: Array<{
     x: number;
     y: number;
@@ -459,11 +525,13 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
   const sceneWithDoubles = scene as MapScene & {
     add: {
       rectangle: ReturnType<typeof vi.fn<(x: number, y: number, width: number, height: number, fillColor: number) => { setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; setAlpha: ReturnType<typeof vi.fn>; setStrokeStyle: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
+      sprite: ReturnType<typeof vi.fn>;
       text: ReturnType<typeof vi.fn<(x: number, y: number, content: string, style?: Record<string, unknown>) => { x: number; y: number; setOrigin: ReturnType<typeof vi.fn>; setDepth: ReturnType<typeof vi.fn>; setVisible: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>>;
       circle: ReturnType<typeof vi.fn>;
       graphics: ReturnType<typeof vi.fn>;
       container: ReturnType<typeof vi.fn>;
     };
+    load: { image: ReturnType<typeof vi.fn>; spritesheet: ReturnType<typeof vi.fn> };
     init: (data: { stateRef: { current: PhaserMapSceneState } }) => void;
     cameras: { main: { setBounds: ReturnType<typeof vi.fn>; centerOn: ReturnType<typeof vi.fn>; setZoom: ReturnType<typeof vi.fn>; zoom: number; scrollX: number; scrollY: number; width: number; height: number } };
     input: { on: ReturnType<typeof vi.fn>; mouse: { disableContextMenu: ReturnType<typeof vi.fn> }; keyboard: { addKeys: ReturnType<typeof vi.fn> } };
@@ -471,6 +539,7 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
     time: { delayedCall: ReturnType<typeof vi.fn> };
     inputHandlers: typeof inputHandlers;
     createdRectangles: typeof createdRectangles;
+    createdSprites: typeof createdSprites;
     createdTexts: typeof createdTexts;
     createdCircles: typeof createdCircles;
     createdContainers: typeof createdContainers;
@@ -484,6 +553,11 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       const rectangle = { fillColor, setOrigin: vi.fn(), setDepth: vi.fn(), setAlpha: vi.fn(), setStrokeStyle: vi.fn(), destroy: vi.fn() };
       createdRectangles.push(rectangle);
       return rectangle;
+    }),
+    sprite: vi.fn((x: number, y: number, texture: string, frame: number) => {
+      const sprite = { x, y, texture, frame, setOrigin: vi.fn(), setDepth: vi.fn(), setAlpha: vi.fn(), setDisplaySize: vi.fn(), destroy: vi.fn() };
+      createdSprites.push(sprite);
+      return sprite;
     }),
     text: vi.fn((x: number, y: number, content: string) => {
       const text = { x, y, content, setOrigin: vi.fn(), setDepth: vi.fn(), setVisible: vi.fn(), destroy: vi.fn() };
@@ -528,6 +602,10 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
       createdLayers.push(container);
       return container;
     }),
+  };
+  sceneWithDoubles.load = {
+    image: vi.fn(),
+    spritesheet: vi.fn(),
   };
   sceneWithDoubles.cameras = {
     main: {
@@ -579,6 +657,7 @@ function attachSceneDoubles(scene: MapScene, options: { holdTweens?: boolean; ke
   };
   sceneWithDoubles.inputHandlers = inputHandlers;
   sceneWithDoubles.createdRectangles = createdRectangles;
+  sceneWithDoubles.createdSprites = createdSprites;
   sceneWithDoubles.createdTexts = createdTexts;
   sceneWithDoubles.createdCircles = createdCircles;
   sceneWithDoubles.createdContainers = createdContainers;

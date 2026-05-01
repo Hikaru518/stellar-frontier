@@ -42,7 +42,7 @@ source:
 | 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | completed | 1 |
 | 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | completed | 1 |
 | 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | completed | 1 |
-| 11 | TASK-011 | 在 PC Phaser MapScene 渲染 authored visual layers | pending | 0 |
+| 11 | TASK-011 | 在 PC Phaser MapScene 渲染 authored visual layers | completed | 1 |
 | 12 | TASK-012 | 收尾验证地图编辑器端到端闭环 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -137,3 +137,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。PC `MapConfigDefinition` 增加可选 `visual.layers`；`buildPhaserTileViews` 从 `context.visual` 派生 discovered tile 的 `visualLayers`，过滤 hidden layer，frontier/unknown 不暴露 visual sprites，无 visual cell 保留 terrain `fillColor` fallback。子 agent 验证 pc-client test 通过（29 files / 247 tests），pc-client lint 通过。
 - Main verification: 复核 `contentData` 类型和 `mapView` 派生逻辑，确认 visual layer 顺序沿用 JSON order，visible=false 过滤，undiscovered/frontier/unknown 输出空 visual layers；`git diff --check` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 247 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过。
+
+### TASK-011: 在 PC Phaser MapScene 渲染 authored visual layers
+- 状态: completed
+- 开始时间: 2026-05-02 01:34
+- 完成时间: 2026-05-02 01:41
+- 尝试次数: 1
+- Monkey summary: 成功。`MapScene.preload` 从 tileset registry 加载 public spritesheet；runtime 将 discovered tile 的 authored visual layers 按 order 渲染为 Phaser sprites，设置 frame、opacity、display size 和 depth；无 visual layer 或无 sprite API 时保留 terrain fallback。子 agent 验证 pc-client test 通过（29 files / 250 tests），pc-client lint 通过。
+- Main verification: 复核并修正渲染语义，确保 visual sprites 叠在 terrain fallback 上方而不是替代 fallback，避免透明 tile 丢失底色；`git diff --check` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 250 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过。
