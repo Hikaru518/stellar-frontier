@@ -1,0 +1,244 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "frame",
+      "id": "ME001",
+      "x": 0,
+      "y": 0,
+      "name": "Map Editor Shell / Open Existing Map",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME001T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 520, "height": 38, "content": "Map Editor", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME001S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 860, "height": 24, "content": "Authoring workbench / open content/maps/*.json / helper status visible", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME001TOP", "x": 910, "y": 22, "name": "top actions", "width": 328, "height": 48, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#A8ADB0" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME001TOPTXT", "x": 16, "y": 14, "name": "top action text", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 292, "height": 20, "content": "New Map    Validate    Save", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "700" }
+        ] },
+        { "type": "frame", "id": "ME001LEFT", "x": 28, "y": 108, "name": "map library panel", "width": 250, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME001L1", "x": 18, "y": 18, "name": "library heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 190, "height": 24, "content": "Map files", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "frame", "id": "ME001FILE1", "x": 16, "y": 58, "name": "selected map", "width": 218, "height": 68, "fill": "#DDE4E1", "stroke": { "thickness": 2, "fill": "#61706C" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME001FILE1T", "x": 12, "y": 10, "name": "file selected text", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 190, "height": 42, "content": "default-map.json\n8 x 8 / dirty: no", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "700" }
+          ] },
+          { "type": "text", "id": "ME001FILES", "x": 18, "y": 146, "name": "file list", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 210, "height": 150, "content": "mine-outpost.json\ncrater-demo.json\n\nHelper: connected\nSchema: loaded\nTilesets: 1", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "text", "id": "ME001LAYERS", "x": 18, "y": 340, "name": "layer summary", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 210, "height": 170, "content": "Layers\n> Terrain base\n  Roads\n  Objects\n  Shadow overlay\n\nPreview: Final Art", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME001CANVAS", "x": 300, "y": 108, "name": "map canvas", "width": 650, "height": 520, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#7D8388" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME001CANVAST", "x": 18, "y": 14, "name": "canvas heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 440, "height": 24, "content": "default-map / 8 x 8 / zoom 100%", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" },
+          { "type": "frame", "id": "ME001GRID", "x": 36, "y": 62, "name": "visual grid preview", "width": 560, "height": 360, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME001GRIDTXT", "x": 24, "y": 22, "name": "grid cells text", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 510, "height": 300, "content": "A1 grass   A2 grass   A3 road    A4 water\nB1 grass   B2 road    B3 road    B4 water\nC1 hill    C2 grass   C3 depot   C4 water\nD1 fog     D2 grass   D3 object  D4 origin\n\nselected tile: D4 / terrain=plain / initialDiscovered", "fontFamily": "Inter", "fontSize": 20, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME001CANVASB", "x": 36, "y": 448, "name": "canvas footer", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 560, "height": 36, "content": "Open existing map keeps gameplay data; visual layers are edited in draft state.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME001RIGHT", "x": 972, "y": 108, "name": "right panel", "width": 266, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME001R1", "x": 18, "y": 18, "name": "details heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 220, "height": 24, "content": "Selection", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME001R2", "x": 18, "y": 60, "name": "details", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 220, "height": 190, "content": "Tile: 4-4\nArea: 区域 4-4\nTerrain: 平原\nWeather: 晴朗\nObjects: none\nSpecial: origin", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "text", "id": "ME001R3", "x": 18, "y": 292, "name": "save state", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 220, "height": 120, "content": "Validation\n0 errors\n2 warnings\n\nSave target\ncontent/maps/default-map.json", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME001BOTTOM", "x": 300, "y": 652, "name": "status strip", "width": 650, "height": 86, "fill": "#ECEDEA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME001B1", "x": 18, "y": 18, "name": "status text", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 600, "height": 44, "content": "Library loaded from helper. Dirty state and validation stay visible while authoring.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ME002",
+      "x": 1320,
+      "y": 0,
+      "name": "New Map Dialog",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME002T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 520, "height": 38, "content": "New Map Dialog", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME002S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 860, "height": 24, "content": "Create full gameplay tiles first; visual layers start empty.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME002DIM", "x": 0, "y": 0, "name": "dimmed workbench", "width": 1280, "height": 820, "fill": "#D4D7D4", "stroke": { "thickness": 0, "fill": "#D4D7D4" }, "layout": "none", "children": [] },
+        { "type": "frame", "id": "ME002DIALOG", "x": 360, "y": 132, "name": "new map modal", "width": 560, "height": 520, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#5F666A" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME002D1", "x": 28, "y": 24, "name": "dialog title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 480, "height": 32, "content": "Create map draft", "fontFamily": "Inter", "fontSize": 24, "fontWeight": "700" },
+          { "type": "text", "id": "ME002D2", "x": 28, "y": 72, "name": "form labels", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 220, "height": 230, "content": "Map id\ncrater-outpost\n\nDisplay name\nCrater Outpost\n\nRows\n16\n\nColumns\n12", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+          { "type": "frame", "id": "ME002PRE", "x": 278, "y": 86, "name": "generated preview", "width": 232, "height": 208, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME002PRET", "x": 16, "y": 14, "name": "preview text", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 196, "height": 160, "content": "Generated\n192 gameplay tiles\norigin: 8-6\ninitial discovered: 8-6\nvisual layers: none", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME002ERR", "x": 28, "y": 326, "name": "inline validation", "fill": "#8A4A3B", "textGrowth": "fixed-width-height", "width": 480, "height": 52, "content": "Inline validation: id must be file-safe; rows and cols must be positive.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "700" },
+          { "type": "frame", "id": "ME002ACTIONS", "x": 28, "y": 414, "name": "dialog actions", "width": 482, "height": 58, "fill": "#ECEDEA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME002ACTTXT", "x": 18, "y": 18, "name": "actions text", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 430, "height": 22, "content": "Cancel                         Create draft", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" }
+          ] }
+        ] }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ME003",
+      "x": 2640,
+      "y": 0,
+      "name": "Visual Painting / Brush + Palette",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME003T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 620, "height": 38, "content": "Visual Painting / Brush + Palette", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME003S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 860, "height": 24, "content": "Palette selection switches to Brush; painting writes only the active visual layer.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME003TOOLS", "x": 28, "y": 108, "name": "tool rail", "width": 128, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME003TOOLTXT", "x": 14, "y": 18, "name": "tool text", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 98, "height": 360, "content": "Tools\n\nSelect\n> Brush\nEraser\nBucket\nRect\nDropper\n\nUndo\nRedo", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME003CANVAS", "x": 178, "y": 108, "name": "painting canvas", "width": 706, "height": 630, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#7D8388" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME003C1", "x": 20, "y": 16, "name": "canvas meta", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 650, "height": 26, "content": "Active layer: Terrain base / tile index 37 / drag painting preview", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" },
+          { "type": "frame", "id": "ME003GRID", "x": 42, "y": 68, "name": "painted grid", "width": 620, "height": 420, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME003GRIDTXT", "x": 22, "y": 20, "name": "painted cells", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 560, "height": 342, "content": "grass  grass  grass  road   road   water\ngrass  grass  [37]   [37]   road   water\nhill   [37]   [37]   depot  road   water\nhill   grass  grass  depot  road   water\nfog    fog    grass  grass  origin water\n\nBrush ghost shows where pointer will write next.", "fontFamily": "Inter", "fontSize": 19, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME003NOTE", "x": 42, "y": 516, "name": "interaction note", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 620, "height": 60, "content": "Visual brush does not change terrain/weather/objectIds/specialStates. Dirty state increments once per drag stroke.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME003PALETTE", "x": 906, "y": 108, "name": "tileset palette", "width": 332, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME003P1", "x": 18, "y": 18, "name": "palette heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 280, "height": 24, "content": "Kenney Tiny Battle", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME003P2", "x": 18, "y": 58, "name": "filters", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 284, "height": 70, "content": "Search index: 37\nCategory: terrain / roads / water / objects\nRecent: 37, 42, 111", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "frame", "id": "ME003SHEET", "x": 18, "y": 144, "name": "tile sheet grid", "width": 292, "height": 244, "fill": "#ECEDEA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME003SHEETTXT", "x": 16, "y": 16, "name": "sheet indexes", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 250, "height": 190, "content": "31 32 33 34 35 36\n37 38 39 40 41 42\n43 44 45 46 47 48\n\n37 selected", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME003P3", "x": 18, "y": 420, "name": "preview tile", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 284, "height": 124, "content": "Preview\nTile index 37\nSource: packed.png\nWrites: { tilesetId, tileIndex }", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ME004",
+      "x": 3960,
+      "y": 0,
+      "name": "Layer Management / Solo + Locked",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME004T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 620, "height": 38, "content": "Layer Management / Solo + Locked", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME004S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 900, "height": 24, "content": "Visible/locked/opacity persist; solo is temporary editor preview state.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME004LEFT", "x": 28, "y": 108, "name": "layer panel", "width": 322, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME004L1", "x": 18, "y": 18, "name": "layers heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 270, "height": 26, "content": "Visual layers", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME004L2", "x": 18, "y": 64, "name": "layer rows", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 280, "height": 300, "content": "S  eye lock opacity\n\n   on  lock 100%  Terrain base\n>  on        90%   Roads\n   off       100%  Objects\n   on        45%   Shadow overlay\n\nMove up / down\nRename\nDelete", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+          { "type": "frame", "id": "ME004WARN", "x": 18, "y": 404, "name": "locked layer warning", "width": 286, "height": 96, "fill": "#EFE7E2", "stroke": { "thickness": 1, "fill": "#9A7567" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME004WARNT", "x": 12, "y": 12, "name": "warning text", "fill": "#6B4033", "textGrowth": "fixed-width-height", "width": 250, "height": 62, "content": "Attempted paint on locked layer is ignored and produces this lightweight notice.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "700" }
+          ] }
+        ] },
+        { "type": "frame", "id": "ME004CANVAS", "x": 376, "y": 108, "name": "solo preview canvas", "width": 556, "height": 630, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#7D8388" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME004C1", "x": 20, "y": 16, "name": "preview heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 500, "height": 26, "content": "Layer Solo preview: Roads only", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" },
+          { "type": "frame", "id": "ME004GRID", "x": 42, "y": 70, "name": "solo grid", "width": 472, "height": 366, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME004GRIDTXT", "x": 22, "y": 20, "name": "solo cells", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 420, "height": 300, "content": ". . road road . .\n. . road . . .\n. . road road road .\n. . . . road .\n\nOther visible layers are hidden only in preview.", "fontFamily": "Inter", "fontSize": 20, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME004C2", "x": 42, "y": 470, "name": "solo note", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 472, "height": 90, "content": "Solo flag is not saved into map JSON. Locked and opacity are authoring/runtime content state.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME004RIGHT", "x": 958, "y": 108, "name": "layer details", "width": 280, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME004R1", "x": 18, "y": 18, "name": "details heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 230, "height": 26, "content": "Active layer details", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME004R2", "x": 18, "y": 62, "name": "details text", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 230, "height": 260, "content": "id: roads\nname: Roads\nvisible: true\nlocked: false\nopacity: 0.9\ncells: 38\n\nBrush target: roads\nBucket target: roads", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "text", "id": "ME004R3", "x": 18, "y": 360, "name": "acceptance", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 230, "height": 140, "content": "Acceptance focus\n- active only\n- locked ignored\n- hidden excluded\n- opacity applied\n- solo temporary", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ME005",
+      "x": 0,
+      "y": 900,
+      "name": "Gameplay Overlay / Inspector + Semantic Brush",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME005T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 760, "height": 38, "content": "Gameplay Overlay / Inspector + Semantic Brush", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME005S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 920, "height": 24, "content": "Semantic editing is explicit; visual paint never infers gameplay data.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME005LEFT", "x": 28, "y": 108, "name": "overlay controls", "width": 250, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME005L1", "x": 18, "y": 18, "name": "preview tabs", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 210, "height": 210, "content": "Preview\nFinal Art\n> Gameplay Overlay\nLayer Solo\n\nOverlay channels\nterrain / weather\nobjects / special\norigin / discovered", "fontFamily": "Inter", "fontSize": 13, "fontWeight": "normal" },
+          { "type": "text", "id": "ME005L2", "x": 18, "y": 282, "name": "semantic brush", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 210, "height": 210, "content": "Semantic brush\nField: terrain\nValue: 水域\nMode: replace\n\nPaint target\nselected tiles\nrectangle\nbucket area", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME005CANVAS", "x": 300, "y": 108, "name": "overlay map", "width": 650, "height": 630, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#7D8388" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME005C1", "x": 20, "y": 16, "name": "overlay heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 580, "height": 26, "content": "Gameplay Overlay / terrain labels over visual map", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" },
+          { "type": "frame", "id": "ME005GRID", "x": 42, "y": 70, "name": "semantic grid", "width": 560, "height": 406, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME005GRIDTXT", "x": 22, "y": 18, "name": "overlay cells", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 510, "height": 336, "content": "PLAIN  PLAIN  ROAD   WATER\nPLAIN  ROAD   ROAD   WATER\nHILL   PLAIN  OBJECT WATER\nFOG    PLAIN  ORIGIN WATER\n\nMismatch marker: visual water tile but terrain=plain\nClick issue or cell opens inspector.", "fontFamily": "Inter", "fontSize": 19, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME005C2", "x": 42, "y": 508, "name": "overlay note", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 560, "height": 62, "content": "Overlay is for checking consistency, not for auto-changing fields. Semantic brush writes gameplay tiles only.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME005RIGHT", "x": 972, "y": 108, "name": "inspector", "width": 266, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME005R1", "x": 18, "y": 18, "name": "inspector heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 220, "height": 26, "content": "Tile inspector", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME005R2", "x": 18, "y": 62, "name": "inspector fields", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 220, "height": 360, "content": "Tile id: 4-4\nArea name: 区域 4-4\nTerrain: 平原\nWeather: 晴朗\nObjects: depot-01\nSpecial states: radiation\nOrigin: yes\nInitial discovered: yes\n\nEnvironment\n20 C / 40% humidity\nradiation: low", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "frame", "id": "ME005SAVE", "x": 18, "y": 462, "name": "apply semantic", "width": 230, "height": 66, "fill": "#DDE4E1", "stroke": { "thickness": 1, "fill": "#61706C" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME005SAVET", "x": 14, "y": 20, "name": "apply text", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 190, "height": 22, "content": "Apply semantic edit", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "700" }
+          ] }
+        ] }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ME006",
+      "x": 1320,
+      "y": 900,
+      "name": "Validation / Save Errors",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME006T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 620, "height": 38, "content": "Validation / Save Errors", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME006S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 920, "height": 24, "content": "Save is blocked by authoritative helper validation; each issue can locate tile or layer.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME006CANVAS", "x": 28, "y": 108, "name": "map with error focus", "width": 720, "height": 520, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#7D8388" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME006C1", "x": 20, "y": 16, "name": "canvas heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 660, "height": 26, "content": "Jumped to issue: visual.layers[2].cells['9-9']", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" },
+          { "type": "frame", "id": "ME006GRID", "x": 52, "y": 70, "name": "error grid", "width": 612, "height": 352, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME006GRIDTXT", "x": 22, "y": 18, "name": "error cells", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 560, "height": 284, "content": "valid valid valid valid\nvalid valid valid valid\nvalid valid ORIGIN valid\nvalid valid valid ERROR\n\nMap scrolls and selects the referenced tile/layer where possible.", "fontFamily": "Inter", "fontSize": 20, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME006C2", "x": 52, "y": 450, "name": "save blocked", "fill": "#8A4A3B", "textGrowth": "fixed-width-height", "width": 612, "height": 42, "content": "Save failed. File was not written; draft remains editable.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "700" }
+        ] },
+        { "type": "frame", "id": "ME006PANEL", "x": 778, "y": 108, "name": "validation panel", "width": 460, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME006P1", "x": 18, "y": 18, "name": "panel heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 400, "height": 26, "content": "Validation results", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "frame", "id": "ME006ERR1", "x": 18, "y": 62, "name": "error item selected", "width": 424, "height": 96, "fill": "#EFE7E2", "stroke": { "thickness": 2, "fill": "#9A7567" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME006ERR1T", "x": 14, "y": 10, "name": "error text", "fill": "#6B4033", "textGrowth": "fixed-width-height", "width": 390, "height": 70, "content": "ERROR / visual_cell_tile_missing\nLayer Objects references tileId 9-9 outside map bounds.\nAction: Jump to layer", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "700" }
+          ] },
+          { "type": "text", "id": "ME006LIST", "x": 18, "y": 184, "name": "issue list", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 420, "height": 300, "content": "ERROR / tileset_id_unknown\ncells['4-4'] uses missing tileset old-pack\n\nERROR / object_id_unknown\ntile 3-2 objectIds includes depot-x\n\nWARN / visual_semantic_mismatch\nwater-looking tile on terrain=plain\n\nWARN / hidden_layer_has_cells\nObjects layer hidden but contains 14 cells", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "frame", "id": "ME006ACT", "x": 18, "y": 524, "name": "save actions", "width": 424, "height": 70, "fill": "#ECEDEA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME006ACTT", "x": 14, "y": 22, "name": "actions text", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 390, "height": 24, "content": "Revalidate                         Save disabled", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "700" }
+          ] }
+        ] }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ME007",
+      "x": 2640,
+      "y": 900,
+      "name": "PC Runtime Preview / Discovered Visual Layers",
+      "width": 1280,
+      "height": 820,
+      "fill": "#E9E9E6",
+      "stroke": { "thickness": 2, "fill": "#6F7478" },
+      "layout": "none",
+      "children": [
+        { "type": "text", "id": "ME007T", "x": 28, "y": 20, "name": "title", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 760, "height": 38, "content": "PC Runtime Preview / Discovered Visual Layers", "fontFamily": "Inter", "fontSize": 30, "fontWeight": "700" },
+        { "type": "text", "id": "ME007S", "x": 28, "y": 62, "name": "subtitle", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 980, "height": 24, "content": "Runtime consumes saved visual layers but only renders sprites for discovered tiles.", "fontFamily": "Inter", "fontSize": 15, "fontWeight": "normal" },
+        { "type": "frame", "id": "ME007LEFT", "x": 28, "y": 108, "name": "editor saved summary", "width": 320, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME007L1", "x": 18, "y": 18, "name": "summary heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 270, "height": 26, "content": "Saved map JSON", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME007L2", "x": 18, "y": 64, "name": "json summary", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 270, "height": 340, "content": "visual.layers[]\n1 Terrain base\n  visible true / opacity 1\n2 Roads\n  visible true / opacity .9\n3 Objects\n  visible true / opacity 1\n4 Shadow\n  visible true / opacity .45\n\nlocked ignored by runtime\nsolo absent from JSON", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "text", "id": "ME007L3", "x": 18, "y": 448, "name": "fallback note", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 270, "height": 98, "content": "Fallback rule\nNo sprite on a discovered tile -> use existing terrain color block.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "700" }
+        ] },
+        { "type": "frame", "id": "ME007CANVAS", "x": 376, "y": 108, "name": "runtime map preview", "width": 556, "height": 630, "fill": "#F7F7F4", "stroke": { "thickness": 2, "fill": "#7D8388" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME007C1", "x": 20, "y": 16, "name": "runtime heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 500, "height": 26, "content": "PC MapPage / Phaser render contract", "fontFamily": "Inter", "fontSize": 16, "fontWeight": "700" },
+          { "type": "frame", "id": "ME007GRID", "x": 42, "y": 70, "name": "runtime discovered grid", "width": 472, "height": 366, "fill": "#EEF0EA", "stroke": { "thickness": 1, "fill": "#B0B5B8" }, "layout": "none", "children": [
+            { "type": "text", "id": "ME007GRIDTXT", "x": 22, "y": 18, "name": "runtime cells", "fill": "#30363A", "textGrowth": "fixed-width-height", "width": 420, "height": 300, "content": "unknown unknown unknown unknown\nunknown grass  road   unknown\nunknown grass  crew   frontier\nunknown water  object unknown\n\nDiscovered cells show sprites; unknown/frontier do not leak visuals.", "fontFamily": "Inter", "fontSize": 19, "fontWeight": "normal" }
+          ] },
+          { "type": "text", "id": "ME007C2", "x": 42, "y": 470, "name": "runtime note", "fill": "#46505A", "textGrowth": "fixed-width-height", "width": 472, "height": 80, "content": "Crew marker, route preview, selection and area labels remain above visual layers.", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] },
+        { "type": "frame", "id": "ME007RIGHT", "x": 958, "y": 108, "name": "runtime checks", "width": 280, "height": 630, "fill": "#F4F4F1", "stroke": { "thickness": 1, "fill": "#8D9498" }, "layout": "none", "children": [
+          { "type": "text", "id": "ME007R1", "x": 18, "y": 18, "name": "checks heading", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 230, "height": 26, "content": "Acceptance checks", "fontFamily": "Inter", "fontSize": 18, "fontWeight": "700" },
+          { "type": "text", "id": "ME007R2", "x": 18, "y": 62, "name": "checks list", "fill": "#394147", "textGrowth": "fixed-width-height", "width": 230, "height": 320, "content": "visual layers render by order\nopacity applies in runtime\nmissing cells fallback to terrain\nundiscovered tiles hidden\ncrew marker still visible\nroute preview still visible\nselection outline still visible\narea label still legible", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" },
+          { "type": "text", "id": "ME007R3", "x": 18, "y": 430, "name": "out of scope", "fill": "#171A1C", "textGrowth": "fixed-width-height", "width": 230, "height": 100, "content": "Not in this frame\nRuntime map switching\nEditor Phaser preview\nHidden map reveal tools", "fontFamily": "Inter", "fontSize": 14, "fontWeight": "normal" }
+        ] }
+      ]
+    }
+  ]
+}
