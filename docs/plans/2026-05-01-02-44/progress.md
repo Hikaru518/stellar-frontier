@@ -38,7 +38,7 @@ source:
 | 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | completed | 1       |
 | 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | completed | 1       |
 | 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | completed | 1       |
-| 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | pending   | 0       |
+| 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | completed | 1       |
 | 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | pending   | 0       |
 | 17 | TASK-017 | App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete   | pending   | 0       |
 | 18 | TASK-018 | LogPanel 历史 run 列表（查看 / 导出 / 删除）                      | pending   | 0       |
@@ -220,3 +220,16 @@ source:
   - 验证：5 次定向 mutation testing 确认每条 AC 都真测对应行为
   - 不做 BroadcastChannel fallback（留 TASK-015 处理）
 - 质量检查: lint PASS；test PASS（39 files / 326 tests，新增 1 文件 7 用例）
+
+### TASK-015: logger facade 集成多 tab 写入选举
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:40
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 `apps/pc-client/src/logger/index.ts`：LoggerFactoryOptions 加 electionChannelFactory + electionTabId；接入 createWriterElection；onRoleChange 写 closure 局部 writerRole；getStatus 返回最新角色；_stop 时 election.stop + channel.close
+  - 默认实现：`defaultElectionChannelFactory()`（feature detect BroadcastChannel + try/catch fallback null）；`defaultTabId()`（crypto.randomUUID 或 Math.random fallback）
+  - 创建 `__tests__/facade.election.test.ts`（InMemory broker/channel + MockWorker + AC1/2/4 + 单实例 + _stop 关 channel）
+  - 修改 `facade.write.test.ts` AC1 用例：增加 `vi.advanceTimersByTime(300)` 等 claim grace 后读 writerRole（语义性修订，原"永远 writer"前提失效）
+  - **设计决策**：facade 不根据 writerRole 改变 worker 调用行为（最简化方案，与 task 一致）；writerRole 仅做 UI 展示
+- 质量检查: lint PASS；test PASS（40 files / 331 tests，新增 1 文件，修改 1 文件）

@@ -90,6 +90,9 @@ describe("logger facade — AC1: init handshake + buffered logs drain", () => {
       expect(entry.run_id).toBe(FIXED_RUN_ID);
     });
     expect(logger.getStatus().mode).toBe("ok");
+    // Solo tab — once the writer-election claim grace expires the role
+    // settles to `"writer"` (TASK-015 wired the election into the facade).
+    vi.advanceTimersByTime(300);
     expect(logger.getStatus().writerRole).toBe("writer");
 
     logger._stop?.();

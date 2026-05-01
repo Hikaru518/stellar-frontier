@@ -1,8 +1,15 @@
+import { LOGGER_CHANNEL } from "./broadcast-protocol";
 import { triggerDownload } from "./download";
 import { createRunId, makeEnvelope } from "./envelope";
 import { createRingBuffer, type RingBuffer } from "./ringBuffer";
 import { LoggerError, type LogEntry, type LogInput, type RunArchive } from "./types";
 import type { LogWorkerCommand, LogWorkerEvent } from "./worker-protocol";
+import {
+  createWriterElection,
+  type BroadcastChannelLike,
+  type WriterElection,
+  type WriterRole,
+} from "./writerElection";
 
 /**
  * Status returned by `LoggerFacade.getStatus`.
@@ -104,6 +111,19 @@ export interface LoggerFactoryOptions {
    * this to make rotate-target ids deterministic.
    */
   runIdFactory?: () => string;
+  /**
+   * Build the BroadcastChannel-like object the writer election uses to talk to
+   * peer tabs (TASK-015 / ADR-008). Returning `null` disables the election:
+   * the facade then behaves as a single-tab writer (`writerRole === "writer"`
+   * forever). Defaults to a thunk that constructs a real `BroadcastChannel`
+   * on `LOGGER_CHANNEL` when the global is available.
+   */
+  electionChannelFactory?: () => BroadcastChannelLike | null;
+  /**
+   * Stable tab id used by the election as a tie-breaker. Defaults to a fresh
+   * `crypto.randomUUID()` (or a `Math.random` fallback when crypto is absent).
+   */
+  electionTabId?: string;
 }
 
 /**
@@ -134,6 +154,22 @@ function defaultWorkerFactory(): Worker {
   });
 }
 
+function defaultElectionChannelFactory(): BroadcastChannelLike | null {
+  if (typeof BroadcastChannel !== "function") return null;
+  try {
+    return new BroadcastChannel(LOGGER_CHANNEL);
+  } catch {
+    return null;
+  }
+}
+
+function defaultTabId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `tab-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+
 /**
  * Build a logger facade instance. Most call-sites should use the exported
  * `logger` singleton; tests construct a fresh facade per case with a mock
@@ -154,7 +190,7 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
   });
 
   let mode: LogStatus["mode"] = "init_pending";
-  const writerRole: LogStatus["writerRole"] = "writer";
+  let writerRole: WriterRole = "writer";
   let fatalReason: string | undefined;
   let warnedFatalOnce = false;
   let warnedLogPathOnce = false;
@@ -188,6 +224,13 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
 
   let worker: Worker | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
+
+  // Multi-tab writer election (TASK-015 / ADR-008). The channel is owned by
+  // the facade — `_stop` is responsible for stopping the election and closing
+  // the channel. When the channel factory returns `null` the facade falls back
+  // to single-tab semantics: `writerRole` stays `"writer"`.
+  let electionChannel: BroadcastChannelLike | null = null;
+  let election: WriterElection | null = null;
 
   function warnOnce(message: string, detail?: unknown): void {
     if (warnedFatalOnce) return;
@@ -395,6 +438,29 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
     fatalReason = "worker_unavailable";
     warnOnce("worker unavailable; degrading to memory_only", err);
     settleReady();
+  }
+
+  // --- Writer election ------------------------------------------------------
+  // Wire the channel-backed election. When no channel is available (no
+  // BroadcastChannel global, factory returned null, etc.) the facade keeps
+  // `writerRole === "writer"` permanently — the historical single-tab
+  // behavior. With a channel, `writerRole` reflects the live election state
+  // (`"pending"` until claim grace settles, then `"writer"` or `"reader"`).
+  const channelFactory =
+    options.electionChannelFactory ?? defaultElectionChannelFactory;
+  electionChannel = channelFactory();
+  if (electionChannel != null) {
+    election = createWriterElection({
+      channel: electionChannel,
+      tabId: options.electionTabId ?? defaultTabId(),
+    });
+    election.onRoleChange((role) => {
+      writerRole = role;
+    });
+    election.start();
+    // After start() the role is `"pending"` until the claim grace timer
+    // fires (or a peer's `held` arrives); pull the latest snapshot now.
+    writerRole = election.getRole();
   }
 
   // --- Flush timer ----------------------------------------------------------
@@ -785,6 +851,22 @@ export function createLogger(options: LoggerFactoryOptions = {}): LoggerInstance
       if (timer != null) {
         clearInterval(timer);
         timer = null;
+      }
+      if (election != null) {
+        try {
+          election.stop();
+        } catch {
+          // ignore — election cleanup is best-effort.
+        }
+        election = null;
+      }
+      if (electionChannel != null) {
+        try {
+          electionChannel.close();
+        } catch {
+          // ignore — mock channels may not implement close.
+        }
+        electionChannel = null;
       }
       if (worker != null) {
         worker.onmessage = null;
