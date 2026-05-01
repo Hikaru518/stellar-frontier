@@ -34,7 +34,7 @@ source:
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 扩展地图 visual schema 与 Kenney tileset registry | completed | 1 |
 | 2 | TASK-002 | 实现 helper 地图库读取与 authoritative validation | completed | 1 |
-| 3 | TASK-003 | 新增 Map Editor helper HTTP API 与资产服务 | pending | 0 |
+| 3 | TASK-003 | 新增 Map Editor helper HTTP API 与资产服务 | completed | 1 |
 | 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | pending | 0 |
 | 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | pending | 0 |
 | 6 | TASK-006 | 实现新建地图、地图网格与基础图层面板 | pending | 0 |
@@ -73,3 +73,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 `mapContentStore.mjs` 与 `mapValidation.mjs`，并补充 helper 单元测试；library 返回 maps、tileset_registry、map_objects、schemas；validation 覆盖 origin、initial discovered、objectIds、visual cell tileId、tilesetId、tileIndex，且缺失 visual 或空 visual layers 合法。子 agent 验证 `npm run editor:test` 通过（11 files / 37 tests）。
 - Main verification: `git diff --check` 通过；`npm run editor:test` 通过（11 files / 37 tests）；`npm run lint` 与 `npm run test` 在当前 Rush/Node 环境被 `ERROR: Unexpected output from "ps" command` 阻断；针对受影响 package 执行 `node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-003: 新增 Map Editor helper HTTP API 与资产服务
+- 状态: completed
+- 开始时间: 2026-05-02 00:33
+- 完成时间: 2026-05-02 00:36
+- 尝试次数: 1
+- Monkey summary: 成功。新增 `GET /api/map-editor/library`、`POST /api/map-editor/validate`、`POST /api/map-editor/save`、`GET /api/map-editor/assets`，支持 JSON body、OPTIONS preflight、保存前 authoritative validation 和受限 assets PNG 服务，旧 `/api/health` 与 `/api/event-editor/library` 行为保持通过测试。子 agent 验证 `npm run editor:test` 通过（11 files / 45 tests），editor lint 通过。
+- Main verification: `git diff --check` 通过；复核 save path 只允许 `content/maps/<id>.json`，assets path 只允许 normalized `assets/*.png` 并经 path guard 解析；`npm run editor:test` 通过（11 files / 45 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
