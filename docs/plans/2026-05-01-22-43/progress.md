@@ -32,7 +32,7 @@ source:
 
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
-| 1 | TASK-001 | 扩展地图 visual schema 与 Kenney tileset registry | pending | 0 |
+| 1 | TASK-001 | 扩展地图 visual schema 与 Kenney tileset registry | completed | 1 |
 | 2 | TASK-002 | 实现 helper 地图库读取与 authoritative validation | pending | 0 |
 | 3 | TASK-003 | 新增 Map Editor helper HTTP API 与资产服务 | pending | 0 |
 | 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | pending | 0 |
@@ -57,3 +57,11 @@ source:
 - 目标产物: `map-editor-ui-scenes.pen`, `map-editor-ui-scenes.md`
 - Subagent summary: 已生成 7 个 frame，覆盖打开地图、新建地图、视觉铺图、图层管理、Gameplay Overlay、Validation 保存错误和 PC runtime 预览。`.pen` 通过 JSON parse，Pencil MCP `snapshot_layout` 返回 `No layout problems.`，并抽样截图验证 `ME001`、`ME003`、`ME005`、`ME007`。
 - Main verification: 主 agent 复核 `map-editor-ui-scenes.md`、Pencil `snapshot_layout` 和 `ME003` 截图。Pencil export 到 repo 目录失败，但子 agent 已导出到 `/private/tmp/map-editor-ui-scenes-exports/`；plan 目录保留 `.pen` 源文件和说明文档作为长期产物。
+
+### TASK-001: 扩展地图 visual schema 与 Kenney tileset registry
+- 状态: completed
+- 开始时间: 2026-05-02 00:18
+- 完成时间: 2026-05-02 00:25
+- 尝试次数: 1
+- Monkey summary: 成功。新增 `map-tilesets.schema.json`，扩展 map schema 的 `visual.layers`，注册 Kenney Tiny Battle packed tilesheet，复制 public runtime PNG，并让 content validation 覆盖所有 map JSON 与 tileset registry。子 agent 验证 `npm run validate:content` 通过，pc-client targeted test/lint 通过；全量 `npm run test`/`npm run lint` 在子 agent 环境中曾被 Rush `ps` 探测阻断。
+- Main verification: `git diff --check` 通过；PNG source/public sha256 一致；registry Kenney 元数据为 16x16、columns=18、tileCount=198，分类 tile indexes 全部在范围内且覆盖 198 个 index；`npm run validate:content` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 244 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过。
