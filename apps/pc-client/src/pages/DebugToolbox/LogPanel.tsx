@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel } from "../../components/Layout";
 import { logger } from "../../logger";
 import type { LogStatus, LoggerFacade } from "../../logger";
-import type { LogEntry, LogSource } from "../../logger/types";
+import type { LogEntry, LogSource, RunArchive } from "../../logger/types";
 
 type Mode = "current" | "archive";
 type SourceFilter = "all" | LogSource;
@@ -32,6 +32,18 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
   const [exportError, setExportError] = useState<string | null>(null);
   const errorTimerRef = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  // --- Archive mode state (TASK-018) -----------------------------------------
+  // When `mode === "archive"` we maintain an independent state machine on top
+  // of the current-mode tail. `viewingRunId === null` shows the list view;
+  // `viewingRunId !== null` shows the read-only entries view for that run.
+  // The two views are mutually exclusive so the user can only inspect one
+  // surface at a time.
+  const [runs, setRuns] = useState<RunArchive[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [viewingRunId, setViewingRunId] = useState<string | null>(null);
+  const [viewingEntries, setViewingEntries] = useState<LogEntry[]>([]);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   // Mount: seed from snapshot, then subscribe for incremental deltas.
   // Subscription also keeps the status banners in sync (worker fatal,
@@ -83,8 +95,83 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
     };
   }, []);
 
+  // Load the archive list whenever the user enters archive mode. The
+  // `cancelled` flag guards against late resolutions if the user toggles
+  // back to current mode before the promise settles.
+  useEffect(() => {
+    if (mode !== "archive") {
+      // Reset view state so re-entry always lands on the fresh list.
+      setViewingRunId(null);
+      setViewingEntries([]);
+      return;
+    }
+    let cancelled = false;
+    setArchiveLoading(true);
+    setArchiveError(null);
+    facade
+      .listRuns()
+      .then((rs) => {
+        if (!cancelled) setRuns(rs);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setArchiveError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setArchiveLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, facade]);
+
   const isMemoryOnly = status.mode === "memory_only";
   const hasFilter = typeFilter !== "" || sourceFilter !== "all";
+
+  async function handleView(runId: string): Promise<void> {
+    setArchiveError(null);
+    setViewingRunId(runId);
+    setViewingEntries([]);
+    try {
+      const bytes = await facade.readRun(runId);
+      const text = new TextDecoder().decode(bytes);
+      const lines = text.split("\n").filter((l) => l.length > 0);
+      const parsed: LogEntry[] = [];
+      for (const line of lines) {
+        try {
+          parsed.push(JSON.parse(line) as LogEntry);
+        } catch {
+          // Skip malformed lines but warn so the user/dev sees the corruption.
+          // Truncate the offending payload so the console stays readable when
+          // a whole file is garbled.
+          // eslint-disable-next-line no-console
+          console.warn("[LogPanel] skipped bad jsonl line:", line.slice(0, 80));
+        }
+      }
+      setViewingEntries(parsed);
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : String(err));
+      setViewingRunId(null);
+    }
+  }
+
+  function exitView(): void {
+    setViewingRunId(null);
+    setViewingEntries([]);
+  }
+
+  async function handleDelete(runId: string): Promise<void> {
+    if (!window.confirm(`确定删除 run ${runId}？`)) return;
+    setArchiveError(null);
+    try {
+      await facade.deleteRun(runId);
+      const rs = await facade.listRuns();
+      setRuns(rs);
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   async function handleExport(): Promise<void> {
     if (isMemoryOnly || isExporting) return;
@@ -175,7 +262,7 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
         </div>
       )}
 
-      {mode === "current" ? (
+      {mode === "current" && (
         <div
           ref={listRef}
           className="log-panel-list"
@@ -210,9 +297,122 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
             ))
           )}
         </div>
-      ) : (
-        <div className="log-panel-list muted-text">
-          （历史 run 列表将在 TASK-018 接入）
+      )}
+
+      {mode === "archive" && archiveError !== null && (
+        <div className="log-panel-export-error" role="alert">
+          {archiveError}
+        </div>
+      )}
+
+      {mode === "archive" && viewingRunId === null && (
+        <div className="log-panel-archive-list" aria-label="历史 run 列表">
+          {archiveLoading ? (
+            <div className="muted-text">加载中…</div>
+          ) : runs.length === 0 ? (
+            <div className="muted-text">暂无历史 run</div>
+          ) : (
+            runs.map((run) => (
+              <div
+                key={run.run_id}
+                className="log-panel-archive-row"
+                data-run-id={run.run_id}
+              >
+                <span className="log-panel-archive-id">{run.run_id}</span>
+                {run.is_current && (
+                  <span className="log-panel-archive-current">当前</span>
+                )}{" "}
+                <span className="log-panel-archive-time">
+                  {formatDateTime(run.created_at_real_time)}
+                </span>{" "}
+                <span className="log-panel-archive-size">
+                  {formatBytes(run.size_bytes)}
+                </span>{" "}
+                {run.entry_count !== undefined && (
+                  <span className="log-panel-archive-count">
+                    {run.entry_count} 条
+                  </span>
+                )}{" "}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  data-action="view"
+                  onClick={() => {
+                    void handleView(run.run_id);
+                  }}
+                >
+                  查看
+                </button>{" "}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  data-action="export"
+                  disabled={isMemoryOnly}
+                  onClick={() => {
+                    void facade.exportRun(run.run_id);
+                  }}
+                >
+                  导出
+                </button>{" "}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  data-action="delete"
+                  disabled={run.is_current}
+                  onClick={() => {
+                    void handleDelete(run.run_id);
+                  }}
+                >
+                  删除
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {mode === "archive" && viewingRunId !== null && (
+        <div className="log-panel-archive-view" aria-label="查看 run">
+          <div className="log-panel-archive-view-header">
+            <strong>查看 {viewingRunId}</strong>{" "}
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={exitView}
+            >
+              返回列表
+            </button>
+          </div>
+          <div
+            className="log-panel-list"
+            style={{ maxHeight: 360, overflowY: "auto" }}
+          >
+            {viewingEntries.length === 0 ? (
+              <div className="muted-text">该 run 无可解析条目</div>
+            ) : (
+              viewingEntries.map((entry, i) => (
+                <div
+                  key={`${entry.run_id ?? "x"}#${entry.seq ?? i}`}
+                  className="log-panel-row"
+                  data-type={entry.type}
+                  data-source={entry.source}
+                >
+                  <span className="log-panel-seq">#{entry.seq}</span>{" "}
+                  <span className="log-panel-time">
+                    {formatHms(entry.occurred_at_real_time)}
+                  </span>{" "}
+                  <span className="log-panel-type-chip">{entry.type}</span>{" "}
+                  <span className="log-panel-source">{entry.source}</span>{" "}
+                  <span
+                    className="log-panel-payload"
+                    title={safeStringify(entry.payload)}
+                  >
+                    {truncate(safeStringify(entry.payload), PAYLOAD_PREVIEW_MAX)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
     </Panel>
@@ -241,4 +441,24 @@ function safeStringify(value: unknown): string {
 /** Cap a string at `max` chars, replacing the tail with `...` when needed. */
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 3) + "...";
+}
+
+/**
+ * Human-friendly byte size: B / KB / MB. We round at fixed precision rather
+ * than localised formatters to keep the test fixtures and snapshots stable.
+ */
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/**
+ * Render the archive row's timestamp as `YYYY-MM-DD HH:MM` (drop seconds /
+ * milliseconds / TZ marker). For an archive index a row-per-run view does
+ * not need second-level precision.
+ */
+function formatDateTime(iso: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(iso);
+  return m ? `${m[1]} ${m[2]}` : iso;
 }

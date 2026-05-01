@@ -41,7 +41,7 @@ source:
 | 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | completed | 1       |
 | 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | completed | 1       |
 | 17 | TASK-017 | App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete   | completed | 1       |
-| 18 | TASK-018 | LogPanel 历史 run 列表（查看 / 导出 / 删除）                      | pending   | 0       |
+| 18 | TASK-018 | LogPanel 历史 run 列表（查看 / 导出 / 删除）                      | completed | 1       |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -256,3 +256,17 @@ source:
   - 创建 `__tests__/actionComplete.integration.test.tsx`（6 静态源码断言 + 2 行为模拟，共 8 用例）
   - 已知限制：React 19 strict mode 下 functional setter 会被调两次，dev 下日志可能重复（per design §13.R3 接受）；生产无影响
 - 质量检查: lint PASS；test PASS（42 files / 347 tests，新增 1 文件 8 用例）
+
+### TASK-018: LogPanel 历史 run 列表（查看 / 导出 / 删除）
+
+- 状态: completed
+- 完成时间: 2026-05-01 07:01
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 LogPanel.tsx：archive mode 完整实现 — listRuns 加载 + view/list 互斥状态机 + readRun JSONL 解码（坏行 console.warn 跳过）+ exportRun + deleteRun（window.confirm + listRuns 刷新）
+  - 当前 run 删除按钮 disabled；导出按钮在 OPFS 不可用时 disabled
+  - formatBytes / formatDateTime helper
+  - 测试新增 8 用例（共 29 LogPanel 用例 = TASK-011 7 + TASK-012 10 + TASK-013 4 + TASK-018 8）
+- 质量检查: lint PASS；test PASS（42 files / 355 tests，新增 8 用例）
+
+**全部 18 个 task 完成 ✅**

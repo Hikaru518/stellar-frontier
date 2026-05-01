@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { LogPanel } from "./LogPanel";
 import type { LoggerFacade, LogStatus } from "../../logger";
 import type { LogEntry, LogSource } from "../../logger/types";
@@ -319,7 +319,7 @@ describe("LogPanel — TASK-012 tail + filter", () => {
     expect(list.textContent).toMatch(/过滤后无匹配/);
   });
 
-  it("archive mode 显示 placeholder 不渲染列表", async () => {
+  it("archive mode 不渲染 current 列表", async () => {
     const user = userEvent.setup();
     const facade = makeMockFacade();
     facade.getRingBufferSnapshot = vi.fn(() =>
@@ -327,8 +327,9 @@ describe("LogPanel — TASK-012 tail + filter", () => {
     );
     render(<LogPanel facade={facade} />);
     await user.click(screen.getByRole("button", { name: "历史" }));
-    expect(screen.getByText(/历史 run 列表将在 TASK-018 接入/)).toBeInTheDocument();
-    // current-mode list is not rendered while in archive mode.
+    // current-mode list is not rendered while in archive mode (TASK-018:
+    // archive mode now shows the historical run list instead of a placeholder,
+    // but the `日志列表` aria-label is still owned by current mode only).
     expect(screen.queryByLabelText("日志列表")).toBeNull();
   });
 });
@@ -416,5 +417,307 @@ describe("LogPanel — TASK-013 导出当前 run", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("LogPanel — TASK-018 archive list", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function makeRun(spec: {
+    runId: string;
+    createdAtRealTime: string;
+    sizeBytes?: number;
+    isCurrent?: boolean;
+    entryCount?: number;
+  }): import("../../logger/types").RunArchive {
+    return {
+      run_id: spec.runId,
+      created_at_real_time: spec.createdAtRealTime,
+      updated_at_real_time: spec.createdAtRealTime,
+      size_bytes: spec.sizeBytes ?? 100,
+      is_current: spec.isCurrent ?? false,
+      ...(spec.entryCount !== undefined ? { entry_count: spec.entryCount } : {}),
+    };
+  }
+
+  it("AC1: 切到 archive 调 listRuns 一次并按 fixture 顺序渲染 3 行", async () => {
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-2",
+        createdAtRealTime: "2026-05-01T03:00:00.000Z",
+        sizeBytes: 1000,
+        isCurrent: true,
+      }),
+      makeRun({
+        runId: "run-1",
+        createdAtRealTime: "2026-05-01T02:00:00.000Z",
+        sizeBytes: 500,
+      }),
+      makeRun({
+        runId: "run-0",
+        createdAtRealTime: "2026-05-01T01:00:00.000Z",
+        sizeBytes: 200,
+      }),
+    ]);
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => expect(facade.listRuns).toHaveBeenCalledTimes(1));
+    const list = await screen.findByLabelText("历史 run 列表");
+    const rows = list.querySelectorAll(".log-panel-archive-row");
+    expect(rows.length).toBe(3);
+    // The "当前" badge appears only on the run flagged is_current.
+    expect(rows[0].textContent).toContain("当前");
+    expect(rows[1].textContent).not.toContain("当前");
+    expect(rows[2].textContent).not.toContain("当前");
+  });
+
+  it("AC1: 当前 run 那行删除按钮 disabled，非当前 run 不 disabled", async () => {
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-2",
+        createdAtRealTime: "2026-05-01T03:00:00.000Z",
+        sizeBytes: 1000,
+        isCurrent: true,
+      }),
+      makeRun({
+        runId: "run-1",
+        createdAtRealTime: "2026-05-01T02:00:00.000Z",
+        sizeBytes: 500,
+      }),
+    ]);
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-2"));
+    const list = screen.getByLabelText("历史 run 列表");
+    const currentRow = list.querySelector<HTMLElement>(
+      '[data-run-id="run-2"]',
+    );
+    const otherRow = list.querySelector<HTMLElement>(
+      '[data-run-id="run-1"]',
+    );
+    expect(currentRow).not.toBeNull();
+    expect(otherRow).not.toBeNull();
+    const currentDelete = currentRow!.querySelector<HTMLButtonElement>(
+      'button[data-action="delete"]',
+    );
+    const otherDelete = otherRow!.querySelector<HTMLButtonElement>(
+      'button[data-action="delete"]',
+    );
+    expect(currentDelete).not.toBeNull();
+    expect(otherDelete).not.toBeNull();
+    expect(currentDelete!.disabled).toBe(true);
+    expect(otherDelete!.disabled).toBe(false);
+  });
+
+  it("AC2: 点查看 → readRun + 解码 → 渲染只读 entries", async () => {
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-1",
+        createdAtRealTime: "2026-05-01T02:00:00.000Z",
+        sizeBytes: 500,
+      }),
+    ]);
+    const entries = [
+      {
+        run_id: "run-1",
+        seq: 1,
+        type: "system.run.start",
+        source: "system",
+        payload: {},
+        log_version: 1,
+        game_version: "1",
+        occurred_at_game_seconds: 0,
+        occurred_at_real_time: "2026-05-01T02:00:00.000Z",
+      },
+      {
+        run_id: "run-1",
+        seq: 2,
+        type: "player.call.choice",
+        source: "player_command",
+        payload: {},
+        log_version: 1,
+        game_version: "1",
+        occurred_at_game_seconds: 1,
+        occurred_at_real_time: "2026-05-01T02:00:01.000Z",
+      },
+    ];
+    const jsonl =
+      entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+    const buffer = new TextEncoder().encode(jsonl).buffer as ArrayBuffer;
+    facade.readRun = vi.fn(async () => buffer);
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-1"));
+    await userEvent.click(screen.getAllByRole("button", { name: "查看" })[0]);
+    await waitFor(() => screen.getByLabelText("查看 run"));
+    expect(facade.readRun).toHaveBeenCalledWith("run-1");
+    const viewList = screen
+      .getByLabelText("查看 run")
+      .querySelector(".log-panel-list");
+    expect(viewList).not.toBeNull();
+    const rows = viewList!.querySelectorAll(".log-panel-row");
+    expect(rows.length).toBe(2);
+    expect(rows[0].getAttribute("data-type")).toBe("system.run.start");
+    expect(rows[1].getAttribute("data-type")).toBe("player.call.choice");
+  });
+
+  it("AC3: 删除 → confirm → deleteRun + listRuns 各 1 次额外", async () => {
+    const facade = makeMockFacade();
+    let callCount = 0;
+    facade.listRuns = vi.fn(async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return [
+          makeRun({
+            runId: "run-2",
+            createdAtRealTime: "2026-05-01T03:00:00.000Z",
+            sizeBytes: 1000,
+            isCurrent: true,
+          }),
+          makeRun({
+            runId: "run-1",
+            createdAtRealTime: "2026-05-01T02:00:00.000Z",
+            sizeBytes: 500,
+          }),
+        ];
+      }
+      return [
+        makeRun({
+          runId: "run-2",
+          createdAtRealTime: "2026-05-01T03:00:00.000Z",
+          sizeBytes: 1000,
+          isCurrent: true,
+        }),
+      ];
+    });
+    facade.deleteRun = vi.fn(async () => {});
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-1"));
+    // Click delete on the non-current row (run-1).
+    const list = screen.getByLabelText("历史 run 列表");
+    const targetRow = list.querySelector<HTMLElement>('[data-run-id="run-1"]');
+    expect(targetRow).not.toBeNull();
+    const deleteBtn = targetRow!.querySelector<HTMLButtonElement>(
+      'button[data-action="delete"]',
+    );
+    expect(deleteBtn).not.toBeNull();
+    await userEvent.click(deleteBtn!);
+    expect(facade.deleteRun).toHaveBeenCalledTimes(1);
+    expect(facade.deleteRun).toHaveBeenCalledWith("run-1");
+    await waitFor(() => expect(facade.listRuns).toHaveBeenCalledTimes(2));
+    // After refresh the run-1 row is gone.
+    await waitFor(() => {
+      const rowsAfter = list.querySelectorAll(".log-panel-archive-row");
+      expect(rowsAfter.length).toBe(1);
+    });
+  });
+
+  it("AC3: 当前 run 删除按钮 disabled 时点击不触发 deleteRun", async () => {
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-2",
+        createdAtRealTime: "2026-05-01T03:00:00.000Z",
+        sizeBytes: 1000,
+        isCurrent: true,
+      }),
+    ]);
+    facade.deleteRun = vi.fn(async () => {});
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-2"));
+    const list = screen.getByLabelText("历史 run 列表");
+    const currentRow = list.querySelector<HTMLElement>(
+      '[data-run-id="run-2"]',
+    );
+    const deleteBtn = currentRow!.querySelector<HTMLButtonElement>(
+      'button[data-action="delete"]',
+    );
+    expect(deleteBtn!.disabled).toBe(true);
+    // userEvent.click on a disabled button is a no-op; ensure deleteRun stays
+    // untouched.
+    await userEvent.click(deleteBtn!);
+    expect(facade.deleteRun).not.toHaveBeenCalled();
+  });
+
+  it("AC4: readRun 含坏 jsonl 行 → console.warn 一次 + 其他行正常渲染", async () => {
+    const consoleWarn = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => {});
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-1",
+        createdAtRealTime: "2026-05-01T02:00:00.000Z",
+        sizeBytes: 500,
+      }),
+    ]);
+    const jsonl =
+      '{"run_id":"run-1","seq":1,"type":"system.run.start","source":"system","payload":{},"log_version":1,"game_version":"1","occurred_at_game_seconds":0,"occurred_at_real_time":"2026-05-01T02:00:00.000Z"}\n' +
+      "!!!bad json line!!!\n" +
+      '{"run_id":"run-1","seq":2,"type":"player.call.choice","source":"player_command","payload":{},"log_version":1,"game_version":"1","occurred_at_game_seconds":1,"occurred_at_real_time":"2026-05-01T02:00:01.000Z"}\n';
+    const buffer = new TextEncoder().encode(jsonl).buffer as ArrayBuffer;
+    facade.readRun = vi.fn(async () => buffer);
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-1"));
+    await userEvent.click(screen.getByRole("button", { name: "查看" }));
+    await waitFor(() => screen.getByLabelText("查看 run"));
+    const viewList = screen
+      .getByLabelText("查看 run")
+      .querySelector(".log-panel-list");
+    const rows = viewList!.querySelectorAll(".log-panel-row");
+    expect(rows.length).toBe(2);
+    expect(consoleWarn).toHaveBeenCalled();
+  });
+
+  it("点 [导出] → 调 facade.exportRun(id)", async () => {
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-1",
+        createdAtRealTime: "2026-05-01T02:00:00.000Z",
+        sizeBytes: 500,
+      }),
+    ]);
+    facade.exportRun = vi.fn(async () => {});
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-1"));
+    await userEvent.click(screen.getByRole("button", { name: "导出" }));
+    expect(facade.exportRun).toHaveBeenCalledTimes(1);
+    expect(facade.exportRun).toHaveBeenCalledWith("run-1");
+  });
+
+  it("查看模式 → 点 '返回列表' 回到 list 视图", async () => {
+    const facade = makeMockFacade();
+    facade.listRuns = vi.fn(async () => [
+      makeRun({
+        runId: "run-1",
+        createdAtRealTime: "2026-05-01T02:00:00.000Z",
+        sizeBytes: 500,
+      }),
+    ]);
+    facade.readRun = vi.fn(async () => new TextEncoder().encode("").buffer as ArrayBuffer);
+    render(<LogPanel facade={facade} />);
+    await userEvent.click(screen.getByRole("button", { name: "历史" }));
+    await waitFor(() => screen.getByText("run-1"));
+    await userEvent.click(screen.getByRole("button", { name: "查看" }));
+    await waitFor(() => screen.getByLabelText("查看 run"));
+    // List view is hidden while viewing.
+    expect(screen.queryByLabelText("历史 run 列表")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "返回列表" }));
+    await waitFor(() => screen.getByLabelText("历史 run 列表"));
+    expect(screen.queryByLabelText("查看 run")).toBeNull();
   });
 });
