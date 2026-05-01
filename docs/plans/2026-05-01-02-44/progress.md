@@ -26,7 +26,7 @@ source:
 |----|----------|----------------------------------------------------------------|-----------|---------|
 | 1  | TASK-001 | 构建期注入 __APP_VERSION__ 与 worker tsconfig 准备               | completed | 1       |
 | 2  | TASK-002 | logger 模块类型定义骨架（LogEntry / 协议）                        | completed | 1       |
-| 3  | TASK-003 | 信封自动填充与内存环形缓冲（envelope + ringBuffer）                | pending   | 0       |
+| 3  | TASK-003 | 信封自动填充与内存环形缓冲（envelope + ringBuffer）                | completed | 1       |
 | 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | pending   | 0       |
 | 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | pending   | 0       |
 | 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | pending   | 0       |
@@ -74,3 +74,15 @@ source:
   - 创建 `apps/pc-client/src/logger/__tests__/types.compile.test.ts`（12 个 TDD 用例：narrow 行为 / 3 个 @ts-expect-error 反例 / exhaustive switch with assertNever）
   - 设计要点：LogInput 用 distributive conditional 派生（`LogEntry extends infer E ? E extends LogEntry ? Pick<E, ...> : never : never`），新增变体自动同步
 - 质量检查: lint PASS；test PASS（27 files / 208 tests，新增 1 文件 12 用例，原 196 个无退化）
+
+### TASK-003: 信封自动填充与内存环形缓冲（envelope + ringBuffer）
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:02
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/envelope.ts`（createRunId + makeEnvelope，UTC 时间字段，base36 随机串过滤兜底）
+  - 创建 `apps/pc-client/src/logger/ringBuffer.ts`（朴素 array+shift，同步通知 delta-only，per-listener try/catch 隔离）
+  - 创建 `__tests__/envelope.test.ts`（10 用例）+ `__tests__/ringBuffer.test.ts`（11 用例）
+  - 设计要点：snapshot 与 pushAll 防御性 slice 拷贝；pushAll([]) 早返回不通知
+- 质量检查: lint PASS；test PASS（29 files / 229 tests，新增 2 文件 21 用例，原 208 个无退化）
