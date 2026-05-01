@@ -40,7 +40,7 @@ source:
 | 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | completed | 1       |
 | 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | completed | 1       |
 | 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | completed | 1       |
-| 17 | TASK-017 | App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete   | pending   | 0       |
+| 17 | TASK-017 | App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete   | completed | 1       |
 | 18 | TASK-018 | LogPanel 历史 run 列表（查看 / 导出 / 删除）                      | pending   | 0       |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -244,3 +244,15 @@ source:
   - handler 用闭包 fired flag 防多次触发；try/catch 兜底；同步 logger.log + void logger.flush（不 await）
   - 创建 `__tests__/beforeunload.integration.test.tsx`（5 静态源码断言 + 3 行为模拟，共 8 用例）
 - 质量检查: lint PASS；test PASS（41 files / 339 tests，新增 1 文件 8 用例）
+
+### TASK-017: App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:53
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 App.tsx：新增模块级 `TERMINAL_ACTION_STATUSES`（completed/failed/interrupted/cancelled）+ `diffActionsAndLog` helper；timer useEffect 内 setGameState 包装为 functional setter，调 diff 后返回 next
+  - payload.action_kind 用 `action.type`；payload.status 是终态字符串
+  - 创建 `__tests__/actionComplete.integration.test.tsx`（6 静态源码断言 + 2 行为模拟，共 8 用例）
+  - 已知限制：React 19 strict mode 下 functional setter 会被调两次，dev 下日志可能重复（per design §13.R3 接受）；生产无影响
+- 质量检查: lint PASS；test PASS（42 files / 347 tests，新增 1 文件 8 用例）
