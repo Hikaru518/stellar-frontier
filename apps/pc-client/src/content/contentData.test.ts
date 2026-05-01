@@ -8,6 +8,7 @@ import tilesetRegistry from "../../../../content/maps/tilesets/registry.json";
 import mapTilesetsSchema from "../../../../content/schemas/map-tilesets.schema.json";
 import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import { buildEventContentIndex } from "../events/contentIndex";
+import type { MapConfigDefinition } from "./contentData";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
 
@@ -87,6 +88,35 @@ describe("default map config", () => {
       expect(Array.isArray(tile.objectIds)).toBe(true);
       expect("objects" in tile).toBe(false);
     }
+  });
+
+  it("types authored visual layers on MapConfigDefinition", () => {
+    const mapWithVisual: MapConfigDefinition = {
+      ...(structuredClone(defaultMapJson) as MapConfigDefinition),
+      visual: {
+        layers: [
+          {
+            id: "base",
+            name: "Base",
+            visible: true,
+            locked: false,
+            opacity: 0.75,
+            cells: {
+              "4-4": {
+                tilesetId: "kenney-tiny-battle",
+                tileIndex: 12,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    expect(mapWithVisual.visual?.layers[0]).toMatchObject({
+      id: "base",
+      opacity: 0.75,
+      cells: { "4-4": { tilesetId: "kenney-tiny-battle", tileIndex: 12 } },
+    });
   });
 });
 

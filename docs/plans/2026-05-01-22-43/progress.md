@@ -41,7 +41,7 @@ source:
 | 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | completed | 1 |
 | 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | completed | 1 |
 | 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | completed | 1 |
-| 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | pending | 0 |
+| 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | completed | 1 |
 | 11 | TASK-011 | 在 PC Phaser MapScene 渲染 authored visual layers | pending | 0 |
 | 12 | TASK-012 | 收尾验证地图编辑器端到端闭环 | pending | 0 |
 
@@ -129,3 +129,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 ValidationPanel，接入 helper validate/save API；保存前先 authoritative validation，失败不调用 save；新增 dirty/saved 状态，保存成功后清 dirty；新地图首次保存不传 `file_path`；保存成功后更新地图文件列表并可重新打开；`file_exists` 冲突显示错误并保留 dirty draft。子 agent 验证 `npm run editor:test` 通过（21 files / 91 tests），editor lint 通过。
 - Main verification: 复核 API client、dirty/save flow、validation issue 跳转和新地图文件列表更新；发现 helper save 还没有真实 `file_exists` 保护，补充 helper 409 `file_exists` 逻辑和 server 测试，避免新地图覆盖已有文件；`git diff --check` 通过；`npm run editor:test` 通过（21 files / 92 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-010: 让 PC content 与 mapView 派生 visual sprite layers
+- 状态: completed
+- 开始时间: 2026-05-02 01:29
+- 完成时间: 2026-05-02 01:33
+- 尝试次数: 1
+- Monkey summary: 成功。PC `MapConfigDefinition` 增加可选 `visual.layers`；`buildPhaserTileViews` 从 `context.visual` 派生 discovered tile 的 `visualLayers`，过滤 hidden layer，frontier/unknown 不暴露 visual sprites，无 visual cell 保留 terrain `fillColor` fallback。子 agent 验证 pc-client test 通过（29 files / 247 tests），pc-client lint 通过。
+- Main verification: 复核 `contentData` 类型和 `mapView` 派生逻辑，确认 visual layer 顺序沿用 JSON order，visible=false 过滤，undiscovered/frontier/unknown 输出空 visual layers；`git diff --check` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 247 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过。
