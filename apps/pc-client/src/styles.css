@@ -958,3 +958,242 @@ blockquote {
     grid-template-columns: 1fr;
   }
 }
+
+/* === Log panel (debug toolbox) ============================================ */
+
+.log-panel-warn,
+.log-panel-info,
+.log-panel-export-error {
+  margin-bottom: 10px;
+  border: 1px solid;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.log-panel-warn,
+.log-panel-export-error {
+  border-color: #9d3d1f;
+  background: #f7e1d7;
+  color: #6e2914;
+}
+
+.log-panel-info {
+  border-color: #24384f;
+  background: #dbe3e9;
+  color: #24384f;
+}
+
+.log-panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.log-panel-controls > input[type="text"] {
+  flex: 1 1 200px;
+  min-width: 160px;
+  height: 30px;
+  border: 1px solid #77736b;
+  background: #f7f4ec;
+  padding: 4px 8px;
+  color: #171a1c;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.log-panel-controls > select {
+  height: 30px;
+  border: 1px solid #77736b;
+  background: #f7f4ec;
+  padding: 0 6px;
+  color: #171a1c;
+  font-size: 12.5px;
+}
+
+.log-panel-controls .primary-button,
+.log-panel-controls .secondary-button {
+  min-height: 30px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.log-panel-list {
+  border: 1px solid #c6c0b4;
+  background: #fbf9f3;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.log-panel-list > .muted-text {
+  padding: 14px;
+  font-family:
+    Inter, "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+}
+
+.log-panel-row {
+  display: grid;
+  grid-template-columns: 56px 78px minmax(160px, 220px) minmax(96px, auto) 1fr;
+  align-items: baseline;
+  gap: 10px;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid #ece7da;
+  padding: 5px 10px 5px 9px;
+}
+
+.log-panel-row:last-child {
+  border-bottom: none;
+}
+
+.log-panel-row:hover {
+  background: #f4efdb;
+}
+
+.log-panel-row[data-source="system"]         { border-left-color: #24384f; }
+.log-panel-row[data-source="player_command"] { border-left-color: #b45b13; }
+.log-panel-row[data-source="event_engine"]   { border-left-color: #6b4f8a; }
+.log-panel-row[data-source="time_loop"]      { border-left-color: #3f7a4a; }
+
+.log-panel-seq {
+  color: #8a857a;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.log-panel-time {
+  color: #46505a;
+  white-space: nowrap;
+}
+
+.log-panel-type-chip {
+  display: inline-block;
+  max-width: 100%;
+  border: 1px solid #c6c0b4;
+  background: #eeece5;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-panel-row[data-source="system"]         .log-panel-type-chip { background: #dbe3e9; border-color: #24384f; color: #24384f; }
+.log-panel-row[data-source="player_command"] .log-panel-type-chip { background: #f4eadf; border-color: #b45b13; color: #6e2914; }
+.log-panel-row[data-source="event_engine"]   .log-panel-type-chip { background: #ebe2f2; border-color: #6b4f8a; color: #4d3a64; }
+.log-panel-row[data-source="time_loop"]      .log-panel-type-chip { background: #e1ede1; border-color: #3f7a4a; color: #2c5a36; }
+
+.log-panel-source {
+  color: #8a857a;
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-panel-payload {
+  color: #2d3338;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Archive list ------------------------------------------------------------ */
+
+.log-panel-archive-list {
+  border: 1px solid #c6c0b4;
+  background: #fbf9f3;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.log-panel-archive-list > .muted-text {
+  padding: 14px;
+}
+
+.log-panel-archive-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.6fr)
+    auto
+    minmax(110px, auto)
+    minmax(64px, auto)
+    minmax(60px, auto)
+    auto
+    auto
+    auto;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid #ece7da;
+  padding: 8px 10px;
+}
+
+.log-panel-archive-row:last-child {
+  border-bottom: none;
+}
+
+.log-panel-archive-row:hover {
+  background: #f4efdb;
+}
+
+.log-panel-archive-id {
+  color: #24384f;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-panel-archive-current {
+  display: inline-block;
+  border: 1px solid #b45b13;
+  background: #f4eadf;
+  padding: 1px 7px;
+  color: #6e2914;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.log-panel-archive-time,
+.log-panel-archive-size,
+.log-panel-archive-count {
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.log-panel-archive-row .secondary-button {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.log-panel-archive-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-panel-archive-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px dashed #c6c0b4;
+  padding-bottom: 8px;
+}
+
+.log-panel-archive-view-header strong {
+  color: #24384f;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}

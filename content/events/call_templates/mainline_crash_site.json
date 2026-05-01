@@ -9,7 +9,7 @@
       "node_id": "first_report",
       "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
       "opening_lines": { "selection": "best_match", "variants": [{ "id": "mainline_crash_first_opening", "text": "{{crew_display_name}} 从坠毁残骸中恢复了基础物资，并确认折跃仓不是简单断电。", "priority": 0 }] },
-      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_crash_first_body", "text": "主目标已明确：小队必须修复损坏折跃仓、找到可用燃料和返航坐标。当前物资只够支撑前期探索。", "priority": 0 }] }],
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "mainline_crash_first_body", "text": "主目标已明确：小队必须修复损坏折跃仓、找到可用燃料和返航坐标。本次稳定回收到口粮、基础工具和少量应急物资，只够支撑前期探索。", "priority": 0 }] }],
       "option_lines": { "ack": { "selection": "best_match", "variants": [{ "id": "mainline_crash_ack_first", "text": "记录返航主目标，继续扩大调查。", "priority": 0 }] } },
       "fallback_order": ["crew_id", "event_pressure", "default"],
       "default_variant_required": true

@@ -319,20 +319,20 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
                 data-run-id={run.run_id}
               >
                 <span className="log-panel-archive-id">{run.run_id}</span>
-                {run.is_current && (
+                {run.is_current ? (
                   <span className="log-panel-archive-current">当前</span>
-                )}{" "}
+                ) : (
+                  <span aria-hidden="true" />
+                )}
                 <span className="log-panel-archive-time">
                   {formatDateTime(run.created_at_real_time)}
-                </span>{" "}
+                </span>
                 <span className="log-panel-archive-size">
                   {formatBytes(run.size_bytes)}
-                </span>{" "}
-                {run.entry_count !== undefined && (
-                  <span className="log-panel-archive-count">
-                    {run.entry_count} 条
-                  </span>
-                )}{" "}
+                </span>
+                <span className="log-panel-archive-count">
+                  {run.entry_count !== undefined ? `${run.entry_count} 条` : "—"}
+                </span>
                 <button
                   type="button"
                   className="secondary-button"

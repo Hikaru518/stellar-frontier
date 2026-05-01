@@ -29,22 +29,51 @@
       "candidate_selection": { "priority": 78, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
       "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "mainline_village_first_contact_rosetta_clue", "allow_while_active": false },
       "event_graph": {
-        "entry_node_id": "first_contact_report",
+        "entry_node_id": "select_first_contact_outcome",
         "nodes": [
+          {
+            "id": "select_first_contact_outcome",
+            "type": "check",
+            "title": "判断是否可直接学会外星语言",
+            "branches": [
+              {
+                "id": "negotiator_shortcut",
+                "conditions": [
+                  { "type": "has_tag", "target": { "type": "primary_crew" }, "value": "negotiator" }
+                ],
+                "next_node_id": "direct_language_report",
+                "effect_refs": ["direct_language_rewards"]
+              }
+            ],
+            "default_next_node_id": "first_contact_report",
+            "evaluation_order": "first_match",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          { "id": "direct_language_report", "type": "call", "title": "报告直接学会外星语言", "call_template_id": "mainline_village_first_contact_rosetta_clue.call.direct_language", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "confirm", "is_default": true }], "option_node_mapping": { "confirm": "direct_language_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
           { "id": "first_contact_report", "type": "call", "title": "报告语言不通", "call_template_id": "mainline_village_first_contact_rosetta_clue.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "mark_rosetta", "effect_refs": ["rosetta_clue_rewards"], "is_default": true }], "option_node_mapping": { "mark_rosetta": "first_contact_end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 240 },
+          { "id": "direct_language_end", "type": "end", "title": "已直接掌握外星语言", "resolution": "resolved", "result_key": "alien_language_learned_from_village", "event_log_template_id": "alien_language_learned_from_village_log", "history_writes": [{ "key_template": "mainline_village:first_contact_direct_language:{crew_id}", "scope": "crew", "value": "alien_language_learned_from_village" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } },
           { "id": "first_contact_end", "type": "end", "title": "罗塞塔线索已记录", "resolution": "resolved", "result_key": "rosetta_clue_found", "event_log_template_id": "rosetta_clue_found_log", "history_writes": [{ "key_template": "mainline_village:first_contact_rosetta_clue", "scope": "world", "value": "rosetta_clue_found" }], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
         ],
         "edges": [],
-        "terminal_node_ids": ["first_contact_end"],
+        "terminal_node_ids": ["direct_language_end", "first_contact_end"],
         "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
       },
-      "effect_groups": [{ "id": "rosetta_clue_rewards", "effects": [
-        { "id": "rosetta_clue_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "rosetta_clue_found", "value": true, "tags": ["mainline", "village", "rosetta"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
-        { "id": "reveal_rosetta_tile", "type": "set_discovery_state", "target": { "type": "tile_id", "id": "1-4" }, "params": { "state": "discovered" }, "failure_policy": "skip_effect", "record_policy": { "write_event_log": false, "write_world_history": false } },
-        { "id": "rosetta_clue_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "外星村落初访语言不通，但队员通过手势和周边符号确认北侧罗塞塔装置可能用于翻译；失败没有惩罚，主线不会硬锁。", "importance": "major", "visibility": "player_visible", "result_key": "rosetta_clue_found" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
-      ] }],
-      "log_templates": [{ "id": "rosetta_clue_found_log", "summary": "罗塞塔装置线索已记录", "importance": "major", "visibility": "player_visible" }],
-      "content_refs": { "call_template_ids": ["mainline_village_first_contact_rosetta_clue.call.report"] },
+      "effect_groups": [
+        { "id": "direct_language_rewards", "effects": [
+          { "id": "learn_alien_language_from_village", "type": "add_crew_condition", "target": { "type": "primary_crew" }, "params": { "condition": "knows_alien_language" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "direct_language_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "高社交队员在外星村落首次接触中直接读懂了对方的语气和手势，立即掌握 knows_alien_language。", "importance": "major", "visibility": "player_visible", "result_key": "alien_language_learned_from_village" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "rosetta_clue_rewards", "effects": [
+          { "id": "rosetta_clue_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "rosetta_clue_found", "value": true, "tags": ["mainline", "village", "rosetta"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_rosetta_tile", "type": "set_discovery_state", "target": { "type": "tile_id", "id": "1-4" }, "params": { "state": "discovered" }, "failure_policy": "skip_effect", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "rosetta_clue_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "外星村落初访语言不通，但队员通过手势和周边符号确认北侧罗塞塔装置可能用于翻译；失败没有惩罚，主线不会硬锁。", "importance": "major", "visibility": "player_visible", "result_key": "rosetta_clue_found" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [
+        { "id": "alien_language_learned_from_village_log", "summary": "外星村落首次接触直接学会语言", "importance": "major", "visibility": "player_visible" },
+        { "id": "rosetta_clue_found_log", "summary": "罗塞塔装置线索已记录", "importance": "major", "visibility": "player_visible" }
+      ],
+      "content_refs": { "call_template_ids": ["mainline_village_first_contact_rosetta_clue.call.direct_language", "mainline_village_first_contact_rosetta_clue.call.report"] },
       "sample_contexts": [{ "trigger_type": "action_complete", "occurred_at": 900, "source": "crew_action", "crew_id": "mike", "tile_id": "2-4", "action_id": "survey:mainline-alien-village:2-4:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-alien-village", "tags": ["mainline", "mainline_village", "alien_village"] } }]
     },
     {

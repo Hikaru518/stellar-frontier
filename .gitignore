@@ -46,3 +46,6 @@ tmp/
 
 # cursor
 .cursor/
+
+# claude
+.claude/
