@@ -50,6 +50,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
+import { logger } from "./logger";
 
 const eventContentIndexResult = buildEventContentIndex(eventContentLibrary);
 if (eventContentIndexResult.errors.length > 0) {
@@ -92,6 +93,22 @@ function App() {
   }, [gameState]);
 
   useEffect(() => {
+    // App 首次挂载：写入 system.run.start。该 useEffect 依赖数组为空，
+    // 只在挂载时执行一次。后续 reset 的 run.start 由 resetGame() 内部直接写。
+    // payload 不附 GameState 起始 snapshot（ADR-005 / ADR-009）。
+    logger.log({
+      type: "system.run.start",
+      source: "system",
+      payload: {
+        game_version: __APP_VERSION__,
+        schema_version: GAME_SAVE_SCHEMA_VERSION,
+      },
+      gameSeconds: 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect
+  }, []);
+
+  useEffect(() => {
     if (returnHomeCompleted) {
       setPage("ending");
     }
@@ -118,6 +135,36 @@ function App() {
   }
 
   function resetGame() {
+    // 1) 同步写 run.end (旧 run)。logger.log 是 fire-and-forget。
+    logger.log({
+      type: "system.run.end",
+      source: "system",
+      payload: { reason: "reset" },
+      gameSeconds: gameState.elapsedGameSeconds,
+    });
+
+    // 2) 异步 flush + rotate + run.start（与下面的 React state 重置并行）。
+    //    UI 重置不能因为 logger 阻塞 — rotate 失败也吞掉，OPFS 不可用时
+    //    rotate 内部已按 ADR-001 进入 memory_only no-op resolve 路径。
+    void (async () => {
+      try {
+        await logger.flush();
+        await logger.rotate("reset");
+      } catch (err) {
+        console.warn("[logger] rotate failed during reset:", err);
+      }
+      logger.log({
+        type: "system.run.start",
+        source: "system",
+        payload: {
+          game_version: __APP_VERSION__,
+          schema_version: GAME_SAVE_SCHEMA_VERSION,
+        },
+        gameSeconds: 0,
+      });
+    })();
+
+    // 3) 同步 React state 重置：与 logger 异步路径并行。
     clearGameSaves();
     const freshState = createInitialGameState();
     setGameState(freshState);

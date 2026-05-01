@@ -31,7 +31,7 @@ source:
 | 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | completed | 1       |
 | 6  | TASK-006 | logger facade — 日志写入主路径与降级                             | completed | 1       |
 | 7  | TASK-007 | logger facade — rotate / 读 / 删 / 列表 / 导出                   | completed | 1       |
-| 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | pending   | 0       |
+| 8  | TASK-008 | App.tsx 接入 — resetGame / 新 run / 归档轮转                     | completed | 1       |
 | 9  | TASK-009 | App.tsx 接入 — handleDecision 玩家指令日志                       | pending   | 0       |
 | 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | pending   | 0       |
 | 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | pending   | 0       |
@@ -137,3 +137,14 @@ source:
   - 创建 `__tests__/download.test.ts`（覆盖 createObjectURL/click/revoke 顺序）+ `facade.rotate.test.ts`（4 条 AC + memory_only 回退 + 各方法）
   - 设计要点：rotate 用 rotateInFlight 单例 promise 串行化；deleteRun fire-and-forget（worker error 走 console.warn）；exportCurrent 真的 await flush 后再 readRun；fatal 时统一 reject 所有 pending readRun/listRun
 - 质量检查: lint PASS；test PASS（34 files / 270 tests，新增 2 文件 12+ 用例 + 修改 ringBuffer）
+
+### TASK-008: App.tsx 接入 — resetGame / 新 run / 归档轮转
+
+- 状态: completed
+- 完成时间: 2026-05-01 05:48
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 `apps/pc-client/src/App.tsx`：import logger；首次挂载 useEffect 写 system.run.start；resetGame 改造为 log(run.end) + IIFE(flush+rotate+log(run.start)) + 同步 state 重置
+  - 创建 `__tests__/reset.integration.test.tsx`（8 条：4 AC + 4 静态源码断言）
+  - 设计要点：异步 logger 调用包在 try/catch 的 IIFE，UI state reset 不阻塞；4 条静态断言（grep App.tsx 内有 logger.flush + logger.rotate("reset")）防止"等价序列"测试沉默忽略真实接入
+- 质量检查: lint PASS；test PASS（35 files / 278 tests，新增 1 文件 8 断言）
