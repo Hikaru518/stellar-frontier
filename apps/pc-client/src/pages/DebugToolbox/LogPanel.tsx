@@ -28,6 +28,9 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [status, setStatus] = useState<LogStatus>(() => facade.getStatus());
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const errorTimerRef = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   // Mount: seed from snapshot, then subscribe for incremental deltas.
@@ -68,8 +71,42 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
     el.scrollTop = el.scrollHeight;
   }, [visibleEntries]);
 
+  // Clear the auto-dismiss timer on unmount so a tail-end timer cannot fire
+  // into an unmounted component (would only warn under StrictMode but is
+  // still a leak and triggers React warnings in tests).
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current !== null) {
+        window.clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const isMemoryOnly = status.mode === "memory_only";
   const hasFilter = typeFilter !== "" || sourceFilter !== "all";
+
+  async function handleExport(): Promise<void> {
+    if (isMemoryOnly || isExporting) return;
+    setIsExporting(true);
+    try {
+      await facade.flush();
+      await facade.exportCurrent();
+      setExportError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setExportError(msg);
+      if (errorTimerRef.current !== null) {
+        window.clearTimeout(errorTimerRef.current);
+      }
+      errorTimerRef.current = window.setTimeout(() => {
+        setExportError(null);
+        errorTimerRef.current = null;
+      }, 10000);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <Panel title="游戏日志">
@@ -124,12 +161,19 @@ export function LogPanel({ facade = logger }: LogPanelProps) {
         <button
           type="button"
           className="secondary-button"
-          disabled={isMemoryOnly}
+          disabled={isMemoryOnly || isExporting}
           title={isMemoryOnly ? "OPFS 不可用，无法导出" : undefined}
+          onClick={handleExport}
         >
-          导出当前 run
+          {isExporting ? "导出中…" : "导出当前 run"}
         </button>
       </div>
+
+      {exportError && (
+        <div className="log-panel-export-error" role="alert">
+          导出失败：{exportError}
+        </div>
+      )}
 
       {mode === "current" ? (
         <div

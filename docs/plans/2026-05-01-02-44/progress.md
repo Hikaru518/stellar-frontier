@@ -36,7 +36,7 @@ source:
 | 10 | TASK-010 | App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）   | completed | 1       |
 | 11 | TASK-011 | DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅                  | completed | 1       |
 | 12 | TASK-012 | LogPanel 实时 tail 与过滤                                        | completed | 1       |
-| 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | pending   | 0       |
+| 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | completed | 1       |
 | 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | pending   | 0       |
 | 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | pending   | 0       |
 | 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | pending   | 0       |
@@ -196,3 +196,14 @@ source:
   - 优化：useMemo 无过滤时直接返回 entries 引用；subscribe 0 长度 delta 不 setEntries
   - 测试新增 10 用例 + 保留 TASK-011 全部 7 用例（共 17）
 - 质量检查: lint PASS；test PASS（38 files / 315 tests，新增 10 用例）
+
+### TASK-013: LogPanel 导出当前 run 按钮
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:22
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 LogPanel.tsx：handleExport 异步函数（flush → exportCurrent，按 OPFS_unavailable / isExporting 早返回）；按钮文案 "导出中…"；错误 alert + 10 秒 setTimeout 清除；unmount cleanup useEffect 清 timer
+  - 测试追加 4 用例：AC1 调用顺序 + disabled / AC2 OPFS 不触发 / AC3 reject 显示错误 / AC4 fake timer 验证 10 秒清除
+- 质量检查: lint PASS；test PASS（38 files / 319 tests，新增 4 用例）
+- P0 主路径全部完成（TASK-001..013），剩 5 个 P1 task

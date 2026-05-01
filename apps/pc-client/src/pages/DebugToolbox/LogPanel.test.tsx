@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { LogPanel } from "./LogPanel";
@@ -330,5 +330,91 @@ describe("LogPanel — TASK-012 tail + filter", () => {
     expect(screen.getByText(/历史 run 列表将在 TASK-018 接入/)).toBeInTheDocument();
     // current-mode list is not rendered while in archive mode.
     expect(screen.queryByLabelText("日志列表")).toBeNull();
+  });
+});
+
+describe("LogPanel — TASK-013 导出当前 run", () => {
+  it("AC1：点击导出 → flush + exportCurrent 顺序调用，按钮 await 期间 disabled", async () => {
+    let flushResolve: (() => void) | undefined;
+    let exportResolve: (() => void) | undefined;
+    const facade = makeMockFacade();
+    facade.flush = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          flushResolve = r;
+        }),
+    );
+    facade.exportCurrent = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          exportResolve = r;
+        }),
+    );
+    render(<LogPanel facade={facade} />);
+    const btn = screen.getByRole("button", { name: "导出当前 run" });
+    expect(btn).not.toBeDisabled();
+    await userEvent.click(btn);
+    expect(facade.flush).toHaveBeenCalledTimes(1);
+    expect(btn).toBeDisabled();
+    expect(facade.exportCurrent).not.toHaveBeenCalled(); // still awaiting flush
+    act(() => {
+      flushResolve!();
+    });
+    await waitFor(() => expect(facade.exportCurrent).toHaveBeenCalledTimes(1));
+    expect(btn).toBeDisabled();
+    act(() => {
+      exportResolve!();
+    });
+    await waitFor(() => expect(btn).not.toBeDisabled());
+  });
+
+  it("AC2：mode=memory_only 时按钮 disabled，点击不触发 flush/exportCurrent", async () => {
+    const facade = makeMockFacade({ mode: "memory_only" });
+    facade.flush = vi.fn(async () => {});
+    facade.exportCurrent = vi.fn(async () => {});
+    render(<LogPanel facade={facade} />);
+    const btn = screen.getByRole("button", { name: "导出当前 run" });
+    expect(btn).toBeDisabled();
+    expect(btn.getAttribute("title")).toMatch(/OPFS/);
+    await userEvent.click(btn);
+    expect(facade.flush).not.toHaveBeenCalled();
+    expect(facade.exportCurrent).not.toHaveBeenCalled();
+  });
+
+  it("AC3：exportCurrent reject 后按钮恢复 enabled，错误文案显示", async () => {
+    const facade = makeMockFacade();
+    facade.flush = vi.fn(async () => {});
+    facade.exportCurrent = vi.fn(async () => {
+      throw new Error("opfs busy");
+    });
+    render(<LogPanel facade={facade} />);
+    const btn = screen.getByRole("button", { name: "导出当前 run" });
+    await userEvent.click(btn);
+    await waitFor(() => expect(btn).not.toBeDisabled());
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/opfs busy/);
+  });
+
+  it("AC4：错误文案 10 秒后自动清除", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const facade = makeMockFacade();
+      facade.flush = vi.fn(async () => {});
+      facade.exportCurrent = vi.fn(async () => {
+        throw new Error("boom");
+      });
+      render(<LogPanel facade={facade} />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const btn = screen.getByRole("button", { name: "导出当前 run" });
+      await user.click(btn);
+      // Error alert is now visible.
+      expect(screen.queryByRole("alert")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(10001);
+      });
+      await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
