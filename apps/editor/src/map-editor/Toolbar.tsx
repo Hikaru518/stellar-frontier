@@ -8,9 +8,12 @@ interface ToolbarProps {
   activeTool: MapEditorTool;
   soloLayerId: string | null;
   activeMapFilePath: string | null;
+  dirty: boolean;
+  saving: boolean;
   onToolChange: (tool: MapEditorTool) => void;
   onUndo: () => void;
   onRedo: () => void;
+  onSave: () => void;
 }
 
 const TOOL_OPTIONS: Array<{ id: MapEditorTool; label: string }> = [
@@ -28,9 +31,12 @@ export default function Toolbar({
   activeTool,
   soloLayerId,
   activeMapFilePath,
+  dirty,
+  saving,
   onToolChange,
   onUndo,
   onRedo,
+  onSave,
 }: ToolbarProps) {
   const activeLayer = state.draft.visual.layers.find((layer) => layer.id === state.activeLayerId);
   const soloLayer = state.draft.visual.layers.find((layer) => layer.id === soloLayerId);
@@ -59,12 +65,16 @@ export default function Toolbar({
         <span className="status-tag status-muted">{state.draft.size.rows} x {state.draft.size.cols}</span>
         <span className="status-tag status-muted">{selectedTileId ?? "No tile"}</span>
         <span className="status-tag status-muted">{activeLayer ? activeLayer.name : "No layer"}</span>
+        <span className={dirty ? "status-tag status-warning" : "status-tag status-success"}>{dirty ? "Unsaved" : "Saved"}</span>
         {soloLayer ? <span className="status-tag status-warning">Solo {soloLayer.name}</span> : null}
         <button type="button" onClick={onUndo} disabled={state.history.past.length === 0}>
           Undo
         </button>
         <button type="button" onClick={onRedo} disabled={state.history.future.length === 0}>
           Redo
+        </button>
+        <button type="button" onClick={onSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
         </button>
       </div>
     </div>

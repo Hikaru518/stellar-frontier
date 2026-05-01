@@ -40,7 +40,7 @@ source:
 | 6 | TASK-006 | 实现新建地图、地图网格与基础图层面板 | completed | 1 |
 | 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | completed | 1 |
 | 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | completed | 1 |
-| 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | pending | 0 |
+| 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | completed | 1 |
 | 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | pending | 0 |
 | 11 | TASK-011 | 在 PC Phaser MapScene 渲染 authored visual layers | pending | 0 |
 | 12 | TASK-012 | 收尾验证地图编辑器端到端闭环 | pending | 0 |
@@ -121,3 +121,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 TileInspector 与 SemanticBrushPanel；inspector 可编辑 areaName、terrain、weather、environment、objectIds、specialStates；semantic brush 支持 terrain/weather、origin、initial discovered 开关；设置 origin 会保证 initial discovered 包含 origin；Gameplay Overlay 在 grid 上叠加 terrain/weather/object/special/origin/discovered；reducer 测试覆盖 visual brush 不修改 gameplay。子 agent 验证 `npm run editor:test` 通过（20 files / 80 tests），editor lint 通过。
 - Main verification: 复核 gameplay reducer commands、inspector/semantic brush UI 和 overlay；修复 semantic brush 与 visual palette 的模式冲突，确保选择 palette tile 会清除 semantic brush 并恢复视觉绘制，补充测试；`git diff --check` 通过；`npm run editor:test` 通过（20 files / 81 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-009: 实现保存、validation panel 与 dirty/history UX
+- 状态: completed
+- 开始时间: 2026-05-02 01:21
+- 完成时间: 2026-05-02 01:28
+- 尝试次数: 1
+- Monkey summary: 成功。新增 ValidationPanel，接入 helper validate/save API；保存前先 authoritative validation，失败不调用 save；新增 dirty/saved 状态，保存成功后清 dirty；新地图首次保存不传 `file_path`；保存成功后更新地图文件列表并可重新打开；`file_exists` 冲突显示错误并保留 dirty draft。子 agent 验证 `npm run editor:test` 通过（21 files / 91 tests），editor lint 通过。
+- Main verification: 复核 API client、dirty/save flow、validation issue 跳转和新地图文件列表更新；发现 helper save 还没有真实 `file_exists` 保护，补充 helper 409 `file_exists` 逻辑和 server 测试，避免新地图覆盖已有文件；`git diff --check` 通过；`npm run editor:test` 通过（21 files / 92 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。

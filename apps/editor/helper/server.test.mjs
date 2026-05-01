@@ -112,6 +112,19 @@ describe("helper server", () => {
     expect(saved.id).toBe("new-map");
   });
 
+  it("rejects new map saves when the derived content/maps file already exists", async () => {
+    await restartWithTempRepo();
+    const response = await postJson("/api/map-editor/save", {
+      data: minimalMap("default-map"),
+    });
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error.code).toBe("file_exists");
+    const saved = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/default-map.json"), "utf8"));
+    expect(saved.name).toBe("default-map");
+  });
+
   it("rejects map saves outside content/maps", async () => {
     await restartWithTempRepo();
     const response = await postJson("/api/map-editor/save", {

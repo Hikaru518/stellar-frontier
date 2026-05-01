@@ -853,7 +853,8 @@ p {
 
 .semantic-brush-panel,
 .tile-inspector,
-.tile-palette {
+.tile-palette,
+.validation-panel {
   display: grid;
   gap: 8px;
   border: 1px dashed #b45b13;
@@ -1068,6 +1069,49 @@ p {
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
   overflow-wrap: anywhere;
+}
+
+.validation-issue-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.validation-issue button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  width: 100%;
+  gap: 7px;
+  border: 1px solid #d0b69b;
+  background: rgba(247, 244, 236, 0.72);
+  padding: 7px;
+  text-align: left;
+}
+
+.validation-error button {
+  border-color: #8a3d1a;
+  background: #fff3ec;
+}
+
+.validation-issue button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.validation-issue strong,
+.validation-issue small,
+.validation-issue span:last-child {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.validation-issue small {
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
 }
 
 @media (max-width: 980px) {

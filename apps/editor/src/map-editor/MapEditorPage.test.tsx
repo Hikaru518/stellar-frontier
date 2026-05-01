@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MapEditorApiError } from "./apiClient";
 import MapEditorPage from "./MapEditorPage";
@@ -228,6 +228,113 @@ describe("MapEditorPage", () => {
 
     expect(container.querySelectorAll(".map-grid-visual-layer .tile-sprite")).toHaveLength(1);
     expect(screen.getByLabelText("Terrain")).toHaveValue("平原");
+  });
+
+  it("shows dirty state and clears it after helper validation and save succeed", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [createMapAsset("default-map", "Default Map", "content/maps/default-map.json", { withLayer: true })],
+        tileset_registry: createTilesetRegistry(),
+      }),
+    );
+    const validateMap = vi.fn(async () => ({ valid: true, errors: [], warnings: [] }));
+    const saveMap = vi.fn(async () => ({ saved: true, file_path: "content/maps/default-map.json", errors: [], warnings: [] }));
+
+    render(<MapEditorPage loadLibrary={loadLibrary} validateMap={validateMap} saveMap={saveMap} />);
+
+    expect(await screen.findByRole("heading", { name: "Default Map" })).toBeInTheDocument();
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select tile index 3" }));
+    pointerDown(screen.getByRole("button", { name: "Select tile 1-1" }));
+    pointerUp(screen.getByRole("button", { name: "Select tile 1-1" }));
+    expect(screen.getByText("Unsaved")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(saveMap).toHaveBeenCalledTimes(1));
+    expect(validateMap.mock.invocationCallOrder[0]!).toBeLessThan(saveMap.mock.invocationCallOrder[0]!);
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+  });
+
+  it("shows validation errors, does not save, and jumps tile issues to the map selection", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [createMapAsset("default-map", "Default Map", "content/maps/default-map.json", { withLayer: true })],
+      }),
+    );
+    const validateMap = vi.fn(async () => ({
+      valid: false,
+      errors: [
+        {
+          severity: "error" as const,
+          code: "unknown_visual_cell_tile",
+          message: "Visual cell references missing tile.",
+          target: { kind: "cell" as const, tileId: "2-3", layerId: "base" },
+        },
+      ],
+      warnings: [],
+    }));
+    const saveMap = vi.fn();
+
+    render(<MapEditorPage loadLibrary={loadLibrary} validateMap={validateMap} saveMap={saveMap} />);
+
+    expect(await screen.findByRole("heading", { name: "Default Map" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("unknown_visual_cell_tile")).toBeInTheDocument();
+    expect(saveMap).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("unknown_visual_cell_tile").closest("button") as HTMLButtonElement);
+
+    expect(screen.getByRole("button", { name: "Select tile 2-3" })).toHaveClass("map-grid-tile-selected");
+  });
+
+  it("adds a newly saved map to the file list and can reopen it", async () => {
+    const loadLibrary = vi.fn(async () => createLibraryResponse());
+    const validateMap = vi.fn(async () => ({ valid: true, errors: [], warnings: [] }));
+    const saveMap = vi.fn(async () => ({ saved: true, file_path: "content/maps/crash-site.json", errors: [], warnings: [] }));
+
+    render(<MapEditorPage loadLibrary={loadLibrary} validateMap={validateMap} saveMap={saveMap} />);
+
+    await screen.findByText("No map draft open");
+    const form = screen.getByRole("form", { name: "New Map" });
+    fireEvent.change(within(form).getByLabelText("ID"), { target: { value: "crash-site" } });
+    fireEvent.change(within(form).getByLabelText("Name"), { target: { value: "Crash Site" } });
+    fireEvent.change(within(form).getByLabelText("Rows"), { target: { value: "2" } });
+    fireEvent.change(within(form).getByLabelText("Cols"), { target: { value: "2" } });
+    fireEvent.click(within(form).getByRole("button", { name: "New Map" }));
+
+    expect(screen.getByText("Unsaved")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(saveMap).toHaveBeenCalledWith({
+      filePath: null,
+      data: expect.objectContaining({ id: "crash-site" }),
+    }));
+    expect(screen.getByRole("button", { name: "Select crash-site" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select crash-site" }));
+    expect(screen.getByRole("heading", { name: "Crash Site" })).toBeInTheDocument();
+  });
+
+  it("shows helper file_exists conflicts without clearing dirty state", async () => {
+    const loadLibrary = vi.fn(async () => createLibraryResponse());
+    const validateMap = vi.fn(async () => ({ valid: true, errors: [], warnings: [] }));
+    const saveMap = vi.fn(async () =>
+      Promise.reject(new MapEditorApiError("file_exists", "Map file already exists.", { status: 409 })),
+    );
+
+    render(<MapEditorPage loadLibrary={loadLibrary} validateMap={validateMap} saveMap={saveMap} />);
+
+    await screen.findByText("No map draft open");
+    const form = screen.getByRole("form", { name: "New Map" });
+    fireEvent.change(within(form).getByLabelText("ID"), { target: { value: "default-map" } });
+    fireEvent.change(within(form).getByLabelText("Name"), { target: { value: "Default Map" } });
+    fireEvent.click(within(form).getByRole("button", { name: "New Map" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("file_exists")).toBeInTheDocument();
+    expect(screen.getAllByText("A map file with this id already exists. Rename the new map before saving.").length).toBeGreaterThan(0);
+    expect(screen.getByText("Unsaved")).toBeInTheDocument();
   });
 });
 

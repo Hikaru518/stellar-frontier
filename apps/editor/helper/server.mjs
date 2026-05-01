@@ -98,9 +98,13 @@ async function routeRequest(request, response, { repoRoot }) {
       return;
     }
 
+    const explicitSavePath = hasExplicitMapSavePath(body);
     const filePath = getMapSavePath(body, data);
     const guard = createPathGuard(repoRoot, ["content/maps"]);
     const absolutePath = guard.resolveAllowedPath(filePath);
+    if (!explicitSavePath && await fileExists(absolutePath)) {
+      throw httpError(409, "file_exists", `Map file already exists: ${filePath}`);
+    }
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
     await fs.writeFile(absolutePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
     sendJson(response, 200, {
@@ -199,6 +203,10 @@ function getMapSavePath(body, data) {
   return filePath;
 }
 
+function hasExplicitMapSavePath(body) {
+  return typeof body?.file_path === "string" || typeof body?.map?.file_path === "string";
+}
+
 function defaultMapSavePath(data) {
   if (typeof data?.id !== "string" || !/^[a-z][a-z0-9_-]*$/.test(data.id)) {
     throw httpError(400, "invalid_map_id", "Map id must be a safe file name.");
@@ -222,6 +230,15 @@ function httpError(statusCode, code, message) {
   error.statusCode = statusCode;
   error.code = code;
   return error;
+}
+
+async function fileExists(absolutePath) {
+  try {
+    await fs.access(absolutePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function sendJson(response, statusCode, body) {

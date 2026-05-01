@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapEditorApiError, HELPER_START_COMMAND, loadMapEditorLibrary } from "./apiClient";
+import { MapEditorApiError, HELPER_START_COMMAND, loadMapEditorLibrary, saveMapDraft, validateMapDraft } from "./apiClient";
 import { createInitialMapEditorState, normalizeMapEditorDraft } from "./mapEditorModel";
 import { mapEditorReducer } from "./mapEditorReducer";
 import LayerPanel from "./LayerPanel";
@@ -9,22 +9,32 @@ import SemanticBrushPanel from "./SemanticBrushPanel";
 import TileInspector from "./TileInspector";
 import TilePalette from "./TilePalette";
 import Toolbar, { type MapEditorTool } from "./Toolbar";
-import type { MapEditorLibraryResponse } from "./apiClient";
+import ValidationPanel, { getIssueLayerId, getIssueTileId } from "./ValidationPanel";
+import type { MapEditorLibraryMap, MapEditorLibraryResponse, MapValidationIssue, SaveMapResponse, ValidateMapResponse } from "./apiClient";
 import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapVisualCellDefinition, SemanticBrush } from "./types";
 
 type LoadLibrary = () => Promise<MapEditorLibraryResponse>;
+type ValidateMap = (input: { filePath?: string | null; data: MapEditorDraft }) => Promise<ValidateMapResponse>;
+type SaveMap = (input: { filePath?: string | null; data: MapEditorDraft }) => Promise<SaveMapResponse>;
 
 interface MapEditorPageProps {
   loadLibrary?: LoadLibrary;
+  validateMap?: ValidateMap;
+  saveMap?: SaveMap;
 }
 
-export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: MapEditorPageProps) {
+export default function MapEditorPage({
+  loadLibrary = loadMapEditorLibrary,
+  validateMap = validateMapDraft,
+  saveMap = saveMapDraft,
+}: MapEditorPageProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [library, setLibrary] = useState<MapEditorLibraryResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [editorState, setEditorState] = useState<MapEditorState | null>(null);
   const [activeMapFilePath, setActiveMapFilePath] = useState<string | null>(null);
+  const [savedDraft, setSavedDraft] = useState<MapEditorDraft | null>(null);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [soloLayerId, setSoloLayerId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<MapEditorTool>("select");
@@ -33,6 +43,11 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
   const [gameplayOverlay, setGameplayOverlay] = useState(false);
   const [recentTiles, setRecentTiles] = useState<MapVisualCellDefinition[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [validationIssues, setValidationIssues] = useState<{ errors: MapValidationIssue[]; warnings: MapValidationIssue[] }>({
+    errors: [],
+    warnings: [],
+  });
+  const [saveState, setSaveState] = useState<"idle" | "validating" | "saving">("idle");
 
   useEffect(() => {
     let isActive = true;
@@ -48,10 +63,13 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
         setLibrary(nextLibrary);
         const firstMap = nextLibrary.maps[0] ?? null;
         setSelectedMapId(firstMap?.id ?? null);
-        setEditorState(firstMap ? createInitialMapEditorState(toDraft(firstMap.data)) : null);
+        const firstDraft = firstMap ? toDraft(firstMap.data) : null;
+        setEditorState(firstDraft ? createInitialMapEditorState(firstDraft) : null);
         setActiveMapFilePath(firstMap?.file_path ?? null);
+        setSavedDraft(firstDraft);
         setSelectedTileId(firstMap?.data.originTileId ?? null);
         setSoloLayerId(null);
+        setValidationIssues({ errors: [], warnings: [] });
         setNotice(null);
         setStatus("loaded");
       })
@@ -79,8 +97,10 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
     setSelectedMapId(map.id);
     setEditorState(nextState);
     setActiveMapFilePath(map.file_path);
+    setSavedDraft(nextState.draft);
     setSelectedTileId(nextState.draft.originTileId);
     setSoloLayerId(null);
+    setValidationIssues({ errors: [], warnings: [] });
     setNotice(null);
   }
 
@@ -88,9 +108,11 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
     const nextState = createInitialMapEditorState(draft);
     setSelectedMapId(draft.id);
     setEditorState(nextState);
-    setActiveMapFilePath(`content/maps/${draft.id}.json`);
+    setActiveMapFilePath(null);
+    setSavedDraft(null);
     setSelectedTileId(draft.originTileId);
     setSoloLayerId(null);
+    setValidationIssues({ errors: [], warnings: [] });
     setNotice(null);
   }
 
@@ -106,6 +128,68 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
       }
       return nextState;
     });
+  }
+
+  const isDirty = editorState ? !savedDraft || serializeDraft(editorState.draft) !== serializeDraft(savedDraft) : false;
+
+  async function handleSave() {
+    if (!editorState || saveState !== "idle") {
+      return;
+    }
+
+    const request = { filePath: activeMapFilePath, data: editorState.draft };
+    setSaveState("validating");
+    setNotice("Validating map draft...");
+
+    try {
+      const validation = await validateMap(request);
+      setValidationIssues({ errors: validation.errors, warnings: validation.warnings });
+      if (!validation.valid || validation.errors.length > 0) {
+        setNotice("Validation failed. Fix the listed issues before saving.");
+        setSaveState("idle");
+        return;
+      }
+
+      setSaveState("saving");
+      setNotice("Saving map draft...");
+      const result = await saveMap(request);
+      setValidationIssues({ errors: result.errors ?? [], warnings: result.warnings ?? validation.warnings });
+      if (!result.saved) {
+        setNotice("Save failed. Fix the listed issues before saving.");
+        setSaveState("idle");
+        return;
+      }
+
+      const filePath = result.file_path ?? activeMapFilePath ?? `content/maps/${editorState.draft.id}.json`;
+      const savedMap: MapEditorLibraryMap = {
+        id: editorState.draft.id,
+        file_path: filePath,
+        data: editorState.draft,
+      };
+      setLibrary((current) => (current ? upsertLibraryMap(current, savedMap) : current));
+      setSelectedMapId(savedMap.id);
+      setActiveMapFilePath(filePath);
+      setSavedDraft(editorState.draft);
+      setNotice(`Saved ${filePath}.`);
+    } catch (saveError) {
+      const issue = issueFromSaveError(saveError);
+      setValidationIssues({ errors: [issue], warnings: [] });
+      setNotice(issue.message);
+    } finally {
+      setSaveState("idle");
+    }
+  }
+
+  function handleIssueSelect(issue: MapValidationIssue) {
+    const tileId = getIssueTileId(issue);
+    const layerId = getIssueLayerId(issue);
+    if (tileId) {
+      setSelectedTileId(tileId);
+    }
+    if (layerId) {
+      dispatch({ type: "layer/setActive", layerId });
+      setSoloLayerId(null);
+    }
   }
 
   if (status === "loading") {
@@ -155,11 +239,14 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
           soloLayerId={soloLayerId}
           gameplayOverlay={gameplayOverlay}
           notice={notice}
+          dirty={isDirty}
+          saving={saveState !== "idle"}
           onSelectTile={setSelectedTileId}
           onToolChange={changeTool}
           onSelectBrush={selectBrush}
           onNotice={setNotice}
           onGameplayOverlayChange={setGameplayOverlay}
+          onSave={handleSave}
           onCommand={dispatch}
         />
 
@@ -172,10 +259,12 @@ export default function MapEditorPage({ loadLibrary = loadMapEditorLibrary }: Ma
           recentTiles={recentTiles}
           soloLayerId={soloLayerId}
           gameplayOverlay={gameplayOverlay}
+          validationIssues={validationIssues}
           onSelectBrush={selectBrush}
           onActiveSemanticBrushChange={changeSemanticBrush}
           onSoloLayerChange={setSoloLayerId}
           onGameplayOverlayChange={setGameplayOverlay}
+          onIssueSelect={handleIssueSelect}
           onCommand={dispatch}
         />
       </div>
@@ -239,11 +328,14 @@ function MapCanvasShell({
   soloLayerId,
   gameplayOverlay,
   notice,
+  dirty,
+  saving,
   onSelectTile,
   onToolChange,
   onSelectBrush,
   onNotice,
   onGameplayOverlayChange,
+  onSave,
   onCommand,
 }: {
   activeMapFilePath: string | null;
@@ -256,11 +348,14 @@ function MapCanvasShell({
   soloLayerId: string | null;
   gameplayOverlay: boolean;
   notice: string | null;
+  dirty: boolean;
+  saving: boolean;
   onSelectTile: (tileId: string) => void;
   onToolChange: (tool: MapEditorTool) => void;
   onSelectBrush: (tile: MapVisualCellDefinition) => void;
   onNotice: (message: string | null) => void;
   onGameplayOverlayChange: (enabled: boolean) => void;
+  onSave: () => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
   const [rectangleStartTileId, setRectangleStartTileId] = useState<string | null>(null);
@@ -286,6 +381,8 @@ function MapCanvasShell({
         activeTool={activeTool}
         soloLayerId={soloLayerId}
         activeMapFilePath={activeMapFilePath}
+        dirty={dirty}
+        saving={saving}
         onToolChange={(tool) => {
           setRectangleStartTileId(null);
           onToolChange(tool);
@@ -293,6 +390,7 @@ function MapCanvasShell({
         }}
         onUndo={() => onCommand({ type: "history/undo" })}
         onRedo={() => onCommand({ type: "history/redo" })}
+        onSave={onSave}
       />
 
       <div className="map-preview-toggle" role="group" aria-label="Preview mode">
@@ -444,10 +542,12 @@ function MapSummaryPanel({
   recentTiles,
   soloLayerId,
   gameplayOverlay,
+  validationIssues,
   onSelectBrush,
   onActiveSemanticBrushChange,
   onSoloLayerChange,
   onGameplayOverlayChange,
+  onIssueSelect,
   onCommand,
 }: {
   library: MapEditorLibraryResponse;
@@ -458,10 +558,12 @@ function MapSummaryPanel({
   recentTiles: MapVisualCellDefinition[];
   soloLayerId: string | null;
   gameplayOverlay: boolean;
+  validationIssues: { errors: MapValidationIssue[]; warnings: MapValidationIssue[] };
   onSelectBrush: (tile: MapVisualCellDefinition) => void;
   onActiveSemanticBrushChange: (brush: SemanticBrush | null) => void;
   onSoloLayerChange: (layerId: string | null) => void;
   onGameplayOverlayChange: (enabled: boolean) => void;
+  onIssueSelect: (issue: MapValidationIssue) => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
   if (!editorState) {
@@ -556,10 +658,11 @@ function MapSummaryPanel({
         )}
       </section>
 
-      <section className="map-summary-card">
-        <h3>Validation</h3>
-        <p className="muted-text">Authoritative save validation will run through the local helper.</p>
-      </section>
+      <ValidationPanel
+        errors={validationIssues.errors}
+        warnings={validationIssues.warnings}
+        onIssueSelect={onIssueSelect}
+      />
     </aside>
   );
 }
@@ -616,4 +719,42 @@ function formatSemanticBrush(brush: SemanticBrush): string {
     return brush.discovered ? "initial discovered" : "initial hidden";
   }
   return "origin";
+}
+
+function serializeDraft(draft: MapEditorDraft): string {
+  return JSON.stringify(draft);
+}
+
+function upsertLibraryMap(library: MapEditorLibraryResponse, savedMap: MapEditorLibraryMap): MapEditorLibraryResponse {
+  const existingIndex = library.maps.findIndex(
+    (map) => map.file_path === savedMap.file_path || map.id === savedMap.id,
+  );
+  const maps = existingIndex >= 0
+    ? library.maps.map((map, index) => (index === existingIndex ? savedMap : map))
+    : [...library.maps, savedMap];
+
+  return {
+    ...library,
+    maps,
+  };
+}
+
+function issueFromSaveError(error: unknown): MapValidationIssue {
+  if (error instanceof MapEditorApiError) {
+    return {
+      severity: "error",
+      code: error.code,
+      message: error.code === "file_exists"
+        ? "A map file with this id already exists. Rename the new map before saving."
+        : error.message,
+      target: { kind: "map" },
+    };
+  }
+
+  return {
+    severity: "error",
+    code: "save_failed",
+    message: error instanceof Error ? error.message : "Save failed.",
+    target: { kind: "map" },
+  };
 }
