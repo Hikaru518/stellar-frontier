@@ -25,7 +25,7 @@ source:
 | #  | Task ID  | 标题                                                            | 状态       | 尝试次数 |
 |----|----------|----------------------------------------------------------------|-----------|---------|
 | 1  | TASK-001 | 构建期注入 __APP_VERSION__ 与 worker tsconfig 准备               | completed | 1       |
-| 2  | TASK-002 | logger 模块类型定义骨架（LogEntry / 协议）                        | pending   | 0       |
+| 2  | TASK-002 | logger 模块类型定义骨架（LogEntry / 协议）                        | completed | 1       |
 | 3  | TASK-003 | 信封自动填充与内存环形缓冲（envelope + ringBuffer）                | pending   | 0       |
 | 4  | TASK-004 | OPFS run store（Worker 内文件管理抽象）                          | pending   | 0       |
 | 5  | TASK-005 | logger.worker.ts 入口与消息处理                                  | pending   | 0       |
@@ -61,3 +61,16 @@ source:
   - 修改 `apps/pc-client/src/test/setup.ts`：注入 `globalThis.__APP_VERSION__ = pkg.version`
   - 新增 `apps/pc-client/src/appVersion.test.ts`：3 个 TDD 用例覆盖三条 AC
 - 质量检查: lint PASS（`tsc --noEmit` exit 0）；test PASS（26 files / 196 tests，含新增 3 个 + 原 193 个全绿）
+
+### TASK-002: logger 模块类型定义骨架（LogEntry / 协议）
+
+- 状态: completed
+- 完成时间: 2026-05-01 04:55
+- 尝试次数: 1
+- Monkey summary:
+  - 创建 `apps/pc-client/src/logger/types.ts`（LogSource / LogEntryEnvelope / 9 个 LogEntry 变体 discriminated union / LogInput 用 distributive Pick / RunArchive / LoggerError class）
+  - 创建 `apps/pc-client/src/logger/worker-protocol.ts`（LogWorkerCommand 7 kinds / LogWorkerEvent 6 kinds，error.cmdKind 用 LogWorkerCommand["kind"] 强绑）
+  - 创建 `apps/pc-client/src/logger/broadcast-protocol.ts`（LoggerBroadcastMessage 3 kinds + LOGGER_CHANNEL / HEARTBEAT_INTERVAL_MS / CLAIM_GRACE_MS / HOLDER_TIMEOUT_MS 常量）
+  - 创建 `apps/pc-client/src/logger/__tests__/types.compile.test.ts`（12 个 TDD 用例：narrow 行为 / 3 个 @ts-expect-error 反例 / exhaustive switch with assertNever）
+  - 设计要点：LogInput 用 distributive conditional 派生（`LogEntry extends infer E ? E extends LogEntry ? Pick<E, ...> : never : never`），新增变体自动同步
+- 质量检查: lint PASS；test PASS（27 files / 208 tests，新增 1 文件 12 用例，原 196 个无退化）
