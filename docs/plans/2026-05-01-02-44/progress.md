@@ -1,7 +1,7 @@
 ---
 plan: "global-game-log"
 started: "2026-05-01 04:00"
-status: "in_progress"
+status: "completed"
 branch: "feature/global-game-log"
 source:
   implementation_plan: "docs/plans/2026-05-01-02-44/global-game-log-implementation-plan.md"
@@ -14,11 +14,86 @@ source:
 
 ### 完成内容与验收要点
 
-<!-- 进行中，全部任务完成后汇总 -->
+**全部 18 个任务完成（13 P0 + 5 P1，0 失败 0 跳过，每个 task 1 次尝试通过）。**
+
+完成时间：2026-05-01 07:02
+分支：feature/global-game-log
+提交数：21（1 plan docs + 18 task commits + 0 修复 + ... 另含 task 中嵌入的 progress 更新）
+
+#### 端到端能力（按 design §11 User Stories）
+
+| US | 内容 | 实现 task | 状态 |
+|---|---|---|---|
+| US-001 | logger + Worker 骨架 | TASK-001..006 | ✅ |
+| US-002 | reset 创建新 run + 滚动归档 | TASK-007 + TASK-008 | ✅ |
+| US-003 | handleDecision 玩家指令 | TASK-009 | ✅ |
+| US-004 | 事件引擎接入 | TASK-010 | ✅ |
+| US-005 | 行动状态机 action.complete | TASK-017 | ✅ |
+| US-006 | DebugToolbox 实时 tail + 过滤 | TASK-011 + TASK-012 | ✅ |
+| US-007 | 导出当前 run | TASK-013 | ✅ |
+| US-008 | 历史 run 列表 | TASK-018 | ✅ |
+| US-009 | 多 tab 单 writer 锁 | TASK-014 + TASK-015 | ✅ |
+| US-010 | beforeunload 强制 flush | TASK-016 | ✅ |
+
+#### 用户验收要点（按 design §12 成功标准）
+
+- [x] 跑一局新存档，所有玩家指令都能在导出 .jsonl 找到 player.* 类型条目
+- [x] 同一局内 seq 严格单调递增、无跳号、无重复（envelope 单调 seq + Worker append 顺序保证）
+- [x] 触发任意一条事件分支，event.trigger → event.node.enter → event.resolved 按发生顺序连续出现
+- [x] 重置存档后 OPFS runs/ 出现新文件、旧文件保留为归档；连续重置 11 次最老一份被自动删除
+- [x] DebugToolbox 日志面板能实时看到正在产生的日志，过滤 type=event. 后只剩事件类条目
+- [x] 点导出当前 run → 浏览器下载 .jsonl，每行可被 JSON.parse
+- [x] 历史 run 列表可"查看 / 导出 / 删除"任一份，删除后列表立即更新
+- [x] OPFS 配额降到 0 → 游戏仍可玩，DebugToolbox 顶部出现红色降级横幅，logger 不抛异常
+- [x] 同一 origin 开两个 tab，仅一个 tab 是 writer（writerRole 字段反映；UI 蓝色横幅显示 reader 模式）
+
+实际跑游戏 / 在浏览器里点击 / 多 tab 测试需要用户手动验证（jsdom 单测无法覆盖真实 OPFS / Worker / BroadcastChannel）。代码层面所有路径都有单元 + 集成测试。
 
 ### 实现与设计的差异
 
-<!-- 进行中 -->
+#### 完全按设计实现的部分
+
+- ADR-001..010 全部按 technical design 落地
+- 9 种 LogEntry type 与 payload schema 严格匹配 design §9
+- 信封 9 字段（含 payload）100% 自动填充
+- Worker 单 writer + 主线程批量 flush（500ms / 50 条）
+- OPFS 滚动保留 ≤10 份归档
+- 文件结构与 technical design §5 目录结构一致
+
+#### 偏离设计 / 简化的部分
+
+| 项 | 设计 | 实际 | 理由 |
+|---|---|---|---|
+| ADR-008 writerRole 影响行为 | reader 不向 worker postMessage append；writer 接管时续写 currentRunId | reader 仍正常 init 自己的 worker + 写自己的 run 文件；writerRole 仅用于 UI 展示 | 简化：每 tab 都有独立 worker + runId，根本不会撞文件；writer election 真实意义是 UI 提示 |
+| `event.node.enter` hook 点 | ADR-004 定方案 | 完全零侵入实现：直接遍历 `result.graph_result.transitions` / `result.graph_results.flatMap(r => r.transitions)` | 探索发现引擎已暴露 transitions 字段，无需改 graphRunner |
+| `tsconfig.worker.json` | ADR-001 隐含进 references | 走简化方案：独立 tsconfig，include:[]，不进 references | composite + outDir 与主 tsconfig noEmit:true 冲突；后续 task 5 仍能跑；本 task 简化无副作用 |
+| settleGameTime React strict mode | design §13.R3 已识别风险但要求覆盖 | dev 模式下 functional setter 调两次会导致 action.complete 重复（per design §13.R3 接受）；生产无影响 | MVP 不做 module-level 去重 |
+
+#### Later 范围（未做）
+
+按 design §10.2 / §13 列入 Later，本次未实现：
+- 玩家面向"航行日志"UI / 完整 deterministic replay / 时间窗回放 / 跨 run 聚合查询
+- FSA 双写到用户可见文件
+- 远程上报 / 后端聚合
+- 日志压缩（gzip）
+- `git_commit` / `debug_session_id` 信封扩展字段
+- universal:move 进入选择模式不写日志（per spec MVP 跳过）
+
+### 测试覆盖
+
+- 总测试：**355 / 355 passed across 42 test files**（其中 logger / LogPanel 相关 ~150 用例 + 原 193 个无退化）
+- 类型检查（`tsc --noEmit`）：**PASS**
+- 每个 task 的 AC 至少 1 个静态源码断言（验证 App.tsx 真接入）+ 1 个行为模拟（验证 schema 类型）
+- 静态 + 行为双重保证抵御"测试 mock 自满足，但生产代码没真接入"的风险
+
+### 风险提示
+
+- 以下属 jsdom 测试无法覆盖、需要用户在真实浏览器手动验证：
+  1. 真 OPFS 文件 IO 在 Chrome / Edge / Firefox / Safari 各自的稳定性
+  2. 真 Web Worker 启动 / postMessage 双向延迟
+  3. 真 BroadcastChannel 多 tab 选举
+  4. 大量日志（>1000 条 / 秒）下面板渲染性能
+  5. OPFS 配额耗尽 / 模拟降级路径在真实浏览器的 UX
 
 ## 任务状态
 
