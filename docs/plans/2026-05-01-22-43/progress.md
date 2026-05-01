@@ -36,7 +36,7 @@ source:
 | 2 | TASK-002 | 实现 helper 地图库读取与 authoritative validation | completed | 1 |
 | 3 | TASK-003 | 新增 Map Editor helper HTTP API 与资产服务 | completed | 1 |
 | 4 | TASK-004 | 建立 Map Editor 前端模型、commands 与 visual layer 操作 | completed | 1 |
-| 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | pending | 0 |
+| 5 | TASK-005 | 启用 editor 模块切换并加载 Map Editor shell | completed | 1 |
 | 6 | TASK-006 | 实现新建地图、地图网格与基础图层面板 | pending | 0 |
 | 7 | TASK-007 | 实现 tileset palette 与视觉铺图工具 | pending | 0 |
 | 8 | TASK-008 | 实现 gameplay inspector、semantic brush 与 Gameplay Overlay | pending | 0 |
@@ -89,3 +89,11 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。新增 map editor 前端类型、draft 创建、reducer/history 和 visual layer 纯操作；实现 brush、eraser、bucket fill、rectangle fill、locked layer no-op、visual command undo/redo，history 限制 100 步。子 agent 验证 `npm run editor:test` 通过（14 files / 55 tests），editor lint 通过。
 - Main verification: 发现并修复 `createInitialMapEditorState` 在旧地图缺失 `visual` 字段时 active layer 读取未 normalize 的边界问题，补充测试；`git diff --check` 通过；`npm run editor:test` 通过（14 files / 56 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
+
+### TASK-005: 启用 editor 模块切换并加载 Map Editor shell
+- 状态: completed
+- 开始时间: 2026-05-02 00:43
+- 完成时间: 2026-05-02 00:51
+- 尝试次数: 1
+- Monkey summary: 成功。启用 Event/Map 顶部模块切换，新增 Map Editor API client 和 shell，支持 helper loading/error/empty/ready 状态、helper unavailable 启动提示、地图文件列表、默认选择第一张地图与基础摘要面板。子 agent 验证 `npm run editor:test` 通过（16 files / 64 tests），editor lint 通过。
+- Main verification: 复核 `App.tsx` 与 Map Editor shell，确认 Map Editor 按钮不再 disabled、切回 Event Editor 仍走原页面、helper unavailable 显示 `npm run editor:helper`、library loaded 时默认选中第一张地图；`git diff --check` 通过；`npm run editor:test` 通过（16 files / 64 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过。
