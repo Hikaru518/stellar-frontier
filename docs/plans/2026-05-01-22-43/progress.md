@@ -1,7 +1,7 @@
 ---
 plan: "map-editor-ux"
 started: "2026-05-02 00:08"
-status: "in_progress"
+status: "completed"
 branch: "codex-map-editor-ux"
 source:
   implementation_plan: "docs/plans/2026-05-01-22-43/map-editor-ux-implementation-plan.md"
@@ -16,11 +16,11 @@ source:
 
 ### 完成内容与验收要点
 
-进行中。先补齐 pencil UI 场景草图，再按 `map-editor-ux-tasks.json` 串行派发实现任务。每个实现任务完成后由主 agent 复核验证并创建独立 commit。
+已完成。先补齐 Pencil UI 场景草图，再按 `map-editor-ux-tasks.json` 串行派发并复核 TASK-001 至 TASK-012；每个实现任务均有独立 commit。
 
 ### 实现与设计的差异
 
-进行中。最终会对照 `map-editor-ux-design.md` 的 user stories 与用户旅程逐项回归。
+设计范围基本落地。根级 `npm run lint` / `npm run test` 在当前 Rush/Node 环境被 `ERROR: Unexpected output from "ps" command` 阻断，已记录 caveat，并用 editor/pc-client package 级 lint/test 完成替代验证；PC runtime 地图文件切换仍按设计保持 out of scope。
 
 ## 前置产出
 
@@ -43,7 +43,7 @@ source:
 | 9 | TASK-009 | 实现保存、validation panel 与 dirty/history UX | completed | 1 |
 | 10 | TASK-010 | 让 PC content 与 mapView 派生 visual sprite layers | completed | 1 |
 | 11 | TASK-011 | 在 PC Phaser MapScene 渲染 authored visual layers | completed | 1 |
-| 12 | TASK-012 | 收尾验证地图编辑器端到端闭环 | pending | 0 |
+| 12 | TASK-012 | 收尾验证地图编辑器端到端闭环 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -145,3 +145,12 @@ source:
 - 尝试次数: 1
 - Monkey summary: 成功。`MapScene.preload` 从 tileset registry 加载 public spritesheet；runtime 将 discovered tile 的 authored visual layers 按 order 渲染为 Phaser sprites，设置 frame、opacity、display size 和 depth；无 visual layer 或无 sprite API 时保留 terrain fallback。子 agent 验证 pc-client test 通过（29 files / 250 tests），pc-client lint 通过。
 - Main verification: 复核并修正渲染语义，确保 visual sprites 叠在 terrain fallback 上方而不是替代 fallback，避免透明 tile 丢失底色；`git diff --check` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 250 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过。
+
+### TASK-012: 收尾验证地图编辑器端到端闭环
+- 状态: completed
+- 开始时间: 2026-05-02 01:42
+- 完成时间: 2026-05-02 01:52
+- 尝试次数: 1
+- Monkey summary: 成功。补充 `map-editor-ux-implementation-plan.md` 的最终验收映射，覆盖 US-001..US-006、用户旅程、失败路径、验证命令和 Rush `ps` caveat；更新 `map-editor-ux-tasks.json`，补充 TASK-012 AC6 与 package 级 fallback 验证说明。子 agent 验证 tasks JSON parse、文档 diff check、content validation、editor test、editor lint、pc-client test/lint 均通过；根级 lint/test 被 Rush `ps` 环境问题阻断。
+- Main verification: `npm run validate:content` 通过；`npm run editor:test` 通过（21 files / 92 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor lint` 通过；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client test` 通过（29 files / 250 tests）；`node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client lint` 通过；`npm run lint` / `npm run test` 均被 `ERROR: Unexpected output from "ps" command` 阻断。
+- Browser smoke: 启动 helper 与 Vite editor 后，用 Playwright/Chromium 新建 `16 x 12` 临时地图、创建图层、用 Kenney tile index `3` 在 `1-1` 铺图、保存并刷新重开，保存前后 visual sprite 数均为 `1`，临时地图文件已清理。烟测发现并修复 preview buttons 被 grid row 拉伸的问题，修复后 Preview mode 高度为 `30px`，截图记录为 `/private/tmp/map-editor-task012-fixed.png`。

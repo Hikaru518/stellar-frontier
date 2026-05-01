@@ -377,6 +377,7 @@
       "files": {
         "create": [],
         "modify": [
+          "apps/editor/src/styles.css",
           "docs/plans/2026-05-01-22-43/map-editor-ux-implementation-plan.md",
           "docs/plans/2026-05-01-22-43/map-editor-ux-tasks.json"
         ],
@@ -391,9 +392,10 @@
         "AC2: `npm run editor:test` 通过。",
         "AC3: `npm run lint` 通过。",
         "AC4: `npm run test` 通过。",
-        "AC5: 手动验收记录覆盖新建 `16 x 12` 地图、创建图层、Kenney palette 铺图、保存后重新打开、PC 地图 fallback 和 visual layer 展示。"
+        "AC5: 手动验收记录覆盖新建 `16 x 12` 地图、创建图层、Kenney palette 铺图、保存后重新打开、PC 地图 fallback 和 visual layer 展示。",
+        "AC6: implementation plan 包含 US-001..US-006、用户旅程、失败路径、验证命令和 Rush `ps` 环境 caveat 的最终验收映射。"
       ],
-      "tech_notes": "不要在本任务扩大范围到 Tiled/LDtk 导入、auto-tiling、运行时地图切换或 Phaser editor preview。"
+      "tech_notes": "不要在本任务扩大范围到 Tiled/LDtk 导入、auto-tiling、运行时地图切换或 Phaser editor preview。若根级 `npm run lint` 或 `npm run test` 被 Rush `ps` issue 阻断，记录环境 caveat，并使用 editor/pc-client package 级 lint/test 作为可行替代验证。"
     }
   ]
 }

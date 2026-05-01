@@ -680,7 +680,7 @@ p {
 
 .map-canvas-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -705,8 +705,11 @@ p {
 }
 
 .map-preview-toggle {
+  grid-row: 2;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  align-content: start;
   gap: 6px;
 }
 
@@ -721,6 +724,7 @@ p {
 }
 
 .map-editor-notice {
+  grid-row: 3;
   margin: 0;
   border: 1px solid #b45b13;
   background: #f8f1e8;
@@ -731,6 +735,7 @@ p {
 }
 
 .map-grid-viewport {
+  grid-row: 4;
   display: grid;
   grid-template-columns: repeat(var(--map-cols), minmax(34px, 1fr));
   align-content: start;
