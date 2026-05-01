@@ -165,7 +165,11 @@ describe("buildCallView", () => {
     expect(view.groups.find((group) => group.title === blackPine!.name)).toBeUndefined();
   });
 
-  it("does not render removed generic object action buttons", () => {
+  it("renders scenario-specific actions for revealed mainline objects, but not for objects without a story event", () => {
+    // `iron-ridge-deposit` has no specific story event yet (per
+    // docs/plans/2026-04-29-15-29 §5.3) so it must NOT expose generic
+    // gather/survey buttons; the forge and warp-pod are wired to story
+    // events, so their per-object actions should appear.
     const tile = createTile("3-2");
     const gameState = createGameState({
       crew: [createMember({ currentTile: "3-2" })],
@@ -185,7 +189,16 @@ describe("buildCallView", () => {
     const view = buildCallView({ member: createMember({ currentTile: "3-2" }), tile, gameState });
     const actionIds = view.groups.flatMap((group) => group.actions.map((action) => action.id));
 
-    expect(actionIds.some((id) => !id.startsWith("universal:") && /:(survey|gather|build|extract|scan)$/.test(id))).toBe(false);
+    expect(actionIds).toEqual(
+      expect.arrayContaining([
+        "mainline-damaged-forge:survey",
+        "mainline-damaged-forge:build",
+        "mainline-damaged-warp-pod:survey",
+        "mainline-damaged-warp-pod:build",
+        "mainline-damaged-warp-pod:extract",
+      ]),
+    );
+    expect(actionIds.some((id) => id.startsWith("iron-ridge-deposit:"))).toBe(false);
   });
 
   it("does not render an object's actions before its visibility is satisfied", () => {
