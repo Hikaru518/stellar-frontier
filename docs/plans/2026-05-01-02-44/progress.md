@@ -39,7 +39,7 @@ source:
 | 13 | TASK-013 | LogPanel 导出当前 run 按钮                                       | completed | 1       |
 | 14 | TASK-014 | 多 tab writer 选举状态机（纯模块）                                | completed | 1       |
 | 15 | TASK-015 | logger facade 集成多 tab 写入选举                                | completed | 1       |
-| 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | pending   | 0       |
+| 16 | TASK-016 | App.tsx 接入 — beforeunload 强制 flush 与 run.end                | completed | 1       |
 | 17 | TASK-017 | App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete   | pending   | 0       |
 | 18 | TASK-018 | LogPanel 历史 run 列表（查看 / 导出 / 删除）                      | pending   | 0       |
 
@@ -233,3 +233,14 @@ source:
   - 修改 `facade.write.test.ts` AC1 用例：增加 `vi.advanceTimersByTime(300)` 等 claim grace 后读 writerRole（语义性修订，原"永远 writer"前提失效）
   - **设计决策**：facade 不根据 writerRole 改变 worker 调用行为（最简化方案，与 task 一致）；writerRole 仅做 UI 展示
 - 质量检查: lint PASS；test PASS（40 files / 331 tests，新增 1 文件，修改 1 文件）
+
+### TASK-016: App.tsx 接入 — beforeunload 强制 flush 与 run.end
+
+- 状态: completed
+- 完成时间: 2026-05-01 06:46
+- 尝试次数: 1
+- Monkey summary:
+  - 修改 App.tsx：import useRef；新增 elapsedGameSecondsRef + 同步 ref 的 useEffect；新增 beforeunload useEffect（mount-only，addEventListener + cleanup removeEventListener）
+  - handler 用闭包 fired flag 防多次触发；try/catch 兜底；同步 logger.log + void logger.flush（不 await）
+  - 创建 `__tests__/beforeunload.integration.test.tsx`（5 静态源码断言 + 3 行为模拟，共 8 用例）
+- 质量检查: lint PASS；test PASS（41 files / 339 tests，新增 1 文件 8 用例）

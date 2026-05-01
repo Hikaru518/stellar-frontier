@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
@@ -113,6 +113,38 @@ function App() {
       setPage("ending");
     }
   }, [returnHomeCompleted]);
+
+  // beforeunload 路径下 handler 必须同步访问最新的 elapsedGameSeconds，但下面
+  // 注册 listener 的 useEffect 依赖 `[]`，闭包会捕获 stale state。所以用 ref
+  // 同步 elapsedGameSeconds（design §10.1 / §11.US-010 / ADR-003）。
+  const elapsedGameSecondsRef = useRef(gameState.elapsedGameSeconds);
+  useEffect(() => {
+    elapsedGameSecondsRef.current = gameState.elapsedGameSeconds;
+  }, [gameState.elapsedGameSeconds]);
+
+  useEffect(() => {
+    // 浏览器关闭/刷新前 best-effort 写一条 system.run.end{reason:"unload"} 并
+    // 触发 flush。handler 必须同步：beforeunload 内不能 await。
+    let fired = false;
+    const handleBeforeUnload = (): void => {
+      if (fired) return;
+      fired = true;
+      try {
+        logger.log({
+          type: "system.run.end",
+          source: "system",
+          payload: { reason: "unload" },
+          gameSeconds: elapsedGameSecondsRef.current,
+        });
+        void logger.flush();
+      } catch {
+        // best-effort：忽略错误，不阻塞页面卸载。
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect
+  }, []);
 
   function appendLog(text: string, tone: Tone = "neutral") {
     setGameState((state) => ({
