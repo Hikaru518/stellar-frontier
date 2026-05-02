@@ -28,8 +28,8 @@
 
 | line_type | unique_id | story_event | source_anchor | target_file | status | priority |
 | --- | --- | --- | --- | --- | --- | --- |
-| side | 01 | 失温婚约（霜湾） | `IAFS_story.md` -> `### 支线 01：失温婚约（霜湾）` | `IAFS_side_01_frozen-vow.md` | todo | P0 |
-| side | 02 | 火井税单（烬炉） | `IAFS_story.md` -> `### 支线 02：火井税单（烬炉）` | `IAFS_side_02_firewell-tax-bill.md` | todo | P0 |
+| side | 01 | 失温婚约（霜湾） | `IAFS_story.md` -> `### 支线 01：失温婚约（霜湾）` | `IAFS_side_01_frozen-vow.md` | done | P0 |
+| side | 02 | 火井税单（烬炉） | `IAFS_story.md` -> `### 支线 02：火井税单（烬炉）` | `IAFS_side_02_firewell-tax-bill.md` | done | P0 |
 | side | 03 | 灰烬拾荒者（交界带） | `IAFS_story.md` -> `### 支线 03：灰烬拾荒者（交界带）` | `IAFS_side_03_ashland-scavengers.md` | done | P0 |
 | side | 04 | 孢子禁区（门域外围） | `IAFS_story.md` -> `### 支线 04：孢子禁区（门域外围）` | `IAFS_side_04_spore-quarantine-zone.md` | todo | P1 |
 | side | 05 | 妖精弃巢（生态观察） | `IAFS_story.md` -> `### 支线 05：妖精弃巢（生态观察）` | `IAFS_side_05_fairy-abandoned-nest.md` | todo | P1 |
