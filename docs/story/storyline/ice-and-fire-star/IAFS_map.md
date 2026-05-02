@@ -21,6 +21,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `reg_ashfrost_belt` | [灰烬霜带] | 交界主区域（region） | 冰火交界中央带，为一片带状区域而非单点 | `bbox: (96,96) -> (160,160)` | high | `IAFS_story.md` 第一阶段开场；`IAFS_wiki.md` 交界设定 |
 | `loc_crash_site` | 坠毁初始落点 | 交界子点位（point） | 位于 [灰烬霜带] 区域中心附近，主线开场点 | `(128,128)` | high | `IAFS_story.md` 第一阶段开场 |
+| `loc_scavenger_camp_ashfrost` | 拾荒营地 | 交界子点位（point） | [灰烬霜带] 内部的拾荒据点；支线 03 到达触发点 | `(132,120)` | medium | `IAFS_side_03_ashland-scavengers.md` arrival 触发 |
 | `loc_frostbay_settlement` | [霜湾聚落] | 聚落（冷端） | 位于交界北侧冷端，稳健落脚点 | `(128,168)` | high | `IAFS_story.md` 第一阶段选择；`IAFS_wiki.md` 聚落设定 |
 | `loc_cinderforge_settlement` | [烬炉城寨] | 聚落（热端） | 位于交界南侧热端，激进推进点 | `(128,88)` | high | `IAFS_story.md` 第一阶段选择；`IAFS_wiki.md` 聚落设定 |
 | `reg_gate_realm` | [门域] | 终局关键区域（region） | 位于交界带外缘深处，为多层结构区域而非单点 | `bbox: (140,136) -> (188,184)` | medium | `IAFS_story.md` 第三阶段主线；`IAFS_wiki.md` 门域设定 |
@@ -32,6 +33,7 @@
 - temporary bounds: `bbox: (96,96) -> (160,160)`
 - key points in region:
   - `loc_crash_site`（坠毁初始落点）
+  - `loc_scavenger_camp_ashfrost`（拾荒营地，支线 03 到达触发点）
   - `loc_old_border_route`（交界旧路，支线 01/03 高相关）
   - 第三阶段门域接近线的外围节点（与 `loc_gate_realm` 相邻）
 - map authoring note:
@@ -92,6 +94,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `loc_spore_quarantine` | [孢子禁区] | 支线 04 | 门域外围，靠近 `loc_gate_spore_front` | `(156,148)` | medium |
 | `loc_abandoned_fairy_node` | [妖精节点]（弃巢） | 支线 05 | 门域外围废墟群，建议与外围警戒环相邻 | `TBD` | low |
+| `loc_scavenger_camp_ashfrost` | 拾荒营地 | 支线 03 | [灰烬霜带] 内部临时据点；用于 `arrival` 触发支线 03 | `(132,120)` | medium |
 | `loc_old_border_route` | [灰烬霜带] 旧路 | 支线 01/03 | 交界带旧通道，连接霜湾与烬炉（region 内线性子路径） | `(128,144) -> (128,112)` | medium |
 | `loc_hightemp_corridor` | 高温走廊（最后一班矿车） | 支线 07 | 烬炉外侧高热矿道 | `TBD` | low |
 
@@ -99,6 +102,9 @@
 
 - [温带母村] 在设定上位于 [灰烬霜带] 北缘（历史地点），建议仅作为“历史图层”标注，不作为当前可达点。
 - [霜爆-热浪] 是环境机制，不是固定地点；在地图上应作为“动态危险图层”。
+- 风险语义补充：
+  - 本地居民默认受窗口直接影响，路径可达性与生存率随窗口剧烈波动。
+  - 探险队默认通过宇航服维持体温，不直接吃温伤；但跨区行动会持续消耗宇航服能源，应在事件中体现为能耗成本。
 - 第三阶段 A/B/C 在主线中作为“可选支线分支”出现，实际地图活动区主要围绕 [门域] 外围与双聚落联络线展开。
 
 ## 7) 后续对接建议

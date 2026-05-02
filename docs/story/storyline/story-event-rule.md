@@ -46,19 +46,25 @@
 
 ## 2) Story-Event 文档书写规则
 
-每个 story-event 文件使用同一骨架，顺序固定：
+story-event md 的首要读者是人（策划/编剧/协作开发），不是运行时解析器。
 
-1. `Meta`
-2. `Narrative Intent`
-3. `Trigger Contract`
-4. `Preconditions`
-5. `Node Flow`
-6. `Choice Matrix`
-7. `Effects Matrix`
-8. `Outcome & Mainline Coupling`
-9. `Call Template Notes`
-10. `Schema Draft`
-11. `Open Questions`
+- 文档应采用“故事驱动”分段，允许按剧情阶段命名 section（如“任务 1：食材搜集”“任务 2：烹饪”“任务 3：派对结算”）。
+- 只要信息完整，不强制每个文件使用完全一致的章节标题。
+- 运行时 JSON 会单独生产；md 的目标是“可读 + 可映射”。
+
+在每个剧情阶段（section）内部，事件信息必须按时间顺序组织，推荐固定为：
+
+1. `Trigger`（触发）
+2. `Condition`（进入条件）
+3. `Event Node`（节点流转）
+4. `Choice`（玩家选择）
+5. `Consequence`（后果/写回）
+
+说明：
+
+- 以上顺序用于提升阅读连贯性，避免“先看效果再猜原因”。
+- 允许在文件末尾集中放置 `Schema Draft`、`Call Template Notes`、`Open Questions`。
+- 若某一阶段无玩家选择，`Choice` 可标注 `N/A`，但需明确自动分支依据。
 
 ## 3) 各章节最小要求
 
@@ -76,52 +82,66 @@
 
 - 用 1-3 条说明玩家体验目标，不写实现细节。
 
-### 3.3 Trigger Contract
+### 3.3 Tone Narrative
+
+- 必须新增一个独立 section：`Tone Narrative`。
+- 该 section 要用该条剧情的指定语气（如严肃/幽默/科幻/哲学/浪漫/惊悚）把故事从触发到结局完整讲一遍。
+- 该 section 是“可读故事版本”，不替代事件图；事件图仍以 `Node Flow` 为准。
+- 建议长度：3-8 段或等价条目，覆盖“开场、冲突升级、关键选择、结局反转/余波”。
+- 约束：
+  - 不引入与 `Node Flow` 冲突的新事实。
+  - 不使用现代互联网语境词（如“网红/直播”等），除非该篇章世界观明确允许。
+
+### 3.4 Trigger Contract
+
 
 - 明确 `trigger.type`（如 `action_complete`、`call_choice`、`idle_time`）。
 - 给出 required context 字段。
 
-### 3.4 Preconditions
+### 3.5 Preconditions
 
 - 写成结构化条件语义，可映射到 condition schema。
 - 避免“自然语言不可判定”的条件描述。
 
-### 3.5 Node Flow
+### 3.6 Node Flow
 
 - 使用节点表或列表，必须包含：
   - `node_id`
   - `node_type`（来自 event graph 白名单）
   - `enter condition`
   - `next`（默认去向/分支去向）
+- 建议紧跟对应剧情阶段书写，不必集中到单独“全局 Node Flow 大章”。
 
-### 3.6 Choice Matrix
+### 3.7 Choice Matrix
 
 - 每个玩家选项必须有稳定 `option_id`。
 - 每个选项必须有明确后续节点与失败去向。
+- 建议与对应触发节点相邻书写，便于“读到这里就能看到可选项”。
 
-### 3.7 Effects Matrix
+### 3.8 Effects Matrix
 
 - 每条效果包含：`effect_type`、`target`、`params`、`failure_policy`、`record_policy`。
 - 明确是否写 `event_log` 和 `world_history`。
+- 建议按 `Consequence` 顺序展示（先写叙事后果，再写状态写回）。
 
-### 3.8 Outcome & Mainline Coupling
+### 3.9 Outcome & Mainline Coupling
 
 - 至少列出 2-3 个结局结果 key。
 - 写明对主线的影响（策略可行性、资源、信任、终局代价）。
 
-### 3.9 Call Template Notes
+### 3.10 Call Template Notes
 
 - 标注 `call_template_id`。
 - 明确 `option_lines` key 必须与 `options[].id` 一致。
 
-### 3.10 Schema Draft
+### 3.11 Schema Draft
 
 - 给出可直接落地的 JSON 草案骨架：
   - `event_definition`
   - `event_graph`
   - `call_template`（若有 call 节点）
 
-### 3.11 Open Questions
+### 3.12 Open Questions
 
 - 仅记录阻塞实现的问题。
 - 非阻塞项不进入该章节。
