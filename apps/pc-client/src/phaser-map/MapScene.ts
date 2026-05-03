@@ -25,23 +25,19 @@ const MAP_SCENE_KEY = "MapScene";
 const TERRAIN_DEPTH = 1;
 const DETAIL_DEPTH = 3;
 const GRID_DEPTH = 4;
-const TOOLTIP_BACKGROUND_DEPTH = 30;
-const TOOLTIP_TEXT_DEPTH = 31;
-const POPUP_BACKGROUND_DEPTH = 30;
-const POPUP_TEXT_DEPTH = 31;
 const PATH_DEPTH = 11;
 const TRAIL_DEPTH = 12;
-const AREA_LABEL_DEPTH = 13;
+const TILE_OVERLAY_DEPTH = 14;
 const CREW_MARKER_DEPTH = 20;
-const HOVER_DELAY_MS = 500;
 export const STEP_DURATION_MS = 250;
 export const ZOOM_LEVELS = [0.35, 0.7, 1.5, 3.0] as const;
 export const INITIAL_ZOOM_LEVEL_INDEX = 1;
 export const ZOOM_TWEEN_DURATION_MS = 350;
 export const LOD_DETAIL_THRESHOLD = 0.9;
 export const LOD_GRID_THRESHOLD = 1.2;
-export const AREA_LABEL_ZOOM_THRESHOLD = 0.7;
+export const CAMERA_EDGE_PADDING_RATIO = 0.35;
 const KEYBOARD_PAN_SPEED = 400;
+const VISUAL_TILE_STEP = TILE_SIZE;
 const tilesetRegistry = tilesetRegistryContent as TilesetRegistry;
 const CREW_MARKER_OFFSETS = [
   { x: 0, y: 0 },
@@ -57,18 +53,6 @@ interface TerrainObject {
   setStrokeStyle?: (lineWidth: number, color: number) => TerrainObject;
   setDisplaySize?: (width: number, height: number) => TerrainObject;
   destroy: () => void;
-}
-
-interface TextObject {
-  setOrigin: (x: number, y: number) => TextObject;
-  setDepth: (depth: number) => TextObject;
-  setVisible?: (visible: boolean) => TextObject;
-  destroy: () => void;
-}
-
-interface TimerEventLike {
-  remove?: (dispatchCallback?: boolean) => void;
-  destroy?: () => void;
 }
 
 interface LayerHolder {
@@ -135,7 +119,6 @@ interface MapSceneRuntime {
   add: {
     rectangle: (x: number, y: number, width: number, height: number, fillColor: number) => TerrainObject;
     sprite?: (x: number, y: number, texture: string, frame: number) => TerrainObject;
-    text?: (x: number, y: number, text: string, style?: Record<string, unknown>) => TextObject;
     circle?: (x: number, y: number, radius: number, fillColor: number) => CircleObject;
     container?: (x: number, y: number) => ContainerObject;
     graphics?: () => GraphicsObject;
@@ -174,9 +157,6 @@ interface MapSceneRuntime {
     }) => unknown;
     killTweensOf?: (targets: unknown) => void;
   };
-  time?: {
-    delayedCall?: (delay: number, callback: () => void) => TimerEventLike;
-  };
   load?: {
     image: (key: string, url: string) => void;
     spritesheet?: (
@@ -193,12 +173,9 @@ interface MapSceneRuntime {
   gridLineLayer?: LayerHolder;
   pathGraphics?: GraphicsObject;
   trailGraphics?: GraphicsObject;
+  tileOverlayGraphics?: GraphicsObject;
   crewMarkerObjects?: Map<string, CrewMarkerRuntime>;
   crewTrails?: Map<string, Point[]>;
-  hoverTimer?: TimerEventLike | null;
-  tooltipObjects?: Array<TerrainObject | TextObject>;
-  popupObjects?: Array<TerrainObject | TextObject>;
-  areaLabelObjects?: TextObject[];
   cameraBoundsKey?: string;
   worldBounds?: { width: number; height: number; centerX: number; centerY: number };
   getState: () => PhaserMapSceneState;
@@ -250,10 +227,8 @@ export class MapScene {
     const runtime = this as unknown as MapSceneRuntime;
     runtime.stateRef.current = nextState;
     initializeCameraInteractionState(runtime);
-    hideTooltip(runtime);
-    hideInlinePopup(runtime);
     redrawTerrain(runtime, nextState);
-    redrawAreaLabels(runtime, nextState);
+    redrawTileOverlays(runtime, nextState);
     redrawRoutePreview(runtime, nextState);
     syncCrewMarkers(runtime, nextState);
     configureCamera(runtime, nextState);
@@ -308,11 +283,9 @@ function initializeCameraInteractionState(scene: MapSceneRuntime): void {
   scene.gridLineLayer ??= createLayerHolder(scene, GRID_DEPTH);
   scene.pathGraphics ??= createGraphics(scene, PATH_DEPTH);
   scene.trailGraphics ??= createGraphics(scene, TRAIL_DEPTH);
+  scene.tileOverlayGraphics ??= createGraphics(scene, TILE_OVERLAY_DEPTH);
   scene.crewMarkerObjects ??= new Map<string, CrewMarkerRuntime>();
   scene.crewTrails ??= new Map<string, Point[]>();
-  scene.tooltipObjects ??= [];
-  scene.popupObjects ??= [];
-  scene.areaLabelObjects ??= [];
   updateLodVisibility(scene);
 }
 
@@ -356,7 +329,6 @@ function setupCameraInteractions(scene: MapSceneRuntime): void {
   });
   scene.input?.on("pointerdown", (pointer: unknown) => {
     const pointerLike = normalizePointer(pointer);
-    hideTooltip(scene);
     if (pointerLike.button !== 2) {
       if (pointerLike.button === 0 || pointerLike.button === undefined) {
         selectTileAtPointer(scene, pointerLike);
@@ -372,11 +344,7 @@ function setupCameraInteractions(scene: MapSceneRuntime): void {
   });
   scene.input?.on("pointermove", (pointer: unknown) => {
     const pointerLike = normalizePointer(pointer);
-    hideTooltip(scene);
     if (!scene.dragStart) {
-      if (pointerLike.button !== 2) {
-        scheduleTooltipAtPointer(scene, pointerLike);
-      }
       return;
     }
     const zoom = scene.cameras.main.zoom || 1;
@@ -403,24 +371,12 @@ function normalizePointer(pointer: unknown): PointerLike {
   };
 }
 
-function scheduleTooltipAtPointer(scene: MapSceneRuntime, pointer: PointerLike): void {
-  const tile = findTileAtPointer(scene, pointer);
-  if (!tile || tile.status !== "discovered") {
-    return;
-  }
-  scene.hoverTimer = scene.time?.delayedCall?.(HOVER_DELAY_MS, () => {
-    showTooltip(scene, tile, pointer);
-  }) ?? null;
-}
-
 function selectTileAtPointer(scene: MapSceneRuntime, pointer: PointerLike): void {
   const tile = findTileAtPointer(scene, pointer);
   if (!tile) {
-    hideInlinePopup(scene);
     return;
   }
   scene.stateRef.current.onSelectTile(tile.id);
-  showInlinePopup(scene, tile, pointer);
 }
 
 function findTileAtPointer(scene: MapSceneRuntime, pointer: PointerLike): PhaserMapTileView | null {
@@ -442,75 +398,6 @@ function getPointerWorldPosition(scene: MapSceneRuntime, pointer: PointerLike): 
     x: pointer.worldX ?? camera.scrollX + pointer.x / (camera.zoom || 1),
     y: pointer.worldY ?? camera.scrollY + pointer.y / (camera.zoom || 1),
   };
-}
-
-function showTooltip(scene: MapSceneRuntime, tile: PhaserMapTileView, pointer: PointerLike): void {
-  hideTooltip(scene);
-  const position = getPointerWorldPosition(scene, pointer);
-  scene.tooltipObjects = createFloatingTextBox(scene, position.x + 14, position.y + 14, [tile.tooltip], TOOLTIP_BACKGROUND_DEPTH, TOOLTIP_TEXT_DEPTH);
-}
-
-function showInlinePopup(scene: MapSceneRuntime, tile: PhaserMapTileView, pointer: PointerLike): void {
-  hideInlinePopup(scene);
-  const position = getPointerWorldPosition(scene, pointer);
-  const lines = [tile.terrain, tile.label || tile.tooltip, "前往此位置"].filter(Boolean) as string[];
-  scene.popupObjects = createFloatingTextBox(scene, position.x + 16, position.y + 16, lines, POPUP_BACKGROUND_DEPTH, POPUP_TEXT_DEPTH);
-}
-
-function createFloatingTextBox(scene: MapSceneRuntime, x: number, y: number, lines: string[], backgroundDepth: number, textDepth: number): Array<TerrainObject | TextObject> {
-  const textObjects: TextObject[] = [];
-  const longestLineLength = Math.max(1, ...lines.map((line) => Array.from(line).length));
-  const backgroundWidth = Math.max(140, longestLineLength * 12 + 24);
-  const backgroundHeight = lines.length * 24 + 20;
-  const background = scene.add.rectangle(x, y, backgroundWidth, backgroundHeight, 0xf4eadf);
-  background.setOrigin(0, 0);
-  background.setDepth(backgroundDepth);
-  background.setAlpha?.(0.96);
-  background.setStrokeStyle?.(1, 0x24384f);
-
-  for (const [index, line] of lines.entries()) {
-    const text = scene.add.text?.(x + 12, y + 10 + index * 24, line, {
-      color: "#24384f",
-      fontFamily: "monospace",
-      fontSize: "14px",
-    });
-    if (text) {
-      text.setOrigin(0, 0);
-      text.setDepth(textDepth);
-      textObjects.push(text);
-    }
-  }
-
-  return [background, ...textObjects];
-}
-
-function hideTooltip(scene: MapSceneRuntime): void {
-  cancelHoverTimer(scene);
-  destroyObjects(scene.tooltipObjects);
-  scene.tooltipObjects = [];
-}
-
-function hideInlinePopup(scene: MapSceneRuntime): void {
-  destroyObjects(scene.popupObjects);
-  scene.popupObjects = [];
-}
-
-function cancelHoverTimer(scene: MapSceneRuntime): void {
-  if (!scene.hoverTimer) {
-    return;
-  }
-  if (scene.hoverTimer.remove) {
-    scene.hoverTimer.remove(false);
-  } else {
-    scene.hoverTimer.destroy?.();
-  }
-  scene.hoverTimer = null;
-}
-
-function destroyObjects(objects: Array<TerrainObject | TextObject> | undefined): void {
-  for (const object of objects ?? []) {
-    object.destroy();
-  }
 }
 
 function zoomByDirection(scene: MapSceneRuntime, direction: 1 | -1, pointer?: PointerLike): void {
@@ -578,9 +465,6 @@ function updateLodVisibility(scene: MapSceneRuntime): void {
   const zoom = scene.cameras.main.zoom;
   scene.detailLayer?.setVisible(zoom >= LOD_DETAIL_THRESHOLD);
   scene.gridLineLayer?.setVisible(zoom >= LOD_GRID_THRESHOLD);
-  for (const label of scene.areaLabelObjects ?? []) {
-    label.setVisible?.(zoom >= AREA_LABEL_ZOOM_THRESHOLD);
-  }
 }
 
 function panCameraWithKeyboard(scene: MapSceneRuntime, delta: number): void {
@@ -623,7 +507,7 @@ function redrawTerrain(scene: MapSceneRuntime, state: PhaserMapSceneState): void
         return [terrainRectangle];
       }
       const sprites = visualLayers.map((layer) => {
-        const sprite = addSprite(tile.col * (TILE_SIZE + TILE_GAP), tile.row * (TILE_SIZE + TILE_GAP), layer.tilesetId, layer.tileIndex);
+        const sprite = addSprite.call(scene.add, tile.col * VISUAL_TILE_STEP, tile.row * VISUAL_TILE_STEP, layer.tilesetId, layer.tileIndex);
         sprite.setOrigin(0, 0);
         sprite.setDisplaySize?.(TILE_SIZE, TILE_SIZE);
         sprite.setAlpha?.(layer.opacity);
@@ -670,51 +554,37 @@ function clearTerrainObjects(scene: MapSceneRuntime): void {
   scene.terrainObjects = [];
 }
 
-function redrawAreaLabels(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
-  clearAreaLabels(scene);
-  const anchorTiles = findAreaLabelAnchors(state.tileViews);
-  scene.areaLabelObjects = anchorTiles
-    .map((tile) => {
-      const label = tile.areaName?.trim();
-      if (!label) {
-        return null;
-      }
-      const text = scene.add.text?.(tile.col * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2, tile.row * (TILE_SIZE + TILE_GAP) + 12, label, {
-        color: "#f4eadf",
-        fontFamily: "monospace",
-        fontSize: "16px",
-        fontStyle: "bold",
-        stroke: "#24384f",
-        strokeThickness: 4,
-      });
-      text?.setOrigin(0.5, 0);
-      text?.setDepth(AREA_LABEL_DEPTH);
-      text?.setVisible?.(scene.cameras.main.zoom >= AREA_LABEL_ZOOM_THRESHOLD);
-      return text ?? null;
-    })
-    .filter((text): text is TextObject => Boolean(text));
-}
-
-function clearAreaLabels(scene: MapSceneRuntime): void {
-  for (const label of scene.areaLabelObjects ?? []) {
-    label.destroy();
+function redrawTileOverlays(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
+  const graphics = scene.tileOverlayGraphics;
+  if (!graphics) {
+    return;
   }
-  scene.areaLabelObjects = [];
-}
 
-function findAreaLabelAnchors(tileViews: PhaserMapTileView[]): PhaserMapTileView[] {
-  const anchorsByArea = new Map<string, PhaserMapTileView>();
-  for (const tile of tileViews) {
-    const areaName = tile.areaName?.trim();
-    if (!areaName) {
-      continue;
+  graphics.clear();
+  for (const tile of state.tileViews) {
+    if (tile.isTarget) {
+      strokeTileFrame(graphics, tile, 3, 0x24384f, 0.95);
     }
-    const current = anchorsByArea.get(areaName);
-    if (!current || tile.row < current.row || (tile.row === current.row && tile.col < current.col)) {
-      anchorsByArea.set(areaName, tile);
+    if (tile.isSelected) {
+      strokeTileFrame(graphics, tile, 4, 0xb45b13, 1);
     }
   }
-  return Array.from(anchorsByArea.values()).sort((a, b) => a.row - b.row || a.col - b.col);
+}
+
+function strokeTileFrame(graphics: GraphicsObject, tile: PhaserMapTileView, lineWidth: number, color: number, alpha: number): void {
+  const inset = lineWidth / 2;
+  const x = tile.col * (TILE_SIZE + TILE_GAP) + inset;
+  const y = tile.row * (TILE_SIZE + TILE_GAP) + inset;
+  const width = TILE_SIZE - lineWidth;
+  const height = TILE_SIZE - lineWidth;
+  graphics.lineStyle(lineWidth, color, alpha);
+  graphics.beginPath?.();
+  graphics.moveTo(x, y);
+  graphics.lineTo(x + width, y);
+  graphics.lineTo(x + width, y + height);
+  graphics.lineTo(x, y + height);
+  graphics.lineTo(x, y);
+  graphics.strokePath();
 }
 
 function redrawRoutePreview(scene: MapSceneRuntime, state: PhaserMapSceneState): void {
@@ -935,7 +805,8 @@ function getScrollLimits(worldSize: number, viewSize: number): { min: number; ma
     return { min: centered, max: centered };
   }
 
-  return { min: 0, max: worldSize - viewSize };
+  const edgePadding = Math.min(TILE_SIZE, viewSize * CAMERA_EDGE_PADDING_RATIO);
+  return { min: -edgePadding, max: worldSize - viewSize + edgePadding };
 }
 
 function getWorldBounds(tileViews: PhaserMapSceneState["tileViews"]): { width: number; height: number; centerX: number; centerY: number } {

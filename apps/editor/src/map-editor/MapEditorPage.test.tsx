@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MapEditorApiError } from "./apiClient";
@@ -9,6 +10,15 @@ import type { MapEditorLibraryResponse } from "./apiClient";
 describe("MapEditorPage", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it("keeps final art visual cells edge-to-edge while grid chrome stays overlay-only", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+
+    expect(styles).toMatch(/\.map-grid-viewport\s*{[^}]*gap:\s*0;/s);
+    expect(styles).toMatch(/\.map-grid-tile\s*{[^}]*border:\s*0;/s);
+    expect(styles).toMatch(/\.map-grid-tile::before\s*{[^}]*box-shadow:/s);
+    expect(styles).toMatch(/\.map-grid-visual-layer\s*{[^}]*background:\s*transparent;/s);
   });
 
   it("loads the helper library, lists map files, and selects the first map", async () => {

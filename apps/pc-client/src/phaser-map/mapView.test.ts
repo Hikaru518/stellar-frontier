@@ -124,7 +124,7 @@ describe("mapView", () => {
       expect(buildTileCenters(views)["1-2"]).toEqual({ x: TILE_SIZE + TILE_GAP + TILE_SIZE / 2, y: TILE_SIZE / 2 });
     });
 
-    it("derives visible visual sprite layers for discovered tiles in map layer order", () => {
+    it("derives visible visual sprite layers for discovered and frontier tiles in map layer order", () => {
       const views = buildPhaserTileViews(visibleWindowWithUnknown(), {
         visual: {
           layers: [
@@ -168,7 +168,9 @@ describe("mapView", () => {
         { layerId: "base", layerName: "Base", order: 0, opacity: 1, tilesetId: "kenney-tiny-battle", tileIndex: 4 },
         { layerId: "detail", layerName: "Detail", order: 2, opacity: 0.6, tilesetId: "kenney-tiny-battle", tileIndex: 8 },
       ]);
-      expect(views.find((view) => view.id === "1-2")?.visualLayers).toEqual([]);
+      expect(views.find((view) => view.id === "1-2")?.visualLayers).toEqual([
+        { layerId: "base", layerName: "Base", order: 0, opacity: 1, tilesetId: "kenney-tiny-battle", tileIndex: 5 },
+      ]);
       expect(views.find((view) => view.id === "1-3")?.visualLayers).toEqual([]);
     });
 
@@ -199,7 +201,7 @@ describe("mapView", () => {
   describe("getCrewMarkerPosition", () => {
     const centers = {
       "1-1": { x: 64, y: 64 },
-      "1-2": { x: 194, y: 64 },
+      "1-2": { x: TILE_SIZE + TILE_SIZE / 2, y: TILE_SIZE / 2 },
     };
 
     it("interpolates by elapsed game seconds at progress 0, 0.5, and 1", () => {
@@ -208,7 +210,7 @@ describe("mapView", () => {
       expect(getCrewMarkerPosition({ currentTileId: "1-1", action, tileCenters: centers, elapsedGameSeconds: 10 })).toEqual(centers["1-1"]);
       expect(getCrewMarkerPosition({ currentTileId: "1-1", action, tileCenters: centers, elapsedGameSeconds: 20 })).toEqual(centers["1-2"]);
       const midpoint = getCrewMarkerPosition({ currentTileId: "1-1", action, tileCenters: centers, elapsedGameSeconds: 15 });
-      expect(midpoint.x).toBeCloseTo(129, 0);
+      expect(midpoint.x).toBeCloseTo(TILE_SIZE, 0);
       expect(midpoint.y).toBeCloseTo(64, 0);
     });
 

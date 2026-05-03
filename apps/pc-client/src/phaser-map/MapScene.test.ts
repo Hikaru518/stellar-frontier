@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSceneState, type PhaserMapCanvasProps, type PhaserMapSceneState } from "./PhaserMapCanvas";
-import { INITIAL_ZOOM_LEVEL_INDEX, MapScene, ZOOM_LEVELS, createMapSceneClass } from "./MapScene";
+import { CAMERA_EDGE_PADDING_RATIO, INITIAL_ZOOM_LEVEL_INDEX, MapScene, ZOOM_LEVELS, createMapSceneClass } from "./MapScene";
 import { TILE_GAP, TILE_SIZE } from "./mapView";
 
 describe("MapScene", () => {
@@ -94,8 +94,8 @@ describe("MapScene", () => {
       ]),
     );
 
-    expect(scene.add.sprite).toHaveBeenNthCalledWith(1, 2 * (TILE_SIZE + TILE_GAP), TILE_SIZE + TILE_GAP, "kenney-tiny-battle", 4);
-    expect(scene.add.sprite).toHaveBeenNthCalledWith(2, 2 * (TILE_SIZE + TILE_GAP), TILE_SIZE + TILE_GAP, "kenney-tiny-battle", 8);
+    expect(scene.add.sprite).toHaveBeenNthCalledWith(1, 2 * TILE_SIZE, TILE_SIZE, "kenney-tiny-battle", 4);
+    expect(scene.add.sprite).toHaveBeenNthCalledWith(2, 2 * TILE_SIZE, TILE_SIZE, "kenney-tiny-battle", 8);
     expect(scene.createdSprites.map((sprite) => sprite.setAlpha.mock.calls[0]?.[0])).toEqual([1, 0.6]);
     expect(scene.createdSprites.map((sprite) => sprite.setDepth.mock.calls[0]?.[0])).toEqual([2, 2.002]);
   });
@@ -176,38 +176,28 @@ describe("MapScene", () => {
     expect(onSelectTile).not.toHaveBeenCalled();
   });
 
-  it("shows a top-level tooltip after hovering a discovered tile for 500ms", () => {
+  it("does not reveal tile text on hover", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("1-2", { row: 1, col: 2, tooltip: "森林 | 北部营地 | (2,1)" })]) }));
 
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.pointermove({ x: 10, y: 10, worldX: 2 * (TILE_SIZE + TILE_GAP) + 10, worldY: TILE_SIZE + TILE_GAP + 10 });
-    scene.pendingDelayedCalls[0]?.callback();
-    const tooltipText = scene.createdTexts[scene.createdTexts.length - 1];
-    const tooltipBackground = scene.createdRectangles[scene.createdRectangles.length - 1];
 
-    expect(scene.time.delayedCall).toHaveBeenCalledWith(500, expect.any(Function));
-    expect(tooltipText?.content).toBe("森林 | 北部营地 | (2,1)");
-    expect(tooltipBackground?.fillColor).toBe(0xf4eadf);
-    expect(tooltipBackground?.setAlpha).toHaveBeenCalledWith(0.96);
-    expect(tooltipBackground?.setStrokeStyle).toHaveBeenCalledWith(1, 0x24384f);
-    expect(tooltipText?.setDepth).toHaveBeenCalledWith(31);
+    expect(scene.time.delayedCall).not.toHaveBeenCalled();
+    expect(scene.createdTexts).toEqual([]);
   });
 
-  it("hides the tooltip and resets the hover timer when the pointer moves", () => {
+  it("leaves hover movement textless when moving across tiles", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("0-1", { col: 1, tooltip: "平原 | 东侧 | (1,0)" })]) }));
 
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.pointermove({ x: 10, y: 10 });
-    scene.pendingDelayedCalls[0]?.callback();
-    const tooltipText = scene.createdTexts[scene.createdTexts.length - 1];
     scene.inputHandlers.pointermove({ x: 20, y: 10, worldX: TILE_SIZE + TILE_GAP + 10, worldY: 10 });
 
-    expect(tooltipText?.destroy).toHaveBeenCalledOnce();
-    expect(scene.pendingDelayedCalls[0]?.remove).toHaveBeenCalledWith(false);
-    expect(scene.time.delayedCall).toHaveBeenCalledTimes(2);
+    expect(scene.time.delayedCall).not.toHaveBeenCalled();
+    expect(scene.createdTexts).toEqual([]);
   });
 
-  it("left-clicking a tile selects it through the latest state ref and opens an inline popup", () => {
+  it("left-clicking a tile selects it through the latest state ref without opening inline text", () => {
     const oldSelectTile = vi.fn();
     const latestSelectTile = vi.fn();
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")], { onSelectTile: oldSelectTile }) }));
@@ -218,10 +208,21 @@ describe("MapScene", () => {
 
     expect(oldSelectTile).not.toHaveBeenCalled();
     expect(latestSelectTile).toHaveBeenCalledWith("0-0");
-    expect(scene.createdTexts.map((text) => text.content)).toEqual(expect.arrayContaining([expect.stringContaining("森林"), expect.stringContaining("营地"), "前往此位置"]));
+    expect(scene.createdTexts).toEqual([]);
   });
 
-  it("right-clicking or dragging does not select tiles or show hover tooltip", () => {
+  it("draws a tile selection frame as an overlay", () => {
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
+
+    scene.updateState(sceneState([tileView("0-1", { col: 1, isSelected: true })]));
+
+    const overlayGraphics = scene.createdGraphics[2];
+    expect(overlayGraphics?.setDepth).toHaveBeenCalledWith(14);
+    expect(overlayGraphics?.lineStyle).toHaveBeenCalledWith(4, 0xb45b13, 1);
+    expect(overlayGraphics?.moveTo).toHaveBeenCalledWith(TILE_SIZE + 2, 2);
+  });
+
+  it("right-clicking or dragging does not select tiles or show text", () => {
     const onSelectTile = vi.fn();
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0")], { onSelectTile }) }));
 
@@ -233,7 +234,7 @@ describe("MapScene", () => {
 
     expect(onSelectTile).not.toHaveBeenCalled();
     expect(scene.time.delayedCall).not.toHaveBeenCalled();
-    expect(scene.createdTexts.map((text) => text.content)).not.toContain("前往此位置");
+    expect(scene.createdTexts).toEqual([]);
   });
 
   it("disables the browser context menu for right-button map drag", () => {
@@ -275,7 +276,8 @@ describe("MapScene", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState(tiles) }), { keys });
     const worldSize = 6 * (TILE_SIZE + TILE_GAP);
     const viewportSize = 100 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX];
-    const maxScroll = worldSize - viewportSize;
+    const edgePadding = Math.min(TILE_SIZE, viewportSize * CAMERA_EDGE_PADDING_RATIO);
+    const maxScroll = worldSize - viewportSize + edgePadding;
 
     (scene.create as unknown as () => void).call(scene);
     scene.cameras.main.scrollX = maxScroll - 5;
@@ -284,6 +286,21 @@ describe("MapScene", () => {
 
     expect(scene.cameras.main.scrollX).toBe(maxScroll);
     expect(scene.cameras.main.scrollY).toBe(maxScroll);
+  });
+
+  it("allows panning slightly past the top-left edge at high zoom for corner inspection", () => {
+    const keys = { A: { isDown: true }, W: { isDown: true } };
+    const tiles = [tileView("0-0"), tileView("7-7", { row: 7, col: 7 })];
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState(tiles) }), { keys });
+    const viewportSize = 100 / ZOOM_LEVELS[3];
+    const edgePadding = Math.min(TILE_SIZE, viewportSize * CAMERA_EDGE_PADDING_RATIO);
+
+    (scene.create as unknown as () => void).call(scene);
+    scene.cameras.main.zoom = ZOOM_LEVELS[3];
+    (scene.update as unknown as (time: number, delta: number) => void).call(scene, 0, 1000);
+
+    expect(scene.cameras.main.scrollX).toBeCloseTo(-edgePadding);
+    expect(scene.cameras.main.scrollY).toBeCloseTo(-edgePadding);
   });
 
   it("toggles LOD layer visibility across zoom thresholds during zoom updates", () => {
@@ -296,7 +313,7 @@ describe("MapScene", () => {
     expect(scene.createdLayers[1]?.setVisible).toHaveBeenLastCalledWith(true);
   });
 
-  it("draws one area label at the top-left anchor tile for each area above terrain trails", () => {
+  it("does not draw area labels before the player selects a tile", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([]) }));
     const tiles = [
       tileView("1-2", { row: 1, col: 2, areaName: "北部玄武高地" }),
@@ -308,25 +325,7 @@ describe("MapScene", () => {
 
     scene.updateState(sceneState(tiles));
 
-    const areaLabels = scene.createdTexts.filter((text) => ["北部玄武高地", "南部裂谷"].includes(text.content));
-    expect(areaLabels).toHaveLength(2);
-    expect(areaLabels[0]).toMatchObject({ content: "北部玄武高地", x: TILE_SIZE + TILE_GAP + TILE_SIZE / 2, y: 12 });
-    expect(areaLabels[0]?.setDepth).toHaveBeenCalledWith(13);
-    expect(areaLabels[0]?.setVisible).toHaveBeenLastCalledWith(true);
-    expect(areaLabels[1]?.content).toBe("南部裂谷");
-  });
-
-  it("hides area labels at global zoom and destroys stale labels on state update", () => {
-    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0", { areaName: "北部玄武高地" })]) }));
-
-    (scene.create as unknown as () => void).call(scene);
-    const firstLabel = scene.createdTexts.find((text) => text.content === "北部玄武高地");
-    scene.inputHandlers.wheel({ x: 64, y: 48 }, {}, 0, 1, 0);
-    scene.updateState(sceneState([tileView("0-1", { col: 1, areaName: "东侧平原" })]));
-
-    expect(firstLabel?.setVisible).toHaveBeenLastCalledWith(false);
-    expect(firstLabel?.destroy).toHaveBeenCalledOnce();
-    expect(scene.createdTexts.find((text) => text.content === "东侧平原")?.setVisible).toHaveBeenLastCalledWith(false);
+    expect(scene.createdTexts).toEqual([]);
   });
 
   it("keeps the pointer world coordinate stable while wheel zooming", () => {
@@ -365,14 +364,15 @@ describe("MapScene", () => {
 
   it("tweens crew markers to changed targets over 250ms and writes data-char-tile", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("0-1", { col: 1 })]) }));
+    const eastCenterX = TILE_SIZE + TILE_SIZE / 2;
 
     scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 64, y: 64 })] }));
     const markerContainer = scene.createdContainers.find((container) => container.x === 64 && container.y === 64);
-    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 194, y: 64 })] }));
+    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: eastCenterX, y: 64 })] }));
 
     expect(scene.tweens.killTweensOf).toHaveBeenCalledWith(markerContainer);
-    expect(scene.tweens.add).toHaveBeenLastCalledWith(expect.objectContaining({ targets: markerContainer, x: 194, y: 64, duration: 250 }));
-    expect(markerContainer?.x).toBe(194);
+    expect(scene.tweens.add).toHaveBeenLastCalledWith(expect.objectContaining({ targets: markerContainer, x: eastCenterX, y: 64, duration: 250 }));
+    expect(markerContainer?.x).toBe(eastCenterX);
     expect(markerContainer?.y).toBe(64);
     expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-char-tile")).toBe("0-1");
   });
@@ -393,16 +393,17 @@ describe("MapScene", () => {
 
   it("draws orange trail segments after crew movement completes", () => {
     const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("0-1", { col: 1 })]) }));
+    const eastCenterX = TILE_SIZE + TILE_SIZE / 2;
 
     scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 64, y: 64 })] }));
-    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: 194, y: 64 })] }));
+    scene.updateState(sceneState([tileView("0-0"), tileView("0-1", { col: 1 })], { crewMarkers: [crewMarker("mike", { x: eastCenterX, y: 64 })] }));
     const trailGraphics = scene.createdGraphics[1];
 
     expect(trailGraphics?.setDepth).toHaveBeenCalledWith(12);
     expect(trailGraphics?.lineStyle).toHaveBeenCalledWith(4, 0xb45b13, 0.9);
-    expect(trailGraphics?.lineTo).toHaveBeenCalledWith(194, 64);
+    expect(trailGraphics?.lineTo).toHaveBeenCalledWith(eastCenterX, 64);
     expect(trailGraphics?.strokeCircle).toHaveBeenCalledWith(64, 64, 3);
-    expect(trailGraphics?.strokeCircle).toHaveBeenCalledWith(194, 64, 3);
+    expect(trailGraphics?.strokeCircle).toHaveBeenCalledWith(eastCenterX, 64, 3);
   });
 
   it("offsets multiple crew markers in the same tile to avoid overlap", () => {

@@ -4,7 +4,7 @@ import type { CrewActionState } from "../events/types";
 import type { VisibleTileStatus, VisibleTileWindow } from "../mapSystem";
 
 export const TILE_SIZE = 128;
-export const TILE_GAP = 2;
+export const TILE_GAP = 0;
 
 const CREW_MARKER_OFFSETS = [
   { x: 0, y: 0 },
@@ -238,7 +238,7 @@ export function buildPhaserTileViews(visibleWindow: VisibleTileWindow, context: 
       isRoute: routeIds.has(cell.id),
       isSelected: context.selectedId === cell.id,
       isTarget: context.selectedMoveTargetId === cell.id,
-      visualLayers: isDiscovered ? buildTileVisualLayers(cell.id, visualLayers) : [],
+      visualLayers: cell.status !== "unknownHole" ? buildTileVisualLayers(cell.id, visualLayers) : [],
     };
   });
 }

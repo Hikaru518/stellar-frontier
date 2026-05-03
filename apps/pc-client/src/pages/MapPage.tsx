@@ -44,9 +44,9 @@ export function MapPage({
   onReturn,
 }: MapPageProps) {
   const visibleWindow = useMemo(() => getVisibleTileWindow(defaultMapConfig, map), [map]);
-  const [selectedId, setSelectedId] = useState(map.originTileId);
+  const [selectedId, setSelectedId] = useState<string | null>(selectedMoveTargetId ?? null);
   const [mapZoomLevel, setMapZoomLevel] = useState(1);
-  const selectedCell = visibleWindow.cells.find((cell) => cell.id === selectedId) ?? visibleWindow.cells[0];
+  const selectedCell = selectedId ? visibleWindow.cells.find((cell) => cell.id === selectedId) : undefined;
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
   const selectedIsDiscovered = selectedCell?.status === "discovered";
   const moveSelectionMember = crew.find((member) => member.id === moveSelectionCrewId);
@@ -66,12 +66,13 @@ export function MapPage({
   const tileViews = useMemo(
     () =>
       buildPhaserTileViews(visibleWindow, {
-        selectedId: selectedCell?.id,
+        selectedId,
         selectedMoveTargetId,
         movePreviewRoute: movePreview?.route,
         crewPositions,
+        visual: defaultMapConfig.visual,
       }),
-    [crewPositions, movePreview?.route, selectedCell?.id, selectedMoveTargetId, visibleWindow],
+    [crewPositions, movePreview?.route, selectedId, selectedMoveTargetId, visibleWindow],
   );
   const tileCenters = useMemo(() => buildTileCenters(tileViews), [tileViews]);
   const crewMarkers = useMemo(
@@ -139,8 +140,16 @@ export function MapPage({
           </p>
         </Panel>
 
-        <Panel title={`坐标详情：${selectedCell ? formatCellCoord(selectedCell) : "无信号"}`} className="map-detail">
-          {selectedCell && selectedTile && selectedIsDiscovered ? (
+        <Panel title={`坐标详情：${selectedCell ? formatCellCoord(selectedCell) : "未选择"}`} className="map-detail">
+          {!selectedCell ? (
+            <FieldList
+              rows={[
+                ["选择状态", "尚未选择地块"],
+                ["行动提示", "点按地图地块后显示选框，并在此处显示该地块信息"],
+                ["候选移动", moveSelectionMember ? "选择一个可达地块后可标记候选目的地" : "未处于通话选点模式"],
+              ]}
+            />
+          ) : selectedTile && selectedIsDiscovered ? (
             <FieldList
               rows={[
                 ["区域", selectedCell.tile?.areaName ?? "未知区域"],
@@ -156,7 +165,7 @@ export function MapPage({
                 ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
               ]}
             />
-          ) : selectedCell && selectedTile && selectedCell.tile && crewIdsForCell(map.tilesById[selectedCell.id], selectedTile).length > 0 ? (
+          ) : selectedTile && selectedCell.tile && crewIdsForCell(map.tilesById[selectedCell.id], selectedTile).length > 0 ? (
             <FieldList
               rows={[
                 ["信号状态", "队员回传"],

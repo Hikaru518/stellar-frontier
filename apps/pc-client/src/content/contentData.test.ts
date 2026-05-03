@@ -125,18 +125,7 @@ describe("map visual content contracts", () => {
   const validateMap = ajv.compile(mapsSchema);
 
   it("accepts authored visual layers with tile-id keyed cells", () => {
-    const mapWithVisual = structuredClone(defaultMapJson) as typeof defaultMapJson & {
-      visual: {
-        layers: Array<{
-          id: string;
-          name: string;
-          visible: boolean;
-          locked: boolean;
-          opacity: number;
-          cells: Record<string, { tilesetId: string; tileIndex: number }>;
-        }>;
-      };
-    };
+    const mapWithVisual = structuredClone(defaultMapJson) as MapConfigDefinition;
 
     mapWithVisual.visual = {
       layers: [
@@ -160,7 +149,7 @@ describe("map visual content contracts", () => {
   });
 
   it("rejects unknown visual fields", () => {
-    const mapWithUnknownVisualField = structuredClone(defaultMapJson) as typeof defaultMapJson & {
+    const mapWithUnknownVisualField = structuredClone(defaultMapJson) as MapConfigDefinition & {
       visual: {
         layers: [];
         unknownVisualField: boolean;

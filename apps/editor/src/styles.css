@@ -739,7 +739,7 @@ p {
   display: grid;
   grid-template-columns: repeat(var(--map-cols), minmax(34px, 1fr));
   align-content: start;
-  gap: 2px;
+  gap: 0;
   min-height: 360px;
   max-height: calc(100vh - 275px);
   overflow: auto;
@@ -758,7 +758,7 @@ p {
   min-width: 34px;
   min-height: 34px;
   aspect-ratio: 1;
-  border: 1px solid #a9a49a;
+  border: 0;
   background: rgba(232, 229, 219, 0.78);
   color: #46505a;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
@@ -768,23 +768,44 @@ p {
   text-align: center;
 }
 
-.map-grid-tile:hover,
-.map-grid-tile-selected {
-  border-color: #24384f;
-  box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.24);
+.map-grid-tile::before {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  box-shadow: inset 0 0 0 1px rgba(36, 56, 79, 0.24);
+  pointer-events: none;
+  content: "";
+}
+
+.map-grid-tile:hover {
+  background: rgba(232, 229, 219, 0.78);
+}
+
+.map-grid-tile:hover::before,
+.map-grid-tile-selected::before {
+  box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.42);
 }
 
 .map-grid-tile-origin {
-  border-color: #b45b13;
   background: #f8f1e8;
   color: #171a1c;
   font-weight: 700;
+}
+
+.map-grid-tile-origin::before {
+  box-shadow: inset 0 0 0 1px rgba(180, 91, 19, 0.72);
+}
+
+.map-grid-tile-origin.map-grid-tile-selected::before,
+.map-grid-tile-origin:hover::before {
+  box-shadow: inset 0 0 0 2px rgba(180, 91, 19, 0.82);
 }
 
 .map-grid-tile-discovered::after {
   position: absolute;
   right: 2px;
   bottom: 2px;
+  z-index: 5;
   width: 6px;
   height: 6px;
   border: 1px solid #2f6f44;
@@ -800,7 +821,7 @@ p {
 
 .map-grid-visual-layer {
   display: block;
-  background: linear-gradient(135deg, hsla(var(--tile-hue), 42%, 52%, 0.22), hsla(var(--tile-hue), 36%, 38%, 0.22));
+  background: transparent;
 }
 
 .map-grid-visual-layer .tile-sprite {
