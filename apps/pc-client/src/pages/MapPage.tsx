@@ -5,7 +5,7 @@ import { mapObjectDefinitionById, type MapObjectDefinition } from "../content/ma
 import { createMovePreview, deriveCrewActionViewModel, formatMoveRoute, type CrewActionViewModel } from "../crewSystem";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
 import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
-import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
+import { getDisplayCoord, getFullTileWindow, getTileLocationLabel, parseTileId, type VisibleTileCell } from "../mapSystem";
 import { PhaserMapCanvas } from "../phaser-map/PhaserMapCanvas";
 import { buildPhaserCrewMarkers, buildPhaserTileViews, buildTileCenters } from "../phaser-map/mapView";
 import { formatDuration } from "../timeSystem";
@@ -43,9 +43,9 @@ export function MapPage({
   onSelectMoveTarget,
   onReturn,
 }: MapPageProps) {
-  const visibleWindow = useMemo(() => getVisibleTileWindow(defaultMapConfig, map), [map]);
+  const visibleWindow = useMemo(() => getFullTileWindow(defaultMapConfig), []);
   const [selectedId, setSelectedId] = useState<string | null>(selectedMoveTargetId ?? null);
-  const [mapZoomLevel, setMapZoomLevel] = useState(1);
+  const [mapZoomLevel, setMapZoomLevel] = useState(0);
   const selectedCell = selectedId ? visibleWindow.cells.find((cell) => cell.id === selectedId) : undefined;
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
   const selectedIsDiscovered = selectedCell?.status === "discovered";
@@ -106,8 +106,8 @@ export function MapPage({
       title="卫星雷达地图"
       subtitle={
         moveSelectionMember
-          ? `局部探索矩阵 / 正在为 ${moveSelectionMember.name} 标记候选目的地 / 指令仍需返回通话确认`
-          : "雷达可见区域 / 地图只读 / 指令需返回通话或通讯台发起"
+          ? `完整地图矩阵 / 正在为 ${moveSelectionMember.name} 标记候选目的地 / 指令仍需返回通话确认`
+          : "完整地图区域 / 地图只读 / 指令需返回通话或通讯台发起"
       }
       gameTimeLabel={gameTimeLabel}
       actions={
@@ -136,7 +136,7 @@ export function MapPage({
 
         <Panel className="map-legend">
           <p>
-            选中：橙色描边 · 队员回传：浅色底 · 高风险状态：橙色文字 · 未探索区域：灰色低对比 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
+            选中：橙色描边 · 队员回传：浅色底 · 高风险状态：橙色文字 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
           </p>
         </Panel>
 

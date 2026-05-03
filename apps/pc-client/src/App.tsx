@@ -27,7 +27,7 @@ import {
   type WorldFlag,
 } from "./events/types";
 import { defaultMapConfig } from "./content/contentData";
-import { canMoveToTile, getTileLocationLabel, getVisibleTileWindow } from "./mapSystem";
+import { canMoveToTile, getTileLocationLabel } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
@@ -309,7 +309,7 @@ function App() {
       if (!canMoveToTile(defaultMapConfig, state.map, targetTileId)) {
         return {
           ...state,
-          logs: appendLogEntry(state.logs, "移动确认失败：目标不在当前已发现或 frontier 信号范围内。", "danger", state.elapsedGameSeconds),
+          logs: appendLogEntry(state.logs, "移动确认失败：目标不在地图范围内。", "danger", state.elapsedGameSeconds),
         };
       }
 
@@ -392,7 +392,6 @@ function App() {
           call={currentCall}
           crew={crew}
           tiles={tiles}
-          map={map}
           activeCalls={gameState.active_calls}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
@@ -519,12 +518,7 @@ function createInitialGameState(): GameState {
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
 }
 
-function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
-  const cell = getVisibleTileWindow(defaultMapConfig, map).cells.find((item) => item.id === tileId);
-  if (cell?.status === "frontier") {
-    return `未探索信号（${cell.displayX},${cell.displayY}）`;
-  }
-
+function getMoveTargetSelectionLabel(_map: GameMapState, tileId: string) {
   return getTileLocationLabel(defaultMapConfig, tileId);
 }
 

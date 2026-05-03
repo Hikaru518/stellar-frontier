@@ -144,9 +144,9 @@ describe("MapScene", () => {
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.wheel({ x: 64, y: 48 }, {}, 0, -1, 0);
 
-    expect(scene.cameras.main.zoom).toBe(ZOOM_LEVELS[2]);
-    expect(setZoomLevelInReact).toHaveBeenLastCalledWith(2);
-    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("2");
+    expect(scene.cameras.main.zoom).toBe(ZOOM_LEVELS[1]);
+    expect(setZoomLevelInReact).toHaveBeenLastCalledWith(1);
+    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("1");
   });
 
   it("zooms out on wheel down and clamps at the minimum zoom level", () => {
@@ -255,13 +255,13 @@ describe("MapScene", () => {
 
     expect(scene.cameras.main.zoom).toBe(ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX]);
     expect(scene.tweens.add).toHaveBeenCalledOnce();
-    expect(setZoomLevelInReact).toHaveBeenLastCalledWith(2);
-    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("2");
+    expect(setZoomLevelInReact).toHaveBeenLastCalledWith(1);
+    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("1");
   });
 
   it("pans with WASD using screen-stable speed adjusted by zoom", () => {
     const keys = { D: { isDown: true }, S: { isDown: true } };
-    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("5-5", { row: 5, col: 5 })]) }), { keys });
+    const scene = attachSceneDoubles(new MapScene({ current: sceneState([tileView("0-0"), tileView("12-12", { row: 12, col: 12 })]) }), { keys });
 
     (scene.create as unknown as () => void).call(scene);
     (scene.update as unknown as (time: number, delta: number) => void).call(scene, 0, 1000);
@@ -308,6 +308,7 @@ describe("MapScene", () => {
 
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.wheel({ x: 64, y: 48 }, {}, 0, -1, 0);
+    scene.inputHandlers.wheel({ x: 64, y: 48 }, {}, 0, -1, 0);
 
     expect(scene.createdLayers[0]?.setVisible).toHaveBeenLastCalledWith(true);
     expect(scene.createdLayers[1]?.setVisible).toHaveBeenLastCalledWith(true);
@@ -334,8 +335,8 @@ describe("MapScene", () => {
     (scene.create as unknown as () => void).call(scene);
     scene.inputHandlers.wheel({ x: 70, y: 35 }, {}, 0, -1, 0);
 
-    expect(scene.cameras.main.scrollX).toBeCloseTo(70 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX] - 70 / ZOOM_LEVELS[2]);
-    expect(scene.cameras.main.scrollY).toBeCloseTo(35 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX] - 35 / ZOOM_LEVELS[2]);
+    expect(scene.cameras.main.scrollX).toBeCloseTo(70 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX] - 70 / ZOOM_LEVELS[1]);
+    expect(scene.cameras.main.scrollY).toBeCloseTo(35 / ZOOM_LEVELS[INITIAL_ZOOM_LEVEL_INDEX] - 35 / ZOOM_LEVELS[1]);
   });
 
   it("zooms in from the keyboard up arrow", () => {
@@ -345,8 +346,8 @@ describe("MapScene", () => {
     (scene.create as unknown as () => void).call(scene);
     (scene.update as unknown as (time: number, delta: number) => void).call(scene, 0, 16);
 
-    expect(scene.cameras.main.zoom).toBe(ZOOM_LEVELS[2]);
-    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("2");
+    expect(scene.cameras.main.zoom).toBe(ZOOM_LEVELS[1]);
+    expect(document.querySelector(".phaser-map-stage")?.getAttribute("data-zoom-level")).toBe("1");
   });
 
   it("draws crew marker containers with head and body circles at depth 20", () => {
