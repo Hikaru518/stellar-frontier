@@ -33,14 +33,13 @@
 
 - 索引页路径：`docs/index.md`
 - 维护方：`audit-wiki` skill 的 Step 5.1 自动重生成
-- 模板：`.opencode/skills/audit-wiki/references/index-template.md`
+- 模板：`.codex/audit-wiki/references/index-template.md`
 - 索引页包含：每个子系统的标题、scope、`last_updated`、一句话概述、与其他系统的耦合关系图（mermaid，自动从各 wiki 章节 6「系统交互」抽取）
 
 **仍未处理的子项**：
 
-- 子系统数量增长 3+ 后再首次跑 audit-wiki 会更有意义；目前 `docs/gameplay/crew/`、`event-system/`、`time-system/` 仍是空目录
-- 索引页的「状态」列（已实现 / 部分实现 / 仅设计 / 已废弃）判定细则需要在第一次实跑后根据真实情况微调
-- 是否引入 `whole-game-index` 这一 scope 暂不需要（`docs/index.md` 直接由 audit-wiki 生成、`organize-wiki` 不动它，二者职责清晰）
+- 索引页的「状态」列（已实现 / 部分实现 / 仅设计 / 已废弃）判定细则仍需要随实际 audit 经验继续微调。
+- 是否引入 `whole-game-index` 这一 scope 暂不需要（`docs/index.md` 直接由 audit-wiki 生成、`organize-wiki` 不动它，二者职责清晰）。
 
 如果未来有更复杂的索引需求（例如按 scope / 按耦合度 / 按更新时间多视图），再考虑独立 skill 或扩展 `audit-wiki/references/index-template.md`。
 
@@ -54,3 +53,15 @@
 - 机制 B 的测试仅在 `vite dev`（开发服务器）下运行，不在 `vite preview`（生产构建）下运行。
 
 本轮 MVP 先保证机制 A 可运行；机制 B 等 Phaser 地图功能稳定后再补充。
+
+## 战争迷雾 / 探索可见性重设计
+
+**当前状态**：PC 地图和通话移动选点已经取消临时 `3 x 3` / discovered frontier 限制，当前完整显示默认 `8 x 8` 地图，并允许选择任意合法 authored tile。`GameState.map.discoveredTileIds`、`initialDiscoveredTileIds` 和 `getVisibleTileWindow` 仍保留在代码与内容模型中，但不作为当前玩家可见范围或移动规则。
+
+**后续要补充**：
+
+- 战争迷雾的视觉层级：完全未知、粗略信号、队员回传、已调查等状态如何显示。
+- 信息隐藏规则：区域名、地形、天气、对象、特殊状态、环境属性分别在哪个状态可见。
+- 移动目标规则：是否允许移动到未知格、边境格或只允许移动到已掌握格。
+- 队员回传与事件触发：抵达、调查、失联、危险状态如何改变地图可见性。
+- UI 文案和测试：避免再次出现临时规则与正式体验混在一起。

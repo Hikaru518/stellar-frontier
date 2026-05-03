@@ -1,6 +1,6 @@
 # 地图模型
 
-本文描述可配置地图系统的核心 game model。地图既是静态内容配置，也是运行时探索状态的事实源；UI、队员行动、调查报告和结构化事件都应从同一套地图模型读取或派生状态。
+本文描述可配置地图系统的核心 game model。地图既是静态内容配置、视觉铺设数据，也是运行时调查 / 揭示状态的事实源；UI、队员行动、调查报告、结构化事件、Map Editor 和 PC Phaser runtime 都应从同一套地图模型读取或派生状态。
 
 地图的玩法规则与玩家体验见 `docs/gameplay/map-system/map-system.md`。事件可访问的地块投影边界见 `docs/game_model/event-integration.md`。
 
@@ -8,10 +8,10 @@
 
 | 规则 | 说明 |
 | --- | --- |
-| `scope` | 覆盖静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换、可见窗口、调查报告和存档 reset 边界。 |
-| `out_of_scope` | 不定义地图编辑器 UI，不定义随机地图生成，不实现天气模拟，不定义对象级通用行动菜单，不重构事件系统语义。 |
-| `content_source_of_truth` | 地图静态内容来自 `content/maps/default-map.json`。地形、区域名、天气、环境属性、地块对象与特殊状态定义不保存在运行时状态里。 |
-| `runtime_source_of_truth` | 玩家发现、调查、揭示对象、揭示状态、活跃状态和调查报告索引来自 `GameState.map`。 |
+| `scope` | 覆盖静态地图配置、视觉层、tileset registry、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换、当前完整地图窗口、调查报告和存档 reset 边界。 |
+| `out_of_scope` | 不定义随机地图生成，不实现天气模拟，不定义对象级通用行动菜单，不重构事件系统语义，不定义正式战争迷雾。 |
+| `content_source_of_truth` | 地图静态内容来自 `content/maps/*.json`；tileset 元数据来自 `content/maps/tilesets/registry.json`；地块对象定义来自 `content/map-objects/*.json`。地形、区域名、天气、环境属性、地块对象引用、特殊状态与视觉层不保存在运行时状态里。 |
+| `runtime_source_of_truth` | 玩家调查状态、揭示对象、揭示状态、活跃状态和调查报告索引来自 `GameState.map`。`discoveredTileIds` 仍存在，但当前 PC 地图展示和移动选点不再用它裁剪范围。 |
 | `compatibility_policy` | 研发期不迁移旧地图视图或旧存档；当前事实源统一为地图配置和 `GameState.map`。 |
 | `save_policy` | 固定 `4 x 4` 旧存档与配置驱动地图不兼容；读取时应 reset 或使用新的 save 版本 / save key。 |
 
@@ -20,9 +20,13 @@
 ```mermaid
 flowchart TD
   MapJson["content/maps/default-map.json"] --> MapConfig["MapConfig"]
+  MapJson --> VisualLayers["visual.layers"]
+  TilesetRegistry["content/maps/tilesets/registry.json"] --> VisualLayers
+  MapObjects["content/map-objects/*.json"] --> MapConfig
   MapConfig --> InitialMap["initial GameState.map"]
   InitialMap --> GameMapState["GameMapState"]
-  GameMapState --> VisibleWindow["visible tile window"]
+  MapConfig --> FullWindow["full tile window"]
+  VisualLayers --> PhaserRuntime["PC Phaser visual runtime"]
   GameMapState --> InvestigationReport["InvestigationReport"]
   GameMapState --> CrewLocation["crew location labels"]
   GameMapState --> EventRuntime["structured event runtime"]
@@ -30,9 +34,12 @@ flowchart TD
 
 | 模型 | 代码名称 | 中文名 | 来源 | 介绍 |
 | --- | --- | --- | --- | --- |
-| 内容文件 | `content/maps/default-map.json` | 默认地图内容配置 | JSON | 地图编辑 / 内容生产应读写的文件，包含尺寸、origin、初始发现地块和完整地图块定义。 |
+| 内容文件 | `content/maps/*.json` | 地图内容配置 | JSON | 地图编辑 / 内容生产应读写的文件，包含尺寸、origin、初始发现地块、完整地图块定义和可选视觉层。当前默认文件为 `content/maps/default-map.json`。 |
 | 内容定义 | `MapConfig` | 地图配置 | `src/content/contentData.ts` | TypeScript 对地图内容的描述，运行时初始化和查询 helper 读取它。 |
 | 运行时状态 | `GameMapState` | 地图运行时状态 | `GameState.map` | 保存玩家探索进度、调查状态、对象 / 状态揭示和调查报告索引。 |
+| 视觉层 | `visual.layers` | 地图视觉铺设 | `content/maps/*.json` | 保存每个视觉 layer 在 tile id 上使用的 tileset id 与 tile index；由 Map Editor 写入，由 PC Phaser runtime 渲染。 |
+| Tileset registry | `content/maps/tilesets/registry.json` | 地图素材注册表 | JSON | 保存 tileset 图片路径、tile 尺寸、spacing、margin、分类和 license。 |
+| 地块对象库 | `content/map-objects/*.json` | 地块对象定义 | JSON | 保存可复用对象定义；地图 tile 只保存 `objectIds` 引用。 |
 
 ## 3. 静态内容模型
 
@@ -49,6 +56,7 @@ flowchart TD
 | `originTileId` | `string` | 坠毁点 / 玩家开始点。玩家显示坐标由此派生为 `(0,0)`。 |
 | `initialDiscoveredTileIds` | `string[]` | 新游戏开局已发现地块，至少包含 `originTileId`。 |
 | `tiles` | `map_tile_definition[]` | 地图块静态定义集合。默认地图应覆盖全部合法格。 |
+| `visual` | `map_visual_definition` | 可选视觉层集合；当前 Map Editor 会规范化为 `{ layers: [] }`，PC Phaser runtime 从这里读取视觉 sprite。 |
 
 ### 3.2 `map_tile_definition`
 
@@ -58,14 +66,14 @@ flowchart TD
 | `row` / `col` | `number` | 内部坐标，从 `1` 开始；必须与 `id` 一致。 |
 | `areaName` | `string` | 区域名。多个 tile 可使用同一区域名；缺失或空值时显示为“野外”。 |
 | `terrain` | `string` | 地形中文名，短期继续沿用移动耗时表需要的中文字符串。 |
-| `weather` | `string` | 发现后显示的天气；当前不参与事件结算。 |
+| `weather` | `string` | 地图配置中的天气；当前 PC 地图完整显示，暂不参与事件结算。 |
 | `environment` | `tile_environment` | 结构化环境读数，调查报告使用。 |
-| `objects` | `tile_object_definition[]` | 地块对象列表，承载矿床、生物巢穴、遗迹、医疗舱、玩家设施等。 |
+| `objectIds` | `string[]` | 地块对象 ID 引用，指向 `content/map-objects/*.json` 中的对象定义。 |
 | `specialStates` | `tile_special_state_definition[]` | 特殊状态列表，承载湖泊沸腾、火山爆发、高威胁生物活动等异常。 |
 
 ### 3.3 `tile_object_definition`
 
-地块对象统一承载资源点、结构、信号、危险、设施、遗迹和地标。对象通过类型、标签和可见性参与结构化地点事件；地图本身不生成资源获取、设施处理、回收或扫描等通用按钮。
+地块对象统一承载资源点、结构、信号、危险、设施、遗迹和地标。对象定义保存在 `content/map-objects/*.json`，地图 tile 只通过 `objectIds` 引用。对象通过类型、标签和可见性参与结构化地点事件；地图本身不生成资源获取、设施处理、回收或扫描等通用按钮。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -104,6 +112,58 @@ flowchart TD
 | `toxicityLevel` | `string | null` | 毒性等级，可选。 |
 | `atmosphericPressureKpa` | `number | null` | 气压，可选。 |
 | `notes` | `string | null` | 设计备注或叙事短句，可选。 |
+
+### 3.6 `map_visual_definition`
+
+视觉层用于把 `assets/` 中登记过的 tileset 资源铺到地图格子上。视觉层只负责最终地图画面，不改变地形、对象、移动、事件或调查规则。
+
+```ts
+type MapVisualDefinition = {
+  layers: MapVisualLayerDefinition[];
+};
+
+type MapVisualLayerDefinition = {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  opacity: number;
+  cells: Record<string, MapVisualCellDefinition>;
+};
+
+type MapVisualCellDefinition = {
+  tilesetId: string;
+  tileIndex: number;
+};
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `visual.layers` | 视觉层数组。Map Editor 可新增、重命名、排序、隐藏、锁定和调整透明度。 |
+| `layer.cells` | 以 tile id 为 key 的稀疏铺设表；未出现的 tile 表示该层没有视觉 sprite。 |
+| `tilesetId` | 引用 `content/maps/tilesets/registry.json` 中的 tileset。 |
+| `tileIndex` | 引用 tileset 中的 tile frame；必须在 `0 <= tileIndex < tileCount` 范围内。 |
+
+渲染规则：
+
+- Map Editor 的 Final Art 与 PC Phaser runtime 都按 layer 顺序叠加可见视觉层。
+- 单个视觉 tile 在本格内完整铺满，视觉 sprite 使用 `TILE_SIZE` 连续排列；格子线、选中框、坐标、origin / discovered 标记、Gameplay Overlay、路线和队员标记都是 overlay，不参与视觉素材布局。
+- `spacing` / `margin` 只描述从 source spritesheet 取 frame 的方式，不表示地图格子之间应该有真实间隙。
+
+### 3.7 `map_tileset_registry`
+
+tileset registry 位于 `content/maps/tilesets/registry.json`，由 `content/schemas/map-tilesets.schema.json` 校验。
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` / `name` | tileset 稳定 ID 与显示名。 |
+| `assetPath` | 仓库内 `assets/` 路径，Map Editor helper 通过 `/api/map-editor/assets` 读取。 |
+| `publicPath` | PC runtime 可从 public 目录加载的路径。 |
+| `tileWidth` / `tileHeight` | source tile frame 尺寸。 |
+| `spacing` / `margin` | source spritesheet 内 frame 间距与边距，仅用于切 frame。 |
+| `columns` / `tileCount` | tile index 计算与 palette 展示范围。 |
+| `categories` | Palette 过滤用分类，如 terrain、water、building、nature、marker。 |
+| `license` | 素材 license 名称与仓库路径。 |
 
 ## 4. 运行时模型
 
@@ -150,7 +210,7 @@ type RuntimeTileState = {
 
 | 字段 | 说明 |
 | --- | --- |
-| `discovered` | 是否已发现。已发现地块可显示区域名、地形和天气。 |
+| `discovered` | 是否已发现。当前不裁剪 PC 地图可见范围；保留给内容初始化、事件条件和未来战争迷雾设计。 |
 | `investigated` | 是否已调查。旧 `tile.investigated` 由该字段派生。 |
 | `revealedObjectIds` | 已揭示对象 ID。`onDiscovered` 对象可在初始化或发现时加入。 |
 | `revealedSpecialStateIds` | 已揭示特殊状态 ID。 |
@@ -183,17 +243,37 @@ displayY = origin.row - tile.row;
 - 地图 UI 文案显示为 `(${displayX},${displayY})`。
 - 普通玩家可见文案不得直接显示内部 `(row,col)`；Debug 工具可选择显示内部坐标。
 
-## 6. 可见窗口模型
+## 6. 地图窗口模型
 
-地图页每个渲染 cell 有三类显示状态：
+当前玩家可见窗口是完整地图窗口：地图页与通话移动目标列表按 `MapConfig.size.rows / cols` 枚举全部合法 tile，并把这些 cell 作为可查看、可点选的目标。`apps/pc-client/src/mapSystem.ts` 中仍保留 `getVisibleTileWindow` 和 `frontier` / `unknownHole` 状态，作为未来战争迷雾设计的候选基础；当前玩家路径使用 `getFullTileWindow`。
+
+当前完整地图窗口：
+
+1. 从 `row = 1..size.rows`、`col = 1..size.cols` 枚举 tile id。
+2. 对每个 id 读取静态 tile 定义。
+3. 按 `originTileId` 派生玩家显示坐标。
+4. 将 cell status 标为 `discovered`，供现有 Phaser 视图复用。
+5. 地图页、通话移动选择、路线预览和 Phaser 初始画面都使用这一窗口。
+
+移动目标合法性当前只检查：
+
+- tile id 格式合法。
+- row / col 位于地图配置边界内。
+- `MapConfig.tiles` 中存在 authored tile。
+
+发现状态不再限制当前移动目标。战争迷雾 / 探索可见性恢复时，需要重新定义这里的窗口状态和移动规则。
+
+### 6.1 预留发现窗口
+
+预留算法中的每个渲染 cell 有三类显示状态：
 
 | 状态 | 说明 | 是否显示真实信息 | 是否可作为移动目标 |
 | --- | --- | --- | --- |
 | `discovered` | 已发现地块。 | 是，显示区域名、地形、天气、已揭示对象 / 状态、队员位置。 | 是 |
-| `frontier` | 合法地图内、与任一已发现格相邻一圈，但尚未发现。 | 否，显示“未探索信号”。 | 是 |
+| `frontier` | 合法地图内、与任一已发现格相邻一圈，但尚未发现。 | 否，显示“未探索信号”。 | 预留，当前不作为移动限制 |
 | `unknownHole` | 位于外接矩形内，但既非已发现也非外围未探索。 | 否，显示“未探索信号”。 | 否 |
 
-可见窗口算法：
+预留发现窗口算法：
 
 1. 从 `GameMapState.discoveredTileIds` 取得已发现 tile 集合。
 2. 对每个已发现 tile 枚举 8 邻域，包含上下左右与四个斜向相邻格。
@@ -204,7 +284,7 @@ displayY = origin.row - tile.row;
 7. 对每格判定：在 `discovered` 中为 `discovered`；否则在 `frontier` 中为 `frontier`；否则为 `unknownHole`。
 8. 若开局发现集合异常为空，初始化逻辑应修复为只发现 `originTileId`。
 
-可见扩张使用 8 邻域，移动路径仍使用上下左右相邻的曼哈顿路径。二者是不同规则。
+可见扩张使用 8 邻域，移动路径仍使用上下左右相邻的曼哈顿路径。二者是不同规则。当前 PC 页面不使用该窗口裁剪地图。
 
 ## 7. 调查报告模型
 
@@ -251,14 +331,14 @@ type InvestigationReport = {
 
 - `CrewMember.currentTile` 保存队员当前所在地块 ID。
 - 队员位置摘要通过地图区域名和玩家显示坐标派生，不使用资源名作为地点。
-- 移动目标合法性读取地图边界、发现状态和外围未探索状态。
-- 队员抵达 `frontier` 地块时，该地块应标记为 discovered，并触发现有抵达事件检查。
+- 移动目标合法性读取地图边界和 authored tile；当前不再读取发现状态或外围未探索状态。
+- 队员抵达目标地块后触发现有抵达事件检查。是否在抵达时改变 discovered 状态属于未来战争迷雾设计。
 
 ### 通讯台与通话
 
 - 通讯台和队员卡片展示区域名与行动状态。
-- 通话移动目标列表可包含已发现地块和 `frontier` 地块。
-- 未探索目标显示为“未探索信号（x,y）”，不得泄露真实区域名、地形、天气、对象或特殊状态。
+- 通话移动目标列表当前包含完整地图中的所有合法 authored tile。
+- 目标文案当前显示真实区域名、显示坐标与地形；不再使用“未探索信号（x,y）”作为当前规则。
 - 已揭示地块对象可作为结构化地点事件的条件、展示上下文或调查线索；剧情动作由事件选项提供，不由地图对象直接生成通用按钮。
 
 ### 事件系统
@@ -285,8 +365,13 @@ type InvestigationReport = {
 - 每个 tile 的 `id` 必须等于 `${row}-${col}`。
 - tile `row`、`col` 必须在地图边界内。
 - 默认地图 `tiles` 覆盖所有合法格；如果未来允许稀疏地图，需要先定义 blocked / void 规则。
-- 地块对象 `id` 在地图内唯一。
+- tile `objectIds` 必须引用 `content/map-objects/*.json` 中存在的对象定义。
 - 特殊状态 `id` 在单 tile 内唯一。
+- `visual.layers` 存在时必须为数组；Map Editor 会规范化为 `{ layers: [] }`。
+- visual layer `id` 在单地图内唯一。
+- visual cell 的 tile id 必须存在于地图 tile 集合。
+- visual cell 的 `tilesetId` 必须引用 `content/maps/tilesets/registry.json` 中存在的 tileset。
+- visual cell 的 `tileIndex` 必须是整数，且小于目标 tileset 的 `tileCount`。
 
 ## 10. 后续扩展记录
 
@@ -295,6 +380,7 @@ type InvestigationReport = {
 - 事件系统与特殊状态联调：明确状态来源、持续时间、过期、刷新、揭示和日志规则。
 - 事件系统与环境属性联调：温度、湿度、磁场、辐射等结构化读数可进入事件条件。
 - 地点剧情动作元数据扩展：当前基础行动只包含移动、待命、停止和调查；未来如果需要每个对象覆盖耗时、消耗或工具需求，应通过结构化事件或目标模型扩展。
+- 战争迷雾 / 探索窗口：当前 PC 地图完整显示并允许选择任意合法 authored tile；后续若恢复探索限制，需要同步更新窗口模型、移动目标规则、信息隐藏、事件触发和 UI 文案。
 
 ## 来源
 
@@ -303,3 +389,4 @@ type InvestigationReport = {
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/configurable-map-system-design.md` |
 | 2026-04-27 | `docs/plans/2026-04-27-17-37/technical-design.md` |
 | 2026-04-28 | `docs/plans/2026-04-27-22-56/communication-table-gameplay-design.md` |
+| 2026-05-03 | `audit-wiki 一致性审计：按当前代码更新地图视觉层、完整地图窗口和移动目标边界` |

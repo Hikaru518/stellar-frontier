@@ -87,10 +87,10 @@
 | `coordinates` | `object` | 玩家显示坐标 `x`、`y`，以坠毁点 / 玩家开始点为 `(0,0)`。 |
 | `terrain_type` | `string` | 地形类型。 |
 | `area_name` | `string` | 区域名。未配置时由地图系统提供“野外”等 fallback。 |
-| `weather` | `string` | 已发现地块可见的天气。当前事件投影可读取，但天气是否参与结算由事件定义决定。 |
+| `weather` | `string` | 地图配置中的天气。当前 PC 地图完整显示天气；事件投影可读取，但天气是否参与结算由事件定义决定。 |
 | `tags` | `string[]` | 地形、生态、剧情、对象和状态标签。 |
 | `danger_tags` | `string[]` | 已揭示且 active 的危险来源标签，例如 `large_beast_activity`、`volcanic_activity`。 |
-| `discovery_state` | `unknown` / `frontier` / `discovered` | 发现状态。 |
+| `discovery_state` | `unknown` / `frontier` / `discovered` | 发现状态。当前保留给事件条件和未来战争迷雾设计，PC 地图展示 / 移动选点不再用它裁剪范围。 |
 | `survey_state` | `unsurveyed` / `surveyed` | 调查状态。 |
 | `visibility` | `hidden` / `frontier` / `visible` | 地块可见性。 |
 | `current_crew_ids` | `string[]` | 当前在地块上的队员。 |
