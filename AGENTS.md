@@ -8,7 +8,7 @@
 - `docs/core-ideas.md` 是特殊的全局核心想法与设计原则页，保持短小、指导性，不使用普通子系统 wiki 的 10 章模板；任何对它的更新都必须先获得人类确认，agent 不得在未确认的情况下自动改写核心原则。
 - `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品/地图的具体配置写在 `content/`。
 - 仓库使用 Rush + pnpm monorepo；不要恢复 npm workspaces，也不要提交 root `package-lock.json`。
-- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src`、`apps/editor/src`、`apps/editor/helper` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
+- 改完代码或内容后必须按下文"测试体系"选择验证命令；如果某个必需验证因为本地环境阻塞，必须在最终说明中记录阻塞原因和已经执行的替代验证。
 
 ## docs/ 知识库结构
 
@@ -43,6 +43,60 @@
 | `wiki-merge-diff.md` | 本轮策划案合入目标 wiki 时的新增 / 更新 / 冲突 / 决议记录。 |
 
 > 修改子系统 wiki 时优先走"增量提案 → 合并 diff → 更新 wiki"流程，不要直接覆写 `docs/gameplay/<system>/<system>.md`。
+
+## 测试体系
+
+本仓库的 CI 入口是 `.github/workflows/pages.yml` 的 `test-build` job。PR 会依次执行安装依赖、安装 Playwright Chromium、`lint`、`validate-content`、`test`、`test:e2e --to @stellar-frontier/pc-client` 和 `build`。本地开发时不必每次都跑完整 CI，但 agent 必须按改动范围跑到足够覆盖风险的验证。
+
+### 根目录命令
+
+| 命令 | 覆盖范围 | 什么时候必须跑 |
+| --- | --- | --- |
+| `npm run validate:content` | `content/` JSON schema 与跨文件引用 | 修改 `content/`、`content/schemas/`、内容加载 / registry 相关代码后。 |
+| `npm run lint` | 所有声明了 `lint` 的 Rush 项目 TypeScript 检查 | 跨包改动、提交前总验证、无法确定影响范围时。 |
+| `npm run test` | 所有声明了 `test` 的 Rush 项目单元测试 | 跨包逻辑改动、共享模型 / 事件 / 地图 / 通讯链路改动后。 |
+| `npm run test:e2e` | PC client Playwright 端到端测试 | 改动 PC 页面流、地图、通话、存档、时间推进、Phaser canvas 或用户旅程后。 |
+| `npm run build` | 所有 Rush 项目 build | 改动构建配置、依赖、资源引用、Vite / TS config，或准备与 CI 完全对齐时。 |
+| `npm run editor:test` | Editor Vitest | 只改 `apps/editor` 且不需要全仓测试时可作为快速验证。 |
+
+### 包级快速验证
+
+改动范围明确时，优先先在对应包目录跑包级命令，失败更容易定位：
+
+```bash
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js lint
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js test
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js test:e2e
+
+cd apps/editor && node ../../common/scripts/install-run-rushx.js lint
+cd apps/editor && node ../../common/scripts/install-run-rushx.js test
+
+cd apps/mobile-client && node ../../common/scripts/install-run-rushx.js lint
+cd apps/mobile-client && node ../../common/scripts/install-run-rushx.js test
+
+cd packages/dual-device && node ../../common/scripts/install-run-rushx.js lint
+cd packages/dual-device && node ../../common/scripts/install-run-rushx.js test
+```
+
+Playwright 浏览器缺失时先执行：
+
+```bash
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js install:browsers
+```
+
+在 macOS / sandbox 环境中，Playwright 可能因 Chromium 权限报错（例如 Mach port permission denied）。这不是业务失败；需要在可启动浏览器的环境重跑同一条 e2e 命令，并在最终说明中区分"环境阻塞"和"测试断言失败"。
+
+### 改动到验证的对应关系
+
+- **只改文档**：至少跑 `git diff --check`；如果文档内包含命令、schema、代码片段，应核对对应文件或脚本是否仍存在。
+- **改 `content/` 或 schema**：必须跑 `npm run validate:content`；如果内容会被 PC / Editor 展示，再跑相关包的 `lint` / `test`。
+- **改 `apps/pc-client/src`**：至少跑 PC client `lint` 和 `test`。涉及页面流、地图、Phaser、存档、通话、时间推进或端到端用户旅程时，加跑 PC client `test:e2e`。
+- **改 `apps/editor/src` 或 `apps/editor/helper`**：至少跑 editor `lint` 和 `test`；涉及保存地图 / 事件内容时，加跑 `npm run validate:content`；涉及可视编辑体验时用浏览器做一次手动视觉验证。
+- **改 `apps/mobile-client/src`**：至少跑 mobile client `lint` 和 `test`；涉及 PC / mobile 配对事件时，同时跑 `packages/dual-device` 与 PC 相关测试。
+- **改 `packages/dual-device/src`**：至少跑 dual-device `lint` 和 `test`；如果影响通讯台、手机 companion 或 Yuan fallback，补跑 PC client `test`，必要时跑 e2e。
+- **改 Rush、依赖、TS / Vite 配置或资源路径**：跑 `npm run lint`、`npm run test`、`npm run build`；如果影响 PC 页面加载，再跑 `npm run test:e2e`。
+
+视觉 / 交互相关改动不能只依赖单元测试。地图、Phaser canvas、Map Editor、响应式布局和点击流程改动，应打开本地页面或使用浏览器自动化验证至少一个核心场景，并在最终说明中写明验证过的页面和场景。
 
 ## 当前系统能做什么
 
