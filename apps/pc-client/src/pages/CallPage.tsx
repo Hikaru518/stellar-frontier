@@ -3,9 +3,9 @@ import { buildCallView } from "../callActions";
 import { ConsoleShell, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, deriveCrewActionViewModel } from "../crewSystem";
-import type { ActionOption, CallContext, CrewMember, GameMapState, GameState, MapTile } from "../data/gameData";
+import type { ActionOption, CallContext, CrewMember, GameState, MapTile } from "../data/gameData";
 import type { RuntimeCall } from "../events/types";
-import { getTileLocationLabel, getVisibleTileWindow, type VisibleTileCell } from "../mapSystem";
+import { getFullTileWindow, getTileLocationLabel, type VisibleTileCell } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 type CallActionOption = ActionOption & {
@@ -34,7 +34,6 @@ interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
   tiles: MapTile[];
-  map: GameMapState;
   activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
@@ -53,7 +52,6 @@ export function CallPage({
   call,
   crew,
   tiles,
-  map,
   activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
@@ -91,9 +89,7 @@ export function CallPage({
     [activeCalls, crew, elapsedGameSeconds, gameState.crew_actions, tiles],
   );
   const memberActionView = member ? crewActionViews[member.id] : null;
-  const visibleMoveCells = getVisibleTileWindow(defaultMapConfig, map).cells.filter(
-    (cell) => cell.status === "discovered" || cell.status === "frontier",
-  );
+  const moveCells = useMemo(() => getFullTileWindow(defaultMapConfig).cells, []);
 
   const callView = useMemo<CallView | null>(() => {
     if (!call || !member || !memberActionView) {
@@ -156,7 +152,7 @@ export function CallPage({
       badge: "普通通话",
       isRuntime: false,
     };
-  }, [activeCalls, call, elapsedGameSeconds, gameState, map, member, memberActionView, runtimeCall, tiles]);
+  }, [activeCalls, call, elapsedGameSeconds, gameState, member, memberActionView, runtimeCall, tiles]);
 
   if (!call || !member || !callView || !memberActionView) {
     return (
@@ -227,8 +223,8 @@ export function CallPage({
             <MoveConfirmPanel
               member={member}
               targetTile={selectedMoveTarget}
-              targetCell={visibleMoveCells.find((cell) => cell.id === call.selectedTargetTileId)}
-              moveCells={visibleMoveCells}
+              targetCell={moveCells.find((cell) => cell.id === call.selectedTargetTileId)}
+              moveCells={moveCells}
               tiles={tiles}
               preview={movePreview}
               callClosed={callClosed}
@@ -450,20 +446,12 @@ function formatMoveTargetLabel(cell: VisibleTileCell | undefined, tile: MapTile 
     return tile?.coord ?? "未知目标";
   }
 
-  if (cell.status === "frontier") {
-    return `未探索信号（${cell.displayX},${cell.displayY}）`;
-  }
-
   return `${getTileLocationLabel(defaultMapConfig, cell.id)} / 地形：${cell.tile?.terrain ?? tile?.terrain ?? "未知地形"}`;
 }
 
 function formatMoveTargetShortLabel(cell: VisibleTileCell | undefined, tile: MapTile | undefined) {
   if (!cell) {
     return tile?.coord ?? "未知目标";
-  }
-
-  if (cell.status === "frontier") {
-    return `未探索信号（${cell.displayX},${cell.displayY}）`;
   }
 
   return getTileLocationLabel(defaultMapConfig, cell.id);
@@ -474,11 +462,7 @@ function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMov
   return preview.steps
     .map((step) => {
       const cell = cellsById.get(step.tileId);
-      if (cell?.status === "frontier") {
-        return `未探索信号（${cell.displayX},${cell.displayY}）`;
-      }
-
-      if (cell?.status === "discovered") {
+      if (cell) {
         return `${getTileLocationLabel(defaultMapConfig, cell.id)} ${step.terrain}`;
       }
 

@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig, type MapSpecialStateDefinition } from "../content/contentData";
-import { mapObjectDefinitionById, type MapObjectDefinition } from "../content/mapObjects";
+import type { MapObjectDefinition } from "../content/mapObjects";
 import { createMovePreview, deriveCrewActionViewModel, formatMoveRoute, type CrewActionViewModel } from "../crewSystem";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
 import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
-import { getDisplayCoord, getTileLocationLabel, getVisibleTileWindow, parseTileId, type VisibleTileCell } from "../mapSystem";
+import { getDisplayCoord, getFullTileWindow, getTileLocationLabel, parseTileId, resolveTileObjects, type VisibleTileCell } from "../mapSystem";
+import { PhaserMapCanvas } from "../phaser-map/PhaserMapCanvas";
+import { buildPhaserCrewMarkers, buildPhaserTileViews, buildTileCenters } from "../phaser-map/mapView";
 import { formatDuration } from "../timeSystem";
+
+const ZOOM_LEVEL_LABELS = ["全局", "区域", "地块", "精细"] as const;
 
 interface MapPageProps {
   tiles: MapTile[];
@@ -39,15 +43,41 @@ export function MapPage({
   onSelectMoveTarget,
   onReturn,
 }: MapPageProps) {
-  const visibleWindow = useMemo(() => getVisibleTileWindow(defaultMapConfig, map), [map]);
-  const [selectedId, setSelectedId] = useState(map.originTileId);
-  const selectedCell = visibleWindow.cells.find((cell) => cell.id === selectedId) ?? visibleWindow.cells[0];
+  const visibleWindow = useMemo(() => getFullTileWindow(defaultMapConfig), []);
+  const [selectedId, setSelectedId] = useState<string | null>(selectedMoveTargetId ?? null);
+  const [mapZoomLevel, setMapZoomLevel] = useState(0);
+  const selectedCell = selectedId ? visibleWindow.cells.find((cell) => cell.id === selectedId) : undefined;
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
-  const selectedIsDiscovered = selectedCell?.status === "discovered";
   const moveSelectionMember = crew.find((member) => member.id === moveSelectionCrewId);
   const movePreview = moveSelectionMember && selectedCell ? createMovePreview(moveSelectionMember, selectedCell.id, tiles) : null;
   const visibleColumns = Math.max(1, visibleWindow.maxCol - visibleWindow.minCol + 1);
   const selectedTileLogs = selectedTile ? getTileEventLogs(eventLogs, selectedTile.id) : [];
+  const crewPositions = useMemo(
+    () =>
+      Object.fromEntries(
+        visibleWindow.cells.map((cell) => {
+          const tile = tiles.find((item) => item.id === cell.id);
+          return [cell.id, crewIdsForCell(map.tilesById[cell.id], tile)];
+        }),
+      ),
+    [map.tilesById, tiles, visibleWindow.cells],
+  );
+  const tileViews = useMemo(
+    () =>
+      buildPhaserTileViews(visibleWindow, {
+        selectedId,
+        selectedMoveTargetId,
+        movePreviewRoute: movePreview?.route,
+        crewPositions,
+        visual: defaultMapConfig.visual,
+      }),
+    [crewPositions, movePreview?.route, selectedId, selectedMoveTargetId, visibleWindow],
+  );
+  const tileCenters = useMemo(() => buildTileCenters(tileViews), [tileViews]);
+  const crewMarkers = useMemo(
+    () => buildPhaserCrewMarkers(crew, crewActions, tileCenters, elapsedGameSeconds),
+    [crew, crewActions, elapsedGameSeconds, tileCenters],
+  );
 
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),
@@ -75,8 +105,8 @@ export function MapPage({
       title="卫星雷达地图"
       subtitle={
         moveSelectionMember
-          ? `局部探索矩阵 / 正在为 ${moveSelectionMember.name} 标记候选目的地 / 指令仍需返回通话确认`
-          : "雷达可见区域 / 地图只读 / 指令需返回通话或通讯台发起"
+          ? `完整地图矩阵 / 正在为 ${moveSelectionMember.name} 标记候选目的地 / 指令仍需返回通话确认`
+          : "完整地图区域 / 地图只读 / 指令需返回通话或通讯台发起"
       }
       gameTimeLabel={gameTimeLabel}
       actions={
@@ -86,99 +116,46 @@ export function MapPage({
       }
     >
       <div className="map-layout">
-        <section
-          className="map-grid"
-          aria-label={`雷达可见矩形：玩家坐标 ${formatWindowCoord(visibleWindow.minRow, visibleWindow.minCol)} 到 ${formatWindowCoord(
-            visibleWindow.maxRow,
-            visibleWindow.maxCol,
-          )}`}
-          style={{ gridTemplateColumns: `repeat(${visibleColumns}, minmax(0, 1fr))` }}
-        >
-          {visibleWindow.cells.map((cell) => {
-            const tile = tiles.find((item) => item.id === cell.id);
-            const runtimeTile = map.tilesById[cell.id];
-            const isDiscovered = cell.status === "discovered";
-            const visibleCrewIds = crewIdsForCell(runtimeTile, tile);
-            const hasCrewSignal = !isDiscovered && Boolean(cell.tile) && visibleCrewIds.length > 0;
-            const visibleSpecialStates = revealedSpecialStates(cell, runtimeTile);
-            const hasDanger = isDiscovered && visibleSpecialStates.some((state) => state.severity === "high");
-            const isRouteTile = movePreview?.route.includes(cell.id) ?? false;
-            const isMoveTarget = selectedMoveTargetId === cell.id;
-            const hasCurrentCrew = visibleCrewIds.length > 0;
-            const firstEventMark = tile?.eventMarks?.[0];
-            return (
-              <button
-                type="button"
-                key={cell.id}
-                className={`map-cell ${selectedCell?.id === cell.id ? "map-cell-selected" : ""} ${
-                  isDiscovered ? "" : "map-cell-unknown"
-                } ${hasDanger ? "map-cell-danger" : ""} ${isRouteTile ? "map-cell-route" : ""} ${isMoveTarget ? "map-cell-target" : ""} ${
-                  hasCurrentCrew ? "map-cell-crew-current" : ""
-                }`}
-                onClick={() => setSelectedId(cell.id)}
-              >
-                <strong>{formatCellCoord(cell)}</strong>
-                {isDiscovered && cell.tile && tile ? (
-                  <>
-                    <span>{cell.tile.areaName}</span>
-                    <small>地形：{cell.tile.terrain}</small>
-                    <small>天气：{cell.tile.weather}</small>
-                    <small>对象：{objectSummary(revealedObjects(cell, runtimeTile))}</small>
-                    <small>状态：{specialStateSummary(visibleSpecialStates)}</small>
-                    {tile.crew.map((crewId) => {
-                      const member = crewById.get(crewId);
-                      const actionView = member ? crewActionViews[member.id] : undefined;
-                      return member ? (
-                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
-                        </small>
-                      ) : null;
-                    })}
-                    {firstEventMark ? <small className="route-text">{firstEventMark.label}</small> : null}
-                  </>
-                ) : hasCrewSignal && cell.tile ? (
-                  <>
-                    <span>队员回传</span>
-                    <small>地形：{cell.tile.terrain}</small>
-                    <small>天气：{cell.tile.weather}</small>
-                    {visibleCrewIds.map((crewId) => {
-                      const member = crewById.get(crewId);
-                      const actionView = member ? crewActionViews[member.id] : undefined;
-                      return member ? (
-                        <small key={crewId} className={actionView?.statusTone === "danger" ? "danger-text" : ""}>
-                          {member.name}：{shortStatus(actionView?.statusText ?? member.status)}
-                        </small>
-                      ) : null;
-                    })}
-                  </>
-                ) : (
-                  <>
-                    <span>未探索区域</span>
-                    <small>详情未确认</small>
-                  </>
-                )}
-                {isRouteTile ? <small className="route-text">候选路线</small> : null}
-                {isMoveTarget ? <small className="route-text">已标记目标</small> : null}
-              </button>
-            );
-          })}
-        </section>
+        <div className="map-canvas-shell">
+          <ul className="zoom-level-bar" aria-label="地图缩放级别">
+            {ZOOM_LEVEL_LABELS.map((label, index) => (
+              <li key={label} className={index === mapZoomLevel ? "zoom-level-pip zoom-level-active" : "zoom-level-pip"}>
+                {label}
+              </li>
+            ))}
+          </ul>
+          <PhaserMapCanvas
+            columns={visibleColumns}
+            tileViews={tileViews}
+            crewMarkers={crewMarkers}
+            onSelectTile={setSelectedId}
+            setZoomLevelInReact={setMapZoomLevel}
+          />
+        </div>
 
         <Panel className="map-legend">
           <p>
-            选中：橙色描边 · 队员回传：浅色底 · 高风险状态：橙色文字 · 未探索区域：灰色低对比 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
+            选中：橙色描边 · 队员回传：浅色底 · 高风险状态：橙色文字 · 候选路线：虚线标记 · 地图页面不直接下达移动指令
           </p>
         </Panel>
 
-        <Panel title={`坐标详情：${selectedCell ? formatCellCoord(selectedCell) : "无信号"}`} className="map-detail">
-          {selectedCell && selectedTile && selectedIsDiscovered ? (
+        <Panel title={`坐标详情：${selectedCell ? formatCellCoord(selectedCell) : "未选择"}`} className="map-detail">
+          {!selectedCell ? (
+            <FieldList
+              rows={[
+                ["选择状态", "尚未选择地块"],
+                ["行动提示", "点按地图地块后显示选框，并在此处显示该地块信息"],
+                ["候选移动", moveSelectionMember ? "选择一个可达地块后可标记候选目的地" : "未处于通话选点模式"],
+              ]}
+            />
+          ) : selectedTile && selectedCell?.tile ? (
             <FieldList
               rows={[
                 ["区域", selectedCell.tile?.areaName ?? "未知区域"],
                 ["地形", selectedCell.tile?.terrain ?? selectedTile.terrain],
                 ["天气", selectedCell.tile?.weather ?? "未知天气"],
-                ["已揭示对象", objectSummary(revealedObjects(selectedCell, map.tilesById[selectedCell.id]))],
-                ["特殊状态", specialStateSummary(revealedSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
+                ["地块对象", objectSummary(tileObjects(selectedCell))],
+                ["特殊状态", specialStateSummary(activeSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
                 ["手下状态", crewStatus(selectedTile, crewById, crewActionViews)],
                 ["计时状态", crewTiming(selectedTile, crewById, crewActionViews, elapsedGameSeconds)],
                 ["事件标记", formatEventMarks(selectedTile)],
@@ -187,7 +164,7 @@ export function MapPage({
                 ["候选移动", moveSelectionMember ? moveSelectionText(movePreview) : "未处于通话选点模式"],
               ]}
             />
-          ) : selectedCell && selectedTile && selectedCell.tile && crewIdsForCell(map.tilesById[selectedCell.id], selectedTile).length > 0 ? (
+          ) : selectedTile && selectedCell.tile && crewIdsForCell(map.tilesById[selectedCell.id], selectedTile).length > 0 ? (
             <FieldList
               rows={[
                 ["信号状态", "队员回传"],
@@ -256,39 +233,21 @@ function formatCellCoord(cell: Pick<VisibleTileCell, "displayX" | "displayY">) {
   return `(${cell.displayX},${cell.displayY})`;
 }
 
-function formatWindowCoord(row: number, col: number) {
-  const origin = parseTileId(defaultMapConfig.originTileId);
-  const coord = origin ? getDisplayCoord({ row, col }, origin) : { displayX: col, displayY: row };
-  return `(${coord.displayX},${coord.displayY})`;
-}
-
-function revealedObjects(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapObjectDefinition[] {
-  if (!cell.tile || cell.status !== "discovered") {
+function tileObjects(cell: VisibleTileCell): MapObjectDefinition[] {
+  if (!cell.tile) {
     return [];
   }
 
-  const revealedIds = new Set(runtimeTile?.revealedObjectIds ?? []);
-  const definitions: MapObjectDefinition[] = [];
-  for (const objectId of cell.tile.objectIds) {
-    const def = mapObjectDefinitionById.get(objectId);
-    if (!def) {
-      continue;
-    }
-    if (def.visibility === "onDiscovered" || revealedIds.has(def.id)) {
-      definitions.push(def);
-    }
-  }
-  return definitions;
+  return resolveTileObjects(cell.tile);
 }
 
-function revealedSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapSpecialStateDefinition[] {
-  if (!cell.tile || cell.status !== "discovered") {
+function activeSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapSpecialStateDefinition[] {
+  if (!cell.tile) {
     return [];
   }
 
   const activeIds = new Set(runtimeTile?.activeSpecialStateIds ?? cell.tile.specialStates.filter((state) => state.startsActive).map((state) => state.id));
-  const revealedIds = new Set(runtimeTile?.revealedSpecialStateIds ?? []);
-  return cell.tile.specialStates.filter((state) => activeIds.has(state.id) && (state.visibility === "onDiscovered" || revealedIds.has(state.id)));
+  return cell.tile.specialStates.filter((state) => activeIds.has(state.id));
 }
 
 function crewIdsForCell(runtimeTile: GameMapState["tilesById"][string], tile?: Pick<MapTile, "crew">) {
@@ -304,6 +263,11 @@ function specialStateSummary(states: MapSpecialStateDefinition[]) {
 }
 
 function crewMapLocation(member: CrewMember, map: GameMapState) {
+  const authoredLocation = getTileLocationLabel(defaultMapConfig, member.currentTile);
+  if (authoredLocation !== member.currentTile) {
+    return authoredLocation;
+  }
+
   const tileState = map.tilesById[member.currentTile];
   if (tileState?.discovered || map.discoveredTileIds.includes(member.currentTile)) {
     return getTileLocationLabel(defaultMapConfig, member.currentTile);
@@ -378,20 +342,4 @@ function moveSelectionText(preview: ReturnType<typeof createMovePreview> | null)
   }
 
   return `${formatMoveRoute(preview)} / 预计 ${formatDuration(preview.totalDurationSeconds)}`;
-}
-
-function shortStatus(status: string) {
-  if (status.includes("熊")) {
-    return "危险";
-  }
-
-  if (status.includes("采矿")) {
-    return "采矿中";
-  }
-
-  if (status.includes("行进")) {
-    return "行进中";
-  }
-
-  return status.slice(0, 8);
 }

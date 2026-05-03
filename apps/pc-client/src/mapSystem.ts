@@ -151,14 +151,41 @@ export function getVisibleTileWindow(config: MapConfigDefinition, runtimeMap: Ru
   return { minRow, maxRow, minCol, maxCol, cells };
 }
 
-export function canMoveToTile(config: MapConfigDefinition, runtimeMap: RuntimeMapState, tileId: string) {
+export function getFullTileWindow(config: MapConfigDefinition): VisibleTileWindow {
+  const origin = getOrigin(config);
+  const cells: VisibleTileCell[] = [];
+
+  for (let row = 1; row <= config.size.rows; row += 1) {
+    for (let col = 1; col <= config.size.cols; col += 1) {
+      const id = getTileId(row, col);
+      const displayCoord = origin ? getDisplayCoord({ row, col }, origin) : { displayX: col, displayY: row };
+      cells.push({
+        id,
+        row,
+        col,
+        ...displayCoord,
+        status: "discovered",
+        tile: getTile(config, id),
+      });
+    }
+  }
+
+  return {
+    minRow: 1,
+    maxRow: config.size.rows,
+    minCol: 1,
+    maxCol: config.size.cols,
+    cells,
+  };
+}
+
+export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeMapState, tileId: string) {
   const coord = parseTileId(tileId);
   if (!coord || !isInsideMap(config, coord.row, coord.col) || !getTile(config, tileId)) {
     return false;
   }
 
-  const cell = getVisibleTileWindow(config, runtimeMap).cells.find((item) => item.id === tileId);
-  return cell?.status === "discovered" || cell?.status === "frontier";
+  return true;
 }
 
 /**

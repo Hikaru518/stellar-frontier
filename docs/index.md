@@ -1,6 +1,6 @@
 ---
 title: Stellar Frontier 设计文档索引
-last_synced: 2026-04-29
+last_synced: 2026-05-03
 maintained_by: audit-wiki
 ---
 
@@ -28,7 +28,7 @@ maintained_by: audit-wiki
 | [队员系统](./gameplay/crew/crew.md) | 队员系统负责管理队员作为行动执行者与真实伙伴的双重身份。 | 2026-04-27 | 已实现 |
 | [双设备游玩](./gameplay/dual-device-play/dual-device-play.md) | 双设备游玩让手机成为可选私人通讯终端，PC 保持唯一权威，Yuan WSS 提供基线连接，WebRTC DataChannel 作为机会性升级。 | 2026-04-28 | 已实现（DataChannel 可观测性待补） |
 | [事件系统](./gameplay/event-system/event-system.md) | 事件系统负责把队员行动、地块状态、时间推进和玩家通话选择转化为可验证、可推进、可结算的世界反馈。 | 2026-04-28 | 已实现 |
-| [可配置地图系统](./gameplay/map-system/map-system.md) | 地图系统是玩家通过雷达 / 地图理解星球现场态势的基础系统，由可配置尺寸的网格地图构成。 | 2026-04-28 | 已实现 |
+| [可配置地图系统](./gameplay/map-system/map-system.md) | 地图系统是玩家通过雷达 / 地图理解星球现场态势的基础系统，由可配置尺寸网格、完整地图窗口和视觉层构成。 | 2026-05-03 | 已实现（战争迷雾待单独设计） |
 | [时间系统](./gameplay/time-system/time-system.md) | 时间系统是所有队员行动、资源产出、通讯事件和地图状态变化的基础系统。 | *（缺字段：frontmatter.last_updated）* | 已实现 |
 
 > 索引页缺口：`docs/gameplay/time-system/time-system.md` 当前缺少标准 wiki frontmatter，后续应由 `organize-wiki` 按 wiki 模板补齐。
@@ -40,6 +40,13 @@ maintained_by: audit-wiki
 | [UI 设计总览](./ui-designs/ui.md) | 汇总游戏原型中的主要 UI 模块，把草图整理成可开发、可验证的 PRD 式说明。 |
 | [UI 设计原则](./ui-designs/ui-design-principles.md) | 约束游戏 UI 原型的低保真控制台美学与系统组织方式。 |
 | 页面 PRD | [控制中心](./ui-designs/pages/控制中心.md) ⋅ [通讯台](./ui-designs/pages/通讯台.md) ⋅ [通话](./ui-designs/pages/通话.md) ⋅ [地图](./ui-designs/pages/地图.md) |
+
+## 3.1 本地编辑器工具
+
+| 文档 / 入口 | 一句话概述 |
+| --- | --- |
+| [Editor README](../apps/editor/README.md) | 说明本地 Game Editor、Event Editor、Map Editor、helper API 和验收命令。 |
+| [Map Editor UX 计划](./plans/2026-05-01-22-43/map-editor-ux-design.md) | 记录地图编辑器面向策划的用户体验、工具模式和验收故事。 |
 
 ## 4. 计划与策划案
 
@@ -60,7 +67,7 @@ maintained_by: audit-wiki
 | [Crew 模型](./game_model/crew.md) | 描述队员内容配置、运行时队员状态，以及地图、行动、事件、物品、日记和时间系统如何读取队员。 |
 | [事件模型](./game_model/event.md) | 描述事件核心模型，包含资产库、静态事件定义、事件图、节点、runtime event/call/objective、condition/effect、handler、生命周期和校验。 |
 | [事件集成状态边界](./game_model/event-integration.md) | 描述事件系统会读写的外部 game model 边界，包括队员、行动、地块、物品、资源、历史、世界标记和存档。 |
-| [地图模型](./game_model/map.md) | 描述静态地图配置、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换和调查报告。 |
+| [地图模型](./game_model/map.md) | 描述静态地图配置、视觉层、tileset registry、地图块层级、运行时地图状态、坐标转换、完整地图窗口和调查报告。 |
 | [通话行动模型](./game_model/call-action.md) | 描述普通通话中的行动定义、按钮生成和行动结算数据契约。 |
 | [事件程序模型与玩家旅程模型索引](./game_model/event-program-model-player-journey.md) | 兼容旧引用的索引页，指向事件核心模型与事件集成状态边界。 |
 

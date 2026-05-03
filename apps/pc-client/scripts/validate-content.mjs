@@ -13,8 +13,11 @@ const { validateEventContentLibrary } = await loadEventValidation();
 const contentFilePairs = [
   ["content/crew/crew.json", "content/schemas/crew.schema.json"],
   ["content/items/items.json", "content/schemas/items.schema.json"],
-  ["content/maps/default-map.json", "content/schemas/maps.schema.json"],
 ];
+
+const mapSchemaPath = "content/schemas/maps.schema.json";
+const mapDataPaths = listJsonFiles("content/maps");
+const tilesetRegistryPair = ["content/maps/tilesets/registry.json", "content/schemas/map-tilesets.schema.json"];
 
 const contentAssetGroups = [
   {
@@ -54,6 +57,8 @@ const eventAssetFiles = [
 const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
 const schemaPaths = new Set([
   ...contentFilePairs.map(([, schemaPath]) => schemaPath),
+  mapSchemaPath,
+  tilesetRegistryPair[1],
   ...contentAssetGroups.map(({ schemaPath }) => schemaPath),
   ...eventSchemaPaths,
 ]);
@@ -63,6 +68,8 @@ for (const schema of Object.values(schemasByPath)) {
 }
 
 const loaded = Object.fromEntries(contentFilePairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
+const loadedMaps = Object.fromEntries(mapDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
+const tilesetRegistry = readJson(tilesetRegistryPair[0]);
 
 let failed = false;
 let eventSchemaFailed = false;
@@ -76,6 +83,12 @@ if (eventManifestResult.issues.length > 0) {
 for (const [dataPath, schemaPath] of contentFilePairs) {
   failed = validateJsonFile(dataPath, schemaPath, loaded[dataPath]) || failed;
 }
+
+for (const [dataPath, mapData] of Object.entries(loadedMaps)) {
+  failed = validateJsonFile(dataPath, mapSchemaPath, mapData) || failed;
+}
+
+failed = validateJsonFile(tilesetRegistryPair[0], tilesetRegistryPair[1], tilesetRegistry) || failed;
 
 for (const { directoryPath, schemaPath } of eventAssetGroups) {
   for (const dataPath of listJsonFiles(directoryPath)) {
@@ -102,7 +115,7 @@ if (!eventSchemaFailed) {
   failed = validateEventProgramReferences() || failed;
 }
 
-failed = validateReferences(loaded) || failed;
+failed = validateReferences(loaded, loadedMaps, tilesetRegistry) || failed;
 
 if (failed) {
   process.exitCode = 1;
@@ -290,11 +303,10 @@ function escapeJsonPointer(value) {
   return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
-function validateReferences(data) {
+function validateReferences(data, maps, registry) {
   let hasError = false;
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
-  const defaultMap = data["content/maps/default-map.json"];
 
   const itemIds = new Set();
   const crewIds = new Set();
@@ -319,7 +331,15 @@ function validateReferences(data) {
 
   const { ids: knownObjectIds, hasError: catalogFailed } = collectMapObjectIds();
   hasError = catalogFailed || hasError;
-  hasError = validateMap(defaultMap, knownObjectIds) || hasError;
+  const { tilesetsById, hasError: tilesetRegistryFailed } = validateTilesetRegistry(registry);
+  hasError = tilesetRegistryFailed || hasError;
+  for (const [dataPath, map] of Object.entries(maps)) {
+    hasError =
+      validateMap(map, knownObjectIds, tilesetsById, {
+        requireDefaultSize: dataPath === "content/maps/default-map.json",
+        dataPath,
+      }) || hasError;
+  }
 
   return hasError;
 }
@@ -340,7 +360,64 @@ function collectMapObjectIds() {
   return { ids, hasError };
 }
 
-function validateMap(map, knownObjectIds) {
+function validateTilesetRegistry(registry) {
+  let hasError = false;
+  const tilesetsById = new Map();
+  const tilesetIds = new Set();
+  const publicTilesetRoot = path.resolve(root, "apps/pc-client/public/maps/tilesets");
+  const publicRoot = path.resolve(root, "apps/pc-client/public");
+
+  for (const tileset of registry.tilesets ?? []) {
+    if (!addUnique(tilesetIds, tileset.id)) {
+      hasError = report(`Duplicate map tileset id: ${tileset.id}`) || hasError;
+    } else {
+      tilesetsById.set(tileset.id, tileset);
+    }
+
+    const assetPath = path.resolve(root, tileset.assetPath);
+    if (!fs.existsSync(assetPath)) {
+      hasError = report(`Map tileset assetPath does not exist for ${tileset.id}: ${tileset.assetPath}`) || hasError;
+    }
+
+    const publicPath = path.resolve(publicRoot, tileset.publicPath);
+    if (!publicPath.startsWith(`${publicTilesetRoot}${path.sep}`)) {
+      hasError =
+        report(`Map tileset publicPath must be under apps/pc-client/public/maps/tilesets: ${tileset.publicPath}`) ||
+        hasError;
+    } else if (!fs.existsSync(publicPath)) {
+      hasError = report(`Map tileset publicPath does not exist for ${tileset.id}: ${tileset.publicPath}`) || hasError;
+    }
+
+    if (tileset.columns * tileset.tileWidth !== tileset.imageWidth) {
+      hasError = report(`Map tileset imageWidth does not match columns * tileWidth for ${tileset.id}`) || hasError;
+    }
+
+    const expectedRows = Math.ceil(tileset.tileCount / tileset.columns);
+    if (expectedRows * tileset.tileHeight !== tileset.imageHeight) {
+      hasError = report(`Map tileset imageHeight does not match tileCount/columns rows for ${tileset.id}`) || hasError;
+    }
+
+    const categoryIds = new Set();
+    for (const category of tileset.categories ?? []) {
+      if (!addUnique(categoryIds, category.id)) {
+        hasError = report(`Duplicate category id in tileset ${tileset.id}: ${category.id}`) || hasError;
+      }
+
+      for (const tileIndex of category.tileIndexes ?? []) {
+        if (tileIndex < 0 || tileIndex >= tileset.tileCount) {
+          hasError =
+            report(
+              `Tileset category tileIndex out of bounds in ${tileset.id}/${category.id}: ${tileIndex} for tileCount ${tileset.tileCount}`,
+            ) || hasError;
+        }
+      }
+    }
+  }
+
+  return { tilesetsById, hasError };
+}
+
+function validateMap(map, knownObjectIds, tilesetsById, options) {
   let hasError = false;
   const { rows, cols } = map.size;
   const tileIds = new Set();
@@ -348,7 +425,7 @@ function validateMap(map, knownObjectIds) {
   const referencedObjectIds = new Map();
   const initialDiscoveredTileIds = new Set(map.initialDiscoveredTileIds);
 
-  if (rows !== 8 || cols !== 8) {
+  if (options.requireDefaultSize && (rows !== 8 || cols !== 8)) {
     hasError = report(`Default map must be 8 x 8, got ${rows} x ${cols}`) || hasError;
   }
 
@@ -416,6 +493,34 @@ function validateMap(map, knownObjectIds) {
 
   if (tileById.size !== rows * cols) {
     hasError = report(`Map tile count must match size coverage: expected ${rows * cols}, got ${tileById.size}`) || hasError;
+  }
+
+  const layerIds = new Set();
+  for (const layer of map.visual?.layers ?? []) {
+    if (!addUnique(layerIds, layer.id)) {
+      hasError = report(`Duplicate visual layer id in ${options.dataPath}: ${layer.id}`) || hasError;
+    }
+
+    for (const [tileId, cell] of Object.entries(layer.cells ?? {})) {
+      if (!tileById.has(tileId)) {
+        hasError = report(`Unknown visual cell tileId in ${options.dataPath}/${layer.id}: ${tileId}`) || hasError;
+      }
+
+      const tileset = tilesetsById.get(cell.tilesetId);
+      if (!tileset) {
+        hasError =
+          report(`Unknown visual cell tilesetId in ${options.dataPath}/${layer.id}/${tileId}: ${cell.tilesetId}`) ||
+          hasError;
+        continue;
+      }
+
+      if (cell.tileIndex < 0 || cell.tileIndex >= tileset.tileCount) {
+        hasError =
+          report(
+            `Visual cell tileIndex out of bounds in ${options.dataPath}/${layer.id}/${tileId}: ${cell.tileIndex} for ${cell.tilesetId}`,
+          ) || hasError;
+      }
+    }
   }
 
   return hasError;

@@ -9,7 +9,7 @@
 | [控制中心](pages/控制中心.md) | 基地总入口，承载日常设施与主要系统入口。 | 查看窗外、使用生活设施、打开通讯台、查看资源状态、进入研究/贸易/星际之门等模块。 |
 | [通讯台](pages/通讯台.md) | 角色通讯与任务入口，展示队员状态和可接通事件。 | 展开/收起通讯录、查看队员、接通来电、查看背包。 |
 | [通话](pages/通话.md) | 承载基础行动确认、剧情选择和紧急事件决策。 | 选择回复、打开地图查看坐标信息、打开通讯录浮层、请求队员移动、待命、停止或调查；剧情动作由事件选项提供。 |
-| [地图](pages/地图.md) | 展示星球地块、地块对象、特殊状态和队员状态。 | 选择坐标点、查看地形 / 天气 / 对象 / 状态 / 队员位置，不直接发起指令。 |
+| [地图](pages/地图.md) | 展示完整星球地图、视觉地块、地块对象、特殊状态和队员状态。 | 缩放 / 平移地图、选择坐标点、查看地形 / 天气 / 对象 / 状态 / 队员位置；从通话进入时只标记候选目的地，不直接发起指令。 |
 
 ## 模块关系
 
@@ -59,6 +59,15 @@ flowchart TD
     BagWindow -->|"关闭"| CommunicationStation
     CallPage -->|"结束通话"| CommunicationStation
 ```
+
+## 开发者 / 策划工具
+
+Game Editor 是独立于玩家 PC 客户端的本地内容生产工具，位于 `apps/editor`。它不属于玩家页面流转，但服务同一套 `content/` 数据。
+
+| 工具 | 主要职责 | 数据边界 |
+| --- | --- | --- |
+| Event Editor | 浏览结构化事件、通话模板、schema、graph 和 validation，编辑并保存事件内容。 | 读写 `content/events/definitions/*.json`、`content/events/call_templates/*.json`，并刷新事件 manifest。 |
+| Map Editor | 新建 / 选择地图，编辑地图尺寸、origin、初始 discovered 标记、地形、天气、环境、地块对象、特殊状态和视觉层。 | 读写 `content/maps/*.json`；读取 `content/maps/tilesets/registry.json`、`content/map-objects/*.json` 与相关 schema；通过 helper 读取 `assets/` 中的 tileset PNG。 |
 
 
 

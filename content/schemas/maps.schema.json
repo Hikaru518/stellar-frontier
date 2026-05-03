@@ -51,6 +51,9 @@
       "items": {
         "$ref": "#/$defs/tile"
       }
+    },
+    "visual": {
+      "$ref": "#/$defs/visual"
     }
   },
   "$defs": {
@@ -182,6 +185,66 @@
         "durationGameSeconds": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layers"],
+      "properties": {
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/visualLayer"
+          }
+        }
+      }
+    },
+    "visualLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "visible", "locked", "opacity", "cells"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cells": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/tileId"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/visualCell"
+          }
+        }
+      }
+    },
+    "visualCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tilesetId", "tileIndex"],
+      "properties": {
+        "tilesetId": {
+          "$ref": "#/$defs/id"
+        },
+        "tileIndex": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

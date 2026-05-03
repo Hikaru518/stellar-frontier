@@ -18,7 +18,8 @@
     "@stellar-frontier/dual-device": "workspace:*",
     "qrcode": "^1.5.4",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "phaser": "~4.1.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",

@@ -1,0 +1,269 @@
+{
+  "topic": "phaser-map",
+  "created": "2026-04-30",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "安装 Phaser 依赖 + 建立目录与空壳文件",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": null,
+      "description": "为 Phaser 地图系统建立基础设施。安装 phaser ~4.1.0 到 apps/pc-client/package.json；新建 apps/pc-client/src/phaser-map/ 目录并创建三个空壳文件（PhaserMapCanvas.tsx、MapScene.ts、mapView.ts）；新建 content/maps/tilesets/registry.json（tilesets 数组为空）；新建 apps/pc-client/public/maps/tilesets/.gitkeep 占位。完成后，后续所有 phaser-map 任务均可在此基础上开始编码，内容校验脚本也可识别 registry.json。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/phaser-map/PhaserMapCanvas.tsx",
+          "apps/pc-client/src/phaser-map/MapScene.ts",
+          "apps/pc-client/src/phaser-map/mapView.ts",
+          "content/maps/tilesets/registry.json",
+          "apps/pc-client/public/maps/tilesets/.gitkeep"
+        ],
+        "modify": [
+          "apps/pc-client/package.json"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: apps/pc-client/package.json 的 dependencies 中包含 phaser 且版本满足 ~4.1.0",
+        "AC2: rush update 后 phaser 可被 import（import Phaser from 'phaser' 不报 TS 类型错误）",
+        "AC3: content/maps/tilesets/registry.json 存在且内容为 {\"tilesets\": []}",
+        "AC4: apps/pc-client/public/maps/tilesets/.gitkeep 存在",
+        "AC5: npm run validate:content 通过（新增 registry.json 不破坏现有校验）"
+      ],
+      "tech_notes": "参考 ADR-002。registry.json 的 tilesets 数组在 MVP 阶段为空；Phaser preload 中需对空数组做判断（跳过循环），不报错。rush add --package phaser@~4.1.0 --make-it-a-dependency 是正确的依赖添加方式，而非直接编辑 package.json。"
+    },
+    {
+      "id": "TASK-002",
+      "title": "实现 mapView.ts 纯函数与单元测试",
+      "priority": "P0",
+      "depends_on": ["TASK-001"],
+      "user_story": null,
+      "description": "在 apps/pc-client/src/phaser-map/mapView.ts 中实现所有纯函数：地形颜色映射（getTerrainFillColor）、Tooltip 文本生成（getTileTooltipText）、队员标记字母（getCrewMarkerLabel）、HTML 语义层 a11y 位置插值（getCrewMarkerPosition，使用 elapsedGameSeconds 而非 wall clock）、BFS 寻路（findTilePath，4 邻域，返回空数组表示不可达）、4 邻域 ID（getGridNeighborIds）、从 VisibleTileWindow 派生 PhaserMapTileView[]（buildPhaserTileViews）、派生语义层坐标（buildPhaserCrewMarkers）。这些函数是 MapScene 和 PhaserMapCanvas 的共同依赖，必须在 Phaser Scene 之前实现并通过测试。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/phaser-map/mapView.test.ts"
+        ],
+        "modify": [
+          "apps/pc-client/src/phaser-map/mapView.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/phaser-map/mapView.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: getTerrainFillColor('森林', 'discovered') 返回 '#2f8f46'；getTerrainFillColor(undefined, 'frontier') 返回 '#6f7378'",
+        "AC2: findTilePath 给定可走 tile 数组和起终点，返回非空路径数组，路径两端 ID 等于起点和终点",
+        "AC3: findTilePath 起点或终点设为不可走（walkable: false 或不存在），返回 []",
+        "AC4: findTilePath(tiles, 'X', 'X')（起点等于终点）返回 ['X']",
+        "AC5: getCrewMarkerPosition 在 progress=0 时返回 from tile 中心，progress=1 时返回 to tile 中心，progress=0.5 时返回两者中点（误差 < 1px）",
+        "AC6: npm run test 全部通过（无 Phaser 依赖，纯函数测试不需要 DOM）"
+      ],
+      "tech_notes": "参考 ADR-004（getCrewMarkerPosition 用于语义层，非 Phaser 动画）。地形颜色映射规则见 initial.md §6.1：水→#2f80ed，森林→#2f8f46，沙漠→#d8b45f，山/岩/丘陵→#777b82，草/平原→#7fbf69，坠毁/设施/残骸→#8c8174，未探索(frontier/unknownHole)→#6f7378，默认→#8c8174。getCrewMarkerPosition 中 progress = (elapsedGameSeconds - stepStartedAt) / (stepFinishTime - stepStartedAt)，需 clamp [0, 1]。"
+    },
+    {
+      "id": "TASK-003",
+      "title": "实现 PhaserMapCanvas.tsx React 外壳",
+      "priority": "P0",
+      "depends_on": ["TASK-001"],
+      "user_story": null,
+      "description": "实现 apps/pc-client/src/phaser-map/PhaserMapCanvas.tsx。职责：用 import('phaser') 懒加载 Phaser（import.meta.env.MODE === 'test' 时跳过）；在 useEffect 中创建 Phaser.Game 实例并挂载到 containerRef；cleanup 时 game.destroy(true) 并设 cancelled flag 防止 React 19 StrictMode 双挂载；通过 stateRef.current = props 在每次 render 同步 props；检测 tileViews/crewMarkers 变化时调用 scene.updateState()；挂载 ResizeObserver 监听容器尺寸变化并调用 game.scale.resize()；渲染 HTML 语义层（pointer-events: none 的格子按钮，供键盘 a11y）。组件本身不含任何 Phaser 游戏逻辑。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/phaser-map/PhaserMapCanvas.test.tsx"
+        ],
+        "modify": [
+          "apps/pc-client/src/phaser-map/PhaserMapCanvas.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/phaser-map/PhaserMapCanvas.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 渲染 PhaserMapCanvas 后，DOM 中同时存在 .phaser-map-stage 元素和 .phaser-map-fallback 元素",
+        "AC2: .phaser-map-fallback 的 CSS pointer-events 为 none（不拦截鼠标事件）",
+        "AC3: import.meta.env.MODE === 'test' 时，Phaser.Game 构造函数不被调用（单元测试可正常运行，无 WebGL 报错）",
+        "AC4: 组件卸载时 game.destroy(true) 被调用，不产生内存泄漏警告",
+        "AC5: 传入不同 tileViews 时，组件不报错（updateState 被调用，即使 scene 尚未就绪也有 null 守卫）"
+      ],
+      "tech_notes": "参考 ADR-003（stateRef 模式）。Phaser Game 配置：type: Phaser.AUTO, antialias: false, pixelArt: true, backgroundColor: '#77736b'。cancelled flag 处理 StrictMode：useEffect cleanup 中设 cancelled = true，第二次 effect 调用时先检查 cancelled，若为 true 则跳过 Game 创建。ResizeObserver 回调用 requestAnimationFrame 节流（参考 R3 风险缓解）。"
+    },
+    {
+      "id": "TASK-004",
+      "title": "实现 MapScene.ts 基础图层与地形色块渲染",
+      "priority": "P0",
+      "depends_on": ["TASK-002", "TASK-003"],
+      "user_story": null,
+      "description": "实现 apps/pc-client/src/phaser-map/MapScene.ts 的基础能力：Phaser Scene 初始化（preload 加载空 registry / create 建立图层）；地形底色层（depth 1，用 getTerrainFillColor 生成的颜色绘制矩形，TILE_SIZE=128, TILE_GAP=2）；摄像机配置（setBounds 世界边界、centerOn 初始位置对准 originTile 中心）；updateState(SceneState) 方法（全量清除并重建地形格子 GameObject）；stateRef 接入（通过 PhaserMapCanvas 传入）。完成后可在浏览器中看到 Phaser 渲染的彩色地块网格，替代原有 DOM Grid。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/MapScene.ts"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: 进入地图页面，浏览器显示 Phaser 渲染的彩色地块网格（非 DOM 按钮），不报 console 错误",
+        "AC2: 已发现格子显示对应地形颜色（如森林格为深绿 #2f8f46），未探索格子显示暗灰 #6f7378",
+        "AC3: 调用 updateState 传入不同 tileViews 后，画面对应更新（格子颜色/数量变化）",
+        "AC4: npm run test 全部通过（MapScene 不在 test 环境初始化）"
+      ],
+      "tech_notes": "参考 ADR-001、ADR-003。TILE_SIZE = 128, TILE_GAP = 2（来自 initial.md §5.3）。格子左上角坐标：x = col × (TILE_SIZE + TILE_GAP), y = row × (TILE_SIZE + TILE_GAP)。世界尺寸：worldWidth = columns × (TILE_SIZE + TILE_GAP), worldHeight 同理。updateState 中用 Graphics 或 Rectangle GameObjects 绘制色块（不是 Sprite，MVP 无贴图）。registry.json 为空时 preload 循环体不执行，正常。"
+    },
+    {
+      "id": "TASK-005",
+      "title": "实现摄像机交互：Zoom、拖拽、WASD 平移",
+      "priority": "P0",
+      "depends_on": ["TASK-004"],
+      "user_story": null,
+      "description": "在 MapScene.ts 中实现完整的摄像机交互系统。4 级离散 Zoom（系数 [0.35, 0.7, 1.5, 3.0]，默认索引 1）：滚轮（deltaY<0 放大）和键盘上下箭头触发，平滑 Tween 过渡（350ms, Cubic.easeInOut），滚轮缩放时以鼠标位置为中心补偿（保持鼠标下方世界坐标不变）。右键拖拽平移（pointer.button === 2）：记录 dragStart，pointermove 时更新 camera.scrollX/Y，速度与 zoom 解耦（屏幕位移感恒定）。WASD 键盘平移（在 update() 中处理，worldSpeed = 400 × delta / (1000 × zoom)）。LOD 切换：在 Tween onUpdate 回调中检测 zoom 跨阈值，切换细节层可见性（非 update() 每帧）。zoom 变化时通过 stateRef.current.setZoomLevelInReact(index) 通知 React，并写入 data-zoom-level 属性。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/MapScene.ts"
+        ],
+        "test": [
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 滚轮向上触发放大，Zoom 从索引 1 变为 2，.phaser-map-stage 的 data-zoom-level 属性变为 '2'",
+        "AC2: 滚轮向下触发缩小，Zoom 索引减 1，data-zoom-level 相应变化",
+        "AC3: Zoom 已在最小级（索引 0）时继续缩小，data-zoom-level 仍为 '0'（边界不越界）",
+        "AC4: 右键按住拖拽，摄像机随鼠标移动平移（不触发选格逻辑）",
+        "AC5: 右键菜单不弹出（disableContextMenu 生效）",
+        "AC6: 缩放 Tween 动画期间，再次触发缩放不生效（zooming flag 防重入）"
+      ],
+      "tech_notes": "参考 ADR-005，initial.md §4.1、§4.2。以鼠标为中心缩放公式：worldX = camera.scrollX + pointer.x / camera.zoom，Tween onUpdate 中 camera.scrollX = worldX - pointer.x / camera.zoom。LOD 阈值：zoom < 0.9 隐藏细节装饰层（depth 3）和网格线（depth 4），0.9 ≤ zoom < 1.2 显示细节层隐藏网格线，zoom ≥ 1.2 全显示。MVP 阶段细节装饰层和网格线均为空，LOD 切换逻辑可先写好但不渲染内容。"
+    },
+    {
+      "id": "TASK-006",
+      "title": "实现 Hover tooltip 与左键选格",
+      "priority": "P0",
+      "depends_on": ["TASK-004"],
+      "user_story": null,
+      "description": "在 MapScene.ts 中实现格子交互。Hover tooltip：鼠标悬停 500ms 后显示（Phaser time.delayedCall，鼠标移动时重置计时器）；内容为「地形名 + 区域名 + 坐标」；样式为半透明米色浮框（0xf4eadf, alpha 0.96），单细边框（0x24384f）；右键拖拽或左键点击时隐藏。左键点击：调用 stateRef.current.onSelectTile(tileId) 更新 React selectedId（触发右侧面板更新）；同时在 Phaser 内显示内联弹出菜单（地形、区域名、「前往此位置」文字，不直接发出移动指令）。右键：触发摄像机拖拽（TASK-005），不触发选中。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/MapScene.ts"
+        ],
+        "test": [
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 鼠标悬停在已发现格子上超过 500ms，出现 tooltip 文本（包含区域名）",
+        "AC2: 鼠标移动时 tooltip 消失（计时器重置）",
+        "AC3: 左键点击格子后，右侧 .map-detail Panel 的标题更新为对应格坐标",
+        "AC4: 右键点击不触发 tooltip 也不触发 onSelectTile",
+        "AC5: 右键拖拽摄像机时，tooltip 不显示"
+      ],
+      "tech_notes": "参考 initial.md §4.4。Tooltip depth 30+（最顶层）。Tooltip 在 Phaser input 的 pointermove 事件中处理，每次 move 先取消旧的 delayedCall 再重新设置 500ms 计时器。onSelectTile 须通过 stateRef.current 调用，而非在 create() 时闭包持有（避免过期引用）。"
+    },
+    {
+      "id": "TASK-007",
+      "title": "实现人物标记与 Tween 移动动画 + 轨迹绘制",
+      "priority": "P0",
+      "depends_on": ["TASK-004"],
+      "user_story": null,
+      "description": "在 MapScene.ts 中实现人物可视化。人物标记为 Phaser Container（depth 20），内含圆形身体（radius=8, color=#24384f, offset y=+3）和圆形头部（radius=6, color=#f4eadf, stroke 2px #24384f, offset y=-9）。移动动画：updateState 传入路径时启动 Tween 链（250ms/格，链式回调驱动下一步）；新路径到达时 tweens.killTweensOf(container) 取消当前 Tween，snap 到当前已完成格，再重启新 Tween 链。多人同格时按 CREW_MARKER_OFFSETS 偏移（最多 4 槽：[{0,0},{18,0},{-18,0},{0,18}]）。已走轨迹（trailGraphics, depth 12）：橙色实线 lineStyle(4, 0xb45b13, 0.9) + 节点小圆点，每步完成后 refreshTrail()。待行路线预览（pathGraphics, depth 11）：半透明蓝色折线 lineStyle(2, 0x90b0c8, 0.55)，updateState 时根据 isRoute 字段重绘，到达目标后清除。完成后写入 data-char-tile 属性。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/MapScene.ts"
+        ],
+        "test": [
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 进入地图页面，队员当前位置显示人物标记 Container（头 + 身圆形）",
+        "AC2: 队员收到移动指令后，人物标记在格间平滑移动（250ms/格 Tween），.phaser-map-stage 的 data-char-tile 最终变为目标格 ID",
+        "AC3: 候选移动路线显示蓝色半透明折线（isRoute 格），取消选点后折线消失",
+        "AC4: 队员走过的格子显示橙色轨迹线",
+        "AC5: 两名队员在同一格时，标记不重叠（按偏移槽位错开显示）"
+      ],
+      "tech_notes": "参考 ADR-004，initial.md §4.3。Tween 链实现：startCrewTween(crewId, fromId, toId) 创建单步 Tween，onComplete 回调追加轨迹并递归调用 startCrewTween 启动下一步（直到路径末尾）。isRoute 字段由 MapPage 传入 tileViews，MapScene 在 updateState 时重绘 pathGraphics。data-char-tile 格式为最近到达格的 ID（如 '4-4'），在每步 Tween 完成时更新。"
+    },
+    {
+      "id": "TASK-008",
+      "title": "MapPage 集成 PhaserMapCanvas + e2e 测试桥接",
+      "priority": "P0",
+      "depends_on": ["TASK-005", "TASK-006", "TASK-007"],
+      "user_story": null,
+      "description": "将 PhaserMapCanvas 集成到 MapPage.tsx：删除 map-grid section（CSS Grid + button 渲染的 DOM 地图）；引入 <PhaserMapCanvas> 组件，传入 columns、tileViews（由 buildPhaserTileViews 生成）、crewMarkers（由 buildPhaserCrewMarkers 生成）、onSelectTile；保留右侧 Panel（map-detail、map-legend、crew-map-panel、return-panel）和候选移动逻辑不变。更新 app.spec.ts：保留已有 DOM 断言，新增 data-zoom-level 初始值断言（'1'）和基本地图加载断言。验证整体游戏流程不受影响（通话、控制中心等页面正常）。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/pages/MapPage.tsx",
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ],
+        "test": [
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 进入地图页面后，.map-grid section 不存在，.phaser-map-stage 存在",
+        "AC2: .phaser-map-stage 的 data-zoom-level 属性初始值为 '1'（默认 Zoom 索引）",
+        "AC3: 点击 Phaser Canvas 内格子后，右侧 .map-detail Panel 标题更新为对应坐标",
+        "AC4: 已有 e2e 测试中的 DOM 断言（非 map-grid 相关）仍然通过",
+        "AC5: npm run lint 无新增错误；npm run test 全部通过"
+      ],
+      "tech_notes": "参考 ADR-001。MapPage 中 buildPhaserTileViews 调用需要 movePreview、selectedId、selectedMoveTargetId 等参数（从 MapPage 现有状态取）。删除 DOM Grid 时，检查是否有其他地方引用了 map-grid 的 CSS 类（e2e 或单元测试中），同步删除或更新。"
+    },
+    {
+      "id": "TASK-009",
+      "title": "实现区域名标签（depth 13）与缩放级别 UI",
+      "priority": "P1",
+      "depends_on": ["TASK-008"],
+      "user_story": null,
+      "description": "两个独立增强功能。一：MapScene 中实现区域名标签（depth 13）：同一 areaName 的所有格子中，选取 row 最小（相同则 col 最小）的格为锚点，在该格上方绘制 Phaser Text 对象显示 areaName；zoom ≥ 0.7 时可见，低于阈值时隐藏（在 Zoom LOD 切换逻辑中统一处理）。二：MapPage 中实现缩放级别指示器 UI：React state 中维护 zoomLevelIndex（由 setZoomLevelInReact 回调更新），渲染 .zoom-level-bar 包含 4 个 pip（全局/区域/地块/精细），当前激活的显示 .zoom-level-active 样式。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/MapScene.ts",
+          "apps/pc-client/src/pages/MapPage.tsx"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: Zoom 级别 ≥ 0.7（索引 ≥ 1）时，地图上显示区域名文字标签（如「北部玄武高地」）",
+        "AC2: Zoom 级别 < 0.7（索引 0）时，区域名标签不可见",
+        "AC3: 区域名标签锚点为该区域内 row 最小（相同则 col 最小）的格子",
+        "AC4: 地图页面右上方或顶栏显示 4 个 zoom pip，当前 Zoom 级别的 pip 样式激活（.zoom-level-active）",
+        "AC5: 滚轮缩放后，zoom pip 指示器随之更新"
+      ],
+      "tech_notes": "参考 initial.md §2.1（区域锚点规则）、§3.4（depth 13）、§8.2（zoom-level-bar CSS）。区域锚点计算：在 updateState 时遍历 tileViews，按 areaName 分组，每组取 Math.min(row) 的格，相同 row 取 Math.min(col)。Phaser Text 对象 depth 13 > trail(12)，防止轨迹线遮挡标签。"
+    },
+    {
+      "id": "TASK-010",
+      "title": "MVP 验收与回归测试",
+      "priority": "P1",
+      "depends_on": ["TASK-008", "TASK-009"],
+      "user_story": null,
+      "description": "对照 initial.md §10 MVP 基线逐项验收并修复遗留问题。验收清单：（1）真实 tileset PNG 替代方案 — 确认程序生成色块正确显示各地形颜色，registry.json + public/maps/tilesets/ 架构就绪；（2）Phaser Scene preload + create 正确，pixelArt: true 生效；（3）4 级 Zoom + 鼠标中心缩放补偿 + LOD 切换（在 Tween 回调中）；（4）右键拖拽摄像机；（5）ResizeObserver + game.scale.resize()；（6）人物移动 Tween 250ms/格 + 橙色轨迹；（7）Hover tooltip 500ms 延迟；（8）点击 → 右侧面板联动；（9）HTML 语义层 pointer-events: none；（10）DOM data-* 桥接供 e2e 使用。运行三项质量门禁并修复所有报错。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/phaser-map/PhaserMapCanvas.tsx",
+          "apps/pc-client/src/phaser-map/MapScene.ts",
+          "apps/pc-client/src/phaser-map/mapView.ts",
+          "apps/pc-client/src/pages/MapPage.tsx",
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/phaser-map/mapView.test.ts",
+          "apps/pc-client/src/phaser-map/PhaserMapCanvas.test.tsx",
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: npm run lint 无错误（TypeScript 严格模式通过）",
+        "AC2: npm run test 全部通过（mapView.test.ts、PhaserMapCanvas.test.tsx 及现有测试）",
+        "AC3: npm run validate:content 通过",
+        "AC4: 浏览器中逐项验证 initial.md §10 MVP 基线的全部 10 项功能正常（人工验收，或 e2e 覆盖可覆盖的项）",
+        "AC5: 切换游戏时间倍速（1x/2x/4x）时，地图页面无 console 报错，人物移动逻辑仍正常"
+      ],
+      "tech_notes": "此任务为收尾验收，主要工作是修复 TASK-001～009 中遗留的 edge cases 和 lint 问题。若某项 MVP 功能未完整实现，在此任务中补完（如 LOD 切换的细节装饰层占位、HUD 提示文字等）。验收时参照 initial.md §10 的 MVP 基线清单和 §9 的测试策略。"
+    }
+  ]
+}

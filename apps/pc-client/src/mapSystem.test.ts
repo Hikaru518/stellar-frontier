@@ -3,6 +3,7 @@ import { defaultMapConfig } from "./content/contentData";
 import {
   canMoveToTile,
   getDisplayCoord,
+  getFullTileWindow,
   getTileAreaName,
   getTileId,
   getTileLocationLabel,
@@ -63,12 +64,38 @@ describe("mapSystem", () => {
     expect(window.cells.find((cell) => cell.id === "4-7")?.status).toBe("frontier");
   });
 
-  it("allows movement only to discovered and frontier tiles", () => {
+  it("builds a full map window without discovery restrictions for the PC map view", () => {
+    const window = getFullTileWindow(defaultMapConfig);
+
+    expect(window).toMatchObject({ minRow: 1, maxRow: 8, minCol: 1, maxCol: 8 });
+    expect(window.cells).toHaveLength(64);
+    expect(window.cells.find((cell) => cell.id === "1-1")).toMatchObject({
+      row: 1,
+      col: 1,
+      displayX: -3,
+      displayY: 3,
+      status: "discovered",
+      tile: expect.objectContaining({ areaName: "北部玄武高地" }),
+    });
+    expect(window.cells.find((cell) => cell.id === "8-8")).toMatchObject({
+      row: 8,
+      col: 8,
+      displayX: 4,
+      displayY: -4,
+      status: "discovered",
+      tile: expect.objectContaining({ areaName: "东南荒滩" }),
+    });
+    expect(window.cells.some((cell) => cell.status !== "discovered")).toBe(false);
+  });
+
+  it("allows movement to authored map tiles without discovery restrictions", () => {
     const map = runtime(["4-4", "4-8"]);
 
     expect(canMoveToTile(defaultMapConfig, map, "4-4")).toBe(true);
     expect(canMoveToTile(defaultMapConfig, map, "4-7")).toBe(true);
-    expect(canMoveToTile(defaultMapConfig, map, "4-6")).toBe(false);
+    expect(canMoveToTile(defaultMapConfig, map, "4-6")).toBe(true);
+    expect(canMoveToTile(defaultMapConfig, map, "1-1")).toBe(true);
+    expect(canMoveToTile(defaultMapConfig, map, "8-8")).toBe(true);
     expect(canMoveToTile(defaultMapConfig, map, "9-9")).toBe(false);
     expect(canMoveToTile(defaultMapConfig, map, "not-a-tile")).toBe(false);
   });

@@ -8,7 +8,7 @@
 - `docs/core-ideas.md` 是特殊的全局核心想法与设计原则页，保持短小、指导性，不使用普通子系统 wiki 的 10 章模板；任何对它的更新都必须先获得人类确认，agent 不得在未确认的情况下自动改写核心原则。
 - `content/` 下的 JSON 是**运行时内容数据**，不是设计文档。设计意图请写在 `docs/`，事件/队员/物品/地图的具体配置写在 `content/`。
 - 仓库使用 Rush + pnpm monorepo；不要恢复 npm workspaces，也不要提交 root `package-lock.json`。
-- 修改 `content/` 后必须能通过 `npm run validate:content`；修改 `apps/pc-client/src`、`apps/mobile-client/src`、`apps/editor/src`、`apps/editor/helper` 或 `packages/dual-device/src` 后必须能通过 `npm run lint` 和 `npm run test`。
+- 改完代码或内容后必须按下文"测试体系"选择验证命令；如果某个必需验证因为本地环境阻塞，必须在最终说明中记录阻塞原因和已经执行的替代验证。
 
 ## docs/ 知识库结构
 
@@ -44,6 +44,60 @@
 
 > 修改子系统 wiki 时优先走"增量提案 → 合并 diff → 更新 wiki"流程，不要直接覆写 `docs/gameplay/<system>/<system>.md`。
 
+## 测试体系
+
+本仓库的 CI 入口是 `.github/workflows/pages.yml` 的 `test-build` job。PR 会依次执行安装依赖、安装 Playwright Chromium、`lint`、`validate-content`、`test`、`test:e2e --to @stellar-frontier/pc-client` 和 `build`。本地开发时不必每次都跑完整 CI，但 agent 必须按改动范围跑到足够覆盖风险的验证。
+
+### 根目录命令
+
+| 命令 | 覆盖范围 | 什么时候必须跑 |
+| --- | --- | --- |
+| `npm run validate:content` | `content/` JSON schema 与跨文件引用 | 修改 `content/`、`content/schemas/`、内容加载 / registry 相关代码后。 |
+| `npm run lint` | 所有声明了 `lint` 的 Rush 项目 TypeScript 检查 | 跨包改动、提交前总验证、无法确定影响范围时。 |
+| `npm run test` | 所有声明了 `test` 的 Rush 项目单元测试 | 跨包逻辑改动、共享模型 / 事件 / 地图 / 通讯链路改动后。 |
+| `npm run test:e2e` | PC client Playwright 端到端测试 | 改动 PC 页面流、地图、通话、存档、时间推进、Phaser canvas 或用户旅程后。 |
+| `npm run build` | 所有 Rush 项目 build | 改动构建配置、依赖、资源引用、Vite / TS config，或准备与 CI 完全对齐时。 |
+| `npm run editor:test` | Editor Vitest | 只改 `apps/editor` 且不需要全仓测试时可作为快速验证。 |
+
+### 包级快速验证
+
+改动范围明确时，优先先在对应包目录跑包级命令，失败更容易定位：
+
+```bash
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js lint
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js test
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js test:e2e
+
+cd apps/editor && node ../../common/scripts/install-run-rushx.js lint
+cd apps/editor && node ../../common/scripts/install-run-rushx.js test
+
+cd apps/mobile-client && node ../../common/scripts/install-run-rushx.js lint
+cd apps/mobile-client && node ../../common/scripts/install-run-rushx.js test
+
+cd packages/dual-device && node ../../common/scripts/install-run-rushx.js lint
+cd packages/dual-device && node ../../common/scripts/install-run-rushx.js test
+```
+
+Playwright 浏览器缺失时先执行：
+
+```bash
+cd apps/pc-client && node ../../common/scripts/install-run-rushx.js install:browsers
+```
+
+在 macOS / sandbox 环境中，Playwright 可能因 Chromium 权限报错（例如 Mach port permission denied）。这不是业务失败；需要在可启动浏览器的环境重跑同一条 e2e 命令，并在最终说明中区分"环境阻塞"和"测试断言失败"。
+
+### 改动到验证的对应关系
+
+- **只改文档**：至少跑 `git diff --check`；如果文档内包含命令、schema、代码片段，应核对对应文件或脚本是否仍存在。
+- **改 `content/` 或 schema**：必须跑 `npm run validate:content`；如果内容会被 PC / Editor 展示，再跑相关包的 `lint` / `test`。
+- **改 `apps/pc-client/src`**：至少跑 PC client `lint` 和 `test`。涉及页面流、地图、Phaser、存档、通话、时间推进或端到端用户旅程时，加跑 PC client `test:e2e`。
+- **改 `apps/editor/src` 或 `apps/editor/helper`**：至少跑 editor `lint` 和 `test`；涉及保存地图 / 事件内容时，加跑 `npm run validate:content`；涉及可视编辑体验时用浏览器做一次手动视觉验证。
+- **改 `apps/mobile-client/src`**：至少跑 mobile client `lint` 和 `test`；涉及 PC / mobile 配对事件时，同时跑 `packages/dual-device` 与 PC 相关测试。
+- **改 `packages/dual-device/src`**：至少跑 dual-device `lint` 和 `test`；如果影响通讯台、手机 companion 或 Yuan fallback，补跑 PC client `test`，必要时跑 e2e。
+- **改 Rush、依赖、TS / Vite 配置或资源路径**：跑 `npm run lint`、`npm run test`、`npm run build`；如果影响 PC 页面加载，再跑 `npm run test:e2e`。
+
+视觉 / 交互相关改动不能只依赖单元测试。地图、Phaser canvas、Map Editor、响应式布局和点击流程改动，应打开本地页面或使用浏览器自动化验证至少一个核心场景，并在最终说明中写明验证过的页面和场景。
+
 ## 当前系统能做什么
 
 游戏原型当前已实现以下能力：
@@ -58,11 +112,13 @@
 - **日记可见性**：日记按 `已传回 / 未传回 / 失联锁定 / 找回解锁` 四态控制可见性。
 - **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，PC 与手机都实例化真实 Yuan `Terminal(enable_WebRTC: true)`，通过 Yuan service 传输心跳、私密来电、已读和接听 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。
 - **Yuan 链路语义**：Yuan WSS 是稳定公网 baseline；WebRTC DataChannel 是机会性局域网升级。`enable_WebRTC: true` 只表示允许协商，不保证当前消息已经走 DataChannel；真实升级需要双方 terminal info 同步、对端消息触发 offer/answer、ICE 候选连通，并需要 Yuan tunnel metric / 调试钩子来确认。
+- **PC 地图**：Phaser 地图默认打开完整 `8 x 8` 地图，显示 Map Editor 保存的视觉层、队员位置、路线预览、选中框和地块详情。当前不使用临时战争迷雾 / `3 x 3` 探索限制；移动选点可选择任意合法 authored tile，但最终指令仍必须回到通话确认。
+- **本地 Game Editor**：`apps/editor` 已包含 Event Editor 与 Map Editor。Map Editor 可新建 / 选择地图，编辑地形、天气、环境、地块对象、特殊状态、origin / initial discovered 标记、视觉层和 tileset palette，并通过 localhost helper 保存到 `content/maps/*.json`。
 - **存档**：以 `localStorage`（key `stellar-frontier-save-v2`）保存全量游戏状态；Debug toolbox 提供重置入口。
 
 ### 内容数据
 
-- 队员、结构化事件、基础行动、物品、地图定义全部从 `content/*.json` 加载，由 `content/schemas/*.schema.json` 与 `content/schemas/events/*.schema.json` 约束格式；`scripts/validate-content.mjs` 同时校验 schema 与跨文件引用完整性。
+- 队员、结构化事件、基础行动、物品、地图定义、地图对象和 tileset registry 全部从 `content/` 下的 JSON 加载，由 `content/schemas/*.schema.json` 与 `content/schemas/events/*.schema.json` 约束格式；`scripts/validate-content.mjs` 同时校验 schema 与跨文件引用完整性。
 
 ## 未来要做（Later）
 
@@ -75,6 +131,7 @@
 - 关系系统、士气系统、好感度或团队氛围联动。
 - 程序生成角色 / 随机背景。
 - 控制中心中的研究台（科技树）、星际贸易、星际之门等模块的实质交互。
+- 战争迷雾 / 探索可见性：当前完整显示地图并允许完整地图选点；未知区域、粗略信号、队员回传、已调查等层级留到后续单独设计。
 - 完整的"经过每个移动地块"事件触发；MVP 仅在抵达 / 完成时检查。
 - Yuan WebRTC DataChannel 的 UI 实时可观测性、TURN/STUN 生产配置、Yuan Host 生产部署与鉴权 hardening。
 
@@ -84,7 +141,7 @@
 - 跨地图移动、载具、飞行、传送（除剧情设定外）。
 - 多队员编队、护送、协同行动；单队员多行动并行。
 - 地图直接下达指令（地图只读，指令必须经通话）。
-- 可视化事件编辑器、复杂剧情树编辑器、复杂变量脚本语言。
+- 玩家侧事件编辑器、复杂剧情树画布、复杂变量脚本语言。
 - 大规模全局随机事件、与现实时间相关的固定时间事件。
 - 昼夜循环、季节、天气、睡眠、暂停、多时间线。
 - 把 Debug toolbox 包装成正式玩法。
@@ -92,7 +149,7 @@
 ## 约束与假设
 
 - **平台**：PC 与手机端都是浏览器应用；PC 仍持有权威 `GameState` 并依赖 `localStorage` 持久化；Stellar 不维护专属 server 组件，跨设备 transport 依赖外部 Yuan Host。
-- **网格**：星球地图为可配置网格，默认 `8 x 8`，移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
+- **网格**：星球地图为可配置网格，默认 `8 x 8`。当前 PC 地图完整显示整张地图；移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
 - **指令通道**：移动、原地待命、停止当前行动、调查当前区域四类基础行动必须经"通讯台 → 通话"发出；剧情动作由结构化事件选项提供；地图与控制中心都不直接下达指令。
 - **行动并行性**：每名队员同一时间只能执行一个主行动；移动中改派必须先停止当前行动。
 - **数据来源唯一**：所有页面共享同一个 `GameState`；不存在页面独立的时间或状态。
@@ -111,7 +168,10 @@
 │   │   ├── presets/<domain>.json         # 可复用 condition / effect preset
 │   │   └── handler_registry.json         # 白名单 handler 与参数 schema 引用
 │   ├── items/items.json                  # 物品定义
-│   ├── maps/default-map.json             # 默认可配置地图内容
+│   ├── map-objects/                      # 地块对象定义：资源、危险、结构、设施、遗迹、地标等
+│   ├── maps/
+│   │   ├── default-map.json              # 默认可配置地图内容，含 gameplay tile 与 visual layers
+│   │   └── tilesets/registry.json        # 地图 tileset registry，引用 assets 中的 tileset PNG
 │   ├── universal-actions/universal-actions.json # 移动、待命、停止、调查四类基础行动定义
 │   └── schemas/
 │       ├── *.schema.json                 # crew / items / maps 等顶层 schema
@@ -128,7 +188,7 @@
 │   │   ├── src/*System.ts                 # crew / diary / event / time / inventory / map 系统
 │   │   └── tests/e2e/app.spec.ts          # Playwright 端到端流程测试
 │   ├── mobile-client/                    # 手机 companion terminal 浏览器客户端
-│   └── editor/                           # 本地 Game Editor / Event Editor 工具，含独立 Vite app、localhost helper 与 editor 专属脚本
+│   └── editor/                           # 本地 Game Editor / Event Editor / Map Editor 工具，含独立 Vite app、localhost helper 与 editor 专属脚本
 ├── packages/
 │   └── dual-device/                      # PC/mobile 共享的配对、真实 Yuan Terminal adapter、typed events 与 fallback 规则
 ├── common/config/rush/                   # Rush + pnpm 配置、command-line、pnpm lock、repo state
@@ -136,4 +196,4 @@
 └── rush.json                             # Rush 项目拓扑与 pnpmVersion
 ```
 
-<!-- last-synced-by audit-wiki: 2026-04-28 -->
+<!-- last-synced-by audit-wiki: 2026-05-03 -->

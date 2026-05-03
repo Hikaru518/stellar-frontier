@@ -1,6 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
+import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import eventManifest from "../../../../content/events/manifest.json";
+import defaultMapJson from "../../../../content/maps/default-map.json";
+import tilesetRegistry from "../../../../content/maps/tilesets/registry.json";
+import mapTilesetsSchema from "../../../../content/schemas/map-tilesets.schema.json";
+import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import { buildEventContentIndex } from "../events/contentIndex";
+import type { MapConfigDefinition } from "./contentData";
+
+const repoRoot = path.resolve(process.cwd(), "../..");
 
 describe("generated event content exports", () => {
   const structuredDomains = [
@@ -78,6 +88,113 @@ describe("default map config", () => {
       expect(Array.isArray(tile.objectIds)).toBe(true);
       expect("objects" in tile).toBe(false);
     }
+  });
+
+  it("types authored visual layers on MapConfigDefinition", () => {
+    const mapWithVisual: MapConfigDefinition = {
+      ...(structuredClone(defaultMapJson) as MapConfigDefinition),
+      visual: {
+        layers: [
+          {
+            id: "base",
+            name: "Base",
+            visible: true,
+            locked: false,
+            opacity: 0.75,
+            cells: {
+              "4-4": {
+                tilesetId: "kenney-tiny-battle",
+                tileIndex: 12,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    expect(mapWithVisual.visual?.layers[0]).toMatchObject({
+      id: "base",
+      opacity: 0.75,
+      cells: { "4-4": { tilesetId: "kenney-tiny-battle", tileIndex: 12 } },
+    });
+  });
+});
+
+describe("map visual content contracts", () => {
+  const ajv = new Ajv2020({ allErrors: true });
+  const validateMap = ajv.compile(mapsSchema);
+
+  it("accepts authored visual layers with tile-id keyed cells", () => {
+    const mapWithVisual = structuredClone(defaultMapJson) as MapConfigDefinition;
+
+    mapWithVisual.visual = {
+      layers: [
+        {
+          id: "base",
+          name: "Base",
+          visible: true,
+          locked: false,
+          opacity: 1,
+          cells: {
+            "4-4": {
+              tilesetId: "kenney-tiny-battle",
+              tileIndex: 0,
+            },
+          },
+        },
+      ],
+    };
+
+    expect(validateMap(mapWithVisual)).toBe(true);
+  });
+
+  it("rejects unknown visual fields", () => {
+    const mapWithUnknownVisualField = structuredClone(defaultMapJson) as MapConfigDefinition & {
+      visual: {
+        layers: [];
+        unknownVisualField: boolean;
+      };
+    };
+
+    mapWithUnknownVisualField.visual = {
+      layers: [],
+      unknownVisualField: true,
+    };
+
+    expect(validateMap(mapWithUnknownVisualField)).toBe(false);
+    expect(validateMap.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          instancePath: "/visual",
+          keyword: "additionalProperties",
+        }),
+      ]),
+    );
+  });
+});
+
+describe("map tileset registry", () => {
+  const ajv = new Ajv2020({ allErrors: true });
+  const validateRegistry = ajv.compile(mapTilesetsSchema);
+
+  it("registers the Kenney Tiny Battle packed spritesheet", () => {
+    expect(validateRegistry(tilesetRegistry)).toBe(true);
+
+    const kenneyTileset = tilesetRegistry.tilesets.find((tileset) => tileset.id === "kenney-tiny-battle");
+    expect(kenneyTileset).toMatchObject({
+      tileWidth: 16,
+      tileHeight: 16,
+      spacing: 0,
+      columns: 18,
+      tileCount: 198,
+      publicPath: "maps/tilesets/kenney-tiny-battle/tilemap_packed.png",
+    });
+    expect(kenneyTileset).toBeDefined();
+
+    const tileIndexes = kenneyTileset?.categories.flatMap((category) => category.tileIndexes) ?? [];
+    expect(tileIndexes.length).toBeGreaterThan(0);
+    expect(tileIndexes.every((tileIndex) => tileIndex >= 0 && tileIndex < 198)).toBe(true);
+    expect(fs.existsSync(path.join(repoRoot, "apps/pc-client/public", kenneyTileset?.publicPath ?? ""))).toBe(true);
   });
 });
 

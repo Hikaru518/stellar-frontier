@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/map-tilesets.schema.json",
+  "title": "Stellar Frontier Map Tileset Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tilesets"],
+  "properties": {
+    "tilesets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tileset"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "tileset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "assetPath",
+        "publicPath",
+        "tileWidth",
+        "tileHeight",
+        "spacing",
+        "margin",
+        "columns",
+        "tileCount",
+        "imageWidth",
+        "imageHeight",
+        "categories"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assetPath": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "publicPath": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "tileWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tileHeight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "spacing": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "margin": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tileCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "imageWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "imageHeight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/category"
+          }
+        },
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "path"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "$ref": "#/$defs/relativePath"
+            }
+          }
+        }
+      }
+    },
+    "category": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "tileIndexes"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["terrain", "water", "road", "building", "nature", "vehicle_unit", "marker", "shadow", "misc"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tileIndexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

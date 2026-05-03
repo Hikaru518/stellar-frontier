@@ -25,6 +25,7 @@ pnpm-debug.log*
 # Editor and OS files
 .vscode/
 .idea/
+.codex/
 .DS_Store
 Thumbs.db
 
@@ -43,6 +44,23 @@ tmp/
 
 # Opencode
 .opencode/plans/
+.opencode/agents/Brainstorm.md
+.opencode/agents/Fox.md
+.opencode/agents/Monkey.md
+.opencode/agents/MonkeyKing.md
+.opencode/agents/WatchDog.md
+.opencode/skills/SKILL.md
+.opencode/skills/brainstorm/
+.opencode/skills/code-review/
+.opencode/skills/dev-workflow-wiki/
+.opencode/skills/implementation-planning/
+.opencode/skills/json-lint/
+.opencode/skills/project-summary/
+.opencode/skills/references/
+.opencode/skills/systematic-debugging/
+.opencode/skills/task-dispatching/
+.opencode/skills/test-driven-development/
+.opencode/skills/writing-clearly-and-concisely/
 
 # cursor
 .cursor/

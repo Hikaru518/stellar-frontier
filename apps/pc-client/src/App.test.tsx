@@ -1648,7 +1648,7 @@ describe("App", () => {
     expect(screen.getAllByRole("button", { name: "返回通讯台" }).length).toBeGreaterThan(0);
   });
 
-  it("shows coarse terrain, weather, and crew status for a crew-occupied frontier tile without revealing objects", () => {
+  it("shows full map details for a crew-occupied tile without mutating discovery state", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
@@ -1678,22 +1678,23 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
 
-    const grid = screen.getByLabelText(/雷达可见矩形/);
-    const amyTile = within(grid).getByRole("button", { name: /\(-1,2\)/ });
-    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
-    expect(within(amyTile).getByText("地形：森林 / 山")).toBeInTheDocument();
-    expect(within(amyTile).getByText("天气：薄雾")).toBeInTheDocument();
-    expect(within(amyTile).getByText("Amy：等待指令。")).toBeInTheDocument();
-    expect(within(amyTile).queryByText("黑松木材带")).not.toBeInTheDocument();
+    expect(document.querySelector(".map-grid")).not.toBeInTheDocument();
+    expect(document.querySelector(".phaser-map-stage")).toBeInTheDocument();
+    const semanticLayer = screen.getByLabelText("地图语义层");
+    const amyTile = within(semanticLayer).getByRole("button", { name: /黑松林缘.*\(-1,2\)/ });
+    expect(amyTile).toHaveTextContent("黑松林缘");
+    expect(amyTile).toHaveTextContent("地形：森林 / 山");
 
     fireEvent.click(amyTile);
-    expect(within(amyTile).getByText("队员回传")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "坐标详情：(-1,2)" })).toBeInTheDocument();
     expect(screen.getByText("地形")).toBeInTheDocument();
     expect(screen.getAllByText("森林 / 山").length).toBeGreaterThan(0);
     expect(screen.getByText("天气")).toBeInTheDocument();
     expect(screen.getAllByText("薄雾").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Amy：等待指令。").length).toBeGreaterThan(0);
-    expect(screen.queryByText("黑松木材带")).not.toBeInTheDocument();
+    expect(screen.getByText("地块对象")).toBeInTheDocument();
+    expect(screen.getByText("黑松木材带 / 野生动物踪迹")).toBeInTheDocument();
+    expect(screen.getByText("大型野兽接近")).toBeInTheDocument();
 
     const saved = readSavedGameState();
     expect(saved.map.discoveredTileIds).not.toContain("2-3");
@@ -1817,7 +1818,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "标记为目的地，返回通话确认" }));
 
     expect(screen.getByText("移动确认")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }));
+    fireEvent.click(screen.getByRole("button", { name: /确认请求 Garry 前往 坠毁西缘 \(-1,0\)/ }));
 
     expect(screen.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeInTheDocument();
     const startedMove = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
@@ -1955,7 +1956,7 @@ describe("App", () => {
     expect(screen.queryByText(/row|col/)).not.toBeInTheDocument();
   });
 
-  it("lets the call page select frontier targets without revealing unknown details", () => {
+  it("lets the call page select any authored map target without fog restrictions", () => {
     const mineralTile = findTileWithObjectTag("mineral_deposit");
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -1989,18 +1990,14 @@ describe("App", () => {
 
     const targetList = screen.getByLabelText("移动目标列表");
     expect(within(targetList).getByRole("button", { name: /坠毁区域 \(0,0\).*地形：平原/ })).toBeInTheDocument();
-    const frontierTarget = within(targetList).getByRole("button", { name: /未探索信号（-1,0）/ });
-    expect(frontierTarget).toBeEnabled();
-    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
-    expect(screen.queryByText("沙漠")).not.toBeInTheDocument();
-    expect(screen.queryByText("阴天")).not.toBeInTheDocument();
+    const fullMapTarget = within(targetList).getByRole("button", { name: /坠毁西缘 \(-1,0\).*地形：沙漠/ });
+    expect(fullMapTarget).toBeEnabled();
 
-    fireEvent.click(frontierTarget);
+    fireEvent.click(fullMapTarget);
 
-    expect(screen.getByText(/已标记候选目的地 未探索信号（-1,0）/)).toBeInTheDocument();
-    expect(screen.getAllByText("未探索信号（-1,0）").length).toBeGreaterThan(0);
-    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
-    expect(screen.queryByText("沙漠")).not.toBeInTheDocument();
+    expect(screen.getByText(/已标记候选目的地 坠毁西缘 \(-1,0\)/)).toBeInTheDocument();
+    expect(screen.getAllByText(/坠毁西缘 \(-1,0\)/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("未探索信号（-1,0）")).not.toBeInTheDocument();
   });
 
   it("renders the map as a dynamic visible matrix without fixed grid copy", () => {
@@ -2011,18 +2008,20 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
     expect(screen.queryByText(/4x4|4 x 4/)).not.toBeInTheDocument();
 
-    const grid = screen.getByLabelText(/雷达可见矩形/);
-    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
-    expect(screen.getAllByRole("button", { name: /未探索区域/ })).toHaveLength(7);
-    expect(screen.getByRole("button", { name: /\(-1,1\).*队员回传/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
-    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("天气：阴天");
-    expect(screen.getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("对象：坠毁残骸");
-    expect(screen.queryByText("坠毁西缘")).not.toBeInTheDocument();
-    expect(screen.queryByText("未发现即时危险")).not.toBeInTheDocument();
+    expect(document.querySelector(".map-grid")).not.toBeInTheDocument();
+    expect(document.querySelector(".phaser-map-stage")).toBeInTheDocument();
+    const semanticLayer = screen.getByLabelText("地图语义层");
+    expect(within(semanticLayer).getAllByRole("button")).toHaveLength(64);
+    expect(within(semanticLayer).queryAllByRole("button", { name: /未探索区域/ })).toHaveLength(0);
+    expect(within(semanticLayer).getByRole("button", { name: /北部玄武高地.*\(-3,3\)/ })).toBeInTheDocument();
+    expect(within(semanticLayer).getByRole("button", { name: /东南荒滩.*\(4,-4\)/ })).toBeInTheDocument();
+    expect(within(semanticLayer).getByRole("button", { name: /坠毁区域/ })).toHaveTextContent("地形：平原");
+    const detailPanel = screen.getByRole("heading", { name: "坐标详情：未选择" }).closest("section");
+    expect(detailPanel).not.toBeNull();
+    expect(within(detailPanel as HTMLElement).getByText("尚未选择地块")).toBeInTheDocument();
   });
 
-  it("keeps frontier and unknown-hole map cells redacted", () => {
+  it("shows full map cells and reveals clicked tile details without fog clipping", () => {
     const map = createInitialMapState();
     map.discoveredTileIds = ["4-4", "4-8"];
     map.tilesById["4-4"] = { ...map.tilesById["4-4"], discovered: true, investigated: true };
@@ -2043,18 +2042,19 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /卫星雷达/ }));
 
-    const grid = screen.getByLabelText(/雷达可见矩形/);
-    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" });
-    expect(screen.queryByText("东侧砾原")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /未探索区域/ }).length).toBeGreaterThan(0);
+    expect(document.querySelector(".map-grid")).not.toBeInTheDocument();
+    expect(document.querySelector(".phaser-map-stage")).toBeInTheDocument();
+    const semanticLayer = screen.getByLabelText("地图语义层");
+    expect(within(semanticLayer).getAllByRole("button")).toHaveLength(64);
+    expect(within(semanticLayer).queryAllByRole("button", { name: /未探索区域/ })).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: /\(2,0\).*未探索区域/ }));
+    fireEvent.click(within(semanticLayer).getByRole("button", { name: /东侧砾原.*\(2,0\)/ }));
     const detailPanel = screen.getByRole("heading", { name: "坐标详情：(2,0)" }).closest("section");
     expect(detailPanel).not.toBeNull();
-    expect(within(detailPanel as HTMLElement).getByText("暂无已确认信息")).toBeInTheDocument();
-    expect(within(detailPanel as HTMLElement).getByText("需通过通讯台联系队员前往或调查后确认详情")).toBeInTheDocument();
-    expect(within(detailPanel as HTMLElement).queryByText("信号未确认")).not.toBeInTheDocument();
-    expect(screen.queryByText("强风")).not.toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("区域")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("东侧砾原")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("地形")).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByText("平原")).toBeInTheDocument();
   });
 
   it("opens a crew profile with attributes, tags, expertise, and diary entries", () => {
