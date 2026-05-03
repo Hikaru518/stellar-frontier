@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
@@ -50,6 +50,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
+import { logger } from "./logger";
 
 const eventContentIndexResult = buildEventContentIndex(eventContentLibrary);
 if (eventContentIndexResult.errors.length > 0) {
@@ -81,7 +82,12 @@ function App() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setGameState((state) => settleGameTime({ ...state, elapsedGameSeconds: state.elapsedGameSeconds + timeMultiplier }));
+      setGameState((state) => {
+        const incremented = { ...state, elapsedGameSeconds: state.elapsedGameSeconds + timeMultiplier };
+        const next = settleGameTime(incremented);
+        diffActionsAndLog(state.crew_actions, next.crew_actions, next.elapsedGameSeconds);
+        return next;
+      });
     }, 1000);
 
     return () => window.clearInterval(timer);
@@ -92,10 +98,58 @@ function App() {
   }, [gameState]);
 
   useEffect(() => {
+    // App 首次挂载：写入 system.run.start。该 useEffect 依赖数组为空，
+    // 只在挂载时执行一次。后续 reset 的 run.start 由 resetGame() 内部直接写。
+    // payload 不附 GameState 起始 snapshot（ADR-005 / ADR-009）。
+    logger.log({
+      type: "system.run.start",
+      source: "system",
+      payload: {
+        game_version: __APP_VERSION__,
+        schema_version: GAME_SAVE_SCHEMA_VERSION,
+      },
+      gameSeconds: 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect
+  }, []);
+
+  useEffect(() => {
     if (returnHomeCompleted) {
       setPage("ending");
     }
   }, [returnHomeCompleted]);
+
+  // beforeunload 路径下 handler 必须同步访问最新的 elapsedGameSeconds，但下面
+  // 注册 listener 的 useEffect 依赖 `[]`，闭包会捕获 stale state。所以用 ref
+  // 同步 elapsedGameSeconds（design §10.1 / §11.US-010 / ADR-003）。
+  const elapsedGameSecondsRef = useRef(gameState.elapsedGameSeconds);
+  useEffect(() => {
+    elapsedGameSecondsRef.current = gameState.elapsedGameSeconds;
+  }, [gameState.elapsedGameSeconds]);
+
+  useEffect(() => {
+    // 浏览器关闭/刷新前 best-effort 写一条 system.run.end{reason:"unload"} 并
+    // 触发 flush。handler 必须同步：beforeunload 内不能 await。
+    let fired = false;
+    const handleBeforeUnload = (): void => {
+      if (fired) return;
+      fired = true;
+      try {
+        logger.log({
+          type: "system.run.end",
+          source: "system",
+          payload: { reason: "unload" },
+          gameSeconds: elapsedGameSecondsRef.current,
+        });
+        void logger.flush();
+      } catch {
+        // best-effort：忽略错误，不阻塞页面卸载。
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect
+  }, []);
 
   function appendLog(text: string, tone: Tone = "neutral") {
     setGameState((state) => ({
@@ -118,6 +172,36 @@ function App() {
   }
 
   function resetGame() {
+    // 1) 同步写 run.end (旧 run)。logger.log 是 fire-and-forget。
+    logger.log({
+      type: "system.run.end",
+      source: "system",
+      payload: { reason: "reset" },
+      gameSeconds: gameState.elapsedGameSeconds,
+    });
+
+    // 2) 异步 flush + rotate + run.start（与下面的 React state 重置并行）。
+    //    UI 重置不能因为 logger 阻塞 — rotate 失败也吞掉，OPFS 不可用时
+    //    rotate 内部已按 ADR-001 进入 memory_only no-op resolve 路径。
+    void (async () => {
+      try {
+        await logger.flush();
+        await logger.rotate("reset");
+      } catch (err) {
+        console.warn("[logger] rotate failed during reset:", err);
+      }
+      logger.log({
+        type: "system.run.start",
+        source: "system",
+        payload: {
+          game_version: __APP_VERSION__,
+          schema_version: GAME_SAVE_SCHEMA_VERSION,
+        },
+        gameSeconds: 0,
+      });
+    })();
+
+    // 3) 同步 React state 重置：与 logger 异步路径并行。
     clearGameSaves();
     const freshState = createInitialGameState();
     setGameState(freshState);
@@ -167,6 +251,16 @@ function App() {
       if (currentCall.settled) {
         return;
       }
+      logger.log({
+        type: "player.call.choice",
+        source: "player_command",
+        payload: {
+          call_id: currentCall.runtimeCallId!,
+          choice_key: actionId,
+          crew_id: currentCall.crewId ?? null,
+        },
+        gameSeconds: gameState.elapsedGameSeconds,
+      });
       setGameState((state) =>
         mergeEventRuntimeState(
           state,
@@ -202,6 +296,16 @@ function App() {
       if (currentCall.settled) {
         return;
       }
+      logger.log({
+        type: "player.action.dispatch",
+        source: "player_command",
+        payload: {
+          crew_id: currentCall.crewId,
+          action_id: "universal:survey",
+          action_kind: "survey",
+        },
+        gameSeconds: gameState.elapsedGameSeconds,
+      });
       const applied = triggerCurrentAreaSurvey(gameState, currentCall.crewId);
       setGameState(applied.state);
       setCurrentCall((call) =>
@@ -221,6 +325,16 @@ function App() {
     }
 
     if (actionId === "universal:standby" || actionId === "universal:stop") {
+      logger.log({
+        type: "player.action.dispatch",
+        source: "player_command",
+        payload: {
+          crew_id: currentCall.crewId,
+          action_id: actionId,
+          action_kind: actionId === "universal:standby" ? "standby" : "stop",
+        },
+        gameSeconds: gameState.elapsedGameSeconds,
+      });
       setGameState((state) => {
         const nextState =
           actionId === "universal:standby"
@@ -290,6 +404,16 @@ function App() {
       appendLog("移动确认失败：没有候选目的地。", "muted");
       return;
     }
+
+    logger.log({
+      type: "player.move.target",
+      source: "player_command",
+      payload: {
+        crew_id: currentCall.crewId,
+        tile_id: currentCall.selectedTargetTileId,
+      },
+      gameSeconds: gameState.elapsedGameSeconds,
+    });
 
     setGameState((state) => {
       const member = state.crew.find((item) => item.id === currentCall.crewId);
@@ -659,6 +783,52 @@ function interruptCrewActionState(action: CrewActionState, occurredAt: number): 
   };
 }
 
+// 终态集合：行动从非终态切到终态时（含从 prev 不存在直接出现为终态），
+// 由 diffActionsAndLog 写一条 action.complete 日志（ADR-005 / §0.2 hook 点 D）。
+const TERMINAL_ACTION_STATUSES = new Set<CrewActionState["status"]>([
+  "completed",
+  "failed",
+  "interrupted",
+  "cancelled",
+]);
+
+/**
+ * 比对 settleGameTime 调用前后的 crew_actions：对每一个新进入终态的 action
+ * 写一条 action.complete（source = "time_loop"）。
+ *
+ * 触发条件：
+ *   - prev 不存在该 id 且 next 已是终态 → 写
+ *   - prev 存在且非终态 + next 终态 → 写
+ *   - prev 已是终态 → 不写（避免重复）
+ *   - next 非终态 → 不写
+ *
+ * 注意：React 19 严格/开发模式下 setState callback 可能被调两次，导致同帧
+ * 重复写入。MVP 接受该风险（design §13.R3）；生产模式无影响。
+ */
+function diffActionsAndLog(
+  prev: Record<string, CrewActionState>,
+  next: Record<string, CrewActionState>,
+  gameSeconds: number,
+): void {
+  for (const [id, action] of Object.entries(next)) {
+    const before = prev[id];
+    const wasTerminalBefore = before ? TERMINAL_ACTION_STATUSES.has(before.status) : false;
+    const isTerminalNow = TERMINAL_ACTION_STATUSES.has(action.status);
+    if (wasTerminalBefore || !isTerminalNow) continue;
+    logger.log({
+      type: "action.complete",
+      source: "time_loop",
+      payload: {
+        crew_id: action.crew_id,
+        action_id: id,
+        action_kind: action.type,
+        status: action.status as "completed" | "failed" | "interrupted" | "cancelled",
+      },
+      gameSeconds,
+    });
+  }
+}
+
 function settleGameTime(state: GameState): GameState {
   let changed = false;
   let resources = state.resources;
@@ -955,24 +1125,111 @@ function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: G
   );
 }
 
+/**
+ * 对前/后两份 event_logs 做 id 集合差集，对每条新增 EventLog 写一条
+ * `event.resolved`。R2（design §13）：用 EventLog.id 集合做差集，绝不能用
+ * 数组长度判断。
+ */
+function diffEventLogsAndLog(
+  prev: GameState["event_logs"],
+  next: GameState["event_logs"],
+  gameSeconds: number,
+): void {
+  const prevIds = new Set(prev.map((log) => log.id));
+  for (const log of next) {
+    if (prevIds.has(log.id)) continue;
+    logger.log({
+      type: "event.resolved",
+      source: "event_engine",
+      payload: {
+        event_log_id: log.id,
+        event_id: log.event_id,
+        event_definition_id: log.event_definition_id,
+        result_key: log.result_key ?? null,
+        summary: log.summary ?? null,
+        importance: log.importance,
+      },
+      gameSeconds,
+    });
+  }
+}
+
 function processAppEventTrigger(state: GameState, context: TriggerContext): GameState {
+  // 1) 写 event.trigger（在调原 processTrigger 之前；ADR-004 / design §9）
+  logger.log({
+    type: "event.trigger",
+    source: "event_engine",
+    payload: { trigger: context },
+    gameSeconds: state.elapsedGameSeconds,
+  });
+
+  // 2) 调原引擎
   const result = processTrigger({
     state: toEventEngineState(state),
     index: eventContentIndex,
     context,
   });
 
-  return mergeEventRuntimeState(state, result.state);
+  // 3) 写 event.node.enter（每个 transition 一条；ADR-004）。
+  // result.graph_result 与 result.graph_results 不一定同时存在。
+  if (result.graph_result) {
+    const eventId = result.event?.id ?? result.graph_result.event.id;
+    for (const t of result.graph_result.transitions) {
+      logger.log({
+        type: "event.node.enter",
+        source: "event_engine",
+        payload: { event_id: eventId, from_node_id: t.from_node_id, to_node_id: t.to_node_id },
+        gameSeconds: state.elapsedGameSeconds,
+      });
+    }
+  }
+  if (result.graph_results) {
+    for (const r of result.graph_results) {
+      for (const t of r.transitions) {
+        logger.log({
+          type: "event.node.enter",
+          source: "event_engine",
+          payload: { event_id: r.event.id, from_node_id: t.from_node_id, to_node_id: t.to_node_id },
+          gameSeconds: state.elapsedGameSeconds,
+        });
+      }
+    }
+  }
+
+  // 4) 合并 state，做 event_logs diff，写 event.resolved。
+  const merged = mergeEventRuntimeState(state, result.state);
+  diffEventLogsAndLog(state.event_logs, merged.event_logs, state.elapsedGameSeconds);
+
+  return merged;
 }
 
 function processAppEventWakeups(state: GameState): GameState {
+  // wakeups 不写 event.trigger（trigger 概念是显式 dispatch；wakeups 是定时
+  // 唤醒）。这是 design §9 的语义约定。
   const result = processEventWakeups({
     state: toEventEngineState(state),
     index: eventContentIndex,
     elapsed_game_seconds: state.elapsedGameSeconds,
   });
 
-  return mergeEventRuntimeState(state, result.state);
+  // 写 event.node.enter（来自所有 graph_results）
+  if (result.graph_results) {
+    for (const r of result.graph_results) {
+      for (const t of r.transitions) {
+        logger.log({
+          type: "event.node.enter",
+          source: "event_engine",
+          payload: { event_id: r.event.id, from_node_id: t.from_node_id, to_node_id: t.to_node_id },
+          gameSeconds: state.elapsedGameSeconds,
+        });
+      }
+    }
+  }
+
+  const merged = mergeEventRuntimeState(state, result.state);
+  diffEventLogsAndLog(state.event_logs, merged.event_logs, state.elapsedGameSeconds);
+
+  return merged;
 }
 
 function triggerCurrentAreaSurvey(state: GameState, crewId: CrewId): { state: GameState; createdEvent: boolean } {

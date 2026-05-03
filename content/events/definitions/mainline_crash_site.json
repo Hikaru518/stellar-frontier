@@ -59,8 +59,9 @@
         {
           "id": "first_survey_rewards",
           "effects": [
-            { "id": "first_ration_reward", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "ration", "quantity": 3 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
-            { "id": "first_signal_flare_reward", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "signal_flare", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "first_ration_reward", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "ration", "quantity": 3 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "first_basic_tool_reward", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "basic_tool", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "first_signal_flare_reward", "type": "add_item", "target": { "type": "crew_inventory" }, "params": { "item_id": "signal_flare", "quantity": 1 }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
             { "id": "main_objective_flag", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "main_objective_return_home_known", "value": true, "tags": ["mainline", "objective"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
             { "id": "reveal_warp_pod", "type": "update_tile_state", "target": { "type": "event_tile" }, "params": { "object_id": "mainline-damaged-warp-pod", "revealed": true }, "failure_policy": "skip_effect", "record_policy": { "write_event_log": false, "write_world_history": false } },
             { "id": "main_objective_log_effect", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "坠毁点调查确认折跃仓受损，返航主目标建立：修复仓体、取得燃料与坐标。", "importance": "major", "visibility": "player_visible", "result_key": "main_objective_started" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
@@ -93,7 +94,7 @@
         { "id": "radar_clues_found_log", "summary": "坠毁点雷达线索已记录", "importance": "major", "visibility": "player_visible" },
         { "id": "repair_docs_available_log", "summary": "维修技术文档已保存", "importance": "major", "visibility": "player_visible" }
       ],
-      "content_refs": { "call_template_ids": ["mainline_crash_site_survey_chain.call.first", "mainline_crash_site_survey_chain.call.radar", "mainline_crash_site_survey_chain.call.repair_docs"], "item_ids": ["ration", "signal_flare"] },
+      "content_refs": { "call_template_ids": ["mainline_crash_site_survey_chain.call.first", "mainline_crash_site_survey_chain.call.radar", "mainline_crash_site_survey_chain.call.repair_docs"], "item_ids": ["ration", "basic_tool", "signal_flare"] },
       "sample_contexts": [
         { "trigger_type": "action_complete", "occurred_at": 120, "source": "crew_action", "crew_id": "mike", "tile_id": "4-4", "action_id": "survey:mainline-damaged-warp-pod:4-4:60", "event_id": null, "event_definition_id": null, "node_id": null, "call_id": null, "objective_id": null, "selected_option_id": null, "world_flag_key": null, "proximity": null, "payload": { "action_type": "survey", "object_id": "mainline-damaged-warp-pod", "tags": ["mainline", "mainline_crash_site", "warp_pod"] } }
       ]

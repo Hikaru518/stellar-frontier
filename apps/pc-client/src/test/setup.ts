@@ -1,6 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import pkg from "../../package.json" with { type: "json" };
+
+// Vite's `define` injection does not run under vitest, so mirror it here so that
+// any module relying on `__APP_VERSION__` (logger envelope, etc.) keeps working
+// in unit tests. Use the real package.json version to stay in sync with builds.
+(globalThis as { __APP_VERSION__?: string }).__APP_VERSION__ = pkg.version;
 
 const localStorageValues = new Map<string, string>();
 

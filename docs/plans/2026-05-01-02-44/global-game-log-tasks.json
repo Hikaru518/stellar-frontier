@@ -1,0 +1,445 @@
+{
+  "topic": "global-game-log",
+  "created": "2026-05-01",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "构建期注入 __APP_VERSION__ 与 worker tsconfig 准备",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": "US-001",
+      "description": "为日志的 game_version 字段提供一个构建期常量，并为后续 Web Worker 文件准备独立的 webworker tsconfig。修改 vite.config.ts，从 apps/pc-client/package.json 读取 version 字段并通过 define 注入到 __APP_VERSION__；在 vite-env.d.ts 中声明全局 const，使主线程与 Worker 模块都可直接读取。同时新增 tsconfig.worker.json（仅包含 lib WebWorker + ES2020），并在主 tsconfig 的 references 中加入它，给后续 logger.worker.ts 单独提供编译环境。最后在 src/test/setup.ts 给 globalThis.__APP_VERSION__ 注入测试默认值，避免单测因常量未定义报错。本任务不引入任何 logger 业务代码，只做脚手架。",
+      "files": {
+        "create": [
+          "apps/pc-client/tsconfig.worker.json"
+        ],
+        "modify": [
+          "apps/pc-client/vite.config.ts",
+          "apps/pc-client/src/vite-env.d.ts",
+          "apps/pc-client/tsconfig.json",
+          "apps/pc-client/src/test/setup.ts"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: 在 apps/pc-client 任一 .ts 文件里直接读取 __APP_VERSION__ 常量可拿到 package.json 的 version 字段值（如 \"0.1.0\"），且 npm run lint 通过。",
+        "AC2: 新增 tsconfig.worker.json 启用了 lib: [\"WebWorker\", \"ES2020\"]，不包含 DOM；主 tsconfig.json 的 references 数组内含 { \"path\": \"./tsconfig.worker.json\" }。",
+        "AC3: npm run test（vitest）可在测试用例中读取 globalThis.__APP_VERSION__ 拿到一个非空字符串，已有测试集全部通过、不出现 ReferenceError。"
+      ],
+      "tech_notes": "遵循 ADR-006。注意：vite.config.ts 顶部用 import pkg from \"./package.json\" with { type: \"json\" } 或 createRequire 读取均可，但需符合现有 ESM 风格。__APP_VERSION__ 必须 JSON.stringify 后再放入 define。"
+    },
+    {
+      "id": "TASK-002",
+      "title": "logger 模块类型定义骨架（LogEntry / 协议）",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": "US-001",
+      "description": "建立整个 logger 模块的类型契约，避免后续多个 task 在类型上反复返工。在 apps/pc-client/src/logger/ 下新建 types.ts，定义 LogSource 联合、LogEntryEnvelope、LogEntry 的 discriminated union（覆盖 system.run.start / system.run.end / player.call.choice / player.move.target / player.action.dispatch / event.trigger / event.node.enter / event.resolved / action.complete 9 种）、RunArchive、LogInput、LoggerError 类型。同时在 worker-protocol.ts 写主线程↔Worker 的 LogWorkerCommand / LogWorkerEvent 双向消息 union；在 broadcast-protocol.ts 写多 tab 选举的 LoggerBroadcastMessage union 与 LOGGER_CHANNEL / HEARTBEAT_INTERVAL_MS / CLAIM_GRACE_MS / HOLDER_TIMEOUT_MS 常量。本任务不写任何运行时逻辑，只产出类型与常量，供后续 task 引用。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/types.ts",
+          "apps/pc-client/src/logger/worker-protocol.ts",
+          "apps/pc-client/src/logger/broadcast-protocol.ts"
+        ],
+        "modify": [],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: types.ts 导出 LogEntry 是一个 discriminated union（按 type 字段 narrow），从外部调用 const e: LogEntry = ... 时若 type=\"player.call.choice\" 则 payload 必须含 call_id / choice_key / crew_id 三字段，TypeScript 在缺字段或字段类型错时编译失败。",
+        "AC2: worker-protocol.ts 的 LogWorkerCommand union 至少包含 init / append / flush / rotate / list_runs / read_run / delete_run 七种 kind；LogWorkerEvent 至少包含 ready / fatal / ack / runs / run_data / error 六种 kind；exhaustive switch 测试在编译期能 narrow 到 never 分支。",
+        "AC3: npm run lint 通过；本任务不应引入任何 .test 文件，但其他任务的测试如果 import 这些类型应可正常编译。"
+      ],
+      "tech_notes": "遵循 ADR-002 / ADR-010。LogEntry payload 不要互相 import 业务模块的类型（除 TriggerContext from src/events/types.ts），保持 logger 模块的低耦合。LogInput 应当用 Pick<LogEntry, \"type\" | \"source\" | \"payload\"> 派生而非手写。"
+    },
+    {
+      "id": "TASK-003",
+      "title": "信封自动填充与内存环形缓冲（envelope + ringBuffer）",
+      "priority": "P0",
+      "depends_on": ["TASK-002"],
+      "user_story": "US-001",
+      "description": "实现两个纯函数模块：envelope.ts 提供 createRunId(date: Date)（生成形如 run-2026-05-01-0244-<rand4> 的字符串）、makeEnvelope(seq, runId, gameSeconds, type, source) 自动填充 8 个信封字段（log_version=1、game_version=__APP_VERSION__、occurred_at_real_time=ISO 8601）；ringBuffer.ts 提供 createRingBuffer<T>({ capacity }) 工厂，返回 { push(item)/pushAll(items)/snapshot()/subscribe(listener) -> unsubscribe } 接口；超过容量时丢最老。subscribe 的 listener 在每次 push/pushAll 之后被调用、参数是新增的 item 列表（非全量快照）。本任务必须含完整单测。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/envelope.ts",
+          "apps/pc-client/src/logger/ringBuffer.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/envelope.test.ts",
+          "apps/pc-client/src/logger/__tests__/ringBuffer.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 给定固定 Date 与 Math.random mock，createRunId() 输出可预测、格式匹配 /^run-\\d{4}-\\d{2}-\\d{2}-\\d{4}-[a-z0-9]{4,}$/。",
+        "AC2: makeEnvelope 给定连续递增的 seq 输入，输出条目的 seq 字段严格递增；occurred_at_real_time 是合法 ISO 8601；log_version=1；game_version 来自 globalThis.__APP_VERSION__。",
+        "AC3: ringBuffer capacity=3 push 4 条后 snapshot 返回最后 3 条；订阅者在每次 push 收到一条 delta；订阅 unsubscribe 后不再被调用。",
+        "AC4: ringBuffer push 0 条不通知订阅者；pushAll 空数组也不通知（边界）。"
+      ],
+      "tech_notes": "遵循 ADR-002。envelope 不维护 seq 状态（seq 由 facade 管理）；ringBuffer 不感知 LogEntry 业务字段（用泛型）。随机串可用 Math.random().toString(36).slice(2,6)，测试时 mock Math.random。"
+    },
+    {
+      "id": "TASK-004",
+      "title": "OPFS run store（Worker 内文件管理抽象）",
+      "priority": "P0",
+      "depends_on": ["TASK-002"],
+      "user_story": "US-002",
+      "description": "实现 Worker 端的 OPFS 操作封装。新建 opfsRunStore.ts，导出 createOpfsRunStore(rootGetter: () => Promise<FileSystemDirectoryHandle>) 工厂函数，返回包含以下方法的对象：init()（确保 runs/ 目录存在）、createRun(runId)（创建文件并返回 SyncAccessHandle）、closeCurrent()、deleteRun(runId)、listRuns()（返回 RunArchive[] 按 created_at 倒序）、readRun(runId)（返回 ArrayBuffer）、rotate(newRunId, maxArchives=10)（关闭当前 → list → 删多余 → 创建新文件）。文件创建时间从文件名 run-YYYY-MM-DD-HHMM-... 解析，避免依赖 OPFS API 不稳定的 lastModified。在测试中提供 mock OPFS（src/test/mocks/opfs.ts），实现 FileSystemDirectoryHandle / FileSystemFileHandle / FileSystemSyncAccessHandle 的内存版本。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/opfsRunStore.ts",
+          "apps/pc-client/src/test/mocks/opfs.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/opfsRunStore.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: createRun + write + close 后再 readRun 能拿回完全相同的字节序列；createRun 同名 runId 会抛出（或上层捕获以便加随机后缀重试）。",
+        "AC2: rotate(newId, 10)：当 runs/ 已有 10 份时调用，结束后目录中恰好 10 份且不含原最老一份；rotate 时旧 SyncAccessHandle 被正确 close。",
+        "AC3: deleteRun(id) 删除指定文件后 listRuns() 不再返回该 id；deleteRun 一个不存在的 id 抛出 LoggerError code=\"run_not_found\"。",
+        "AC4: 在 mock 中模拟 OPFS root getter reject（如 navigator.storage 未定义），init() reject 一个 LoggerError code=\"opfs_unavailable\"。"
+      ],
+      "tech_notes": "遵循 ADR-001 / ADR-008。opfsRunStore 不依赖 worker-protocol（只是被 worker 调用）；测试时不需要真 Worker。文件命名解析：解析失败的文件忽略不报错（兼容未来手动塞入文件）。tsconfig.worker.json 用于编译此文件 + logger.worker.ts。"
+    },
+    {
+      "id": "TASK-005",
+      "title": "logger.worker.ts 入口与消息处理",
+      "priority": "P0",
+      "depends_on": ["TASK-002", "TASK-004"],
+      "user_story": "US-001",
+      "description": "实现 Web Worker 入口文件。logger.worker.ts 在加载时尝试通过 navigator.storage.getDirectory() 拿 root，构建 opfsRunStore，并按收到的 LogWorkerCommand 分发：init → store.init() + store.createRun(cmd.runId) → 回 ready；append → 把 entries 序列化为 JSONL 写入当前 SyncAccessHandle，结束后回 ack(upToSeq)；flush → 当前 handle.flush() 后回 ack；rotate → 当前 close + store.rotate(newRunId, 10) + 回 ready；list_runs / read_run / delete_run 直接转发 store；OPFS 不可用时立即回 fatal({ reason: \"opfs_unavailable\" })。所有错误用 try/catch 包裹，回 error 事件而不是 throw。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/logger.worker.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/logger.worker.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 在 mock OPFS 环境下 postMessage({kind:\"init\",runId:\"r1\"}) 后 worker 回 {kind:\"ready\",runId:\"r1\"}；OPFS 不可用时回 {kind:\"fatal\",reason:\"opfs_unavailable\"}。",
+        "AC2: init+append([entryA, entryB]) 后再 read_run(\"r1\") 能拿到的 ArrayBuffer 解码为字符串后用 \\n split 出来正好两行，每行 JSON.parse 后字段与 entryA/entryB 一致。",
+        "AC3: rotate({newRunId:\"r2\"}) 之后再 append 写入到 r2，原 r1 文件保留；list_runs 返回包含 r1 和 r2。",
+        "AC4: delete_run(\"r2\") 当 r2 是当前 writer 的文件时回 {kind:\"error\",reason:\"writer_busy\"}（worker 维护 currentRunId 状态做检查）。"
+      ],
+      "tech_notes": "遵循 ADR-001 / ADR-003。worker 文件顶部用 /// <reference lib=\"webworker\" /> 启用 webworker 类型；用 self.onmessage / self.postMessage。测试用 vitest 的 vi.importActual + 自建 MessageChannel 模拟 postMessage 双向通信，参考 src/test/mocks/worker.ts（如不存在请新建）。"
+    },
+    {
+      "id": "TASK-006",
+      "title": "logger facade — 日志写入主路径与降级",
+      "priority": "P0",
+      "depends_on": ["TASK-003", "TASK-005"],
+      "user_story": "US-001",
+      "description": "实现主线程 logger 单例，公开 LoggerFacade 接口的写侧能力：log(input) / flush() / subscribe(listener) / getCurrentRunId() / getRingBufferSnapshot() / getStatus()。内部维护：seq 计数器、currentRunId、ring buffer（capacity=2000）、buffer 队列（待发 Worker 的条目）、pendingFlushTimer、writerStatus。Worker 通过 new Worker(new URL(\"./logger.worker.ts\", import.meta.url), { type: \"module\" }) 启动；启动时先 generate runId（envelope.createRunId），postMessage init，等到 ready 后 drain 内存中堆积的条目；ready 之前 log() 也不丢。批量 flush 触发条件：buffer ≥ 50 或距上次 flush ≥ 500ms 或显式 flush()。Worker 发 fatal 时切 mode=\"memory_only\"，console.warn 一次，后续 log() 仍写 ring buffer + subscribers，不再 postMessage。本 task 不实现 rotate / readRun / deleteRun / listRuns / export（留给 TASK-007）。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/index.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/facade.write.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 启动后立即调 log() 10 次，再等待 worker ready，最终 worker 收到的 append 包含全部 10 条且 seq 连续从 1 起。",
+        "AC2: 连续调 log() 50 次，在第 50 条触发 flush（不依赖 timer）；连续调 5 次后等 600ms 也会触发 flush；显式 await flush() resolve 时所有此前 log 的条目都已被 ack。",
+        "AC3: Worker 发 fatal 后 logger.getStatus().mode 变为 \"memory_only\"，再调 log() 不抛异常、ring buffer 仍累计、subscribers 仍收到 delta、控制台只 warn 一次（不重复）。",
+        "AC4: subscribe 的 listener 在每次 log 后被同步调用一次，参数是含 1 个完整 LogEntry 的 delta；unsubscribe 后不再被调用。"
+      ],
+      "tech_notes": "遵循 ADR-003。Worker URL 用 import.meta.url + new URL，Vite 会自动处理 worker 打包。测试时通过 vi.mock(\"./logger.worker.ts?worker\") 或注入 worker 工厂的方式 mock；推荐 facade 暴露一个 internal createLogger({ workerFactory }) 工厂以便测试。"
+    },
+    {
+      "id": "TASK-007",
+      "title": "logger facade — rotate / 读 / 删 / 列表 / 导出",
+      "priority": "P0",
+      "depends_on": ["TASK-006"],
+      "user_story": "US-002",
+      "description": "在 logger facade 上扩展剩余 API：rotate(reason) / listRuns() / readRun(runId) / deleteRun(runId) / exportCurrent() / exportRun(runId)。rotate 流程：当前 buffer flush → postMessage flush 等 ack → seq 重置为 1 → 生成 newRunId → postMessage rotate(newRunId) 等 ready → 更新 currentRunId 并清空 ring buffer。exportCurrent / exportRun 调 readRun 拿到 ArrayBuffer 后用 download.ts 模块的 triggerDownload(blob, filename) 触发浏览器下载（filename = <runId>.jsonl, MIME = application/x-ndjson）。deleteRun 在 runId === currentRunId 时立即 reject LoggerError code=\"writer_busy\" 不下发到 Worker。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/download.ts"
+        ],
+        "modify": [
+          "apps/pc-client/src/logger/index.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/facade.rotate.test.ts",
+          "apps/pc-client/src/logger/__tests__/download.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: log 5 条 → rotate(\"reset\") → log 3 条；listRuns 返回两个 runId，readRun(老 runId) 包含 5 行、readRun(新 runId) 包含 3 行；新 run 中条目的 seq 从 1 重新计起。",
+        "AC2: deleteRun(currentRunId) 立即 reject LoggerError 且 code=\"writer_busy\"，不发 Worker 命令。",
+        "AC3: exportCurrent() 调用 download.triggerDownload，参数 filename 形如 <currentRunId>.jsonl，blob.type 为 application/x-ndjson；测试通过 spy / mock URL.createObjectURL 验证。",
+        "AC4: rotate 期间 log() 调用不丢失（在 flush 与 ready 之间到达的条目以新 runId + seq 从 1 起序列化进新文件）。"
+      ],
+      "tech_notes": "遵循 ADR-001 / ADR-007。triggerDownload 用 URL.createObjectURL + 隐藏 <a download> click 模式；测试时 mock document.createElement('a')。注意：rotate 之后不要继续把新条目用旧 runId 写出，所以 buffer 要在 flush 完成后立即清空老 entries。"
+    },
+    {
+      "id": "TASK-008",
+      "title": "App.tsx 接入 — resetGame / 新 run / 归档轮转",
+      "priority": "P0",
+      "depends_on": ["TASK-007"],
+      "user_story": "US-002",
+      "description": "把 logger 接入 App.tsx 的应用启动与 reset 流程。应用首次挂载时（useEffect with [] deps）logger 自启动并写一条 system.run.start，payload={ game_version: __APP_VERSION__, schema_version: GAME_SAVE_SCHEMA_VERSION }。改造 resetGame()：先 logger.log(system.run.end {reason:\"reset\"}) → await logger.flush() → await logger.rotate(\"reset\") → 然后再 clearGameSaves() / setGameState(freshState) / setCurrentCall(null) 等原有清理 → 最后 logger.log(system.run.start {...})。整套流程要保证在 OPFS 不可用降级模式下也能跑完（rotate 在 memory-only 模式下 no-op resolve，不阻塞 reset）。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/App.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/reset.integration.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 应用首次渲染后 logger.getRingBufferSnapshot() 至少有一条 type=\"system.run.start\"，且 payload.game_version 非空字符串、payload.schema_version 等于 GAME_SAVE_SCHEMA_VERSION。",
+        "AC2: 在 mock OPFS 下渲染 App + 触发 resetGame()，OPFS runs/ 目录最终包含 2 份文件；老文件最后一行是 system.run.end{reason:\"reset\"}；新文件第一行是 system.run.start。",
+        "AC3: 连续触发 resetGame 11 次，OPFS runs/ 最终恰好包含 10 份文件，最早创建的那份已被删除。",
+        "AC4: 在 OPFS 不可用（mock 抛 opfs_unavailable）时调 resetGame 不抛异常、应用 state 仍按原逻辑重置、ring buffer 仍写入 run.end / run.start 条目。"
+      ],
+      "tech_notes": "遵循 ADR-001 / ADR-009。createInitialGameState 不要因为新增逻辑被引入新副作用；logger 启动是模块级单例，App 第一次挂载只触发一次 init。run_id 与历史归档冲突时由 facade 自动重试加随机后缀。"
+    },
+    {
+      "id": "TASK-009",
+      "title": "App.tsx 接入 — handleDecision 玩家指令日志",
+      "priority": "P0",
+      "depends_on": ["TASK-008"],
+      "user_story": "US-003",
+      "description": "在 handleDecision() 的 5 个分支以及移动目标确认（confirmMoveTarget 或对应函数）中各加一行 logger.log。具体映射：① 事件选项分支（currentCall.runtimeCallId 存在）→ player.call.choice，payload={ call_id: currentCall.runtimeCallId, choice_key: actionId, crew_id: currentCall.crewId ?? null }；② universal:move 仅记录进入选择模式（可选；MVP 跳过）；③ universal:survey → player.action.dispatch，payload={ crew_id, action_id: \"universal:survey\", action_kind: \"survey\" }；④ universal:standby → player.action.dispatch action_kind=\"standby\"；⑤ universal:stop → player.action.dispatch action_kind=\"stop\"。在地图选择目标确认（用户在 MapPage 点 tile 后被 App 接收到的回调）→ player.move.target，payload={ crew_id: currentCall.crewId, tile_id: selectedTargetTileId }。所有 logger.log 必须放在原有 setGameState 调用之前/之后但同步执行（不 await），不改变 handleDecision 返回值与既有 setState 调用顺序。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/App.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/handleDecision.integration.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 模拟玩家在通讯台点一次事件选项 → ring buffer 出现一条 type=\"player.call.choice\" 且 payload.call_id / payload.choice_key / payload.crew_id 字段值与点击参数一致。",
+        "AC2: 模拟玩家点 universal:standby → ring buffer 出现一条 type=\"player.action.dispatch\" 且 payload.action_kind=\"standby\"；同理验证 universal:stop / universal:survey。",
+        "AC3: 模拟玩家在地图确认移动目标（先 universal:move 后选 tile）→ ring buffer 出现一条 type=\"player.move.target\" 且 payload.tile_id 等于所选 tile id。",
+        "AC4: 接入日志后，handleDecision 后 setGameState 仍触发原有事件 / 移动 / 行动逻辑（验证：crew_actions / currentCall 等业务字段变更与未接日志前一致；通过快照对比）。"
+      ],
+      "tech_notes": "遵循 ADR-002。logger.log 不需要 await，调用即返回。注意 confirmMoveTarget 的实际函数名以代码为准（探索报告给出大致行号但需要在 implementation 时再读一次）。源 source 字段一律填 \"player_command\"。"
+    },
+    {
+      "id": "TASK-010",
+      "title": "App.tsx 接入 — 事件引擎日志（trigger / node.enter / resolved）",
+      "priority": "P0",
+      "depends_on": ["TASK-008"],
+      "user_story": "US-004",
+      "description": "包装 processAppEventTrigger() 与 processAppEventWakeups() 两个函数（保留原签名，内部加日志）。包装步骤：调用前 logger.log(event.trigger, payload={ trigger: ctx })；调原 processTrigger / processEventWakeups 拿到 result；遍历 result.graph_result?.transitions 与 result.graph_results?.flatMap(r => r.transitions)，对每个 transition logger.log(event.node.enter, payload={ event_id: result.event?.id ?? r.event.id, from_node_id, to_node_id })；merge state 后做 event_logs id 集合 diff（newIds = next.event_logs 的 id 集合 − prev.event_logs 的 id 集合），对每个新增 EventLog logger.log(event.resolved, payload={ event_log_id, event_id, event_definition_id, result_key, summary, importance })。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/App.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/eventEngineMiddleware.integration.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 触发任意一个事件分支（如通过 currentAreaSurvey 触发）→ ring buffer 内出现 event.trigger（含完整 TriggerContext）→ 至少 1 条 event.node.enter（from_node_id=null, to_node_id=entry node）→ 若该事件在同一帧产生 EventLog 则有 event.resolved；三类条目的 seq 严格按发生顺序递增。",
+        "AC2: 在事件引擎跳两个节点的场景中，event.node.enter 数量恰好等于 result.transitions.length；每条 payload.from_node_id / to_node_id 与引擎返回值一致。",
+        "AC3: event_logs 在两次 processTrigger 调用之间不变时 → 不写 event.resolved；两次都返回相同 id 也不会重复写（用 Set 做 diff）。",
+        "AC4: 包装不改变 processAppEventTrigger / processAppEventWakeups 的返回值类型与字段；其他依赖这两个函数的地方（如 settleGameTime 中 triggerContexts 处理）继续工作。"
+      ],
+      "tech_notes": "遵循 ADR-004。注意 processEventWakeups 一次可能跑多个 event，所以 result.events 与 result.graph_results 是数组形态；不要漏遍历。event.resolved 的 importance 字段直接透传 EventLog.importance。"
+    },
+    {
+      "id": "TASK-011",
+      "title": "DebugToolbox 加入 LogPanel 骨架与 OPFS 状态横幅",
+      "priority": "P0",
+      "depends_on": ["TASK-007"],
+      "user_story": "US-006",
+      "description": "在 DebugToolbox.tsx 内插入第三个 Panel \"游戏日志\"，内容由新建组件 LogPanel.tsx 渲染。LogPanel 内部维护 mode: \"current\" | \"archive\"（segmented button 切换）、type 过滤字符串、source 下拉选项；初始显示空 placeholder。订阅 logger.subscribe 但暂不实现完整 tail 渲染（等 TASK-012）。Panel 顶部根据 logger.getStatus().mode 显示一条状态横幅：mode=\"memory_only\" 时红色 \"日志未持久化（OPFS 不可用）\"；多 tab 选举功能未做时永远显示 writer 状态。导出 / 历史按钮在本 task 渲染但 onClick 是 stub（disabled 或显示 toast）。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.tsx"
+        ],
+        "modify": [
+          "apps/pc-client/src/pages/DebugToolbox.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 打开 DebugToolbox 渲染后能看到第三个 Panel 标题 \"游戏日志\"，与现有两个 Panel 同视觉风格。",
+        "AC2: mode 切换按钮渲染为 \"实时\" 与 \"历史\" 两个 button，点击后内部 state 切换；当前 mode 高亮（与 Panel 内现有 selected button 风格一致）。",
+        "AC3: getStatus().mode === \"memory_only\" 时 LogPanel 顶部出现一条 className=\"log-panel-warn\" 的红色横幅，文本含 \"OPFS 不可用\"；getStatus().mode === \"ok\" 时该横幅不出现。",
+        "AC4: type 过滤输入框与 source 下拉（all/player_command/event_engine/time_loop/system）渲染并允许键入；尚未连接到日志列表（验证 onChange 触发即可）。"
+      ],
+      "tech_notes": "遵循 ADR-007。复用 components/Layout 内已有 Panel / StatusTag / 按钮样式；CSS 类名前缀 log-panel-。组件应 mount 时 logger.subscribe，unmount 时 unsubscribe，避免内存泄漏。"
+    },
+    {
+      "id": "TASK-012",
+      "title": "LogPanel 实时 tail 与过滤",
+      "priority": "P0",
+      "depends_on": ["TASK-011"],
+      "user_story": "US-006",
+      "description": "完善 LogPanel current 模式的实时 tail 能力。挂载时 logger.getRingBufferSnapshot() 拿初始数据，logger.subscribe 监听 delta；维护 entries: LogEntry[] state 上限 2000 条（与 ring buffer 等长，超出自动丢最老）；用一个高度受限（max-height: 360px）、overflow:auto 的 div 渲染 entries（按 seq 升序，自动滚动到底部，但仅在用户没有上滚时滚）。type 过滤：用 String.startsWith 前缀匹配 entry.type；source 过滤：精确匹配 entry.source（all 时不过滤）。两者同时生效（AND）。每行渲染：seq、occurred_at_real_time（时分秒）、type 着色 chip、payload JSON.stringify（展开 1 层）。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.tsx",
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.test.tsx"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: 在 mock 的 logger 中 push 5 条不同 type 的条目 → LogPanel 渲染 5 行，按 seq 升序；新 push 1 条立即出现并自动滚到底部。",
+        "AC2: 输入 type 过滤词 \"event.\" → 仅显示 type 以 event. 开头的条目；删除过滤词恢复全部。",
+        "AC3: 选择 source=\"player_command\" → 仅显示 player.* 条目；切回 all 恢复全部；同时 type=\"event.\" + source=\"event_engine\" 时只显示 event.* 条目。",
+        "AC4: ring buffer 中条目超过 2000 时面板渲染数也保持不超过 2000；不出现卡顿（react 重渲染节流：可以用 requestAnimationFrame 或 useTransition，但只要 200 条/秒不卡即可）。"
+      ],
+      "tech_notes": "遵循 ADR-007。性能：useTransition 或简单防抖即可；MVP 不强求虚拟列表。CSS overflow-anchor: none 配合手动 scrollIntoView 实现 tail 行为。过滤词在 mode=\"archive\" 时也生效，但 archive 实现在 TASK-013 / 后续。"
+    },
+    {
+      "id": "TASK-013",
+      "title": "LogPanel 导出当前 run 按钮",
+      "priority": "P0",
+      "depends_on": ["TASK-007", "TASK-011"],
+      "user_story": "US-007",
+      "description": "在 LogPanel current 模式实现 \"导出当前 run .jsonl\" 按钮。点击流程：showLoading → await logger.flush() → await logger.exportCurrent() → hideLoading；过程中按钮 disabled。OPFS 不可用（getStatus().mode===\"memory_only\"）时按钮 disabled + tooltip \"日志未持久化\"。导出成功时不弹任何 toast（浏览器自带下载提示），失败（reject LoggerError）时在按钮下方显示一行错误文本（10 秒后清除）。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.tsx",
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.test.tsx"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: 点 \"导出\" 按钮 → logger.flush 与 logger.exportCurrent 被调用一次（按顺序）；按钮在 await 期间为 disabled；流程结束后恢复。",
+        "AC2: getStatus().mode===\"memory_only\" 时按钮 disabled，hover 显示 tooltip 含 \"OPFS\"；点击不触发 logger 调用。",
+        "AC3: exportCurrent reject LoggerError 时按钮恢复 enabled，并在面板内显示错误文案（包含 LoggerError.message）。",
+        "AC4: download.triggerDownload 收到的 filename 与 logger.getCurrentRunId() 一致并以 .jsonl 结尾。"
+      ],
+      "tech_notes": "遵循 ADR-007。本 task 不实现历史 run 列表（TASK-018），但按钮位置应预留。错误文案 10 秒清除可用 setTimeout + cleanup 防止 unmount 后 setState。"
+    },
+    {
+      "id": "TASK-014",
+      "title": "多 tab writer 选举状态机（纯模块）",
+      "priority": "P1",
+      "depends_on": ["TASK-002"],
+      "user_story": "US-009",
+      "description": "实现 BroadcastChannel 多 tab writer 选举的纯状态机模块 writerElection.ts，不依赖任何 logger 业务字段。导出 createWriterElection({ channel, tabId, intervalMs, claimGraceMs, holderTimeoutMs }) 工厂；返回 { start() / stop() / getRole(): \"writer\"|\"reader\"|\"pending\" / onRoleChange(listener) -> unsubscribe }。规则：start 后广播 claim → 等 claimGraceMs 看是否收到他 tab 的 held → 收到则进入 reader，没收到则进入 writer 并每 intervalMs 广播 held；reader 监听 held，若超 holderTimeoutMs 没收到则发起新 claim；多 writer 同时存在时（claim 同时到达）按 tabId 字典序大者让位为 reader。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/logger/writerElection.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/writerElection.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 单实例 start 后在 claimGraceMs+10ms 内 getRole() 返回 \"writer\"。",
+        "AC2: 两个实例（共享 mock channel）同时 start，等收敛后恰好一个为 writer，另一个为 reader；reader 在 holderTimeoutMs 内不晋升。",
+        "AC3: writer.stop() 之后 reader 在 holderTimeoutMs+10ms 内晋升为 writer（onRoleChange 通知 reader→writer）。",
+        "AC4: BroadcastChannel 不可用（构造抛异常）时 createWriterElection 立即返回固定 \"writer\" 角色（fallback 到单 tab 模式）。"
+      ],
+      "tech_notes": "遵循 ADR-008。tabId 用 crypto.randomUUID() 或 Math.random().toString(36)。测试用自建 InMemoryBroadcastChannel mock（事件循环用 vi.useFakeTimers()）。"
+    },
+    {
+      "id": "TASK-015",
+      "title": "logger facade 集成多 tab 写入选举",
+      "priority": "P1",
+      "depends_on": ["TASK-014", "TASK-008"],
+      "user_story": "US-009",
+      "description": "将 writerElection 集成进 facade。facade 启动时构建 writerElection（CHANNEL = LOGGER_CHANNEL）；onRoleChange 改变 internal writerRole 状态；只有 writer 角色才向 Worker postMessage append/flush/rotate（reader 仍 push ring buffer + 通知 subscribers）；reader 晋升为 writer 时不重写历史，从下一 seq 续写到目前文件（writer 接管时先调一次 list_runs 拿到 currentRunId 的最新 size，向其 append 即可）。getStatus() 返回的 writerRole 与角色变化保持一致；LogPanel 顶部根据 writerRole 显示一条蓝色 banner \"当前 tab 为只读模式\"。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/logger/index.ts",
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/facade.election.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 第二个 facade 实例启动后 getStatus().writerRole === \"reader\"；调 log() 不导致 worker.postMessage(\"append\") 被调用（用 spy 验证）。",
+        "AC2: writer 实例 stop 后 reader 实例在 ~holderTimeoutMs 内 writerRole 变为 \"writer\"，开始向 Worker 发 append；新 writer 不创建新 run（不调 rotate），仍写到原 currentRunId。",
+        "AC3: LogPanel 顶部当 writerRole===\"reader\" 时出现蓝色 banner（不同于 OPFS 红色 banner）含 \"只读模式\" 字样。",
+        "AC4: 关闭 BroadcastChannel（mock 直接抛）时 facade 仍正常工作（writerRole 始终为 writer，与 ADR-008 fallback 一致）。"
+      ],
+      "tech_notes": "遵循 ADR-008。reader 接管时不需要重读文件历史 seq —— 只要 writer 接管前所有条目都是其他 tab 写的，新 writer 的 seq 计数器从 \"自己看到的最大 seq + 1\" 起即可（reader 在订阅 ring buffer 时已知）。"
+    },
+    {
+      "id": "TASK-016",
+      "title": "App.tsx 接入 — beforeunload 强制 flush 与 run.end",
+      "priority": "P1",
+      "depends_on": ["TASK-008"],
+      "user_story": "US-010",
+      "description": "在 App 顶层 useEffect 注册 window beforeunload listener：触发时同步 logger.log(system.run.end {reason:\"unload\"}) 并尝试 logger.flush()（best-effort，不能 await）。注意 beforeunload handler 内不可发起异步操作并保证完成，但可以用 navigator.sendBeacon 形式或调用一次同步的 flush 命令把当前 buffer 推给 Worker（Worker 端 SyncAccessHandle 是同步的，理论上数据到 Worker 后 flush 是即时的；但 postMessage 仍异步）。本 task 仅做 best-effort：log + 立刻 flush()（不 await），不引入新的同步 API。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/App.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/beforeunload.integration.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 模拟 dispatchEvent(new Event(\"beforeunload\")) → logger.log 被调用一次 type=\"system.run.end\" payload.reason=\"unload\"；logger.flush 被调用一次。",
+        "AC2: handler 注册在 mount 时、cleanup 在 unmount 时移除（验证：unmount 后 dispatchEvent beforeunload 不再触发 logger.log）。",
+        "AC3: 多次 beforeunload（如有）只产生 1 条 run.end 条目（去重 / 仅在第一次触发记录），避免污染日志。",
+        "AC4: 即使 logger 处于 memory_only 模式，handler 也不抛异常（log 路径已保证不抛）。"
+      ],
+      "tech_notes": "遵循 ADR-003 / design §10.1.7。设计上接受 ~500 ms buffer 内的尾部丢失（design §6.F2）；不要假装能保证 100% 持久化。AC3 的去重可以用一个 ref boolean：fired = useRef(false)。"
+    },
+    {
+      "id": "TASK-017",
+      "title": "App.tsx 接入 — settleGameTime 行动终态 diff 写 action.complete",
+      "priority": "P1",
+      "depends_on": ["TASK-008"],
+      "user_story": "US-005",
+      "description": "在调用 settleGameTime 的地方做 before/after crew_actions 状态 diff。把现有 setGameState((state) => settleGameTime({ ...state, elapsedGameSeconds: state.elapsedGameSeconds + timeMultiplier })) 改造为先计算 next，遍历 prev.crew_actions 与 next.crew_actions：对每个 id，若 prev 状态属于 {queued, active, paused} 且 next 状态属于 {completed, failed, interrupted, cancelled}，则 logger.log(action.complete, payload={ crew_id: action.crew_id, action_id: id, action_kind: action.action_kind, status: next.status })。新出现（prev 没有 id）但已是终态的也写一条。setState 仍返回 next。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/App.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/logger/__tests__/actionComplete.integration.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 模拟一个 active 行动达到 ends_at 后被 completeCrewActionState 标记 completed → ring buffer 出现 action.complete payload.status=\"completed\"。",
+        "AC2: 模拟移动行动被中断为 interrupted → ring buffer 出现 action.complete payload.status=\"interrupted\"；同一行动不会被重复记录第二次（连续两次 settleGameTime 不重写）。",
+        "AC3: 行动从 queued 直接到 cancelled（少见但可能） → 也写一条 action.complete。",
+        "AC4: payload.action_kind 字段值与 CrewActionState.action_kind 完全一致（如 \"move\" / \"investigate\" / \"standby\" / \"stop\"）。"
+      ],
+      "tech_notes": "遵循 ADR-005。注意 setGameState 的 functional setter 中调用 logger.log 是安全的（同步、纯）；不要在 React 18+ 严格模式下出现重复触发的副作用问题（如果 dev 模式下 functional setter 被调两次 → 用 prev/next 对比的方式仍正确，但要确认 logger.log 幂等：可在 facade 内做最近 N 条去重，或本任务保证状态转换 set 内只比较 status 变化）。"
+    },
+    {
+      "id": "TASK-018",
+      "title": "LogPanel 历史 run 列表（查看 / 导出 / 删除）",
+      "priority": "P1",
+      "depends_on": ["TASK-013"],
+      "user_story": "US-008",
+      "description": "实现 LogPanel archive 模式。切到 archive 时调 logger.listRuns()，按 created_at_real_time 倒序展示每行：run_id、时间、size_bytes、entry_count（如果有）、操作按钮 [查看] [导出] [删除]。当前 run 标记 \"当前\" 徽章且删除按钮 disabled。点 \"查看\" → 调 logger.readRun(id) 解码为 entries 数组（用 split(\"\\n\") 过滤空行 + JSON.parse，遇坏行 console.warn 跳过）→ 在面板里以与 current 模式相同的列表样式只读展示（共享渲染组件）；title 标记 \"查看 <run_id>\"。点 \"导出\" → logger.exportRun(id)。点 \"删除\" → 弹一个 confirm dialog（项目内可能用 window.confirm 或自带 Modal） → 确认后 logger.deleteRun(id) → 再次 listRuns 刷新列表。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.tsx",
+          "apps/pc-client/src/pages/DebugToolbox/LogPanel.test.tsx"
+        ],
+        "test": []
+      },
+      "acceptance_criteria": [
+        "AC1: 切到 archive 模式后 listRuns 被调一次；mock 返回 3 份 run 时 UI 渲染 3 行；当前 run 那行带 \"当前\" 徽章且删除按钮 disabled。",
+        "AC2: 点 \"查看\" 一份历史 run → readRun 被调用，解码后 LogPanel 内部条目列表展示该 run 的全部行，新条目不再追加（订阅停止 / 不显示当前 run 的 delta）。",
+        "AC3: 点 \"删除\" → 弹确认 → 确认后 deleteRun + listRuns 各被调一次；列表行数减 1；尝试删除当前 run 按钮 disabled / 点击不触发 deleteRun。",
+        "AC4: readRun 解析中遇到一行非合法 JSON → console.warn 一次 + 跳过该行；其他合法行仍正常渲染。"
+      ],
+      "tech_notes": "遵循 ADR-007。共享渲染：抽出 <LogList entries=... /> 子组件，current 与 archive 都用它。confirm 用 window.confirm 简化 MVP；如果项目已有 ConfirmDialog 可复用。size_bytes 来自 RunArchive.size_bytes，格式化为 KB 显示。"
+    }
+  ]
+}

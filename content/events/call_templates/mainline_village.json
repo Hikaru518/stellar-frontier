@@ -2,6 +2,20 @@
   "call_templates": [
     {
       "schema_version": "event-program-model-v1",
+      "id": "mainline_village_first_contact_rosetta_clue.call.direct_language",
+      "version": 1,
+      "domain": "mainline_village",
+      "event_definition_id": "mainline_village_first_contact_rosetta_clue",
+      "node_id": "direct_language_report",
+      "render_context_fields": ["crew_id", "crew_display_name", "tile_id", "event_pressure"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "village_direct_language_opening", "text": "{{crew_display_name}} 在外星村落第一次接触时迅速抓住了对方的语气规律。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "max_lines": 1, "variants": [{ "id": "village_direct_language_body", "text": "这次接触没有走罗塞塔保底线，而是凭高社交直接建立了基础互相理解；当前队员立即获得 knows_alien_language。", "priority": 0 }] }],
+      "option_lines": { "confirm": { "selection": "best_match", "variants": [{ "id": "village_direct_language_option", "text": "确认直接建立沟通。", "priority": 0 }] } },
+      "fallback_order": ["crew_id", "event_pressure", "default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
       "id": "mainline_village_first_contact_rosetta_clue.call.report",
       "version": 1,
       "domain": "mainline_village",
