@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig, type MapSpecialStateDefinition } from "../content/contentData";
-import { mapObjectDefinitionById, type MapObjectDefinition } from "../content/mapObjects";
+import type { MapObjectDefinition } from "../content/mapObjects";
 import { createMovePreview, deriveCrewActionViewModel, formatMoveRoute, type CrewActionViewModel } from "../crewSystem";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile } from "../data/gameData";
 import type { CrewActionState, EventLog, RuntimeCall } from "../events/types";
-import { getDisplayCoord, getFullTileWindow, getTileLocationLabel, parseTileId, type VisibleTileCell } from "../mapSystem";
+import { getDisplayCoord, getFullTileWindow, getTileLocationLabel, parseTileId, resolveTileObjects, type VisibleTileCell } from "../mapSystem";
 import { PhaserMapCanvas } from "../phaser-map/PhaserMapCanvas";
 import { buildPhaserCrewMarkers, buildPhaserTileViews, buildTileCenters } from "../phaser-map/mapView";
 import { formatDuration } from "../timeSystem";
@@ -48,7 +48,6 @@ export function MapPage({
   const [mapZoomLevel, setMapZoomLevel] = useState(0);
   const selectedCell = selectedId ? visibleWindow.cells.find((cell) => cell.id === selectedId) : undefined;
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
-  const selectedIsDiscovered = selectedCell?.status === "discovered";
   const moveSelectionMember = crew.find((member) => member.id === moveSelectionCrewId);
   const movePreview = moveSelectionMember && selectedCell ? createMovePreview(moveSelectionMember, selectedCell.id, tiles) : null;
   const visibleColumns = Math.max(1, visibleWindow.maxCol - visibleWindow.minCol + 1);
@@ -149,14 +148,14 @@ export function MapPage({
                 ["候选移动", moveSelectionMember ? "选择一个可达地块后可标记候选目的地" : "未处于通话选点模式"],
               ]}
             />
-          ) : selectedTile && selectedIsDiscovered ? (
+          ) : selectedTile && selectedCell?.tile ? (
             <FieldList
               rows={[
                 ["区域", selectedCell.tile?.areaName ?? "未知区域"],
                 ["地形", selectedCell.tile?.terrain ?? selectedTile.terrain],
                 ["天气", selectedCell.tile?.weather ?? "未知天气"],
-                ["已揭示对象", objectSummary(revealedObjects(selectedCell, map.tilesById[selectedCell.id]))],
-                ["特殊状态", specialStateSummary(revealedSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
+                ["地块对象", objectSummary(tileObjects(selectedCell))],
+                ["特殊状态", specialStateSummary(activeSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
                 ["手下状态", crewStatus(selectedTile, crewById, crewActionViews)],
                 ["计时状态", crewTiming(selectedTile, crewById, crewActionViews, elapsedGameSeconds)],
                 ["事件标记", formatEventMarks(selectedTile)],
@@ -234,33 +233,21 @@ function formatCellCoord(cell: Pick<VisibleTileCell, "displayX" | "displayY">) {
   return `(${cell.displayX},${cell.displayY})`;
 }
 
-function revealedObjects(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapObjectDefinition[] {
-  if (!cell.tile || cell.status !== "discovered") {
+function tileObjects(cell: VisibleTileCell): MapObjectDefinition[] {
+  if (!cell.tile) {
     return [];
   }
 
-  const revealedIds = new Set(runtimeTile?.revealedObjectIds ?? []);
-  const definitions: MapObjectDefinition[] = [];
-  for (const objectId of cell.tile.objectIds) {
-    const def = mapObjectDefinitionById.get(objectId);
-    if (!def) {
-      continue;
-    }
-    if (def.visibility === "onDiscovered" || revealedIds.has(def.id)) {
-      definitions.push(def);
-    }
-  }
-  return definitions;
+  return resolveTileObjects(cell.tile);
 }
 
-function revealedSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapSpecialStateDefinition[] {
-  if (!cell.tile || cell.status !== "discovered") {
+function activeSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapSpecialStateDefinition[] {
+  if (!cell.tile) {
     return [];
   }
 
   const activeIds = new Set(runtimeTile?.activeSpecialStateIds ?? cell.tile.specialStates.filter((state) => state.startsActive).map((state) => state.id));
-  const revealedIds = new Set(runtimeTile?.revealedSpecialStateIds ?? []);
-  return cell.tile.specialStates.filter((state) => activeIds.has(state.id) && (state.visibility === "onDiscovered" || revealedIds.has(state.id)));
+  return cell.tile.specialStates.filter((state) => activeIds.has(state.id));
 }
 
 function crewIdsForCell(runtimeTile: GameMapState["tilesById"][string], tile?: Pick<MapTile, "crew">) {
@@ -276,6 +263,11 @@ function specialStateSummary(states: MapSpecialStateDefinition[]) {
 }
 
 function crewMapLocation(member: CrewMember, map: GameMapState) {
+  const authoredLocation = getTileLocationLabel(defaultMapConfig, member.currentTile);
+  if (authoredLocation !== member.currentTile) {
+    return authoredLocation;
+  }
+
   const tileState = map.tilesById[member.currentTile];
   if (tileState?.discovered || map.discoveredTileIds.includes(member.currentTile)) {
     return getTileLocationLabel(defaultMapConfig, member.currentTile);

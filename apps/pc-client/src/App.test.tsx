@@ -1692,7 +1692,9 @@ describe("App", () => {
     expect(screen.getByText("天气")).toBeInTheDocument();
     expect(screen.getAllByText("薄雾").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Amy：等待指令。").length).toBeGreaterThan(0);
-    expect(screen.getByText("黑松木材带")).toBeInTheDocument();
+    expect(screen.getByText("地块对象")).toBeInTheDocument();
+    expect(screen.getByText("黑松木材带 / 野生动物踪迹")).toBeInTheDocument();
+    expect(screen.getByText("大型野兽接近")).toBeInTheDocument();
 
     const saved = readSavedGameState();
     expect(saved.map.discoveredTileIds).not.toContain("2-3");

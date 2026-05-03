@@ -23,6 +23,12 @@ const initialTiles = [
   tile("2-3", "(2,3)", 2, 3, "森林 / 山", ["木材", "野生动物踪迹"], [], [], ["garry"], "大型野兽接近", "危险"),
   tile("4-3", "(4,3)", 4, 3, "沙漠", [], [], [], [], "未发现即时危险", "待命"),
 ];
+const initialActiveSpecialStateIdsByTile: Record<string, string[]> = {
+  "1-7": ["static-front"],
+  "2-3": ["beast-approach"],
+  "4-2": ["unknown-echo"],
+  "6-1": ["acid-rain-pool"],
+};
 
 test("PS-001 opens basic normal-call actions for Mike, Amy, and Garry", async ({ page }) => {
   await installSave(page, {
@@ -225,7 +231,7 @@ test("shows the Yuan realtime link with WebRTC as LAN upgrade and WSS fallback",
   await expect(phonePanel.getByText("enableWebRTC=true", { exact: true })).toBeVisible();
 });
 
-test("shows only the crash site and frontier window on a new map", async ({ page }) => {
+test("shows the full authored map on a new map", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: /卫星雷达/ }).click();
@@ -233,14 +239,14 @@ test("shows only the crash site and frontier window on a new map", async ({ page
   await expect(page.locator(".map-grid")).toHaveCount(0);
   const stage = page.locator(".phaser-map-stage");
   await expect(stage).toBeVisible();
-  await expect(stage).toHaveAttribute("data-zoom-level", "1");
+  await expect(stage).toHaveAttribute("data-zoom-level", "0");
   const semanticLayer = page.getByLabel("地图语义层");
-  await expect(semanticLayer.getByRole("button")).toHaveCount(9);
-  await expect(semanticLayer.getByRole("button", { name: /坠毁区域/ })).toBeVisible();
-  await expect(semanticLayer.getByRole("button", { name: /未探索区域/ })).toHaveCount(7);
+  await expect(semanticLayer.getByRole("button")).toHaveCount(64);
+  expect(await semanticLayer.getByRole("button", { name: /坠毁区域/ }).count()).toBeGreaterThan(0);
+  await expect(semanticLayer.getByRole("button", { name: /坠毁西缘/ })).toHaveCount(1);
+  expect(await semanticLayer.getByRole("button", { name: /北部玄武高地/ }).count()).toBeGreaterThan(0);
+  await expect(semanticLayer.getByRole("button", { name: /未探索区域/ })).toHaveCount(0);
   await expect(page.getByText(/4x4|4 x 4/)).toHaveCount(0);
-  await expect(semanticLayer.getByText("坠毁西缘")).toHaveCount(0);
-  await expect(semanticLayer.getByText("北部玄武高地")).toHaveCount(0);
 });
 
 test("renders the Phaser canvas inside a stable fixed map viewport", async ({ page }) => {
@@ -265,7 +271,7 @@ test("renders the Phaser canvas inside a stable fixed map viewport", async ({ pa
   expect(laterBox?.height).toBeCloseTo(initialBox?.height ?? 0, 0);
 });
 
-test("shows crew-returned coarse info on an occupied frontier tile without revealing objects", async ({ page }) => {
+test("shows full tile info on an occupied full-map tile", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("amy", "2-3", { status: "等待指令。" })],
@@ -278,19 +284,19 @@ test("shows crew-returned coarse info on an occupied frontier tile without revea
   await page.getByRole("button", { name: /卫星雷达/ }).click();
 
   await expect(page.locator(".map-grid")).toHaveCount(0);
-  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "1");
+  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "0");
   const semanticLayer = page.getByLabel("地图语义层");
   await expect(semanticLayer.getByRole("button", { name: /\(-1,2\)/ })).toBeVisible();
-  await expect(page.getByText("黑松木材带")).toHaveCount(0);
 
   await clickPhaserMapTile(page, "2-3");
   const detail = page.locator(".map-detail");
   await expect(detail.getByText("坐标详情：(-1,2)")).toBeVisible();
-  await expect(detail.getByText("队员回传")).toBeVisible();
+  await expect(detail.getByText("黑松林缘")).toBeVisible();
   await expect(detail.getByText("森林 / 山")).toBeVisible();
   await expect(detail.getByText("薄雾")).toBeVisible();
+  await expect(detail.getByText("黑松木材带 / 野生动物踪迹")).toBeVisible();
+  await expect(detail.getByText("大型野兽接近")).toBeVisible();
   await expect(detail.getByText("Amy：等待指令。")).toBeVisible();
-  await expect(page.getByText("黑松木材带")).toHaveCount(0);
 });
 
 test("moves a crew member along intermediate route steps instead of jumping to the target", async ({ page }) => {
@@ -365,7 +371,7 @@ test("moves a crew member along intermediate route steps instead of jumping to t
   expect(afterLeaving.map.discoveredTileIds).not.toContain("4-5");
 });
 
-test("moves Garry to a frontier tile and expands the visible map", async ({ page }) => {
+test("moves Garry to a full-map tile selected from the complete target list", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,
     crew: [idleCrew("garry", "4-4", { status: "坠毁区域待命。" })],
@@ -381,8 +387,8 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await garryCard.getByRole("button", { name: "通话" }).click();
   await page.getByRole("button", { name: "移动到指定区域" }).click();
 
-  await page.getByRole("button", { name: /未探索信号（-1,0）/ }).click();
-  await page.getByRole("button", { name: /确认请求 Garry 前往 未探索信号（-1,0）/ }).click();
+  await page.getByRole("button", { name: /坠毁西缘 \(-1,0\).*地形：沙漠/ }).click();
+  await page.getByRole("button", { name: /确认请求 Garry 前往 坠毁西缘 \(-1,0\)/ }).click();
   await expect(page.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeVisible();
 
   await page.clock.runFor(150_000);
@@ -391,7 +397,7 @@ test("moves Garry to a frontier tile and expands the visible map", async ({ page
   await page.getByRole("button", { name: /地图二级菜单/ }).click();
   const semanticLayer = page.getByLabel("地图语义层");
   await expect(semanticLayer.getByRole("button", { name: /坠毁西缘/ })).toBeVisible();
-  await expect(semanticLayer.getByRole("button")).toHaveCount(12);
+  await expect(semanticLayer.getByRole("button")).toHaveCount(64);
 });
 
 test("keeps the Phaser map stable while game time runs at 1x, 2x, and 4x", async ({ page }) => {
@@ -439,7 +445,7 @@ test("keeps the Phaser map stable while game time runs at 1x, 2x, and 4x", async
   await page.getByRole("button", { name: /卫星雷达/ }).click();
 
   const stage = page.locator(".phaser-map-stage");
-  await expect(stage).toHaveAttribute("data-zoom-level", "1");
+  await expect(stage).toHaveAttribute("data-zoom-level", "0");
   await page.clock.runFor(15_000);
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
@@ -633,7 +639,7 @@ async function startNormalCrewCall(page: Page, crewLabel: string) {
 }
 
 async function clickPhaserMapTile(page: Page, tileId: string) {
-  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "1");
+  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "0");
   const tile = page.locator(`.phaser-map-fallback-tile[data-tile-id="${tileId}"]`);
   await tile.focus();
   await page.keyboard.press("Enter");
@@ -1084,7 +1090,7 @@ function createInitialMapState() {
             {
               discovered: id === "4-4",
               investigated: id === "4-4",
-              activeSpecialStateIds: [],
+              activeSpecialStateIds: initialActiveSpecialStateIdsByTile[id] ?? [],
               revealedObjectIds: [],
               revealedSpecialStateIds: [],
             },
