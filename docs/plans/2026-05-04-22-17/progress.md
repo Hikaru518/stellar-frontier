@@ -26,7 +26,7 @@ source:
 |---|---------|------|------|---------|
 | 1 | TASK-001 | PC Event loader 改为 manifest + glob | completed | 1 |
 | 2 | TASK-002 | 实现 Event domain manifest store | completed | 2 |
-| 3 | TASK-003 | 实现 Draft envelope store | pending | 0 |
+| 3 | TASK-003 | 实现 Draft envelope store | completed | 1 |
 | 4 | TASK-004 | 实现 Event validation adapter | pending | 0 |
 | 5 | TASK-005 | 添加 Draft 和 Domain helper routes | pending | 0 |
 | 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | pending | 0 |
@@ -76,3 +76,12 @@ source:
 - developer summary: 实现 helper 内部 Event manifest/domain store，支持读取 manifest、domain summaries、新建空 definitions/call_templates、manifest 更新和 manifest 校验；`loadEventEditorLibrary` 现在返回 `domains`，并保留原 `definitions/call_templates/presets/handlers/schemas` 形状。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（22 files / 101 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/contentStore.mjs apps/editor/helper/contentStore.test.mjs apps/editor/helper/eventManifestStore.mjs apps/editor/helper/eventManifestStore.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 editor helper 内部 manifest/domain 模块，无可交互 UI 面。
+
+### TASK-003: 实现 Draft envelope store
+- 状态: completed
+- 开始时间: 2026-05-05 10:10
+- 完成时间: 2026-05-05 10:23
+- 尝试次数: 1
+- developer summary: 新增 helper 侧 Draft envelope store，支持创建 new/edit_existing draft、读取、保存、hash 生成、active summary 和 archive move；`loadEventEditorLibrary` 现在返回 active draft summaries，archive draft 不进入列表。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（23 files / 107 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/contentStore.mjs apps/editor/helper/contentStore.test.mjs apps/editor/helper/eventDraftStore.mjs apps/editor/helper/eventDraftStore.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改 editor helper 内部 draft storage 模块，无可交互 UI 面。

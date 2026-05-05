@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createEventDraftStore } from "./eventDraftStore.mjs";
 import { buildEventDomainSummaries } from "./eventManifestStore.mjs";
 import { createPathGuard } from "./pathGuard.mjs";
 
@@ -20,6 +21,7 @@ export async function loadEventEditorLibrary({
   repoRoot = path.resolve(import.meta.dirname, "../../.."),
 } = {}) {
   const guard = createPathGuard(repoRoot, [EVENT_ROOT, SCHEMA_ROOT]);
+  const draftStore = createEventDraftStore({ repoRoot });
   const manifest = await readJson(guard, MANIFEST_PATH);
   const domains = await buildEventDomainSummaries(guard, manifest);
   const definitions = [];
@@ -54,6 +56,7 @@ export async function loadEventEditorLibrary({
 
   const handlers = await loadHandlerAssets(guard);
   const schemas = await loadSchemas(guard);
+  const drafts = await draftStore.listActiveDraftSummaries();
 
   return {
     definitions,
@@ -62,6 +65,7 @@ export async function loadEventEditorLibrary({
     handlers,
     schemas,
     domains,
+    drafts,
   };
 }
 
