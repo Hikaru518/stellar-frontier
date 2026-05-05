@@ -114,6 +114,48 @@ describe("EventBrowser", () => {
     expect(callTemplateRow).not.toHaveTextContent(/OK|ERROR|WARNING/);
   });
 
+  it("renders Edit Existing only for definitions without selecting the row", () => {
+    const onSelectAsset = vi.fn();
+    const onEditDefinition = vi.fn();
+    const library = createLibraryResponse({
+      definitions: [
+        createDefinitionAsset("forest.signal", {
+          data: createDefinitionData({
+            id: "forest.signal",
+            title: "Signal flare",
+            summary: "Crew finds a rescue marker.",
+            triggerType: "arrival",
+            handlerType: "grant_item",
+          }),
+        }),
+      ],
+      call_templates: [
+        createCallTemplateAsset("forest.signal.call", {
+          data: createCallTemplateData({
+            id: "forest.signal.call",
+            eventDefinitionId: "forest.signal",
+            nodeId: "intro_call",
+          }),
+        }),
+      ],
+    });
+
+    render(
+      <EventBrowser
+        library={library}
+        selectedAsset={null}
+        onSelectAsset={onSelectAsset}
+        onEditDefinition={onEditDefinition}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Existing forest.signal" }));
+
+    expect(onEditDefinition).toHaveBeenCalledWith(expect.objectContaining({ id: "forest.signal", asset_type: "event_definition" }));
+    expect(onSelectAsset).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Edit Existing forest.signal.call" })).not.toBeInTheDocument();
+  });
+
   it("includes structured preset and handler assets in the browser", () => {
     const library = createLibraryResponse({
       presets: [createPresetAsset("forest.relic_preset")],

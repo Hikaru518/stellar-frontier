@@ -38,7 +38,7 @@ source:
 | 12 | TASK-012 | 实现 Node capability registry 与 node templates | completed | 2 |
 | 13 | TASK-013 | 实现 Effect 与 Handler capability registry | completed | 2 |
 | 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | completed | 3 |
-| 15 | TASK-015 | 实现 Draft Browser 与 Create/Edit Draft 入口 | pending | 0 |
+| 15 | TASK-015 | 实现 Draft Browser 与 Create/Edit Draft 入口 | completed | 3 |
 | 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | pending | 0 |
 | 17 | TASK-017 | 实现 Basic step 结构化表单 | pending | 0 |
 | 18 | TASK-018 | 实现 Trigger step 与 capability insertion | pending | 0 |
@@ -215,3 +215,16 @@ source:
 - developer summary: 新增纯 `eventAuthoringReducer`，支持 step selection、call option add/remove/rename、delete node；同步维护 call node options、option_node_mapping、graph edges、call template option_lines，并在删除 call node 时清理对应 call template 和 `content_refs.call_template_ids`。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（32 files / 172 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/templates.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改纯 authoring reducer/helper，无可交互 UI 面。
+
+### TASK-015: 实现 Draft Browser 与 Create/Edit Draft 入口
+- 状态: completed
+- 开始时间: 2026-05-05 14:27
+- 完成时间: 2026-05-05 14:43
+- 尝试次数: 3
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区未看到 TASK-015 相关文件产出，交给下一次尝试重新实现。
+  - 尝试 2: developer 子任务立即返回，要求 prompt 显式包含 `$developer` 后才能修改文件；未产生代码改动，交给第三次尝试重新分发。
+  - 尝试 3: developer 子任务长时间未返回，关闭时仍在运行；工作区只看到 `DraftBrowser.test.tsx` 测试骨架，未看到核心实现文件，dispatcher 主线程接手补完。
+- developer summary: dispatcher 主线程补齐 Draft Browser、Create Domain dialog、Event Browser definition edit action 和 EventEditorPage 的 draft/domain API 接入；创建/打开 draft 后显示轻量 Draft open 占位，完整 authoring workspace 留给 TASK-016；页面对旧 helper/mock response 做 domains/drafts normalization，避免入口崩溃。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（34 files / 183 tests）；`git diff --check -- apps/editor/src/event-editor/EventEditorPage.tsx apps/editor/src/event-editor/EventBrowser.tsx apps/editor/src/event-editor/EventEditorPage.test.tsx apps/editor/src/event-editor/EventBrowser.test.tsx apps/editor/src/event-editor/authoring/DraftBrowser.tsx apps/editor/src/event-editor/authoring/DomainDialog.tsx apps/editor/src/event-editor/authoring/DraftBrowser.test.tsx apps/editor/src/event-editor/authoring/DomainDialog.test.tsx apps/editor/src/styles.css docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，真实 helper 数据加载成功；确认 Draft Browser、Create Event、Edit Existing 按钮可见，Create Domain dialog 可打开/关闭，浏览器 console error 为空；未提交 create/edit 动作，避免写入真实 content。

@@ -12,6 +12,7 @@ interface EventBrowserProps {
   library: EventEditorLibraryResponse;
   selectedAsset: EditorEventAsset<unknown> | null;
   onSelectAsset: (asset: EditorEventAsset<unknown>) => void;
+  onEditDefinition?: (asset: EventEditorLibraryResponse["definitions"][number]) => void;
 }
 
 const ASSET_TYPE_OPTIONS = [
@@ -21,7 +22,7 @@ const ASSET_TYPE_OPTIONS = [
   { value: "handler", label: "Handlers" },
 ];
 
-export default function EventBrowser({ library, selectedAsset, onSelectAsset }: EventBrowserProps) {
+export default function EventBrowser({ library, selectedAsset, onSelectAsset, onEditDefinition }: EventBrowserProps) {
   const [filters, setFilters] = useState<Required<EventBrowserFilters>>({
     domain: "",
     assetType: "",
@@ -116,14 +117,26 @@ export default function EventBrowser({ library, selectedAsset, onSelectAsset }: 
         <ul className="event-browser-list" aria-label="Event assets">
           {filteredItems.map((item) => (
             <li key={getBrowserItemKey(item)}>
-              <button
-                type="button"
-                className={`event-browser-row ${selectedKey === getBrowserItemKey(item) ? "event-browser-row-selected" : ""}`}
-                aria-label={`Select ${item.asset.id}`}
-                onClick={() => onSelectAsset(item.asset)}
-              >
-                <AssetRow item={item} />
-              </button>
+              <div className="event-browser-row-shell">
+                <button
+                  type="button"
+                  className={`event-browser-row ${selectedKey === getBrowserItemKey(item) ? "event-browser-row-selected" : ""}`}
+                  aria-label={`Select ${item.asset.id}`}
+                  onClick={() => onSelectAsset(item.asset)}
+                >
+                  <AssetRow item={item} />
+                </button>
+                {item.asset.asset_type === "event_definition" && onEditDefinition ? (
+                  <button
+                    type="button"
+                    className="event-browser-secondary-action"
+                    aria-label={`Edit Existing ${item.asset.id}`}
+                    onClick={() => onEditDefinition(item.asset as EventEditorLibraryResponse["definitions"][number])}
+                  >
+                    Edit Existing
+                  </button>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

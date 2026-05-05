@@ -304,12 +304,24 @@ p {
   list-style: none;
 }
 
+.event-browser-row-shell {
+  display: grid;
+  gap: 5px;
+}
+
 .event-browser-row {
   display: grid;
   width: 100%;
   gap: 4px;
   padding: 8px;
   text-align: left;
+}
+
+.event-browser-secondary-action {
+  justify-self: end;
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 12px;
 }
 
 .event-browser-row-selected {
@@ -333,6 +345,92 @@ p {
   color: #46505a;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
+}
+
+.event-draft-browser {
+  margin-bottom: 10px;
+}
+
+.event-create-draft-form,
+.event-domain-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.event-create-draft-form label,
+.event-domain-form label {
+  display: grid;
+  gap: 4px;
+  color: #46505a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.event-create-draft-form input,
+.event-create-draft-form select,
+.event-create-draft-form textarea,
+.event-domain-form input {
+  width: 100%;
+  border: 1px solid #77736b;
+  background: #f7f4ec;
+  padding: 7px;
+  color: #171a1c;
+}
+
+.event-create-draft-form textarea {
+  min-height: 62px;
+  resize: vertical;
+}
+
+.event-action-status,
+.event-action-error {
+  margin-bottom: 8px;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.event-action-error {
+  color: #8a2f17;
+}
+
+.event-action-error-card {
+  border-color: #8a2f17;
+}
+
+.event-domain-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(23, 26, 28, 0.22);
+  padding: 20px;
+}
+
+.event-domain-dialog {
+  width: min(420px, 100%);
+  background: #f4eadf;
+}
+
+.event-domain-dialog-heading,
+.event-domain-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.event-domain-dialog-heading {
+  margin-bottom: 10px;
+}
+
+.event-domain-dialog-heading h3 {
+  margin-bottom: 0;
+}
+
+.event-domain-dialog-actions {
+  justify-content: flex-end;
 }
 
 .status-warning {
