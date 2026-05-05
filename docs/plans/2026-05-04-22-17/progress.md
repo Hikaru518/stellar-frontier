@@ -46,7 +46,7 @@ source:
 | 20 | TASK-020 | 实现 Graph node editor 基础节点 | completed | 1 |
 | 21 | TASK-021 | 实现 Call/Check/Random graph editor | completed | 1 |
 | 22 | TASK-022 | 实现 Advanced node editors | completed | 1 |
-| 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | pending | 0 |
+| 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | completed | 1 |
 | 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | pending | 0 |
 | 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | pending | 0 |
 | 26 | TASK-026 | 整合 Save Draft UI | pending | 0 |
@@ -301,3 +301,14 @@ source:
 - developer summary: 扩展 `GraphStructureEditor` 支持 `action_request`、`objective`、`spawn_event` 三类高级节点；新增结构化 target ref、trigger definition、condition、key/value params 编辑器；reducer 增加 typed update actions 并保持缺失 transition 不阻塞继续编辑。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（42 files / 225 tests）；主线程补强高级节点 condition type 下拉为统一 `conditionCapabilities` 来源；`git diff --check -- apps/editor/src/event-editor/authoring/AdvancedNodeEditors.test.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task022_semantic_check_1777971378192_20260505_085618`；确认可添加并编辑 `action_request` 的 request/action/target refs/action params/completion trigger conditions/accepted-completed-failed transitions，缺失 completed transition 显示 warning；确认可添加并编辑 `objective` 的 objective template/mode/required action params/created-completed-failed transitions，缺失 completed transition 显示 warning；确认可添加并编辑 `spawn_event` 的 event id/spawn policy/context mapping/dedupe/next transition，缺失 next transition 显示 warning；Graph Preview 显示三类节点且浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-023: 实现 Effects、Log Templates 与 History 结构化编辑
+- 状态: completed
+- 开始时间: 2026-05-05 16:57
+- 完成时间: 2026-05-05 17:13
+- 尝试次数: 1
+- 尝试记录:
+  - developer worker 长时间未返回，关闭后已有部分 Effects step/catalog/reducer 改动落地；dispatcher 主线程复核并补齐 `EffectsStep.test.tsx`、history_writes/final_effect_refs 编辑、Effects step node update 不跳回 Graph 的修正和验证。
+- developer summary: 新增 Effects step，支持 effect group 增删改、effect 增删改、target/params/failure_policy/record_policy/handler_type 结构化编辑；新增 log template 增删改；Capability Catalog 支持 effects 模式并可把 effect template 插入当前 effect group；Effects step 显示缺失 effect group 引用 warning，并支持 end/log_only node 的 history_writes 与 end final_effect_refs 编辑。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（43 files / 230 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/EffectsStep.tsx apps/editor/src/event-editor/authoring/EffectsStep.test.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts apps/editor/src/event-editor/authoring/CapabilityCatalogPanel.tsx apps/editor/src/event-editor/authoring/CapabilityCatalogPanel.test.tsx docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task023_semantic_check_1777972211124_20260505_091011`；确认 Effects step 可新增/编辑 `bridge_effects`、结构化编辑 `handler_effect` target/params/failure/record policy、通过 Catalog 插入 handler effect template、新增并编辑 `bridge_resolved_log`、编辑 end node final_effect_refs 和 history write；缺失 `missing_effects` effect group 时显示 warning；修复并确认 history write 更新后仍停留在 Effects step；浏览器 console error 为空。验证后已删除临时 draft 文件。

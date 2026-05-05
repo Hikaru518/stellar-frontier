@@ -5,10 +5,13 @@ import type {
   CallOption,
   CheckNode,
   Condition,
+  Effect,
+  EffectGroup,
   EndNode,
   EventEdge,
   EventDefinition,
   EventGraph,
+  EventLogTemplate,
   EventNode,
   EventNodeBase,
   EventNodeType,
@@ -54,9 +57,11 @@ type NodeCommonFieldsUpdate = Partial<
   blocking?: Partial<BlockingRequirement>;
 };
 type EndNodeFieldsUpdate = Partial<Omit<Pick<EndNode, "resolution" | "result_key" | "event_log_template_id" | "cleanup_policy">, "cleanup_policy">> & {
+  final_effect_refs?: EndNode["final_effect_refs"];
+  history_writes?: EndNode["history_writes"];
   cleanup_policy?: Partial<EndNode["cleanup_policy"]>;
 };
-type LogOnlyNodeFieldsUpdate = Partial<Pick<LogOnlyNode, "event_log_template_id" | "effect_refs" | "next_node_id">>;
+type LogOnlyNodeFieldsUpdate = Partial<Pick<LogOnlyNode, "event_log_template_id" | "effect_refs" | "history_writes" | "next_node_id">>;
 type WaitNodeFieldsUpdate = Partial<
   Pick<WaitNode, "duration_seconds" | "wake_trigger_type" | "next_node_id" | "set_next_wakeup_at" | "interrupt_policy">
 >;
@@ -98,6 +103,9 @@ type SpawnEventNodeFieldsUpdate = Partial<
     "event_definition_id" | "spawn_policy" | "context_mapping" | "parent_event_link" | "dedupe_key_template" | "next_node_id"
   >
 >;
+type EffectGroupFieldsUpdate = Partial<Pick<EffectGroup, "id" | "description">>;
+type EffectFieldsUpdate = Partial<Effect>;
+type LogTemplateFieldsUpdate = Partial<EventLogTemplate>;
 
 const DEFAULT_CANDIDATE_SELECTION: EventDefinition["candidate_selection"] = {
   priority: 0,
@@ -194,11 +202,13 @@ export type EventAuthoringAction =
       type: "update_end_node";
       nodeId: string;
       fields: EndNodeFieldsUpdate;
+      preserveEditorState?: boolean;
     }
   | {
       type: "update_log_only_node";
       nodeId: string;
       fields: LogOnlyNodeFieldsUpdate;
+      preserveEditorState?: boolean;
     }
   | {
       type: "update_wait_node";
@@ -244,6 +254,48 @@ export type EventAuthoringAction =
   | {
       type: "delete_node";
       nodeId: string;
+    }
+  | {
+      type: "add_effect_group";
+      groupId?: string;
+    }
+  | {
+      type: "update_effect_group";
+      groupId: string;
+      fields: EffectGroupFieldsUpdate;
+    }
+  | {
+      type: "remove_effect_group";
+      groupId: string;
+    }
+  | {
+      type: "add_effect";
+      groupId: string;
+      effect: Effect;
+    }
+  | {
+      type: "update_effect";
+      groupId: string;
+      effectId: string;
+      fields: EffectFieldsUpdate;
+    }
+  | {
+      type: "remove_effect";
+      groupId: string;
+      effectId: string;
+    }
+  | {
+      type: "add_log_template";
+      logTemplateId?: string;
+    }
+  | {
+      type: "update_log_template";
+      logTemplateId: string;
+      fields: LogTemplateFieldsUpdate;
+    }
+  | {
+      type: "remove_log_template";
+      logTemplateId: string;
     };
 
 export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAuthoringAction): EventDraftEnvelope {
@@ -281,9 +333,9 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
     case "update_node_common_fields":
       return updateNodeCommonFields(draft, action.nodeId, action.fields);
     case "update_end_node":
-      return updateEndNode(draft, action.nodeId, action.fields);
+      return updateEndNode(draft, action.nodeId, action.fields, action.preserveEditorState);
     case "update_log_only_node":
-      return updateLogOnlyNode(draft, action.nodeId, action.fields);
+      return updateLogOnlyNode(draft, action.nodeId, action.fields, action.preserveEditorState);
     case "update_wait_node":
       return updateWaitNode(draft, action.nodeId, action.fields);
     case "update_call_node":
@@ -302,6 +354,24 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
       return updateSpawnEventNode(draft, action.nodeId, action.fields);
     case "delete_node":
       return deleteNode(draft, action.nodeId);
+    case "add_effect_group":
+      return addEffectGroup(draft, action.groupId);
+    case "update_effect_group":
+      return updateEffectGroup(draft, action.groupId, action.fields);
+    case "remove_effect_group":
+      return removeEffectGroup(draft, action.groupId);
+    case "add_effect":
+      return addEffect(draft, action.groupId, action.effect);
+    case "update_effect":
+      return updateEffect(draft, action.groupId, action.effectId, action.fields);
+    case "remove_effect":
+      return removeEffect(draft, action.groupId, action.effectId);
+    case "add_log_template":
+      return addLogTemplate(draft, action.logTemplateId);
+    case "update_log_template":
+      return updateLogTemplateFields(draft, action.logTemplateId, action.fields);
+    case "remove_log_template":
+      return removeLogTemplate(draft, action.logTemplateId);
   }
 }
 
@@ -671,13 +741,20 @@ function updateNodeCommonFields(
   return updateDraftGraph(draft, replaceNode(graph, updatedNode, nodeId), nextNodeId);
 }
 
-function updateEndNode(draft: EventDraftEnvelope, nodeId: string, fields: EndNodeFieldsUpdate): EventDraftEnvelope {
+function updateEndNode(
+  draft: EventDraftEnvelope,
+  nodeId: string,
+  fields: EndNodeFieldsUpdate,
+  preserveEditorState = false,
+): EventDraftEnvelope {
   const graph = requireGraph(draft);
   const node = requireTypedNode(graph, nodeId, "end");
   const { cleanup_policy: cleanupPolicyFields, ...flatFields } = fields;
   const updatedNode: EndNode = {
     ...node,
     ...flatFields,
+    final_effect_refs: fields.final_effect_refs ? [...fields.final_effect_refs] : node.final_effect_refs,
+    history_writes: fields.history_writes ? clonePlain(fields.history_writes) : node.history_writes,
     cleanup_policy: cleanupPolicyFields
       ? {
           ...node.cleanup_policy,
@@ -686,13 +763,14 @@ function updateEndNode(draft: EventDraftEnvelope, nodeId: string, fields: EndNod
       : node.cleanup_policy,
   };
 
-  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId, preserveEditorState);
 }
 
 function updateLogOnlyNode(
   draft: EventDraftEnvelope,
   nodeId: string,
   fields: LogOnlyNodeFieldsUpdate,
+  preserveEditorState = false,
 ): EventDraftEnvelope {
   const graph = requireGraph(draft);
   const node = requireTypedNode(graph, nodeId, "log_only");
@@ -700,9 +778,10 @@ function updateLogOnlyNode(
     ...node,
     ...fields,
     effect_refs: fields.effect_refs ? [...fields.effect_refs] : node.effect_refs,
+    history_writes: fields.history_writes ? clonePlain(fields.history_writes) : node.history_writes,
   };
 
-  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId, preserveEditorState);
 }
 
 function updateWaitNode(draft: EventDraftEnvelope, nodeId: string, fields: WaitNodeFieldsUpdate): EventDraftEnvelope {
@@ -910,10 +989,203 @@ function deleteNode(draft: EventDraftEnvelope, nodeId: string): EventDraftEnvelo
   };
 }
 
+function addEffectGroup(draft: EventDraftEnvelope, groupId: string | undefined): EventDraftEnvelope {
+  const effectGroups = draft.working_definition.effect_groups ?? [];
+  const resolvedGroupId = groupId ?? createUniqueEffectGroupId(effectGroups);
+
+  requireSafeUniqueEffectGroupId(effectGroups, resolvedGroupId);
+
+  return updateWorkingDefinition(draft, {
+    effect_groups: [
+      ...effectGroups,
+      {
+        id: resolvedGroupId,
+        description: "",
+        effects: [],
+      },
+    ],
+  });
+}
+
+function updateEffectGroup(
+  draft: EventDraftEnvelope,
+  groupId: string,
+  fields: EffectGroupFieldsUpdate,
+): EventDraftEnvelope {
+  const effectGroups = draft.working_definition.effect_groups ?? [];
+  const group = requireEffectGroup(effectGroups, groupId);
+  const nextGroupId = fields.id ?? group.id;
+
+  if (nextGroupId !== group.id) {
+    requireSafeUniqueEffectGroupId(effectGroups, nextGroupId, group.id);
+  }
+
+  return updateWorkingDefinition(draft, {
+    effect_groups: effectGroups.map((candidate) =>
+      candidate.id === groupId
+        ? {
+            ...candidate,
+            id: nextGroupId,
+            description: hasOwn(fields, "description") ? fields.description : candidate.description,
+          }
+        : candidate,
+    ),
+  });
+}
+
+function removeEffectGroup(draft: EventDraftEnvelope, groupId: string): EventDraftEnvelope {
+  const effectGroups = draft.working_definition.effect_groups ?? [];
+  requireEffectGroup(effectGroups, groupId);
+
+  return updateWorkingDefinition(draft, {
+    effect_groups: effectGroups.filter((group) => group.id !== groupId),
+  });
+}
+
+function addEffect(draft: EventDraftEnvelope, groupId: string, effect: Effect): EventDraftEnvelope {
+  const effectGroups = draft.working_definition.effect_groups ?? [];
+  const group = requireEffectGroup(effectGroups, groupId);
+
+  if (group.effects.some((candidate) => candidate.id === effect.id)) {
+    throw new Error(`Effect group "${groupId}" already has effect "${effect.id}".`);
+  }
+
+  return updateEffectGroups(draft, effectGroups, groupId, {
+    ...group,
+    effects: [...group.effects, clonePlain(effect)],
+  });
+}
+
+function updateEffect(
+  draft: EventDraftEnvelope,
+  groupId: string,
+  effectId: string,
+  fields: EffectFieldsUpdate,
+): EventDraftEnvelope {
+  const effectGroups = draft.working_definition.effect_groups ?? [];
+  const group = requireEffectGroup(effectGroups, groupId);
+  const effect = requireEffect(group, effectId);
+  const nextEffectId = fields.id ?? effect.id;
+
+  if (nextEffectId !== effect.id && group.effects.some((candidate) => candidate.id === nextEffectId)) {
+    throw new Error(`Effect group "${groupId}" already has effect "${nextEffectId}".`);
+  }
+
+  return updateEffectGroups(draft, effectGroups, groupId, {
+    ...group,
+    effects: group.effects.map((candidate) =>
+      candidate.id === effectId
+        ? {
+            ...candidate,
+            ...clonePlain(fields),
+            id: nextEffectId,
+            target: hasOwn(fields, "target") ? clonePlain(fields.target as Effect["target"]) : candidate.target,
+            params: hasOwn(fields, "params") ? cloneJsonObject(fields.params) : candidate.params,
+            record_policy: hasOwn(fields, "record_policy")
+              ? clonePlain(fields.record_policy as Effect["record_policy"])
+              : candidate.record_policy,
+          }
+        : candidate,
+    ),
+  });
+}
+
+function removeEffect(draft: EventDraftEnvelope, groupId: string, effectId: string): EventDraftEnvelope {
+  const effectGroups = draft.working_definition.effect_groups ?? [];
+  const group = requireEffectGroup(effectGroups, groupId);
+  requireEffect(group, effectId);
+
+  return updateEffectGroups(draft, effectGroups, groupId, {
+    ...group,
+    effects: group.effects.filter((effect) => effect.id !== effectId),
+  });
+}
+
+function addLogTemplate(draft: EventDraftEnvelope, logTemplateId: string | undefined): EventDraftEnvelope {
+  const logTemplates = draft.working_definition.log_templates ?? [];
+  const resolvedLogTemplateId = logTemplateId ?? createUniqueLogTemplateId(logTemplates);
+
+  if (logTemplates.some((template) => template.id === resolvedLogTemplateId)) {
+    throw new Error(`Log template "${resolvedLogTemplateId}" already exists.`);
+  }
+
+  return updateWorkingDefinition(draft, {
+    log_templates: [
+      ...logTemplates,
+      {
+        id: resolvedLogTemplateId,
+        summary: "TODO event log summary.",
+        importance: "normal",
+        visibility: "player_visible",
+      },
+    ],
+  });
+}
+
+function updateLogTemplateFields(
+  draft: EventDraftEnvelope,
+  logTemplateId: string,
+  fields: LogTemplateFieldsUpdate,
+): EventDraftEnvelope {
+  const logTemplates = draft.working_definition.log_templates ?? [];
+  const template = requireLogTemplate(logTemplates, logTemplateId);
+  const nextLogTemplateId = fields.id ?? template.id;
+
+  if (nextLogTemplateId !== template.id && logTemplates.some((candidate) => candidate.id === nextLogTemplateId)) {
+    throw new Error(`Log template "${nextLogTemplateId}" already exists.`);
+  }
+
+  return updateWorkingDefinition(draft, {
+    log_templates: logTemplates.map((candidate) =>
+      candidate.id === logTemplateId
+        ? {
+            ...candidate,
+            ...fields,
+            id: nextLogTemplateId,
+          }
+        : candidate,
+    ),
+  });
+}
+
+function removeLogTemplate(draft: EventDraftEnvelope, logTemplateId: string): EventDraftEnvelope {
+  const logTemplates = draft.working_definition.log_templates ?? [];
+  requireLogTemplate(logTemplates, logTemplateId);
+
+  return updateWorkingDefinition(draft, {
+    log_templates: logTemplates.filter((template) => template.id !== logTemplateId),
+  });
+}
+
+function updateWorkingDefinition(
+  draft: EventDraftEnvelope,
+  fields: Partial<EventDraftWorkingDefinition>,
+): EventDraftEnvelope {
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      ...fields,
+    },
+  };
+}
+
+function updateEffectGroups(
+  draft: EventDraftEnvelope,
+  effectGroups: EffectGroup[],
+  groupId: string,
+  updatedGroup: EffectGroup,
+): EventDraftEnvelope {
+  return updateWorkingDefinition(draft, {
+    effect_groups: effectGroups.map((group) => (group.id === groupId ? updatedGroup : group)),
+  });
+}
+
 function updateDraftGraph(
   draft: EventDraftEnvelope,
   graph: EventGraph,
   selectedNodeId: string | null = null,
+  preserveEditorState = false,
 ): EventDraftEnvelope {
   return {
     ...draft,
@@ -921,7 +1193,7 @@ function updateDraftGraph(
       ...draft.working_definition,
       event_graph: graph,
     },
-    editor_state: createGraphNodeSelectionState(draft, selectedNodeId),
+    editor_state: preserveEditorState ? draft.editor_state : createGraphNodeSelectionState(draft, selectedNodeId),
   };
 }
 
@@ -1067,6 +1339,36 @@ function updateCallTemplate(
   }
 
   return updatedTemplates;
+}
+
+function requireEffectGroup(effectGroups: EffectGroup[], groupId: string): EffectGroup {
+  const group = effectGroups.find((candidate) => candidate.id === groupId);
+
+  if (!group) {
+    throw new Error(`Event draft is missing effect group "${groupId}".`);
+  }
+
+  return group;
+}
+
+function requireEffect(effectGroup: EffectGroup, effectId: string): Effect {
+  const effect = effectGroup.effects.find((candidate) => candidate.id === effectId);
+
+  if (!effect) {
+    throw new Error(`Effect group "${effectGroup.id}" is missing effect "${effectId}".`);
+  }
+
+  return effect;
+}
+
+function requireLogTemplate(logTemplates: EventLogTemplate[], logTemplateId: string): EventLogTemplate {
+  const template = logTemplates.find((candidate) => candidate.id === logTemplateId);
+
+  if (!template) {
+    throw new Error(`Event draft is missing log template "${logTemplateId}".`);
+  }
+
+  return template;
 }
 
 function getOptionLines(template: EventDraftWorkingCallTemplate): Record<string, TextVariantGroup> {
@@ -1276,6 +1578,42 @@ function requireSafeUniqueNodeId(graph: EventGraph, nodeId: string, currentNodeI
   if (nodeId !== currentNodeId && graph.nodes.some((node) => node.id === nodeId)) {
     throw new Error(`Event graph already has node "${nodeId}".`);
   }
+}
+
+function requireSafeUniqueEffectGroupId(effectGroups: EffectGroup[], groupId: string, currentGroupId?: string): void {
+  if (!isSafeEventId(groupId)) {
+    throw new Error(`Effect group id "${groupId}" must use lowercase letters, numbers, underscores, or hyphens.`);
+  }
+
+  if (groupId !== currentGroupId && effectGroups.some((group) => group.id === groupId)) {
+    throw new Error(`Event draft already has effect group "${groupId}".`);
+  }
+}
+
+function createUniqueEffectGroupId(effectGroups: EffectGroup[]): string {
+  let index = 1;
+  let candidate = "effect_group";
+  const existingIds = new Set(effectGroups.map((group) => group.id));
+
+  while (existingIds.has(candidate)) {
+    index += 1;
+    candidate = `effect_group_${index}`;
+  }
+
+  return candidate;
+}
+
+function createUniqueLogTemplateId(logTemplates: EventLogTemplate[]): string {
+  let index = 1;
+  let candidate = "event_log";
+  const existingIds = new Set(logTemplates.map((template) => template.id));
+
+  while (existingIds.has(candidate)) {
+    index += 1;
+    candidate = `event_log_${index}`;
+  }
+
+  return candidate;
 }
 
 function getEventDefinitionId(draft: EventDraftEnvelope): string {

@@ -1,7 +1,9 @@
 import { useState } from "react";
+import type { Effect, EffectGroup } from "../../../../pc-client/src/events/types";
 import type { EventDraftEnvelope, EventEditorStep } from "../types";
 import BasicStep from "./BasicStep";
 import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
+import EffectsStep from "./EffectsStep";
 import GraphStructureEditor from "./GraphStructureEditor";
 import TriggerStep from "./TriggerStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
@@ -46,8 +48,14 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
   const activeStepConfig = AUTHORING_STEPS.find((step) => step.id === activeStep) ?? AUTHORING_STEPS[0];
   const isLockedTarget = draft.mode === "edit_existing";
   const triggerConditions = draft.working_definition.trigger?.conditions ?? [];
+  const effectGroups = draft.working_definition.effect_groups ?? [];
   const [conditionInsertIndex, setConditionInsertIndex] = useState(triggerConditions.length);
+  const [selectedEffectGroupId, setSelectedEffectGroupId] = useState<string | null>(effectGroups[0]?.id ?? null);
   const resolvedConditionInsertIndex = Math.min(Math.max(conditionInsertIndex, 0), triggerConditions.length);
+  const resolvedSelectedEffectGroupId =
+    selectedEffectGroupId && effectGroups.some((group) => group.id === selectedEffectGroupId)
+      ? selectedEffectGroupId
+      : (effectGroups[0]?.id ?? null);
 
   return (
     <section className="event-authoring-workspace" aria-label="Event authoring workspace">
@@ -93,7 +101,9 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               <p className="muted-text">{activeStepConfig.responsibility}</p>
             </div>
             <span className="status-tag status-muted">
-              {activeStep === "basic" || activeStep === "trigger" || activeStep === "graph" ? "editable" : "placeholder"}
+              {activeStep === "basic" || activeStep === "trigger" || activeStep === "graph" || activeStep === "effects"
+                ? "editable"
+                : "placeholder"}
             </span>
           </div>
           {activeStep === "basic" ? (
@@ -107,6 +117,13 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
             />
           ) : activeStep === "graph" ? (
             <GraphStructureEditor draft={draft} onDraftChange={onDraftChange} />
+          ) : activeStep === "effects" ? (
+            <EffectsStep
+              draft={draft}
+              selectedEffectGroupId={resolvedSelectedEffectGroupId}
+              onSelectedEffectGroupIdChange={setSelectedEffectGroupId}
+              onDraftChange={onDraftChange}
+            />
           ) : (
             <StepPlaceholder step={activeStepConfig} draft={draft} />
           )}
@@ -132,6 +149,24 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
 
                 setConditionInsertIndex(resolvedConditionInsertIndex + 1);
                 onDraftChange(nextDraft);
+              }}
+            />
+          ) : activeStep === "effects" ? (
+            <CapabilityCatalogPanel
+              activeKind="effects"
+              onInsertEffectTemplate={(effect) => {
+                const selectedGroup = effectGroups.find((group) => group.id === resolvedSelectedEffectGroupId);
+                if (!selectedGroup) {
+                  return;
+                }
+
+                onDraftChange(
+                  eventAuthoringReducer(draft, {
+                    type: "add_effect",
+                    groupId: selectedGroup.id,
+                    effect: withUniqueEffectId(selectedGroup, effect),
+                  }),
+                );
               }}
             />
           ) : (
@@ -239,4 +274,24 @@ function resolveActiveStep(step: EventEditorStep): AuthoringStep {
 
 function formatDraftHash(hash: string | null): string {
   return hash ? hash.slice(0, 8) : "unsaved";
+}
+
+function withUniqueEffectId(group: EffectGroup, effect: Effect): Effect {
+  if (!group.effects.some((candidate) => candidate.id === effect.id)) {
+    return effect;
+  }
+
+  let index = 1;
+  let candidateId = effect.id;
+  const existingIds = new Set(group.effects.map((candidate) => candidate.id));
+
+  while (existingIds.has(candidateId)) {
+    index += 1;
+    candidateId = `${effect.id}_${index}`;
+  }
+
+  return {
+    ...effect,
+    id: candidateId,
+  };
 }

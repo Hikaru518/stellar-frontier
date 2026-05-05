@@ -4,6 +4,7 @@ import type {
   CallNode,
   CheckNode,
   Condition,
+  Effect,
   EventGraph,
   EventNode,
   LogOnlyNode,
@@ -17,7 +18,7 @@ import type { EventDraftEnvelope, EventDraftWorkingCallTemplate, EventEditorStep
 import { createDefaultNewDraftEnvelope } from "./draftEnvelope";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
 import { triggerCapabilities } from "./capabilityCatalog";
-import { createDefaultCallTemplateShell, createDefaultNodeTemplate } from "./templates";
+import { createDefaultCallTemplateShell, createDefaultEffectTemplate, createDefaultNodeTemplate } from "./templates";
 
 const CREATED_AT = "2026-05-05T15:30:12.000Z";
 
@@ -792,6 +793,147 @@ describe("event authoring reducer", () => {
         expect.objectContaining({ code: "missing_edge_target", targetNodeId: "end" }),
       ]),
     );
+  });
+
+  it("adds, updates, and removes effect groups and effects without mutating the original draft", () => {
+    const draft = createDraft();
+    const effect = createDefaultEffectTemplate({ type: "set_world_flag", effectId: "mark_bridge_ready" });
+
+    const withGroup = eventAuthoringReducer(draft, {
+      type: "add_effect_group",
+      groupId: "bridge_effects",
+    });
+    const renamedGroup = eventAuthoringReducer(withGroup, {
+      type: "update_effect_group",
+      groupId: "bridge_effects",
+      fields: {
+        id: "bridge_resolution_effects",
+        description: "Effects written when the bridge resolves.",
+      },
+    });
+    const withEffect = eventAuthoringReducer(renamedGroup, {
+      type: "add_effect",
+      groupId: "bridge_resolution_effects",
+      effect,
+    });
+    const updatedEffect = eventAuthoringReducer(withEffect, {
+      type: "update_effect",
+      groupId: "bridge_resolution_effects",
+      effectId: "mark_bridge_ready",
+      fields: {
+        id: "mark_bridge_crossed",
+        params: { flag_key: "bridge_crossed", value: true },
+        failure_policy: "skip_group",
+        record_policy: {
+          write_event_log: true,
+          write_world_history: true,
+          history_key_template: "bridge:{event_id}",
+        },
+        handler_type: "custom_effect",
+      } satisfies Partial<Effect>,
+    });
+    const withoutEffect = eventAuthoringReducer(updatedEffect, {
+      type: "remove_effect",
+      groupId: "bridge_resolution_effects",
+      effectId: "mark_bridge_crossed",
+    });
+    const withoutGroup = eventAuthoringReducer(withoutEffect, {
+      type: "remove_effect_group",
+      groupId: "bridge_resolution_effects",
+    });
+
+    expect(withGroup.working_definition.effect_groups).toEqual([{ id: "bridge_effects", description: "", effects: [] }]);
+    expect(renamedGroup.working_definition.effect_groups?.[0]).toMatchObject({
+      id: "bridge_resolution_effects",
+      description: "Effects written when the bridge resolves.",
+    });
+    expect(updatedEffect.working_definition.effect_groups?.[0]?.effects[0]).toMatchObject({
+      id: "mark_bridge_crossed",
+      type: "set_world_flag",
+      params: { flag_key: "bridge_crossed", value: true },
+      failure_policy: "skip_group",
+      record_policy: {
+        write_event_log: true,
+        write_world_history: true,
+        history_key_template: "bridge:{event_id}",
+      },
+      handler_type: "custom_effect",
+    });
+    expect(withoutEffect.working_definition.effect_groups?.[0]?.effects).toEqual([]);
+    expect(withoutGroup.working_definition.effect_groups).toEqual([]);
+    expect(draft.working_definition.effect_groups).toBeUndefined();
+  });
+
+  it("adds, updates, and removes log templates without mutating the original draft", () => {
+    const draft = createDraft();
+
+    const withLog = eventAuthoringReducer(draft, {
+      type: "add_log_template",
+      logTemplateId: "bridge_log",
+    });
+    const updated = eventAuthoringReducer(withLog, {
+      type: "update_log_template",
+      logTemplateId: "bridge_log",
+      fields: {
+        id: "bridge_resolved_log",
+        summary: "The bridge route is resolved.",
+        importance: "major",
+        visibility: "hidden_until_resolved",
+      },
+    });
+    const removed = eventAuthoringReducer(updated, {
+      type: "remove_log_template",
+      logTemplateId: "bridge_resolved_log",
+    });
+
+    expect(withLog.working_definition.log_templates).toEqual(
+      expect.arrayContaining([
+        {
+          id: "bridge_log",
+          summary: "TODO event log summary.",
+          importance: "normal",
+          visibility: "player_visible",
+        },
+      ]),
+    );
+    expect(updated.working_definition.log_templates).toEqual(
+      expect.arrayContaining([
+        {
+          id: "bridge_resolved_log",
+          summary: "The bridge route is resolved.",
+          importance: "major",
+          visibility: "hidden_until_resolved",
+        },
+      ]),
+    );
+    expect(removed.working_definition.log_templates?.some((template) => template.id === "bridge_resolved_log")).toBe(false);
+    expect(draft.working_definition.log_templates?.some((template) => template.id === "bridge_log")).toBe(false);
+  });
+
+  it("can update node effect/history fields without moving the editor out of the Effects step", () => {
+    const draft = createDraft({
+      editor_state: {
+        active_step: "effects",
+        selection: { step: "effects" },
+        collapsed_sections: [],
+      },
+    });
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "update_end_node",
+      nodeId: "end",
+      preserveEditorState: true,
+      fields: {
+        final_effect_refs: ["bridge_effects"],
+        history_writes: [{ key_template: "bridge:{crew_id}", scope: "crew_tile", value: true }],
+      },
+    });
+
+    expect(getNode(updated, "end")).toMatchObject({
+      final_effect_refs: ["bridge_effects"],
+      history_writes: [{ key_template: "bridge:{crew_id}", scope: "crew_tile", value: true }],
+    });
+    expect(updated.editor_state).toEqual(draft.editor_state);
   });
 });
 

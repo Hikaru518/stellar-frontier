@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { conditionHandlerOptions } from "./capabilityCatalog";
+import { conditionHandlerOptions, effectHandlerOptions } from "./capabilityCatalog";
 import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
 
 describe("CapabilityCatalogPanel", () => {
@@ -56,6 +56,38 @@ describe("CapabilityCatalogPanel", () => {
       type: "handler_condition",
       handler_type: conditionHandlerOptions[0]?.value ?? "TODO_HANDLER",
       params: {},
+    });
+  });
+
+  it("shows effect metadata and sends the selected effect template", () => {
+    const onInsertEffectTemplate = vi.fn();
+
+    render(<CapabilityCatalogPanel activeKind="effects" onInsertEffectTemplate={onInsertEffectTemplate} />);
+
+    const effectTemplateSelect = screen.getByLabelText("Effect template");
+    fireEvent.change(effectTemplateSelect, { target: { value: "handler_effect" } });
+    fireEvent.click(screen.getByRole("button", { name: "Insert effect template" }));
+
+    const handlerCard = screen.getByLabelText("Effect capability handler_effect");
+    expect(handlerCard).toHaveTextContent("Handler effect");
+    expect(handlerCard).toHaveTextContent("handler_effect");
+    expect(handlerCard).toHaveTextContent("Executes a registered effect handler with optional target and params.");
+    expect(handlerCard).toHaveTextContent("Required fields");
+    expect(handlerCard).toHaveTextContent("id, type, target, params, failure_policy, record_policy, handler_type");
+    expect(handlerCard).toHaveTextContent("Common use");
+    expect(handlerCard).toHaveTextContent("Use bespoke runtime effects while keeping editor choices limited to effect handlers.");
+
+    expect(onInsertEffectTemplate).toHaveBeenCalledWith({
+      id: "handler_effect",
+      type: "handler_effect",
+      target: { type: "world_flags" },
+      params: {},
+      failure_policy: "fail_event",
+      record_policy: {
+        write_event_log: false,
+        write_world_history: false,
+      },
+      handler_type: effectHandlerOptions[0]?.value ?? "TODO_HANDLER",
     });
   });
 });
