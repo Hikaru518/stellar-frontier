@@ -11,6 +11,7 @@ import type {
   EventDraftEnvelope,
   EventDraftSummary,
   EventEditorLibraryResponse,
+  PublishDraftResponse,
   SaveDraftResponse,
 } from "./types";
 
@@ -232,6 +233,98 @@ describe("EventEditorPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Draft hash conflict.");
     expect(within(basicForm).getByLabelText("Title")).toHaveValue("Local unsaved title");
     expect(screen.getByLabelText("Draft save controls")).toHaveTextContent("unsaved changes");
+  });
+
+  it("publishes a clean draft, refreshes the library, and selects the formal definition", async () => {
+    const draft = createDraftEnvelope();
+    const publishedDefinition = createDefinitionAsset("forest_bridge_choice", {
+      data: {
+        ...(createDefinitionData() as Record<string, unknown>),
+        id: "forest_bridge_choice",
+      },
+    });
+    const loadLibrary = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createLibraryResponse({
+          domains: [createDomainSummary("forest")],
+          drafts: [createDraftSummary("forest_bridge_choice_20260505_153012")],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createLibraryResponse({
+          definitions: [publishedDefinition],
+          domains: [createDomainSummary("forest")],
+          drafts: [],
+          schemas: createSchemas(),
+        }),
+      );
+    const loadDraftRequest = vi.fn(async (): Promise<EventDraftEnvelope> => draft);
+    const publishDraftRequest = vi.fn(async (): Promise<PublishDraftResponse> => ({
+      published: true,
+      written_files: ["content/events/definitions/forest.json", "content/events/call_templates/forest.json"],
+      archived_draft_path: "content/events/drafts/archive/forest_bridge_choice_20260505_153012.json",
+      generated: {
+        definition: draft.working_definition,
+        call_templates: draft.working_call_templates,
+      },
+      issues: [],
+    }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} loadDraftRequest={loadDraftRequest} publishDraftRequest={publishDraftRequest} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open draft forest_bridge_choice_20260505_153012" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish Draft" }));
+
+    await waitFor(() => {
+      expect(publishDraftRequest).toHaveBeenCalledWith(expect.objectContaining({ draft_id: "forest_bridge_choice_20260505_153012" }));
+      expect(loadLibrary).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByRole("heading", { name: "Event Authoring Workspace" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Selection summary")).toHaveTextContent("forest_bridge_choice");
+  });
+
+  it("keeps the draft open and shows grouped issues when publish validation fails", async () => {
+    const draft = createDraftEnvelope();
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        domains: [createDomainSummary("forest")],
+        drafts: [createDraftSummary("forest_bridge_choice_20260505_153012")],
+      }),
+    );
+    const loadDraftRequest = vi.fn(async (): Promise<EventDraftEnvelope> => draft);
+    const publishDraftRequest = vi.fn(async (): Promise<PublishDraftResponse> => ({
+      published: false,
+      written_files: [],
+      generated: {
+        definition: draft.working_definition,
+        call_templates: draft.working_call_templates,
+      },
+      issues: [
+        {
+          severity: "error",
+          code: "unknown_effect_ref",
+          message: "Missing effect group.",
+          json_path: "/event_definitions/0/event_graph/nodes/0/options/0/effect_refs/0",
+          editor_location: {
+            step: "graph",
+            node_id: "call",
+            option_id: "ack",
+          },
+        },
+      ],
+    }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} loadDraftRequest={loadDraftRequest} publishDraftRequest={publishDraftRequest} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open draft forest_bridge_choice_20260505_153012" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish Draft" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Publish validation failed.");
+    expect(screen.getByRole("heading", { name: "Event Authoring Workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Graph validation issues" })).toHaveTextContent("unknown_effect_ref");
   });
 
   it("creates a domain and refreshes library summaries", async () => {

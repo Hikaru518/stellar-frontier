@@ -32,6 +32,7 @@ describe("EventAuthoringWorkspace", () => {
       expect.objectContaining({
         editor_state: expect.objectContaining({ active_step: "graph", selection: { step: "graph" } }),
       }),
+      { markDirty: false },
     );
     expect(within(stepNav).getByRole("button", { name: "Graph" })).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("heading", { name: "Graph" })).toBeInTheDocument();
@@ -149,6 +150,7 @@ describe("EventAuthoringWorkspace", () => {
           selection: expect.objectContaining({ nodeId: "call", optionId: "ack" }),
         }),
       }),
+      { markDirty: false },
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
@@ -165,7 +167,7 @@ function WorkspaceHarness({
   onValidateDraft,
 }: {
   draft: EventDraftEnvelope;
-  onDraftChange: (draft: EventDraftEnvelope) => void;
+  onDraftChange: (draft: EventDraftEnvelope, options?: { markDirty?: boolean }) => void;
   onValidateDraft?: Parameters<typeof EventAuthoringWorkspace>[0]["onValidateDraft"];
 }) {
   const [currentDraft, setCurrentDraft] = useState(draft);
@@ -173,9 +175,9 @@ function WorkspaceHarness({
   return (
     <EventAuthoringWorkspace
       draft={currentDraft}
-      onDraftChange={(nextDraft) => {
+      onDraftChange={(nextDraft, options) => {
         setCurrentDraft(nextDraft);
-        onDraftChange(nextDraft);
+        onDraftChange(nextDraft, options);
       }}
       onValidateDraft={onValidateDraft}
     />

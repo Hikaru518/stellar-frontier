@@ -1429,6 +1429,22 @@ p {
   padding: 9px;
 }
 
+.publish-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px dashed #b45b13;
+  background: rgba(255, 255, 255, 0.28);
+  padding: 9px;
+}
+
+.publish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .event-validation-toolbar,
 .validation-summary-tags {
   display: flex;

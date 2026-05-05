@@ -6,6 +6,7 @@ import {
   HELPER_START_COMMAND,
   loadDraft,
   loadEventEditorLibrary,
+  publishDraft,
   saveDraft,
   validateDraft,
 } from "./apiClient";
@@ -22,6 +23,7 @@ import type {
   EventDraftEnvelope,
   EventEditorIssue,
   EventEditorLibraryResponse,
+  PublishDraftResponse,
   SaveDraftResponse,
   ValidateDraftResponse,
 } from "./types";
@@ -32,6 +34,7 @@ type LoadDraftRequestHandler = (draftId: string) => Promise<EventDraftEnvelope>;
 type CreateDomainRequestHandler = (domainId: string) => Promise<CreateDomainResponse>;
 type ValidateDraftRequestHandler = (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
 type SaveDraftRequestHandler = (draft: EventDraftEnvelope, expectedDraftHash: string | null) => Promise<SaveDraftResponse>;
+type PublishDraftRequestHandler = (draft: EventDraftEnvelope) => Promise<PublishDraftResponse>;
 
 interface EventEditorPageProps {
   loadLibrary?: LoadLibrary;
@@ -40,6 +43,7 @@ interface EventEditorPageProps {
   createDomainRequest?: CreateDomainRequestHandler;
   validateDraftRequest?: ValidateDraftRequestHandler;
   saveDraftRequest?: SaveDraftRequestHandler;
+  publishDraftRequest?: PublishDraftRequestHandler;
 }
 
 type InspectorTab = "schema" | "graph";
@@ -56,6 +60,7 @@ export default function EventEditorPage({
   createDomainRequest = defaultCreateDomainRequest,
   validateDraftRequest = defaultValidateDraftRequest,
   saveDraftRequest = defaultSaveDraftRequest,
+  publishDraftRequest = defaultPublishDraftRequest,
 }: EventEditorPageProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [library, setLibrary] = useState<EventEditorLibraryResponse | null>(null);
@@ -71,6 +76,12 @@ export default function EventEditorPage({
     errorMessage: string | null;
     issues: EventEditorIssue[];
   }>({ status: "idle", errorMessage: null, issues: [] });
+  const [publishState, setPublishState] = useState<{
+    status: "idle" | "publishing" | "published" | "error";
+    errorMessage: string | null;
+    issues: EventEditorIssue[];
+    result: PublishDraftResponse | null;
+  }>({ status: "idle", errorMessage: null, issues: [], result: null });
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("schema");
   const [browserPaneState, setBrowserPaneState] = useState(loadBrowserPaneState);
 
@@ -196,8 +207,13 @@ export default function EventEditorPage({
               isSaving={saveState.status === "saving"}
               saveErrorMessage={saveState.errorMessage}
               saveIssues={saveState.issues}
+              isPublishing={publishState.status === "publishing"}
+              publishErrorMessage={publishState.errorMessage}
+              publishIssues={publishState.issues}
+              publishResult={publishState.result}
               onDraftChange={handleActiveDraftChange}
               onSaveDraft={handleSaveActiveDraft}
+              onPublishDraft={handlePublishActiveDraft}
               onValidateDraft={validateDraftRequest}
             />
           ) : activeAsset ? (
@@ -229,6 +245,7 @@ export default function EventEditorPage({
     setActiveDraft(null);
     setIsActiveDraftDirty(false);
     setSaveState({ status: "idle", errorMessage: null, issues: [] });
+    setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
     setInspectorTab("schema");
   }
 
@@ -253,6 +270,7 @@ export default function EventEditorPage({
       setActiveDraft(response.draft);
       setIsActiveDraftDirty(false);
       setSaveState({ status: "idle", errorMessage: null, issues: [] });
+      setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
       setActiveAsset(null);
       await refreshLibraryAfterAction({ keepDraft: true });
     } catch (nextError: unknown) {
@@ -272,6 +290,7 @@ export default function EventEditorPage({
       setActiveDraft(draft);
       setIsActiveDraftDirty(false);
       setSaveState({ status: "idle", errorMessage: null, issues: [] });
+      setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
       setActiveAsset(null);
     } catch (nextError: unknown) {
       setActionError(toError(nextError));
@@ -305,14 +324,15 @@ export default function EventEditorPage({
     });
   }
 
-  function handleActiveDraftChange(nextDraft: EventDraftEnvelope): void {
+  function handleActiveDraftChange(nextDraft: EventDraftEnvelope, options: { markDirty?: boolean } = {}): void {
     setActiveDraft(nextDraft);
-    setIsActiveDraftDirty(true);
+    setIsActiveDraftDirty((current) => (options.markDirty === false ? current : true));
     setSaveState((current) => ({
       status: current.status === "saving" ? "saving" : "idle",
       errorMessage: null,
       issues: [],
     }));
+    setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
   }
 
   async function handleSaveActiveDraft(): Promise<void> {
@@ -346,6 +366,44 @@ export default function EventEditorPage({
         issues: [],
       });
       setIsActiveDraftDirty(true);
+    }
+  }
+
+  async function handlePublishActiveDraft(): Promise<void> {
+    if (!activeDraft || isActiveDraftDirty) {
+      return;
+    }
+
+    setPublishState({ status: "publishing", errorMessage: null, issues: [], result: null });
+    setActionError(null);
+
+    try {
+      const response = await publishDraftRequest(activeDraft);
+      if (!response.published) {
+        setPublishState({
+          status: "error",
+          errorMessage: "Publish validation failed.",
+          issues: response.issues ?? [],
+          result: response,
+        });
+        return;
+      }
+
+      const nextLibrary = normalizeEventEditorLibrary(await loadLibrary());
+      const assets = getBrowserAssets(nextLibrary);
+      setLibrary(nextLibrary);
+      setActiveDraft(null);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "idle", errorMessage: null, issues: [] });
+      setPublishState({ status: "published", errorMessage: null, issues: response.issues ?? [], result: response });
+      setActiveAsset(assets.find((asset) => asset.asset_type === "event_definition" && asset.id === activeDraft.target.definition_id) ?? assets[0] ?? null);
+    } catch (nextError: unknown) {
+      setPublishState({
+        status: "error",
+        errorMessage: toError(nextError).message,
+        issues: [],
+        result: null,
+      });
     }
   }
 
@@ -617,4 +675,24 @@ function defaultValidateDraftRequest(draft: EventDraftEnvelope): Promise<Validat
 
 function defaultSaveDraftRequest(draft: EventDraftEnvelope, expectedDraftHash: string | null): Promise<SaveDraftResponse> {
   return saveDraft({ draftId: draft.draft_id, draft, expectedDraftHash });
+}
+
+function defaultPublishDraftRequest(draft: EventDraftEnvelope): Promise<PublishDraftResponse> {
+  return publishDraft({
+    draftId: draft.draft_id,
+    expectedDraftHash: draft.hashes.draft,
+    expectedSourceHashes: expectedSourceHashesForPublish(draft),
+  });
+}
+
+function expectedSourceHashesForPublish(draft: EventDraftEnvelope): Record<string, string | null> | undefined {
+  if (draft.mode !== "edit_existing" || !draft.source) {
+    return undefined;
+  }
+
+  return {
+    [draft.source.definition_file_path]: draft.hashes.source_definition_file,
+    [draft.source.call_template_file_path]: draft.hashes.source_call_template_file,
+    [draft.source.manifest_file_path]: draft.hashes.source_manifest,
+  };
 }

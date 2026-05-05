@@ -1,7 +1,7 @@
 ---
 plan: "event-editor-editing-version"
 started: "2026-05-05 09:27"
-status: "in_progress"
+status: "completed"
 branch: "feature/event-editor-editing-version"
 source:
   implementation_plan: "docs/plans/2026-05-04-22-17/event-editor-editing-version-implementation-plan.md"
@@ -14,11 +14,11 @@ source:
 
 ### 完成内容与验收要点
 
-进行中。
+Event Editor 编辑版 MVP 已完成：runtime 事件读取改为 manifest 驱动；editor helper 支持 domain、draft、validate、save、publish；前端提供 Draft Browser、结构化五步 authoring workspace、Graph Preview、Validation Panel、Raw JSON Viewer、Save Draft 和 Publish Draft 流程。
 
 ### 实现与设计的差异
 
-进行中。
+步骤导航和 validation issue jump 会更新 draft 的 `editor_state` 视图状态，但不会标记为需要保存的内容改动；这样策划可以从已保存 draft 进入 Review 并直接发布，不会被单纯导航阻塞。
 
 ## 任务状态
 
@@ -50,7 +50,7 @@ source:
 | 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | completed | 1 |
 | 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | completed | 1 |
 | 26 | TASK-026 | 整合 Save Draft UI | completed | 1 |
-| 27 | TASK-027 | 整合 Publish Panel UI | pending | 0 |
+| 27 | TASK-027 | 整合 Publish Panel UI | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -339,3 +339,12 @@ source:
 - developer summary: EventAuthoringWorkspace header 新增 Save Draft 控制区，显示 saved / unsaved changes / saving 状态；EventEditorPage 负责 dirty state、`saveDraft` API 调用、expected draft hash、保存成功后更新 active draft hash 并刷新 library；保存失败保留内存 draft 并在 workspace 展示错误和 helper issues。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（46 files / 246 tests）。
 - browser validation: browser-use 因 `No active Codex browser pane available` 无法恢复，改用 Playwright 本地浏览器 fallback 打开 `http://localhost:5175/`；创建临时 draft `codex_task026_semantic_check_1777974502996_20260505_094823`，编辑 Basic title 后确认 dirty 状态，点击 Save Draft 后确认状态变为 saved 且 metadata hash 保持可见；刷新页面后从 Draft Browser 重新打开该 draft，确认 title 为 `Task 026 saved title`；浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-027: 整合 Publish Panel UI
+- 状态: completed
+- 开始时间: 2026-05-05 17:50
+- 完成时间: 2026-05-05 18:02
+- 尝试次数: 1
+- developer summary: Review step 新增 Publish Panel，展示将发布的 definition/domain/status/call template 摘要、dirty draft 保存提示、publish 按钮、发布错误和 helper issues；EventEditorPage 接入 `publishDraft` API、publish state、发布成功后的 library refresh 和正式 definition selection；步骤导航与 issue jump 改为 editor-only 状态变更，不再把纯导航标记为会阻塞 publish 的 dirty 内容改动。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（47 files / 251 tests）；`npm run validate:content` passed。
+- browser validation: browser-use 因 `No active Codex browser pane available` 无法恢复，改用 Playwright 本地浏览器 fallback 打开 `http://localhost:5175/`；通过 helper 创建并保存临时合法 draft `codex_task027_semantic_check_1777975135712_20260505_095855`，在 UI 中打开后切到 Review，确认 `Publish Draft` 按钮可用；点击发布后 workspace 关闭、正式 definition `codex_task027_semantic_check_1777975135712` 被选中、active draft 列表中不再出现该 draft，浏览器 console error 为空。验证后已清理写入的正式 content 与 archived draft。

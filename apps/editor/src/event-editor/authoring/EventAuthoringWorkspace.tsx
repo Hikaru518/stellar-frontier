@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import type { Effect, EffectGroup } from "../../../../pc-client/src/events/types";
-import type { EventDraftEnvelope, EventEditorIssue, EventEditorStep, ValidateDraftResponse } from "../types";
+import type { EventDraftEnvelope, EventEditorIssue, EventEditorStep, PublishDraftResponse, ValidateDraftResponse } from "../types";
 import BasicStep from "./BasicStep";
 import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
 import EffectsStep from "./EffectsStep";
 import EventValidationPanel from "./EventValidationPanel";
 import GraphStructureEditor from "./GraphStructureEditor";
+import PublishPanel from "./PublishPanel";
 import StructuredJsonViewer from "./StructuredJsonViewer";
 import TriggerStep from "./TriggerStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
@@ -19,8 +20,13 @@ interface EventAuthoringWorkspaceProps {
   isSaving?: boolean;
   saveErrorMessage?: string | null;
   saveIssues?: EventEditorIssue[];
-  onDraftChange: (draft: EventDraftEnvelope) => void;
+  isPublishing?: boolean;
+  publishErrorMessage?: string | null;
+  publishIssues?: EventEditorIssue[];
+  publishResult?: PublishDraftResponse | null;
+  onDraftChange: (draft: EventDraftEnvelope, options?: { markDirty?: boolean }) => void;
   onSaveDraft?: () => void;
+  onPublishDraft?: () => void;
   onValidateDraft?: (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
 }
 
@@ -58,8 +64,13 @@ export default function EventAuthoringWorkspace({
   isSaving = false,
   saveErrorMessage = null,
   saveIssues = [],
+  isPublishing = false,
+  publishErrorMessage = null,
+  publishIssues = [],
+  publishResult = null,
   onDraftChange,
   onSaveDraft,
+  onPublishDraft,
   onValidateDraft,
 }: EventAuthoringWorkspaceProps) {
   const activeStep = resolveActiveStep(draft.editor_state.active_step);
@@ -178,8 +189,14 @@ export default function EventAuthoringWorkspace({
               status={validationStatus}
               errorMessage={validationError}
               focusedJsonPath={focusedJsonPath}
+              isDirty={isDirty}
+              isPublishing={isPublishing}
+              publishErrorMessage={publishErrorMessage}
+              publishIssues={publishIssues}
+              publishResult={publishResult}
               onValidate={onValidateDraft ? runValidation : undefined}
               onIssueJump={jumpToIssue}
+              onPublish={onPublishDraft}
             />
           ) : (
             <StepPlaceholder step={activeStepConfig} draft={draft} />
@@ -260,6 +277,7 @@ export default function EventAuthoringWorkspace({
         step,
         selection: { step },
       }),
+      { markDirty: false },
     );
   }
 
@@ -294,6 +312,7 @@ export default function EventAuthoringWorkspace({
         location: issue.editor_location,
         jsonPath: issue.json_path,
       }),
+      { markDirty: false },
     );
   }
 }
@@ -328,16 +347,28 @@ function ReviewStep({
   status,
   errorMessage,
   focusedJsonPath,
+  isDirty,
+  isPublishing,
+  publishErrorMessage,
+  publishIssues,
+  publishResult,
   onValidate,
   onIssueJump,
+  onPublish,
 }: {
   draft: EventDraftEnvelope;
   issues: EventEditorIssue[];
   status: "idle" | "running" | "complete" | "error";
   errorMessage: string | null;
   focusedJsonPath: string | null;
+  isDirty: boolean;
+  isPublishing: boolean;
+  publishErrorMessage: string | null;
+  publishIssues: EventEditorIssue[];
+  publishResult: PublishDraftResponse | null;
   onValidate?: () => void;
   onIssueJump: (issue: EventEditorIssue) => void;
+  onPublish?: () => void;
 }) {
   return (
     <div className="event-review-step" aria-label="Review step">
@@ -364,6 +395,16 @@ function ReviewStep({
         status={status}
         errorMessage={errorMessage}
         onValidate={onValidate}
+        onIssueJump={onIssueJump}
+      />
+      <PublishPanel
+        draft={draft}
+        isDirty={isDirty}
+        isPublishing={isPublishing}
+        errorMessage={publishErrorMessage}
+        result={publishResult}
+        issues={publishIssues}
+        onPublish={onPublish}
         onIssueJump={onIssueJump}
       />
       <StructuredJsonViewer draft={draft} focusPath={focusedJsonPath} />
