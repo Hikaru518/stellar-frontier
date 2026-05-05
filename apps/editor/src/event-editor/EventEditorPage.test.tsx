@@ -11,6 +11,7 @@ import type {
   EventDraftEnvelope,
   EventDraftSummary,
   EventEditorLibraryResponse,
+  SaveDraftResponse,
 } from "./types";
 
 describe("EventEditorPage", () => {
@@ -151,6 +152,86 @@ describe("EventEditorPage", () => {
     expect(within(stepNav).getByRole("button", { name: "Review" })).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
     expect(screen.getByLabelText("Draft metadata")).toHaveTextContent("review");
+  });
+
+  it("saves dirty drafts, updates the draft hash, and refreshes the draft browser data", async () => {
+    const savedDraft = createDraftEnvelope({
+      working_definition: {
+        ...createDraftEnvelope().working_definition,
+        title: "Revised bridge choice",
+      },
+      hashes: {
+        ...createDraftEnvelope().hashes,
+        draft: "b".repeat(64),
+      },
+    });
+    const loadLibrary = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createLibraryResponse({
+          domains: [createDomainSummary("forest")],
+          drafts: [createDraftSummary("forest_bridge_choice_20260505_153012")],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createLibraryResponse({
+          domains: [createDomainSummary("forest")],
+          drafts: [createDraftSummary("forest_bridge_choice_20260505_153012", { draft_hash: "b".repeat(64) })],
+        }),
+      );
+    const loadDraftRequest = vi.fn(async (): Promise<EventDraftEnvelope> => createDraftEnvelope());
+    const saveDraftRequest = vi.fn(async (): Promise<SaveDraftResponse> => ({
+      saved: true,
+      file_path: "content/events/drafts/forest_bridge_choice_20260505_153012.json",
+      draft_hash: "b".repeat(64),
+      issues: [],
+      draft: savedDraft,
+    }));
+
+    render(<EventEditorPage loadLibrary={loadLibrary} loadDraftRequest={loadDraftRequest} saveDraftRequest={saveDraftRequest} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open draft forest_bridge_choice_20260505_153012" }));
+    const basicForm = await screen.findByRole("form", { name: "Basic event fields" });
+    fireEvent.change(within(basicForm).getByLabelText("Title"), { target: { value: "Revised bridge choice" } });
+
+    expect(screen.getByLabelText("Draft save controls")).toHaveTextContent("unsaved changes");
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    await waitFor(() => {
+      expect(saveDraftRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          working_definition: expect.objectContaining({ title: "Revised bridge choice" }),
+        }),
+        "a".repeat(64),
+      );
+      expect(loadLibrary).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByLabelText("Draft save controls")).toHaveTextContent("saved");
+    expect(screen.getByLabelText("Draft metadata")).toHaveTextContent("bbbbbbbb");
+  });
+
+  it("keeps local edits visible when Save Draft fails", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        domains: [createDomainSummary("forest")],
+        drafts: [createDraftSummary("forest_bridge_choice_20260505_153012")],
+      }),
+    );
+    const loadDraftRequest = vi.fn(async (): Promise<EventDraftEnvelope> => createDraftEnvelope());
+    const saveDraftRequest = vi.fn(async (): Promise<SaveDraftResponse> => {
+      throw new Error("Draft hash conflict.");
+    });
+
+    render(<EventEditorPage loadLibrary={loadLibrary} loadDraftRequest={loadDraftRequest} saveDraftRequest={saveDraftRequest} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open draft forest_bridge_choice_20260505_153012" }));
+    const basicForm = await screen.findByRole("form", { name: "Basic event fields" });
+    fireEvent.change(within(basicForm).getByLabelText("Title"), { target: { value: "Local unsaved title" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Draft hash conflict.");
+    expect(within(basicForm).getByLabelText("Title")).toHaveValue("Local unsaved title");
+    expect(screen.getByLabelText("Draft save controls")).toHaveTextContent("unsaved changes");
   });
 
   it("creates a domain and refreshes library summaries", async () => {

@@ -49,7 +49,7 @@ source:
 | 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | completed | 1 |
 | 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | completed | 1 |
 | 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | completed | 1 |
-| 26 | TASK-026 | 整合 Save Draft UI | pending | 0 |
+| 26 | TASK-026 | 整合 Save Draft UI | completed | 1 |
 | 27 | TASK-027 | 整合 Publish Panel UI | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -330,3 +330,12 @@ source:
 - developer summary: 新增 `StructuredJsonViewer`，Review step 现在展示只读分区 Raw JSON；默认分区包括 Draft Envelope、Event Definition、Trigger、Graph Nodes、Effect Groups、Log Templates、Call Templates；大 section 默认折叠并显示数量摘要；搜索命中自动展开对应 section；section 和字段均提供 Copy path；`jsonPath` helper 增加正式 publish issue path 到 draft viewer path 的映射，使 issue JSON path 能定位 `/working_definition/**` 或 `/working_call_templates/**`。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（46 files / 243 tests）。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task025_semantic_check_1777973831448_20260505_093711` 并通过 helper 保存带 graph/effect/call template 的验证 fixture；确认 Review step 显示 Raw JSON Viewer 的 7 个分区；Graph Nodes 默认折叠；搜索 `bridge_effects` 自动展开 Effect Groups 并显示命中；点击 section Copy path 入口时发现未聚焦页面会触发浏览器 Clipboard `NotAllowedError`，已修复为静默失败且保留可见 path；点击 validation issue 后跳转 Graph step，返回 Review 后 Graph Nodes 自动展开并定位 `/working_definition/event_graph/nodes/0/options/0/effect_refs/0`。验证后已删除临时 draft 文件。
+
+### TASK-026: 整合 Save Draft UI
+- 状态: completed
+- 开始时间: 2026-05-05 17:42
+- 完成时间: 2026-05-05 17:49
+- 尝试次数: 1
+- developer summary: EventAuthoringWorkspace header 新增 Save Draft 控制区，显示 saved / unsaved changes / saving 状态；EventEditorPage 负责 dirty state、`saveDraft` API 调用、expected draft hash、保存成功后更新 active draft hash 并刷新 library；保存失败保留内存 draft 并在 workspace 展示错误和 helper issues。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（46 files / 246 tests）。
+- browser validation: browser-use 因 `No active Codex browser pane available` 无法恢复，改用 Playwright 本地浏览器 fallback 打开 `http://localhost:5175/`；创建临时 draft `codex_task026_semantic_check_1777974502996_20260505_094823`，编辑 Basic title 后确认 dirty 状态，点击 Save Draft 后确认状态变为 saved 且 metadata hash 保持可见；刷新页面后从 Draft Browser 重新打开该 draft，确认 title 为 `Task 026 saved title`；浏览器 console error 为空。验证后已删除临时 draft 文件。

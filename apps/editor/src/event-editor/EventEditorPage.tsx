@@ -6,6 +6,7 @@ import {
   HELPER_START_COMMAND,
   loadDraft,
   loadEventEditorLibrary,
+  saveDraft,
   validateDraft,
 } from "./apiClient";
 import DraftBrowser from "./authoring/DraftBrowser";
@@ -19,7 +20,9 @@ import type {
   CreateDraftResponse,
   EditorEventAsset,
   EventDraftEnvelope,
+  EventEditorIssue,
   EventEditorLibraryResponse,
+  SaveDraftResponse,
   ValidateDraftResponse,
 } from "./types";
 
@@ -28,6 +31,7 @@ type CreateDraftRequestHandler = (request: CreateDraftRequest) => Promise<Create
 type LoadDraftRequestHandler = (draftId: string) => Promise<EventDraftEnvelope>;
 type CreateDomainRequestHandler = (domainId: string) => Promise<CreateDomainResponse>;
 type ValidateDraftRequestHandler = (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
+type SaveDraftRequestHandler = (draft: EventDraftEnvelope, expectedDraftHash: string | null) => Promise<SaveDraftResponse>;
 
 interface EventEditorPageProps {
   loadLibrary?: LoadLibrary;
@@ -35,6 +39,7 @@ interface EventEditorPageProps {
   loadDraftRequest?: LoadDraftRequestHandler;
   createDomainRequest?: CreateDomainRequestHandler;
   validateDraftRequest?: ValidateDraftRequestHandler;
+  saveDraftRequest?: SaveDraftRequestHandler;
 }
 
 type InspectorTab = "schema" | "graph";
@@ -50,6 +55,7 @@ export default function EventEditorPage({
   loadDraftRequest = defaultLoadDraftRequest,
   createDomainRequest = defaultCreateDomainRequest,
   validateDraftRequest = defaultValidateDraftRequest,
+  saveDraftRequest = defaultSaveDraftRequest,
 }: EventEditorPageProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [library, setLibrary] = useState<EventEditorLibraryResponse | null>(null);
@@ -59,6 +65,12 @@ export default function EventEditorPage({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [activeAsset, setActiveAsset] = useState<EditorEventAsset<unknown> | null>(null);
   const [activeDraft, setActiveDraft] = useState<EventDraftEnvelope | null>(null);
+  const [isActiveDraftDirty, setIsActiveDraftDirty] = useState(false);
+  const [saveState, setSaveState] = useState<{
+    status: "idle" | "saving" | "saved" | "error";
+    errorMessage: string | null;
+    issues: EventEditorIssue[];
+  }>({ status: "idle", errorMessage: null, issues: [] });
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("schema");
   const [browserPaneState, setBrowserPaneState] = useState(loadBrowserPaneState);
 
@@ -178,7 +190,16 @@ export default function EventEditorPage({
 
         <div className="event-detail-pane" aria-label="Selected event workspace">
           {activeDraft ? (
-            <EventAuthoringWorkspace draft={activeDraft} onDraftChange={setActiveDraft} onValidateDraft={validateDraftRequest} />
+            <EventAuthoringWorkspace
+              draft={activeDraft}
+              isDirty={isActiveDraftDirty}
+              isSaving={saveState.status === "saving"}
+              saveErrorMessage={saveState.errorMessage}
+              saveIssues={saveState.issues}
+              onDraftChange={handleActiveDraftChange}
+              onSaveDraft={handleSaveActiveDraft}
+              onValidateDraft={validateDraftRequest}
+            />
           ) : activeAsset ? (
             <>
               <AssetHeaderStrip asset={activeAsset} />
@@ -206,6 +227,8 @@ export default function EventEditorPage({
     setLibrary(normalizedLibrary);
     setActiveAsset(assets[0] ?? null);
     setActiveDraft(null);
+    setIsActiveDraftDirty(false);
+    setSaveState({ status: "idle", errorMessage: null, issues: [] });
     setInspectorTab("schema");
   }
 
@@ -228,6 +251,8 @@ export default function EventEditorPage({
     try {
       const response = await createDraftRequest(request);
       setActiveDraft(response.draft);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "idle", errorMessage: null, issues: [] });
       setActiveAsset(null);
       await refreshLibraryAfterAction({ keepDraft: true });
     } catch (nextError: unknown) {
@@ -245,6 +270,8 @@ export default function EventEditorPage({
     try {
       const draft = await loadDraftRequest(draftId);
       setActiveDraft(draft);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "idle", errorMessage: null, issues: [] });
       setActiveAsset(null);
     } catch (nextError: unknown) {
       setActionError(toError(nextError));
@@ -276,6 +303,50 @@ export default function EventEditorPage({
       definition_id: asset.id,
       domain: asset.domain,
     });
+  }
+
+  function handleActiveDraftChange(nextDraft: EventDraftEnvelope): void {
+    setActiveDraft(nextDraft);
+    setIsActiveDraftDirty(true);
+    setSaveState((current) => ({
+      status: current.status === "saving" ? "saving" : "idle",
+      errorMessage: null,
+      issues: [],
+    }));
+  }
+
+  async function handleSaveActiveDraft(): Promise<void> {
+    if (!activeDraft) {
+      return;
+    }
+
+    setSaveState({ status: "saving", errorMessage: null, issues: [] });
+    setActionError(null);
+
+    try {
+      const response = await saveDraftRequest(activeDraft, activeDraft.hashes.draft);
+      if (!response.saved) {
+        setSaveState({
+          status: "error",
+          errorMessage: "Draft save did not complete.",
+          issues: response.issues ?? [],
+        });
+        setIsActiveDraftDirty(true);
+        return;
+      }
+
+      setActiveDraft(response.draft);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "saved", errorMessage: null, issues: response.issues ?? [] });
+      await refreshLibraryAfterAction({ keepDraft: true });
+    } catch (nextError: unknown) {
+      setSaveState({
+        status: "error",
+        errorMessage: toError(nextError).message,
+        issues: [],
+      });
+      setIsActiveDraftDirty(true);
+    }
   }
 
   function startBrowserResize(event: ReactMouseEvent<HTMLDivElement>): void {
@@ -542,4 +613,8 @@ function defaultCreateDomainRequest(domainId: string): Promise<CreateDomainRespo
 
 function defaultValidateDraftRequest(draft: EventDraftEnvelope): Promise<ValidateDraftResponse> {
   return validateDraft({ draftId: draft.draft_id, draft, level: "publish" });
+}
+
+function defaultSaveDraftRequest(draft: EventDraftEnvelope, expectedDraftHash: string | null): Promise<SaveDraftResponse> {
+  return saveDraft({ draftId: draft.draft_id, draft, expectedDraftHash });
 }

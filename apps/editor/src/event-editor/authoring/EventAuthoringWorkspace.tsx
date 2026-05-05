@@ -15,7 +15,12 @@ type AuthoringStep = Exclude<EventEditorStep, "domain">;
 
 interface EventAuthoringWorkspaceProps {
   draft: EventDraftEnvelope;
+  isDirty?: boolean;
+  isSaving?: boolean;
+  saveErrorMessage?: string | null;
+  saveIssues?: EventEditorIssue[];
   onDraftChange: (draft: EventDraftEnvelope) => void;
+  onSaveDraft?: () => void;
   onValidateDraft?: (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
 }
 
@@ -47,7 +52,16 @@ const AUTHORING_STEPS = [
   },
 ] as const satisfies readonly { id: AuthoringStep; label: string; responsibility: string }[];
 
-export default function EventAuthoringWorkspace({ draft, onDraftChange, onValidateDraft }: EventAuthoringWorkspaceProps) {
+export default function EventAuthoringWorkspace({
+  draft,
+  isDirty = false,
+  isSaving = false,
+  saveErrorMessage = null,
+  saveIssues = [],
+  onDraftChange,
+  onSaveDraft,
+  onValidateDraft,
+}: EventAuthoringWorkspaceProps) {
   const activeStep = resolveActiveStep(draft.editor_state.active_step);
   const activeStepConfig = AUTHORING_STEPS.find((step) => step.id === activeStep) ?? AUTHORING_STEPS[0];
   const isLockedTarget = draft.mode === "edit_existing";
@@ -78,9 +92,19 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
   return (
     <section className="event-authoring-workspace" aria-label="Event authoring workspace">
       <header className="event-authoring-header">
-        <div className="event-authoring-title-block">
-          <h3>Event Authoring Workspace</h3>
-          <p className="muted-text">Wizard shell for editing the draft envelope. Detailed forms arrive in later tasks.</p>
+        <div className="event-authoring-header-main">
+          <div className="event-authoring-title-block">
+            <h3>Event Authoring Workspace</h3>
+            <p className="muted-text">Wizard shell for editing the draft envelope. Save keeps this as an active draft, not runtime content.</p>
+          </div>
+          <div className="event-authoring-save-controls" aria-label="Draft save controls">
+            <span className={isSaving ? "status-tag status-warning" : isDirty ? "status-tag status-warning" : "status-tag status-success"}>
+              {isSaving ? "saving" : isDirty ? "unsaved changes" : "saved"}
+            </span>
+            <button type="button" onClick={onSaveDraft} disabled={!onSaveDraft || isSaving || !isDirty}>
+              {isSaving ? "Saving..." : "Save Draft"}
+            </button>
+          </div>
         </div>
         <dl className="event-authoring-meta" aria-label="Draft metadata">
           <MetaItem label="Draft id" value={draft.draft_id} />
@@ -91,6 +115,7 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
           <MetaItem label="Domain" value={draft.target.domain} locked={isLockedTarget} ariaLabel="Draft domain" />
           <MetaItem label="Definition id" value={draft.target.definition_id} locked={isLockedTarget} ariaLabel="Draft definition id" />
         </dl>
+        {saveErrorMessage || saveIssues.length > 0 ? <SaveFeedback errorMessage={saveErrorMessage} issues={saveIssues} /> : null}
       </header>
 
       <div className="event-authoring-shell">
@@ -271,6 +296,30 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
       }),
     );
   }
+}
+
+function SaveFeedback({ errorMessage, issues }: { errorMessage: string | null; issues: EventEditorIssue[] }) {
+  return (
+    <section className="event-save-feedback" role={errorMessage ? "alert" : undefined} aria-label="Draft save feedback">
+      {errorMessage ? <p>{errorMessage}</p> : null}
+      {issues.length > 0 ? (
+        <ul className="validation-issue-list" aria-label="Draft save issues">
+          {issues.map((issue, index) => (
+            <li key={`${issue.code}:${issue.json_path ?? index}`} className={issue.severity === "error" ? "validation-issue validation-error" : "validation-issue"}>
+              <button type="button" disabled>
+                <span className={issue.severity === "error" ? "status-tag status-error" : "status-tag status-warning"}>{issue.severity}</span>
+                <span>
+                  <strong>{issue.message}</strong>
+                  <small>{issue.code}</small>
+                  {issue.json_path ? <small>{issue.json_path}</small> : null}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
 }
 
 function ReviewStep({

@@ -65,6 +65,35 @@ describe("EventAuthoringWorkspace", () => {
     expect(screen.getByLabelText("Draft definition id")).toHaveTextContent("Locked");
   });
 
+  it("shows draft dirty state, save action, and save feedback", () => {
+    const onSaveDraft = vi.fn();
+
+    render(
+      <EventAuthoringWorkspace
+        draft={createDraftEnvelope()}
+        isDirty
+        saveErrorMessage="Draft save did not complete."
+        saveIssues={[
+          {
+            severity: "error",
+            code: "invalid_draft",
+            message: "Draft id is invalid.",
+            json_path: "/draft_id",
+          },
+        ]}
+        onDraftChange={vi.fn()}
+        onSaveDraft={onSaveDraft}
+      />,
+    );
+
+    expect(screen.getByLabelText("Draft save controls")).toHaveTextContent("unsaved changes");
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("Draft save did not complete.");
+    expect(screen.getByRole("list", { name: "Draft save issues" })).toHaveTextContent("invalid_draft");
+  });
+
   it("runs review validation and jumps node issues back to the graph editor", async () => {
     const onDraftChange = vi.fn();
     const onValidateDraft = vi.fn().mockResolvedValue({
