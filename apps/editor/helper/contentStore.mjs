@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { buildEventDomainSummaries } from "./eventManifestStore.mjs";
 import { createPathGuard } from "./pathGuard.mjs";
 
 const EVENT_ROOT = "content/events";
@@ -20,6 +21,7 @@ export async function loadEventEditorLibrary({
 } = {}) {
   const guard = createPathGuard(repoRoot, [EVENT_ROOT, SCHEMA_ROOT]);
   const manifest = await readJson(guard, MANIFEST_PATH);
+  const domains = await buildEventDomainSummaries(guard, manifest);
   const definitions = [];
   const callTemplates = [];
   const presets = [];
@@ -59,6 +61,7 @@ export async function loadEventEditorLibrary({
     presets,
     handlers,
     schemas,
+    domains,
   };
 }
 

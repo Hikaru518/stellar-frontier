@@ -25,7 +25,7 @@ source:
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
 | 1 | TASK-001 | PC Event loader 改为 manifest + glob | completed | 1 |
-| 2 | TASK-002 | 实现 Event domain manifest store | pending | 0 |
+| 2 | TASK-002 | 实现 Event domain manifest store | completed | 2 |
 | 3 | TASK-003 | 实现 Draft envelope store | pending | 0 |
 | 4 | TASK-004 | 实现 Event validation adapter | pending | 0 |
 | 5 | TASK-005 | 添加 Draft 和 Domain helper routes | pending | 0 |
@@ -64,3 +64,15 @@ source:
 - developer summary: PC structured event loader 已改为 `content/events/manifest.json` + Vite 静态 eager `import.meta.glob`；definitions、call_templates、presets 按 manifest domain 顺序加载并 flatten；测试已移除 generated manifest 依赖，覆盖 manifest 顺序、flatten 内容和 drafts 排除。
 - dispatcher validation: `cd apps/pc-client && node ../../common/scripts/install-run-rushx.js lint` passed；`cd apps/pc-client && node ../../common/scripts/install-run-rushx.js test` passed（46 files / 420 tests）；`npm run validate:content` passed；`git diff --check -- apps/pc-client/src/content/contentData.ts apps/pc-client/src/content/contentData.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 PC runtime content loader，无可交互 UI 面。
+
+### TASK-002: 实现 Event domain manifest store
+- 状态: completed
+- 开始时间: 2026-05-05 09:38
+- 完成时间: 2026-05-05 10:09
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: developer 子任务创建了 `eventManifestStore.mjs`、`eventManifestStore.test.mjs` 并更新 `contentStore`，但长时间未返回 summary；已关闭该子任务并保留工作区改动，交给下一次尝试复核/补完。
+  - 尝试 2: developer 子任务复核并补完现有改动，返回成功 summary。
+- developer summary: 实现 helper 内部 Event manifest/domain store，支持读取 manifest、domain summaries、新建空 definitions/call_templates、manifest 更新和 manifest 校验；`loadEventEditorLibrary` 现在返回 `domains`，并保留原 `definitions/call_templates/presets/handlers/schemas` 形状。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（22 files / 101 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/contentStore.mjs apps/editor/helper/contentStore.test.mjs apps/editor/helper/eventManifestStore.mjs apps/editor/helper/eventManifestStore.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改 editor helper 内部 manifest/domain 模块，无可交互 UI 面。

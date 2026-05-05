@@ -14,6 +14,19 @@ describe("contentStore", () => {
     expect(library.call_templates.length).toBeGreaterThan(0);
     expect(library.presets).toEqual(expect.any(Array));
     expect(library.handlers.length).toBeGreaterThan(0);
+    expect(library.domains[0]).toEqual(
+      expect.objectContaining({
+        id: "crash_site",
+        manifest_path: "content/events/manifest.json",
+        manifest_json_path: "/domains/0",
+        definitions_file_path: "content/events/definitions/crash_site.json",
+        call_templates_file_path: "content/events/call_templates/crash_site.json",
+        presets_file_path: null,
+        has_presets: false,
+      }),
+    );
+    expect(library.domains[0].definition_count).toBeGreaterThan(0);
+    expect(library.domains[0].call_template_count).toBeGreaterThan(0);
     expect(library.definitions[0]).toEqual(
       expect.objectContaining({
         asset_type: "event_definition",
