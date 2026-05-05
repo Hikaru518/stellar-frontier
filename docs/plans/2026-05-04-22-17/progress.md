@@ -44,7 +44,7 @@ source:
 | 18 | TASK-018 | 实现 Trigger step 与 capability insertion | completed | 3 |
 | 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | completed | 3 |
 | 20 | TASK-020 | 实现 Graph node editor 基础节点 | completed | 1 |
-| 21 | TASK-021 | 实现 Call/Check/Random graph editor | pending | 0 |
+| 21 | TASK-021 | 实现 Call/Check/Random graph editor | completed | 1 |
 | 22 | TASK-022 | 实现 Advanced node editors | pending | 0 |
 | 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | pending | 0 |
 | 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | pending | 0 |
@@ -283,3 +283,12 @@ source:
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（40 files / 216 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/GraphStructureEditor.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.test.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - dispatcher fix: browser 验证发现真实 Create Event route 会生成缺少 `event_graph` 的 draft，导致 Add node 被禁用；主线程修正为 missing graph 时允许添加第一个 node，并由 `add_node` 初始化默认 graph rules、entry 和 nodes。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task020_semantic_check_1777969002807_20260505_081642`；确认 missing `event_graph` 状态下可添加第一个 wait node，编辑 title/description/effect refs/duration/wake trigger/interrupt policy；添加 end node 并编辑 resolution/result_key/event_log_template_id；将 wait next 指向 end 后删除 end，确认 Graph Structure Health 和 Graph Preview 同时显示 `missing_terminal_node` / `missing_edge_target` warning；浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-021: 实现 Call/Check/Random graph editor
+- 状态: completed
+- 开始时间: 2026-05-05 16:21
+- 完成时间: 2026-05-05 16:37
+- 尝试次数: 1
+- developer summary: 扩展 `GraphStructureEditor` 支持 call/check/random 节点编辑；call 可编辑 speaker、urgency、delivery、expires、on_missed 和 options；check/random 可编辑 branches、conditions JSON、next/default next、effect refs、random weight/seed/store result；reducer 增加 typed update actions，并把 add node 扩展到 call/check/random，其中新增 call node 会同步创建 call template 和 `content_refs.call_template_ids`。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（41 files / 221 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/CallNodeEditor.test.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.test.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task021_semantic_check_1777970174710_20260505_083614`；确认可从 missing `event_graph` 状态添加 call node，编辑 speaker/urgency/delivery/expires，修改 `ack` option 指向缺失 node 后显示 warning；添加 `scan_bridge` option 并重命名为 `inspect_bridge`；添加 check/random node，确认 invalid conditions JSON 只显示 `aria-invalid=true` 不写入，valid JSON 后恢复；确认 check/random branch target/default target 指向缺失 node 时显示 Graph Health warning 且 draft 继续可编辑；`tab.dev.logs` 中浏览器 console error 为空。验证后已删除临时 draft 文件。

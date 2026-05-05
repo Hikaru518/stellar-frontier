@@ -1,6 +1,8 @@
 import type {
   BlockingRequirement,
   CallNode,
+  CallOption,
+  CheckNode,
   Condition,
   EndNode,
   EventEdge,
@@ -10,6 +12,7 @@ import type {
   EventNodeBase,
   EventNodeType,
   LogOnlyNode,
+  RandomNode,
   TriggerDefinition,
   TriggerType,
   WaitNode,
@@ -25,6 +28,7 @@ import { triggerCapabilities } from "./capabilityCatalog";
 import {
   createDefaultBlocking,
   createDefaultCallOptionTextVariantGroup,
+  createDefaultCallTemplateShell,
   createDefaultGraphRules,
   createDefaultNodeTemplate,
   isSafeEventId,
@@ -34,7 +38,7 @@ type BasicFieldsUpdate = Partial<Pick<EventDefinition, "title" | "summary" | "ta
 type CandidateSelectionUpdate = Partial<EventDefinition["candidate_selection"]>;
 type RepeatPolicyUpdate = Partial<EventDefinition["repeat_policy"]>;
 type TriggerProbability = TriggerDefinition["probability"];
-type EditableBasicNodeType = Extract<EventNodeType, "end" | "log_only" | "wait">;
+type EditableGraphNodeType = Extract<EventNodeType, "call" | "check" | "random" | "end" | "log_only" | "wait">;
 type NodeCommonFieldsUpdate = Partial<
   Pick<EventNodeBase, "id" | "title" | "description" | "enter_effect_refs" | "exit_effect_refs" | "auto_next_node_id">
 > & {
@@ -47,6 +51,12 @@ type LogOnlyNodeFieldsUpdate = Partial<Pick<LogOnlyNode, "event_log_template_id"
 type WaitNodeFieldsUpdate = Partial<
   Pick<WaitNode, "duration_seconds" | "wake_trigger_type" | "next_node_id" | "set_next_wakeup_at" | "interrupt_policy">
 >;
+type CallNodeFieldsUpdate = Partial<Pick<CallNode, "speaker_crew_ref" | "urgency" | "delivery" | "expires_in_seconds" | "on_missed">>;
+type CallOptionFieldsUpdate = Partial<Pick<CallOption, "requirements" | "effect_refs" | "is_default">> & {
+  next_node_id?: string;
+};
+type CheckNodeFieldsUpdate = Partial<Pick<CheckNode, "branches" | "default_next_node_id" | "evaluation_order">>;
+type RandomNodeFieldsUpdate = Partial<Pick<RandomNode, "seed_scope" | "branches" | "default_next_node_id" | "store_result_as">>;
 
 const DEFAULT_CANDIDATE_SELECTION: EventDefinition["candidate_selection"] = {
   priority: 0,
@@ -127,7 +137,7 @@ export type EventAuthoringAction =
     }
   | {
       type: "add_node";
-      nodeType: EditableBasicNodeType;
+      nodeType: EditableGraphNodeType;
       nodeId?: string;
     }
   | {
@@ -153,6 +163,27 @@ export type EventAuthoringAction =
       type: "update_wait_node";
       nodeId: string;
       fields: WaitNodeFieldsUpdate;
+    }
+  | {
+      type: "update_call_node";
+      nodeId: string;
+      fields: CallNodeFieldsUpdate;
+    }
+  | {
+      type: "update_call_option";
+      nodeId: string;
+      optionId: string;
+      fields: CallOptionFieldsUpdate;
+    }
+  | {
+      type: "update_check_node";
+      nodeId: string;
+      fields: CheckNodeFieldsUpdate;
+    }
+  | {
+      type: "update_random_node";
+      nodeId: string;
+      fields: RandomNodeFieldsUpdate;
     }
   | {
       type: "delete_node";
@@ -199,6 +230,14 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
       return updateLogOnlyNode(draft, action.nodeId, action.fields);
     case "update_wait_node":
       return updateWaitNode(draft, action.nodeId, action.fields);
+    case "update_call_node":
+      return updateCallNode(draft, action.nodeId, action.fields);
+    case "update_call_option":
+      return updateCallOption(draft, action.nodeId, action.optionId, action.fields);
+    case "update_check_node":
+      return updateCheckNode(draft, action.nodeId, action.fields);
+    case "update_random_node":
+      return updateRandomNode(draft, action.nodeId, action.fields);
     case "delete_node":
       return deleteNode(draft, action.nodeId);
   }
@@ -477,11 +516,12 @@ function renameCallOption(
 
 function addNode(
   draft: EventDraftEnvelope,
-  nodeType: EditableBasicNodeType,
+  nodeType: EditableGraphNodeType,
   requestedNodeId: string | undefined,
 ): EventDraftEnvelope {
   const graph = getGraphOrDefault(draft);
   const nodeId = requestedNodeId?.trim() || createUniqueNodeId(graph, nodeType);
+  const nextNodeId = getDefaultTransitionTargetNodeId(graph, nodeId);
 
   requireSafeUniqueNodeId(graph, nodeId);
 
@@ -489,7 +529,7 @@ function addNode(
     type: nodeType,
     eventDefinitionId: getEventDefinitionId(draft),
     nodeId,
-    nextNodeId: getDefaultTransitionTargetNodeId(graph, nodeId),
+    nextNodeId,
   });
   const updatedGraph: EventGraph = {
     ...graph,
@@ -497,6 +537,29 @@ function addNode(
     nodes: [...graph.nodes, node],
     terminal_node_ids: node.type === "end" ? appendIdIfMissing(graph.terminal_node_ids, nodeId) : graph.terminal_node_ids,
   };
+
+  if (node.type === "call") {
+    const callTemplate: EventDraftWorkingCallTemplate = {
+      ...createDefaultCallTemplateShell({
+        domain: draft.target.domain,
+        eventDefinitionId: getEventDefinitionId(draft),
+        nodeId,
+      }),
+    };
+
+    return {
+      ...draft,
+      working_definition: appendCallTemplateRef(
+        {
+          ...draft.working_definition,
+          event_graph: updatedGraph,
+        },
+        node.call_template_id,
+      ),
+      working_call_templates: [...draft.working_call_templates, callTemplate],
+      editor_state: createGraphNodeSelectionState(draft, nodeId),
+    };
+  }
 
   return updateDraftGraph(draft, updatedGraph, nodeId);
 }
@@ -586,6 +649,93 @@ function updateWaitNode(draft: EventDraftEnvelope, nodeId: string, fields: WaitN
   const updatedNode: WaitNode = {
     ...node,
     ...fields,
+  };
+
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+}
+
+function updateCallNode(draft: EventDraftEnvelope, nodeId: string, fields: CallNodeFieldsUpdate): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "call");
+  const updatedNode: CallNode = {
+    ...node,
+    speaker_crew_ref: fields.speaker_crew_ref ? clonePlain(fields.speaker_crew_ref) : node.speaker_crew_ref,
+    urgency: fields.urgency ?? node.urgency,
+    delivery: fields.delivery ?? node.delivery,
+    expires_in_seconds: hasOwn(fields, "expires_in_seconds") ? (fields.expires_in_seconds ?? null) : node.expires_in_seconds,
+    on_missed: hasOwn(fields, "on_missed") ? normalizeCallOnMissed(fields.on_missed) : node.on_missed,
+  };
+
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+}
+
+function updateCallOption(
+  draft: EventDraftEnvelope,
+  nodeId: string,
+  optionId: string,
+  fields: CallOptionFieldsUpdate,
+): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "call");
+
+  if (!node.options.some((option) => option.id === optionId)) {
+    throw new Error(`Call option "${optionId}" does not exist on call node "${nodeId}".`);
+  }
+
+  const hasNextNodeUpdate = hasOwn(fields, "next_node_id");
+  const nextNodeId = hasNextNodeUpdate ? fields.next_node_id?.trim() ?? "" : node.option_node_mapping[optionId];
+  const updatedNode: CallNode = {
+    ...node,
+    options: node.options.map((option) => (option.id === optionId ? updateCallOptionFields(option, fields) : option)),
+    option_node_mapping: hasNextNodeUpdate
+      ? {
+          ...node.option_node_mapping,
+          [optionId]: nextNodeId,
+        }
+      : node.option_node_mapping,
+  };
+  const updatedGraph = replaceNode(graph, updatedNode);
+
+  return updateDraftGraph(
+    draft,
+    {
+      ...updatedGraph,
+      edges: hasNextNodeUpdate ? replaceViaEdge(graph.edges, nodeId, optionId, nextNodeId) : graph.edges,
+    },
+    nodeId,
+  );
+}
+
+function updateCheckNode(draft: EventDraftEnvelope, nodeId: string, fields: CheckNodeFieldsUpdate): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "check");
+  const updatedNode: CheckNode = {
+    ...node,
+    evaluation_order: fields.evaluation_order ?? node.evaluation_order,
+    default_next_node_id: hasOwn(fields, "default_next_node_id")
+      ? fields.default_next_node_id ?? ""
+      : node.default_next_node_id,
+    branches: hasOwn(fields, "branches") && fields.branches
+      ? fields.branches.map((branch) => normalizeCheckBranch(branch))
+      : node.branches,
+  };
+
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+}
+
+function updateRandomNode(draft: EventDraftEnvelope, nodeId: string, fields: RandomNodeFieldsUpdate): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "random");
+  const updatedNode: RandomNode = {
+    ...node,
+    seed_scope: fields.seed_scope ?? node.seed_scope,
+    default_next_node_id: hasOwn(fields, "default_next_node_id")
+      ? fields.default_next_node_id ?? null
+      : node.default_next_node_id,
+    store_result_as: fields.store_result_as ?? node.store_result_as,
+    branches: hasOwn(fields, "branches") && fields.branches
+      ? fields.branches.map((branch) => normalizeRandomBranch(branch))
+      : node.branches,
   };
 
   return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
@@ -786,6 +936,78 @@ function getOptionLines(template: EventDraftWorkingCallTemplate): Record<string,
   return template.option_lines ?? {};
 }
 
+function updateCallOptionFields(option: CallOption, fields: CallOptionFieldsUpdate): CallOption {
+  const updatedOption: CallOption = {
+    ...option,
+    is_default: hasOwn(fields, "is_default") ? fields.is_default : option.is_default,
+  };
+
+  if (hasOwn(fields, "effect_refs")) {
+    if (fields.effect_refs && fields.effect_refs.length > 0) {
+      updatedOption.effect_refs = [...fields.effect_refs];
+    } else {
+      delete updatedOption.effect_refs;
+    }
+  }
+
+  if (hasOwn(fields, "requirements")) {
+    if (fields.requirements && fields.requirements.length > 0) {
+      updatedOption.requirements = clonePlain(fields.requirements);
+    } else {
+      delete updatedOption.requirements;
+    }
+  }
+
+  return updatedOption;
+}
+
+function normalizeCallOnMissed(onMissed: CallNode["on_missed"] | undefined): CallNode["on_missed"] {
+  const nextNodeId = normalizeOptionalString(onMissed?.next_node_id ?? undefined);
+  const effectRefs = onMissed?.effect_refs?.filter((effectRef) => effectRef.trim().length > 0);
+
+  if (!nextNodeId && (!effectRefs || effectRefs.length === 0)) {
+    return undefined;
+  }
+
+  return {
+    next_node_id: nextNodeId ?? null,
+    effect_refs: effectRefs && effectRefs.length > 0 ? [...effectRefs] : undefined,
+  };
+}
+
+function normalizeCheckBranch(branch: CheckNode["branches"][number]): CheckNode["branches"][number] {
+  const updatedBranch: CheckNode["branches"][number] = {
+    ...branch,
+    conditions: clonePlain(branch.conditions ?? []),
+  };
+
+  if (branch.effect_refs && branch.effect_refs.length > 0) {
+    updatedBranch.effect_refs = [...branch.effect_refs];
+  } else {
+    delete updatedBranch.effect_refs;
+  }
+
+  return updatedBranch;
+}
+
+function normalizeRandomBranch(branch: RandomNode["branches"][number]): RandomNode["branches"][number] {
+  const updatedBranch: RandomNode["branches"][number] = {
+    ...branch,
+    weight: Number.isFinite(branch.weight) ? branch.weight : 0,
+  };
+
+  if (branch.conditions) {
+    updatedBranch.conditions = clonePlain(branch.conditions);
+  }
+  if (branch.effect_refs && branch.effect_refs.length > 0) {
+    updatedBranch.effect_refs = [...branch.effect_refs];
+  } else {
+    delete updatedBranch.effect_refs;
+  }
+
+  return updatedBranch;
+}
+
 function appendEdgeIfMissing(edges: EventEdge[], nextEdge: EventEdge): EventEdge[] {
   if (
     edges.some(
@@ -797,6 +1019,20 @@ function appendEdgeIfMissing(edges: EventEdge[], nextEdge: EventEdge): EventEdge
   }
 
   return [...edges, nextEdge];
+}
+
+function replaceViaEdge(edges: EventEdge[], fromNodeId: string, via: string, toNodeId: string): EventEdge[] {
+  const remainingEdges = edges.filter((edge) => !(edge.from_node_id === fromNodeId && edge.via === via));
+
+  if (!toNodeId) {
+    return remainingEdges;
+  }
+
+  return appendEdgeIfMissing(remainingEdges, {
+    from_node_id: fromNodeId,
+    to_node_id: toNodeId,
+    via,
+  });
 }
 
 function omitRecordKey<T>(record: Record<string, T>, keyToOmit: string): Record<string, T> {
@@ -842,6 +1078,19 @@ function removeCallTemplateRef(
   };
 }
 
+function appendCallTemplateRef(
+  workingDefinition: EventDraftWorkingDefinition,
+  callTemplateId: string,
+): EventDraftWorkingDefinition {
+  return {
+    ...workingDefinition,
+    content_refs: {
+      ...workingDefinition.content_refs,
+      call_template_ids: appendIdIfMissing(workingDefinition.content_refs?.call_template_ids ?? [], callTemplateId),
+    },
+  };
+}
+
 function createGraphNodeSelectionState(draft: EventDraftEnvelope, nodeId: string | null): EventDraftEnvelope["editor_state"] {
   return {
     ...draft.editor_state,
@@ -850,7 +1099,7 @@ function createGraphNodeSelectionState(draft: EventDraftEnvelope, nodeId: string
   };
 }
 
-function createUniqueNodeId(graph: EventGraph, nodeType: EditableBasicNodeType): string {
+function createUniqueNodeId(graph: EventGraph, nodeType: EditableGraphNodeType): string {
   let index = 1;
   let candidate: string = nodeType;
   const existingNodeIds = new Set(graph.nodes.map((node) => node.id));

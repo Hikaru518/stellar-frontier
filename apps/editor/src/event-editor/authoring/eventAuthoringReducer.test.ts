@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { CallNode, Condition, EventGraph, EventNode, LogOnlyNode, WaitNode } from "../../../../pc-client/src/events/types";
+import type {
+  CallNode,
+  CheckNode,
+  Condition,
+  EventGraph,
+  EventNode,
+  LogOnlyNode,
+  RandomNode,
+  WaitNode,
+} from "../../../../pc-client/src/events/types";
 import { analyzeGraphHealth } from "../graphModel";
 import type { EventDraftEnvelope, EventDraftWorkingCallTemplate, EventEditorStep } from "../types";
 import { createDefaultNewDraftEnvelope } from "./draftEnvelope";
@@ -316,6 +325,127 @@ describe("event authoring reducer", () => {
     });
   });
 
+  it("updates call node fields and option targets while preserving draft saveability", () => {
+    const draft = createDraft();
+
+    const withCallFields = eventAuthoringReducer(draft, {
+      type: "update_call_node",
+      nodeId: "call",
+      fields: {
+        speaker_crew_ref: { type: "crew_id", id: "amy" },
+        urgency: "urgent",
+        delivery: "incoming_call",
+        expires_in_seconds: 45,
+        on_missed: {
+          next_node_id: "missed_end",
+          effect_refs: ["missed_call_effects"],
+        },
+      },
+    });
+    const updated = eventAuthoringReducer(withCallFields, {
+      type: "update_call_option",
+      nodeId: "call",
+      optionId: "ack",
+      fields: {
+        next_node_id: "missing_ack_target",
+        effect_refs: ["ack_effects"],
+      },
+    });
+    const health = analyzeGraphHealth(updated.working_definition);
+
+    expect(getCallNode(updated, "call")).toMatchObject({
+      speaker_crew_ref: { type: "crew_id", id: "amy" },
+      urgency: "urgent",
+      delivery: "incoming_call",
+      expires_in_seconds: 45,
+      on_missed: {
+        next_node_id: "missed_end",
+        effect_refs: ["missed_call_effects"],
+      },
+      options: [{ id: "ack", is_default: true, effect_refs: ["ack_effects"] }],
+      option_node_mapping: { ack: "missing_ack_target" },
+    });
+    expect(getGraph(updated).edges).toEqual([{ from_node_id: "call", to_node_id: "missing_ack_target", via: "ack" }]);
+    expect(health.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "missing_edge_target", targetNodeId: "missing_ack_target" })]),
+    );
+    expect(getCallNode(draft, "call").option_node_mapping).toEqual({ ack: "end" });
+  });
+
+  it("updates check and random branch fields with typed node actions", () => {
+    const draft = createDraftWithCheckAndRandomNodes();
+    const branchCondition: Condition = {
+      type: "world_flag_equals",
+      field: "bridge_ready",
+      value: true,
+    };
+
+    const withCheck = eventAuthoringReducer(draft, {
+      type: "update_check_node",
+      nodeId: "gate",
+      fields: {
+        default_next_node_id: "missing_default",
+        branches: [
+          {
+            id: "has_bridge",
+            conditions: [branchCondition],
+            next_node_id: "randomizer",
+            effect_refs: ["mark_bridge_ready"],
+          },
+        ],
+      },
+    });
+    const updated = eventAuthoringReducer(withCheck, {
+      type: "update_random_node",
+      nodeId: "randomizer",
+      fields: {
+        default_next_node_id: "missing_random_default",
+        store_result_as: "bridge_roll",
+        branches: [
+          {
+            id: "lucky",
+            weight: 3,
+            conditions: [branchCondition],
+            next_node_id: "missing_random_target",
+            effect_refs: ["lucky_effects"],
+          },
+        ],
+      },
+    });
+
+    expect(getCheckNode(updated, "gate")).toMatchObject({
+      default_next_node_id: "missing_default",
+      branches: [
+        {
+          id: "has_bridge",
+          conditions: [branchCondition],
+          next_node_id: "randomizer",
+          effect_refs: ["mark_bridge_ready"],
+        },
+      ],
+    });
+    expect(getRandomNode(updated, "randomizer")).toMatchObject({
+      default_next_node_id: "missing_random_default",
+      store_result_as: "bridge_roll",
+      branches: [
+        {
+          id: "lucky",
+          weight: 3,
+          conditions: [branchCondition],
+          next_node_id: "missing_random_target",
+          effect_refs: ["lucky_effects"],
+        },
+      ],
+    });
+    expect(analyzeGraphHealth(updated.working_definition).issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_edge_target", targetNodeId: "missing_default" }),
+        expect.objectContaining({ code: "missing_edge_target", targetNodeId: "missing_random_target" }),
+      ]),
+    );
+    expect(getCheckNode(draft, "gate").branches[0]?.conditions).toEqual([]);
+  });
+
   it("adds, selects, and edits base graph nodes without mutating the original graph", () => {
     const draft = createDraft();
 
@@ -587,6 +717,34 @@ function createDraftWithFollowupCall(): EventDraftEnvelope {
   };
 }
 
+function createDraftWithCheckAndRandomNodes(): EventDraftEnvelope {
+  const draft = createDraft();
+  const graph = getGraph(draft);
+  const checkNode = createDefaultNodeTemplate({
+    type: "check",
+    eventDefinitionId: "forest_bridge_choice",
+    nodeId: "gate",
+    nextNodeId: "end",
+  }) as CheckNode;
+  const randomNode = createDefaultNodeTemplate({
+    type: "random",
+    eventDefinitionId: "forest_bridge_choice",
+    nodeId: "randomizer",
+    nextNodeId: "end",
+  }) as RandomNode;
+
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      event_graph: {
+        ...graph,
+        nodes: [...graph.nodes, checkNode, randomNode],
+      },
+    },
+  };
+}
+
 function getGraph(draft: EventDraftEnvelope): EventGraph {
   const graph = draft.working_definition.event_graph;
 
@@ -622,6 +780,26 @@ function getLogOnlyNode(draft: EventDraftEnvelope, nodeId: string): LogOnlyNode 
 
   if (node.type !== "log_only") {
     throw new Error(`Expected log-only node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getCheckNode(draft: EventDraftEnvelope, nodeId: string): CheckNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "check") {
+    throw new Error(`Expected check node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getRandomNode(draft: EventDraftEnvelope, nodeId: string): RandomNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "random") {
+    throw new Error(`Expected random node ${nodeId}.`);
   }
 
   return node;

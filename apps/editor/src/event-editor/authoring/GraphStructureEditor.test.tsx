@@ -2,10 +2,11 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { EventNode, LogOnlyNode, WaitNode } from "../../../../pc-client/src/events/types";
+import type { CheckNode, EventNode, LogOnlyNode, RandomNode, WaitNode } from "../../../../pc-client/src/events/types";
 import type { EventDraftEnvelope } from "../types";
 import { createDefaultNewDraftEnvelope } from "./draftEnvelope";
 import GraphStructureEditor from "./GraphStructureEditor";
+import { createDefaultNodeTemplate } from "./templates";
 
 vi.mock("./GraphPreviewPanel", () => ({
   default: () => <section aria-label="Read-only graph preview">Graph Preview</section>,
@@ -194,6 +195,97 @@ describe("GraphStructureEditor", () => {
       { from_node_id: "call", to_node_id: "end", via: "ack" },
     ]);
   });
+
+  it("edits check branch fields and reports missing branch targets without blocking draft updates", () => {
+    const onDraftChange = vi.fn();
+
+    render(<GraphStructureEditorHarness draft={createDraftWithCheckAndRandomNodes()} onDraftChange={onDraftChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select node gate" }));
+
+    const checkFields = screen.getByRole("group", { name: "Check node fields" });
+    fireEvent.change(within(checkFields).getByLabelText("Check default next node id"), {
+      target: { value: "missing_check_default" },
+    });
+
+    const branchFields = screen.getByRole("group", { name: "Check branch default_branch" });
+    const conditionInput = within(branchFields).getByLabelText("Check branch default_branch conditions JSON");
+    const callCountBeforeInvalidConditions = onDraftChange.mock.calls.length;
+    fireEvent.change(conditionInput, { target: { value: "{" } });
+
+    expect(conditionInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("Conditions must be valid JSON.");
+    expect(onDraftChange).toHaveBeenCalledTimes(callCountBeforeInvalidConditions);
+
+    fireEvent.change(conditionInput, {
+      target: { value: '[{"type":"world_flag_equals","field":"bridge_ready","value":true}]' },
+    });
+    fireEvent.change(within(branchFields).getByLabelText("Check branch default_branch next node id"), {
+      target: { value: "missing_check_target" },
+    });
+    fireEvent.change(within(branchFields).getByLabelText("Check branch default_branch effect refs"), {
+      target: { value: "mark_bridge_ready, notify_crew" },
+    });
+
+    expect(getCheckNode(getLatestDraft(onDraftChange), "gate")).toMatchObject({
+      default_next_node_id: "missing_check_default",
+      branches: [
+        {
+          id: "default_branch",
+          conditions: [{ type: "world_flag_equals", field: "bridge_ready", value: true }],
+          next_node_id: "missing_check_target",
+          effect_refs: ["mark_bridge_ready", "notify_crew"],
+        },
+      ],
+    });
+    expect(screen.getByText("Edge target node not found: missing_check_target.")).toBeInTheDocument();
+  });
+
+  it("edits random branch fields and keeps invalid conditions local until valid JSON is entered", () => {
+    const onDraftChange = vi.fn();
+
+    render(<GraphStructureEditorHarness draft={createDraftWithCheckAndRandomNodes()} onDraftChange={onDraftChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select node randomizer" }));
+
+    const randomFields = screen.getByRole("group", { name: "Random node fields" });
+    fireEvent.change(within(randomFields).getByLabelText("Random default next node id"), {
+      target: { value: "missing_random_default" },
+    });
+    fireEvent.change(within(randomFields).getByLabelText("Store result as"), { target: { value: "bridge_roll" } });
+
+    const branchFields = screen.getByRole("group", { name: "Random branch default_branch" });
+    fireEvent.change(within(branchFields).getByLabelText("Random branch default_branch weight"), { target: { value: "3" } });
+
+    const conditionInput = within(branchFields).getByLabelText("Random branch default_branch conditions JSON");
+    const callCountBeforeInvalidConditions = onDraftChange.mock.calls.length;
+    fireEvent.change(conditionInput, { target: { value: "{\"type\":\"world_flag_equals\"}" } });
+
+    expect(conditionInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("Conditions must be a JSON array.");
+    expect(onDraftChange).toHaveBeenCalledTimes(callCountBeforeInvalidConditions);
+
+    fireEvent.change(conditionInput, {
+      target: { value: '[{"type":"world_flag_equals","field":"bridge_ready","value":true}]' },
+    });
+    fireEvent.change(within(branchFields).getByLabelText("Random branch default_branch next node id"), {
+      target: { value: "missing_random_target" },
+    });
+
+    expect(getRandomNode(getLatestDraft(onDraftChange), "randomizer")).toMatchObject({
+      default_next_node_id: "missing_random_default",
+      store_result_as: "bridge_roll",
+      branches: [
+        {
+          id: "default_branch",
+          weight: 3,
+          conditions: [{ type: "world_flag_equals", field: "bridge_ready", value: true }],
+          next_node_id: "missing_random_target",
+        },
+      ],
+    });
+    expect(screen.getByText("Edge target node not found: missing_random_target.")).toBeInTheDocument();
+  });
 });
 
 function GraphStructureEditorHarness({
@@ -228,6 +320,39 @@ function createDraft(overrides: Partial<EventDraftEnvelope> = {}): EventDraftEnv
   return {
     ...draft,
     ...overrides,
+  };
+}
+
+function createDraftWithCheckAndRandomNodes(): EventDraftEnvelope {
+  const draft = createDraft();
+  const graph = draft.working_definition.event_graph;
+
+  if (!graph) {
+    throw new Error("Expected graph.");
+  }
+
+  const checkNode = createDefaultNodeTemplate({
+    type: "check",
+    eventDefinitionId: "forest_bridge_choice",
+    nodeId: "gate",
+    nextNodeId: "end",
+  }) as CheckNode;
+  const randomNode = createDefaultNodeTemplate({
+    type: "random",
+    eventDefinitionId: "forest_bridge_choice",
+    nodeId: "randomizer",
+    nextNodeId: "end",
+  }) as RandomNode;
+
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      event_graph: {
+        ...graph,
+        nodes: [...graph.nodes, checkNode, randomNode],
+      },
+    },
   };
 }
 
@@ -266,6 +391,26 @@ function getWaitNode(draft: EventDraftEnvelope, nodeId: string): WaitNode {
 
   if (node.type !== "wait") {
     throw new Error(`Expected wait node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getCheckNode(draft: EventDraftEnvelope, nodeId: string): CheckNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "check") {
+    throw new Error(`Expected check node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getRandomNode(draft: EventDraftEnvelope, nodeId: string): RandomNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "random") {
+    throw new Error(`Expected random node ${nodeId}.`);
   }
 
   return node;
