@@ -47,6 +47,33 @@ export interface GraphLayout {
   triggerPosition: GraphPosition;
 }
 
+export type GraphHealthStatus = "healthy" | "incomplete";
+
+export type GraphHealthIssueCode =
+  | "missing_event_graph"
+  | "missing_entry_node"
+  | "missing_terminal_node"
+  | "unmapped_call_option"
+  | "missing_edge_source"
+  | "missing_edge_target";
+
+export interface GraphHealthIssue {
+  code: GraphHealthIssueCode;
+  severity: "error" | "warning";
+  message: string;
+  nodeId?: Id;
+  optionId?: Id;
+  edgeKey?: string;
+  sourceNodeId?: Id;
+  targetNodeId?: Id;
+}
+
+export interface GraphHealthSummary {
+  status: GraphHealthStatus;
+  issues: GraphHealthIssue[];
+  canRenderPreview: boolean;
+}
+
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 104;
 const TRIGGER_WIDTH = 180;
@@ -97,6 +124,106 @@ export function findCallTemplate(library: EventEditorLibraryResponse, definition
   return library.call_templates.map((asset) => asset.data).find((template) => template.event_definition_id === definitionId && template.node_id === nodeId) ?? null;
 }
 
+export function analyzeGraphHealth(definition: unknown, edges?: readonly DerivedEdge[]): GraphHealthSummary {
+  const graph = readEventGraphRecord(definition);
+  const issues: GraphHealthIssue[] = [];
+
+  if (!graph) {
+    issues.push({
+      code: "missing_event_graph",
+      severity: "error",
+      message: "No event_graph is available yet.",
+    });
+
+    return { status: "incomplete", issues, canRenderPreview: false };
+  }
+
+  const nodeRecords = readRecordArray(graph.nodes);
+  const nodeIds = createNodeIdSet(nodeRecords);
+  const entryNodeId = readString(graph.entry_node_id);
+
+  if (!entryNodeId || !nodeIds.has(entryNodeId)) {
+    issues.push({
+      code: "missing_entry_node",
+      severity: "error",
+      message: entryNodeId ? `Entry node not found: ${entryNodeId}.` : "Entry node is not set.",
+      nodeId: entryNodeId ?? undefined,
+    });
+  }
+
+  for (const terminalNodeId of readStringArray(graph.terminal_node_ids)) {
+    if (!nodeIds.has(terminalNodeId)) {
+      issues.push({
+        code: "missing_terminal_node",
+        severity: "error",
+        message: `Terminal node not found: ${terminalNodeId}.`,
+        nodeId: terminalNodeId,
+      });
+    }
+  }
+
+  for (const node of nodeRecords) {
+    if (node.type !== "call") {
+      continue;
+    }
+
+    const nodeId = readString(node.id);
+    const options = readRecordArray(node.options);
+    const optionNodeMapping = isRecord(node.option_node_mapping) ? node.option_node_mapping : {};
+
+    for (const option of options) {
+      const optionId = readString(option.id);
+      if (!nodeId || !optionId) {
+        continue;
+      }
+
+      const mappedNodeId = readString(optionNodeMapping[optionId]);
+      if (!mappedNodeId) {
+        issues.push({
+          code: "unmapped_call_option",
+          severity: "error",
+          message: `Call option ${nodeId}.${optionId} has no option_node_mapping target.`,
+          nodeId,
+          optionId,
+        });
+      }
+    }
+  }
+
+  for (const edge of readEdgesForHealth(graph, edges)) {
+    if (!nodeIds.has(edge.fromNodeId)) {
+      issues.push({
+        code: "missing_edge_source",
+        severity: "error",
+        message: `Edge source node not found: ${edge.fromNodeId}.`,
+        edgeKey: edge.key,
+        sourceNodeId: edge.fromNodeId,
+      });
+    }
+
+    if (!nodeIds.has(edge.toNodeId)) {
+      issues.push({
+        code: "missing_edge_target",
+        severity: "error",
+        message: `Edge target node not found: ${edge.toNodeId}.`,
+        edgeKey: edge.key,
+        targetNodeId: edge.toNodeId,
+      });
+    }
+  }
+
+  return {
+    status: issues.length === 0 ? "healthy" : "incomplete",
+    issues,
+    canRenderPreview: Boolean(entryNodeId && nodeIds.has(entryNodeId)),
+  };
+}
+
+export function filterRenderableGraphEdges(nodes: readonly EventNode[], edges: readonly DerivedEdge[]): DerivedEdge[] {
+  const nodeIds = createNodeIdSet(nodes);
+  return edges.filter((edge) => nodeIds.has(edge.fromNodeId) && nodeIds.has(edge.toNodeId));
+}
+
 export function layoutGraph(nodes: readonly EventNode[], edges: readonly DerivedEdge[], entryNodeId: Id): GraphLayout {
   const graph = new graphlib.Graph();
   graph.setGraph({ rankdir: "LR", nodesep: 72, ranksep: 180, marginx: 48, marginy: 48 });
@@ -124,72 +251,113 @@ export function layoutGraph(nodes: readonly EventNode[], edges: readonly Derived
 }
 
 function deriveNodeEdges(node: EventNode): DerivedEdge[] {
+  const nodeId = readString((node as { id?: unknown }).id);
+  if (!nodeId) {
+    return [];
+  }
+
   const edges: DerivedEdge[] = [];
 
   switch (node.type) {
     case "call": {
-      for (const option of node.options) {
-        const toNodeId = node.option_node_mapping[option.id];
+      const options = Array.isArray(node.options) ? node.options : [];
+      const optionNodeMapping = isRecord(node.option_node_mapping) ? node.option_node_mapping : {};
+
+      for (const option of options) {
+        const optionId = readString(option.id);
+        if (!optionId) {
+          continue;
+        }
+
+        const toNodeId = readString(optionNodeMapping[optionId]);
         if (toNodeId) {
-          edges.push(createEdge(node.id, toNodeId, { kind: "option", optionId: option.id, isDefault: option.is_default === true }, option.effect_refs ?? []));
+          edges.push(createEdge(nodeId, toNodeId, { kind: "option", optionId, isDefault: option.is_default === true }, readEffectRefs(option.effect_refs)));
         }
       }
       if (node.on_missed?.next_node_id) {
-        edges.push(createEdge(node.id, node.on_missed.next_node_id, { kind: "on_missed" }, node.on_missed.effect_refs ?? []));
+        edges.push(createEdge(nodeId, node.on_missed.next_node_id, { kind: "on_missed" }, readEffectRefs(node.on_missed.effect_refs)));
       }
       break;
     }
-    case "wait":
-      edges.push(createEdge(node.id, node.next_node_id, { kind: "wait_next" }));
+    case "wait": {
+      const nextNodeId = readString(node.next_node_id);
+      if (nextNodeId) {
+        edges.push(createEdge(nodeId, nextNodeId, { kind: "wait_next" }));
+      }
       if (node.on_interrupted?.next_node_id) {
-        edges.push(createEdge(node.id, node.on_interrupted.next_node_id, { kind: "on_interrupted" }, node.on_interrupted.effect_refs ?? []));
+        edges.push(createEdge(nodeId, node.on_interrupted.next_node_id, { kind: "on_interrupted" }, readEffectRefs(node.on_interrupted.effect_refs)));
       }
       break;
+    }
     case "check":
-      for (const branch of node.branches) {
-        edges.push(createEdge(node.id, branch.next_node_id, { kind: "branch", branchId: branch.id }, branch.effect_refs ?? []));
+      for (const branch of Array.isArray(node.branches) ? node.branches : []) {
+        const branchId = readString(branch.id);
+        const nextNodeId = readString(branch.next_node_id);
+        if (branchId && nextNodeId) {
+          edges.push(createEdge(nodeId, nextNodeId, { kind: "branch", branchId }, readEffectRefs(branch.effect_refs)));
+        }
       }
-      edges.push(createEdge(node.id, node.default_next_node_id, { kind: "default_branch" }));
+      if (readString(node.default_next_node_id)) {
+        edges.push(createEdge(nodeId, node.default_next_node_id, { kind: "default_branch" }));
+      }
       break;
     case "random":
-      for (const branch of node.branches) {
-        edges.push(createEdge(node.id, branch.next_node_id, { kind: "branch", branchId: branch.id, weight: branch.weight }, branch.effect_refs ?? []));
+      for (const branch of Array.isArray(node.branches) ? node.branches : []) {
+        const branchId = readString(branch.id);
+        const nextNodeId = readString(branch.next_node_id);
+        if (branchId && nextNodeId) {
+          edges.push(createEdge(nodeId, nextNodeId, { kind: "branch", branchId, weight: branch.weight }, readEffectRefs(branch.effect_refs)));
+        }
       }
       if (node.default_next_node_id) {
-        edges.push(createEdge(node.id, node.default_next_node_id, { kind: "default_branch" }));
+        edges.push(createEdge(nodeId, node.default_next_node_id, { kind: "default_branch" }));
       }
       break;
     case "action_request":
       if (node.on_accepted_node_id) {
-        edges.push(createEdge(node.id, node.on_accepted_node_id, { kind: "on_accepted" }));
+        edges.push(createEdge(nodeId, node.on_accepted_node_id, { kind: "on_accepted" }));
       }
-      edges.push(createEdge(node.id, node.on_completed_node_id, { kind: "on_completed" }));
-      edges.push(createEdge(node.id, node.on_failed_node_id, { kind: "on_failed" }));
+      if (readString(node.on_completed_node_id)) {
+        edges.push(createEdge(nodeId, node.on_completed_node_id, { kind: "on_completed" }));
+      }
+      if (readString(node.on_failed_node_id)) {
+        edges.push(createEdge(nodeId, node.on_failed_node_id, { kind: "on_failed" }));
+      }
       break;
     case "objective":
       if (node.on_created_node_id) {
-        edges.push(createEdge(node.id, node.on_created_node_id, { kind: "on_created" }));
+        edges.push(createEdge(nodeId, node.on_created_node_id, { kind: "on_created" }));
       }
-      edges.push(createEdge(node.id, node.on_completed_node_id, { kind: "on_completed" }));
+      if (readString(node.on_completed_node_id)) {
+        edges.push(createEdge(nodeId, node.on_completed_node_id, { kind: "on_completed" }));
+      }
       if (node.on_failed_node_id) {
-        edges.push(createEdge(node.id, node.on_failed_node_id, { kind: "on_failed" }));
+        edges.push(createEdge(nodeId, node.on_failed_node_id, { kind: "on_failed" }));
       }
       break;
-    case "spawn_event":
-      edges.push(createEdge(node.id, node.next_node_id, { kind: "spawn_next" }));
+    case "spawn_event": {
+      const nextNodeId = readString(node.next_node_id);
+      if (nextNodeId) {
+        edges.push(createEdge(nodeId, nextNodeId, { kind: "spawn_next" }));
+      }
       break;
-    case "log_only":
-      edges.push(createEdge(node.id, node.next_node_id, { kind: "log_next" }, node.effect_refs ?? []));
+    }
+    case "log_only": {
+      const nextNodeId = readString(node.next_node_id);
+      if (nextNodeId) {
+        edges.push(createEdge(nodeId, nextNodeId, { kind: "log_next" }, readEffectRefs(node.effect_refs)));
+      }
       break;
+    }
     case "end":
       break;
   }
 
   if (node.auto_next_node_id) {
-    edges.push(createEdge(node.id, node.auto_next_node_id, { kind: "auto_next" }));
+    edges.push(createEdge(nodeId, node.auto_next_node_id, { kind: "auto_next" }));
   }
   if (node.timeout?.next_node_id) {
-    edges.push(createEdge(node.id, node.timeout.next_node_id, { kind: "timeout" }, node.timeout.effect_refs ?? []));
+    edges.push(createEdge(nodeId, node.timeout.next_node_id, { kind: "timeout" }, readEffectRefs(node.timeout.effect_refs)));
   }
 
   return edges;
@@ -253,4 +421,68 @@ function toTopLeftPosition(position: { x: number; y: number } | undefined, width
     x: Math.round(position.x - width / 2),
     y: Math.round(position.y - height / 2),
   };
+}
+
+function readEventGraphRecord(definition: unknown): Record<string, unknown> | null {
+  if (!isRecord(definition) || !isRecord(definition.event_graph)) {
+    return null;
+  }
+
+  return definition.event_graph;
+}
+
+function readEdgesForHealth(graph: Record<string, unknown>, edges: readonly DerivedEdge[] | undefined): DerivedEdge[] {
+  if (edges) {
+    return [...edges];
+  }
+
+  return [
+    ...readRecordArray(graph.nodes).flatMap((node) => deriveNodeEdges(node as unknown as EventNode)),
+    ...readManualEdgesForHealth(graph),
+  ];
+}
+
+function readManualEdgesForHealth(graph: Record<string, unknown>): DerivedEdge[] {
+  return readRecordArray(graph.edges).flatMap((edge, index): DerivedEdge[] => {
+    const fromNodeId = readString(edge.from_node_id);
+    const toNodeId = readString(edge.to_node_id);
+
+    if (!fromNodeId || !toNodeId) {
+      return [];
+    }
+
+    return [
+      {
+        fromNodeId,
+        toNodeId,
+        mechanism: { kind: "manual", via: readString(edge.via) },
+        effectRefs: [],
+        key: `graph-edge:${index}:${fromNodeId}:${toNodeId}`,
+      },
+    ];
+  });
+}
+
+function createNodeIdSet(nodes: readonly unknown[]): Set<Id> {
+  return new Set(nodes.map((node) => (isRecord(node) ? readString(node.id) : null)).filter((id): id is Id => id !== null));
+}
+
+function readRecordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function readEffectRefs(value: unknown): Id[] {
+  return readStringArray(value);
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

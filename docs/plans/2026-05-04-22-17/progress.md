@@ -42,7 +42,7 @@ source:
 | 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | completed | 1 |
 | 17 | TASK-017 | 实现 Basic step 结构化表单 | completed | 2 |
 | 18 | TASK-018 | 实现 Trigger step 与 capability insertion | completed | 3 |
-| 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | pending | 0 |
+| 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | completed | 3 |
 | 20 | TASK-020 | 实现 Graph node editor 基础节点 | pending | 0 |
 | 21 | TASK-021 | 实现 Call/Check/Random graph editor | pending | 0 |
 | 22 | TASK-022 | 实现 Advanced node editors | pending | 0 |
@@ -260,3 +260,16 @@ source:
 - developer summary: 新增 TriggerStep 与 CapabilityCatalogPanel，支持 trigger type 选择、required_context/probability 编辑、trigger conditions 增删改；Catalog 展示 trigger/condition 能力 metadata 并可插入 condition template；handler_condition 支持 handler_type select 和 params object JSON 校验入口；EventAuthoringWorkspace 在 trigger step 接入 TriggerStep 和 Catalog。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（38 files / 202 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/TriggerStep.tsx apps/editor/src/event-editor/authoring/CapabilityCatalogPanel.tsx apps/editor/src/event-editor/authoring/TriggerStep.test.tsx apps/editor/src/event-editor/authoring/CapabilityCatalogPanel.test.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，通过 UI 创建临时 draft `codex_task018_semantic_check_20260505_073555`；确认 Trigger step 可见，trigger type / required_context 可编辑，Catalog 可插入 `handler_condition`，handler_type select 可见，Params object 输入 invalid `{` 后显示 alert 且 `aria-invalid=true`，输入 valid `{\"threshold\":2}` 后恢复 `aria-invalid=false`；浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-019: 实现 Graph Preview adapter 与结构健康摘要
+- 状态: completed
+- 开始时间: 2026-05-05 15:37
+- 完成时间: 2026-05-05 16:02
+- 尝试次数: 3
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区只看到 `graphModel.test.ts` 测试改动，未看到 GraphPreviewPanel 或 graphModel 实现，交给下一次尝试补完。
+  - 尝试 2: developer 子任务长时间未返回，关闭时仍在运行；工作区看到 GraphCanvas/GraphPanel/graphModel 实现改动和 `GraphPreviewPanel.test.tsx`，但未看到 `GraphPreviewPanel.tsx` 实现，交给第三次尝试补完。
+  - 尝试 3: developer 子任务补齐 GraphPreviewPanel、read-only canvas 开关、graph health helper 和测试，并返回成功 summary。
+- developer summary: 新增 `GraphPreviewPanel`，从 draft `working_definition` 派生节点、transition 和结构健康摘要；`GraphCanvas` 支持 `interactive={false}`，Graph Preview 禁止拖拽/连线修改但保留只读选择；`graphModel` 增加 missing entry/terminal、unmapped call option、missing edge endpoint 检查，并过滤不可渲染 edge。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（39 files / 206 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/GraphPreviewPanel.tsx apps/editor/src/event-editor/authoring/GraphPreviewPanel.test.tsx apps/editor/src/event-editor/GraphPanel.tsx apps/editor/src/event-editor/GraphCanvas.tsx apps/editor/src/event-editor/graphModel.ts apps/editor/src/event-editor/graphModel.test.ts apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`；新建临时 draft `codex_task019_semantic_check_1777968079548_20260505_080119` 后确认空 working_definition 显示 `missing_event_graph` 且不崩溃；再从现有 `forest_trace_small_camp` 创建 edit draft，确认 Graph Preview 显示 healthy、3 nodes、2 transitions、Event graph canvas 可见；两次浏览器 console error 均为空。验证后已删除临时 draft 文件。

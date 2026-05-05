@@ -29,6 +29,7 @@ interface GraphCanvasProps {
   edges: DerivedEdge[];
   selection: GraphSelection;
   onSelect: (selection: GraphSelection) => void;
+  interactive?: boolean;
 }
 
 interface EventNodeData extends Record<string, unknown> {
@@ -50,8 +51,8 @@ const nodeTypes: NodeTypes = {
   triggerNode: TriggerGraphNode,
 };
 
-export default function GraphCanvas({ definition, edges, selection, onSelect }: GraphCanvasProps) {
-  const { flowNodes, flowEdges } = useMemo(() => buildFlowGraph(definition, edges), [definition, edges]);
+export default function GraphCanvas({ definition, edges, selection, onSelect, interactive = true }: GraphCanvasProps) {
+  const { flowNodes, flowEdges } = useMemo(() => buildFlowGraph(definition, edges, interactive), [definition, edges, interactive]);
   const [nodes, setNodes, onNodesChange] = useNodesState<GraphFlowNode>(flowNodes);
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(flowEdges);
 
@@ -73,12 +74,12 @@ export default function GraphCanvas({ definition, edges, selection, onSelect }: 
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
-        nodesDraggable
+        nodesDraggable={interactive}
         nodesConnectable={false}
         edgesReconnectable={false}
         elementsSelectable
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={interactive ? onNodesChange : undefined}
+        onEdgesChange={interactive ? onEdgesChange : undefined}
         onNodeClick={(_, node) => {
           onSelect(node.id === TRIGGER_NODE_ID ? { type: "trigger" } : { type: "node", nodeId: node.id });
         }}
@@ -93,7 +94,7 @@ export default function GraphCanvas({ definition, edges, selection, onSelect }: 
   );
 }
 
-function buildFlowGraph(definition: EventDefinition, edges: DerivedEdge[]): { flowNodes: GraphFlowNode[]; flowEdges: FlowEdge[] } {
+function buildFlowGraph(definition: EventDefinition, edges: DerivedEdge[], interactive: boolean): { flowNodes: GraphFlowNode[]; flowEdges: FlowEdge[] } {
   const layout = layoutGraph(definition.event_graph.nodes, edges, definition.event_graph.entry_node_id);
   const flowNodes: GraphFlowNode[] = [
     {
@@ -101,7 +102,7 @@ function buildFlowGraph(definition: EventDefinition, edges: DerivedEdge[]): { fl
       type: "triggerNode",
       position: layout.triggerPosition,
       data: { triggerType: definition.trigger.type },
-      draggable: true,
+      draggable: interactive,
       selectable: true,
     },
     ...definition.event_graph.nodes.map((node): EventFlowNode => ({
@@ -113,7 +114,7 @@ function buildFlowGraph(definition: EventDefinition, edges: DerivedEdge[]): { fl
         isEntry: node.id === definition.event_graph.entry_node_id,
         isTerminal: definition.event_graph.terminal_node_ids.includes(node.id),
       },
-      draggable: true,
+      draggable: interactive,
       selectable: true,
     })),
   ];

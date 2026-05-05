@@ -50,7 +50,7 @@ export default function GraphPanel({ asset, draft, library }: GraphPanelProps) {
           </dl>
 
           <TriggerSummary definition={definition} />
-          <GraphCanvas definition={definition} edges={edges} selection={selection} onSelect={setSelection} />
+          <GraphCanvas definition={definition} edges={edges} selection={selection} onSelect={setSelection} interactive />
           <GraphDetailPanel definition={definition} library={library} edges={edges} selection={selection} onSelect={setSelection} />
         </div>
       ) : null}
