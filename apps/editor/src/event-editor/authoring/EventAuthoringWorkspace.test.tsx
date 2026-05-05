@@ -1,9 +1,14 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventDraftEnvelope } from "../types";
 import EventAuthoringWorkspace from "./EventAuthoringWorkspace";
+import { createDefaultNodeTemplate } from "./templates";
+
+vi.mock("./GraphPreviewPanel", () => ({
+  default: () => <section aria-label="Read-only graph preview">Graph Preview</section>,
+}));
 
 describe("EventAuthoringWorkspace", () => {
   afterEach(() => {
@@ -59,14 +64,74 @@ describe("EventAuthoringWorkspace", () => {
     expect(screen.getByLabelText("Draft definition id")).toHaveTextContent("forest.signal");
     expect(screen.getByLabelText("Draft definition id")).toHaveTextContent("Locked");
   });
+
+  it("runs review validation and jumps node issues back to the graph editor", async () => {
+    const onDraftChange = vi.fn();
+    const onValidateDraft = vi.fn().mockResolvedValue({
+      valid: false,
+      issues: [
+        {
+          severity: "error",
+          code: "missing_next_node",
+          message: "Missing next node.",
+          asset_type: "event_definition",
+          asset_id: "forest_bridge_choice",
+          json_path: "/event_definitions/0/event_graph/nodes/0/option_node_mapping/ack",
+          editor_location: {
+            step: "graph",
+            section: "event_graph",
+            node_id: "call",
+            option_id: "ack",
+            field_path: "/event_definitions/0/event_graph/nodes/0/option_node_mapping/ack",
+          },
+        },
+      ],
+    });
+    const draft = createDraftEnvelope({
+      editor_state: {
+        active_step: "review",
+        selection: { step: "review" },
+        collapsed_sections: [],
+      },
+      working_definition: {
+        ...createDraftEnvelope().working_definition,
+        event_graph: createGraph(),
+      },
+    });
+
+    render(<WorkspaceHarness draft={draft} onDraftChange={onDraftChange} onValidateDraft={onValidateDraft} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run publish validation" }));
+
+    expect(await screen.findByText("Missing next node.")).toBeInTheDocument();
+    expect(onValidateDraft).toHaveBeenCalledWith(expect.objectContaining({ draft_id: "forest_bridge_choice_20260505_153012" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Jump to Graph issue missing_next_node" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Graph" })).toHaveAttribute("aria-current", "step");
+    });
+    expect(screen.getByRole("heading", { name: "Graph" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Node id")).toHaveValue("call");
+    expect(onDraftChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        editor_state: expect.objectContaining({
+          active_step: "graph",
+          selection: expect.objectContaining({ nodeId: "call", optionId: "ack" }),
+        }),
+      }),
+    );
+  });
 });
 
 function WorkspaceHarness({
   draft,
   onDraftChange,
+  onValidateDraft,
 }: {
   draft: EventDraftEnvelope;
   onDraftChange: (draft: EventDraftEnvelope) => void;
+  onValidateDraft?: Parameters<typeof EventAuthoringWorkspace>[0]["onValidateDraft"];
 }) {
   const [currentDraft, setCurrentDraft] = useState(draft);
 
@@ -77,6 +142,7 @@ function WorkspaceHarness({
         setCurrentDraft(nextDraft);
         onDraftChange(nextDraft);
       }}
+      onValidateDraft={onValidateDraft}
     />
   );
 }
@@ -121,5 +187,31 @@ function createDraftEnvelope(overrides: Partial<EventDraftEnvelope> = {}): Event
   return {
     ...draft,
     ...overrides,
+  };
+}
+
+function createGraph() {
+  return {
+    entry_node_id: "call",
+    nodes: [
+      createDefaultNodeTemplate({
+        type: "call",
+        eventDefinitionId: "forest_bridge_choice",
+        nodeId: "call",
+        nextNodeId: "end",
+      }),
+      createDefaultNodeTemplate({
+        type: "end",
+        eventDefinitionId: "forest_bridge_choice",
+        nodeId: "end",
+      }),
+    ],
+    edges: [{ from_node_id: "call", to_node_id: "end", via: "ack" }],
+    terminal_node_ids: ["end"],
+    graph_rules: {
+      acyclic: true,
+      max_active_nodes: 1,
+      allow_parallel_nodes: false,
+    },
   };
 }

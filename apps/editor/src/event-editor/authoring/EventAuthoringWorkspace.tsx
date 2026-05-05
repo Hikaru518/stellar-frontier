@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Effect, EffectGroup } from "../../../../pc-client/src/events/types";
-import type { EventDraftEnvelope, EventEditorStep } from "../types";
+import type { EventDraftEnvelope, EventEditorIssue, EventEditorStep, ValidateDraftResponse } from "../types";
 import BasicStep from "./BasicStep";
 import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
 import EffectsStep from "./EffectsStep";
+import EventValidationPanel from "./EventValidationPanel";
 import GraphStructureEditor from "./GraphStructureEditor";
 import TriggerStep from "./TriggerStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
@@ -13,6 +14,7 @@ type AuthoringStep = Exclude<EventEditorStep, "domain">;
 interface EventAuthoringWorkspaceProps {
   draft: EventDraftEnvelope;
   onDraftChange: (draft: EventDraftEnvelope) => void;
+  onValidateDraft?: (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
 }
 
 const AUTHORING_STEPS = [
@@ -43,19 +45,31 @@ const AUTHORING_STEPS = [
   },
 ] as const satisfies readonly { id: AuthoringStep; label: string; responsibility: string }[];
 
-export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventAuthoringWorkspaceProps) {
+export default function EventAuthoringWorkspace({ draft, onDraftChange, onValidateDraft }: EventAuthoringWorkspaceProps) {
   const activeStep = resolveActiveStep(draft.editor_state.active_step);
   const activeStepConfig = AUTHORING_STEPS.find((step) => step.id === activeStep) ?? AUTHORING_STEPS[0];
   const isLockedTarget = draft.mode === "edit_existing";
   const triggerConditions = draft.working_definition.trigger?.conditions ?? [];
   const effectGroups = draft.working_definition.effect_groups ?? [];
+  const selectionEffectGroupId = readSelectionString(draft.editor_state.selection, "effectGroupId");
   const [conditionInsertIndex, setConditionInsertIndex] = useState(triggerConditions.length);
   const [selectedEffectGroupId, setSelectedEffectGroupId] = useState<string | null>(effectGroups[0]?.id ?? null);
+  const [validationIssues, setValidationIssues] = useState<EventEditorIssue[]>([]);
+  const [validationStatus, setValidationStatus] = useState<"idle" | "running" | "complete" | "error">("idle");
+  const [validationError, setValidationError] = useState<string | null>(null);
   const resolvedConditionInsertIndex = Math.min(Math.max(conditionInsertIndex, 0), triggerConditions.length);
   const resolvedSelectedEffectGroupId =
     selectedEffectGroupId && effectGroups.some((group) => group.id === selectedEffectGroupId)
       ? selectedEffectGroupId
+      : selectionEffectGroupId && effectGroups.some((group) => group.id === selectionEffectGroupId)
+        ? selectionEffectGroupId
       : (effectGroups[0]?.id ?? null);
+
+  useEffect(() => {
+    setValidationIssues([]);
+    setValidationStatus("idle");
+    setValidationError(null);
+  }, [draft.draft_id]);
 
   return (
     <section className="event-authoring-workspace" aria-label="Event authoring workspace">
@@ -101,7 +115,11 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               <p className="muted-text">{activeStepConfig.responsibility}</p>
             </div>
             <span className="status-tag status-muted">
-              {activeStep === "basic" || activeStep === "trigger" || activeStep === "graph" || activeStep === "effects"
+              {activeStep === "basic" ||
+              activeStep === "trigger" ||
+              activeStep === "graph" ||
+              activeStep === "effects" ||
+              activeStep === "review"
                 ? "editable"
                 : "placeholder"}
             </span>
@@ -123,6 +141,15 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               selectedEffectGroupId={resolvedSelectedEffectGroupId}
               onSelectedEffectGroupIdChange={setSelectedEffectGroupId}
               onDraftChange={onDraftChange}
+            />
+          ) : activeStep === "review" ? (
+            <ReviewStep
+              draft={draft}
+              issues={validationIssues}
+              status={validationStatus}
+              errorMessage={validationError}
+              onValidate={onValidateDraft ? runValidation : undefined}
+              onIssueJump={jumpToIssue}
             />
           ) : (
             <StepPlaceholder step={activeStepConfig} draft={draft} />
@@ -205,6 +232,84 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
       }),
     );
   }
+
+  async function runValidation(): Promise<void> {
+    if (!onValidateDraft) {
+      return;
+    }
+
+    setValidationStatus("running");
+    setValidationError(null);
+
+    try {
+      const result = await onValidateDraft(draft);
+      setValidationIssues(result.issues);
+      setValidationStatus(result.valid ? "complete" : "complete");
+    } catch (error: unknown) {
+      setValidationError(error instanceof Error ? error.message : "Unknown validation error.");
+      setValidationStatus("error");
+    }
+  }
+
+  function jumpToIssue(issue: EventEditorIssue): void {
+    if (issue.editor_location?.effect_group_id) {
+      setSelectedEffectGroupId(issue.editor_location.effect_group_id);
+    }
+
+    onDraftChange(
+      eventAuthoringReducer(draft, {
+        type: "jump_to_editor_location",
+        location: issue.editor_location,
+        jsonPath: issue.json_path,
+      }),
+    );
+  }
+}
+
+function ReviewStep({
+  draft,
+  issues,
+  status,
+  errorMessage,
+  onValidate,
+  onIssueJump,
+}: {
+  draft: EventDraftEnvelope;
+  issues: EventEditorIssue[];
+  status: "idle" | "running" | "complete" | "error";
+  errorMessage: string | null;
+  onValidate?: () => void;
+  onIssueJump: (issue: EventEditorIssue) => void;
+}) {
+  return (
+    <div className="event-review-step" aria-label="Review step">
+      <dl className="event-authoring-step-summary">
+        <div>
+          <dt>Draft target</dt>
+          <dd>
+            <code>
+              {draft.target.domain}/{draft.target.definition_id}
+            </code>
+          </dd>
+        </div>
+        <div>
+          <dt>Working call templates</dt>
+          <dd>{draft.working_call_templates.length}</dd>
+        </div>
+        <div>
+          <dt>Draft hash</dt>
+          <dd>{formatDraftHash(draft.hashes.draft)}</dd>
+        </div>
+      </dl>
+      <EventValidationPanel
+        issues={issues}
+        status={status}
+        errorMessage={errorMessage}
+        onValidate={onValidate}
+        onIssueJump={onIssueJump}
+      />
+    </div>
+  );
 }
 
 function StepPlaceholder({
@@ -270,6 +375,15 @@ function MetaItem({
 
 function resolveActiveStep(step: EventEditorStep): AuthoringStep {
   return step === "domain" ? "basic" : step;
+}
+
+function readSelectionString(selection: unknown, key: string): string | null {
+  if (!selection || typeof selection !== "object" || Array.isArray(selection)) {
+    return null;
+  }
+
+  const value = (selection as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
 }
 
 function formatDraftHash(hash: string | null): string {

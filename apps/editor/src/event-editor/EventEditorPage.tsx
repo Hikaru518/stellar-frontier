@@ -6,6 +6,7 @@ import {
   HELPER_START_COMMAND,
   loadDraft,
   loadEventEditorLibrary,
+  validateDraft,
 } from "./apiClient";
 import DraftBrowser from "./authoring/DraftBrowser";
 import EventAuthoringWorkspace from "./authoring/EventAuthoringWorkspace";
@@ -19,18 +20,21 @@ import type {
   EditorEventAsset,
   EventDraftEnvelope,
   EventEditorLibraryResponse,
+  ValidateDraftResponse,
 } from "./types";
 
 type LoadLibrary = () => Promise<EventEditorLibraryResponse>;
 type CreateDraftRequestHandler = (request: CreateDraftRequest) => Promise<CreateDraftResponse>;
 type LoadDraftRequestHandler = (draftId: string) => Promise<EventDraftEnvelope>;
 type CreateDomainRequestHandler = (domainId: string) => Promise<CreateDomainResponse>;
+type ValidateDraftRequestHandler = (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
 
 interface EventEditorPageProps {
   loadLibrary?: LoadLibrary;
   createDraftRequest?: CreateDraftRequestHandler;
   loadDraftRequest?: LoadDraftRequestHandler;
   createDomainRequest?: CreateDomainRequestHandler;
+  validateDraftRequest?: ValidateDraftRequestHandler;
 }
 
 type InspectorTab = "schema" | "graph";
@@ -45,6 +49,7 @@ export default function EventEditorPage({
   createDraftRequest = defaultCreateDraftRequest,
   loadDraftRequest = defaultLoadDraftRequest,
   createDomainRequest = defaultCreateDomainRequest,
+  validateDraftRequest = defaultValidateDraftRequest,
 }: EventEditorPageProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [library, setLibrary] = useState<EventEditorLibraryResponse | null>(null);
@@ -173,7 +178,7 @@ export default function EventEditorPage({
 
         <div className="event-detail-pane" aria-label="Selected event workspace">
           {activeDraft ? (
-            <EventAuthoringWorkspace draft={activeDraft} onDraftChange={setActiveDraft} />
+            <EventAuthoringWorkspace draft={activeDraft} onDraftChange={setActiveDraft} onValidateDraft={validateDraftRequest} />
           ) : activeAsset ? (
             <>
               <AssetHeaderStrip asset={activeAsset} />
@@ -533,4 +538,8 @@ function defaultLoadDraftRequest(draftId: string): Promise<EventDraftEnvelope> {
 
 function defaultCreateDomainRequest(domainId: string): Promise<CreateDomainResponse> {
   return createDomain({ domainId });
+}
+
+function defaultValidateDraftRequest(draft: EventDraftEnvelope): Promise<ValidateDraftResponse> {
+  return validateDraft({ draftId: draft.draft_id, draft, level: "publish" });
 }

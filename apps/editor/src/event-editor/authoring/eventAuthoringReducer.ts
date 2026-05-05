@@ -31,6 +31,7 @@ import type {
   EventDraftEnvelope,
   EventDraftWorkingCallTemplate,
   EventDraftWorkingDefinition,
+  EventEditorIssue,
   EventEditorStep,
 } from "../types";
 import { triggerCapabilities } from "./capabilityCatalog";
@@ -106,6 +107,7 @@ type SpawnEventNodeFieldsUpdate = Partial<
 type EffectGroupFieldsUpdate = Partial<Pick<EffectGroup, "id" | "description">>;
 type EffectFieldsUpdate = Partial<Effect>;
 type LogTemplateFieldsUpdate = Partial<EventLogTemplate>;
+type EditorLocation = NonNullable<EventEditorIssue["editor_location"]>;
 
 const DEFAULT_CANDIDATE_SELECTION: EventDefinition["candidate_selection"] = {
   priority: 0,
@@ -128,6 +130,11 @@ export type EventAuthoringAction =
       type: "select_step";
       step: EventEditorStep;
       selection?: unknown;
+    }
+  | {
+      type: "jump_to_editor_location";
+      location: EditorLocation | null | undefined;
+      jsonPath?: string;
     }
   | {
       type: "update_basic_fields";
@@ -302,6 +309,8 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
   switch (action.type) {
     case "select_step":
       return selectStep(draft, action.step, action.selection);
+    case "jump_to_editor_location":
+      return jumpToEditorLocation(draft, action.location, action.jsonPath);
     case "update_basic_fields":
       return updateBasicFields(draft, action.fields);
     case "update_candidate_selection":
@@ -384,6 +393,30 @@ function selectStep(draft: EventDraftEnvelope, step: EventEditorStep, selection:
       selection: selection ?? null,
     },
   };
+}
+
+function jumpToEditorLocation(
+  draft: EventDraftEnvelope,
+  location: EditorLocation | null | undefined,
+  jsonPath: string | undefined,
+): EventDraftEnvelope {
+  if (!location) {
+    return selectStep(draft, "review", {
+      step: "review",
+      fieldPath: jsonPath ?? null,
+    });
+  }
+
+  return selectStep(draft, location.step, {
+    step: location.step,
+    section: location.section ?? null,
+    nodeId: location.node_id ?? null,
+    optionId: location.option_id ?? null,
+    effectGroupId: location.effect_group_id ?? null,
+    effectId: location.effect_id ?? null,
+    callTemplateId: location.call_template_id ?? null,
+    fieldPath: location.field_path ?? jsonPath ?? null,
+  });
 }
 
 function updateBasicFields(draft: EventDraftEnvelope, fields: BasicFieldsUpdate): EventDraftEnvelope {

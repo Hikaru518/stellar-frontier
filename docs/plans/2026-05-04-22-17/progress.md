@@ -47,7 +47,7 @@ source:
 | 21 | TASK-021 | 实现 Call/Check/Random graph editor | completed | 1 |
 | 22 | TASK-022 | 实现 Advanced node editors | completed | 1 |
 | 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | completed | 1 |
-| 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | pending | 0 |
+| 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | completed | 1 |
 | 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | pending | 0 |
 | 26 | TASK-026 | 整合 Save Draft UI | pending | 0 |
 | 27 | TASK-027 | 整合 Publish Panel UI | pending | 0 |
@@ -312,3 +312,12 @@ source:
 - developer summary: 新增 Effects step，支持 effect group 增删改、effect 增删改、target/params/failure_policy/record_policy/handler_type 结构化编辑；新增 log template 增删改；Capability Catalog 支持 effects 模式并可把 effect template 插入当前 effect group；Effects step 显示缺失 effect group 引用 warning，并支持 end/log_only node 的 history_writes 与 end final_effect_refs 编辑。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（43 files / 230 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/EffectsStep.tsx apps/editor/src/event-editor/authoring/EffectsStep.test.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts apps/editor/src/event-editor/authoring/CapabilityCatalogPanel.tsx apps/editor/src/event-editor/authoring/CapabilityCatalogPanel.test.tsx docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task023_semantic_check_1777972211124_20260505_091011`；确认 Effects step 可新增/编辑 `bridge_effects`、结构化编辑 `handler_effect` target/params/failure/record policy、通过 Catalog 插入 handler effect template、新增并编辑 `bridge_resolved_log`、编辑 end node final_effect_refs 和 history write；缺失 `missing_effects` effect group 时显示 warning；修复并确认 history write 更新后仍停留在 Effects step；浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-024: 实现 Validation Panel 与 editor-location jump
+- 状态: completed
+- 开始时间: 2026-05-05 17:14
+- 完成时间: 2026-05-05 17:31
+- 尝试次数: 1
+- developer summary: 新增 `EventValidationPanel`，按 Basic/Trigger/Graph/Effects/Call Template/Domain/Review fallback 分组展示 `EventEditorIssue`，保留 severity/code/message/path/location；新增 `jsonPath` helper 处理 JSON Pointer 与 dot/bracket fallback；Review step 接入 publish validation 按钮并展示 helper 返回的 issues；reducer 新增 `jump_to_editor_location`，点击 issue 可写入 step/section/node/effect/call template selection。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（45 files / 237 tests）。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task024_semantic_check_1777973236313_20260505_092716` 并通过 helper 保存带缺失 graph target、缺失 effect group、缺失 effect handler 的验证 fixture；在 Review step 点击 Run publish validation 后确认 Validation Panel 显示 5 个 error，并按 Graph / Effects / Call Template 分组展示 code、message、JSON path；点击 Call Template `unknown_effect_ref` issue 跳转到 Graph step 且 `Node id = call`；点击 Effects `unknown_handler_type` issue 跳转到 Effects step 且显示当前 `bridge_effects` group；浏览器 console error 为空。验证后已删除临时 draft 文件。

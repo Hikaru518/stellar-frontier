@@ -437,6 +437,10 @@ p {
   color: #8a5a11;
 }
 
+.status-error {
+  color: #8a3d1a;
+}
+
 .status-locked {
   border-color: #24384f;
   color: #24384f;
@@ -721,7 +725,8 @@ p {
 .event-authoring-step-panel,
 .event-authoring-helper-panel,
 .event-authoring-step-summary,
-.event-authoring-helper-list {
+.event-authoring-helper-list,
+.event-review-step {
   display: grid;
   gap: 8px;
 }
@@ -1383,6 +1388,27 @@ p {
   color: #46505a;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
+}
+
+.event-validation-panel {
+  min-width: 0;
+}
+
+.event-validation-toolbar,
+.validation-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-validation-toolbar {
+  justify-content: space-between;
+}
+
+.validation-issue-location {
+  color: #46505a;
+  font-size: 12px;
 }
 
 @media (max-width: 980px) {

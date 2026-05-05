@@ -935,6 +935,63 @@ describe("event authoring reducer", () => {
     });
     expect(updated.editor_state).toEqual(draft.editor_state);
   });
+
+  it("jumps validation issues to graph and effects editor selections", () => {
+    const draft = createDraft();
+
+    const graphJump = eventAuthoringReducer(draft, {
+      type: "jump_to_editor_location",
+      location: {
+        step: "graph",
+        section: "event_graph",
+        node_id: "call",
+        option_id: "ack",
+        field_path: "/event_definitions/0/event_graph/nodes/0/options/0/id",
+      },
+    });
+    const effectsJump = eventAuthoringReducer(draft, {
+      type: "jump_to_editor_location",
+      location: {
+        step: "effects",
+        section: "effect_groups",
+        effect_group_id: "bridge_effects",
+        effect_id: "bridge_effect",
+        field_path: "/event_definitions/0/effect_groups/0/effects/0/id",
+      },
+    });
+    const fallbackJump = eventAuthoringReducer(draft, {
+      type: "jump_to_editor_location",
+      location: undefined,
+      jsonPath: "/event_definitions/0/unknown",
+    });
+
+    expect(graphJump.editor_state).toMatchObject({
+      active_step: "graph",
+      selection: {
+        step: "graph",
+        section: "event_graph",
+        nodeId: "call",
+        optionId: "ack",
+        fieldPath: "/event_definitions/0/event_graph/nodes/0/options/0/id",
+      },
+    });
+    expect(effectsJump.editor_state).toMatchObject({
+      active_step: "effects",
+      selection: {
+        step: "effects",
+        section: "effect_groups",
+        effectGroupId: "bridge_effects",
+        effectId: "bridge_effect",
+      },
+    });
+    expect(fallbackJump.editor_state).toMatchObject({
+      active_step: "review",
+      selection: {
+        step: "review",
+        fieldPath: "/event_definitions/0/unknown",
+      },
+    });
+  });
 });
 
 function createDraft(overrides: Partial<EventDraftEnvelope> = {}): EventDraftEnvelope {
