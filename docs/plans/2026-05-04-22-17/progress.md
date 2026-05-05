@@ -28,7 +28,7 @@ source:
 | 2 | TASK-002 | 实现 Event domain manifest store | completed | 2 |
 | 3 | TASK-003 | 实现 Draft envelope store | completed | 1 |
 | 4 | TASK-004 | 实现 Event validation adapter | completed | 1 |
-| 5 | TASK-005 | 添加 Draft 和 Domain helper routes | pending | 0 |
+| 5 | TASK-005 | 添加 Draft 和 Domain helper routes | completed | 2 |
 | 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | pending | 0 |
 | 7 | TASK-007 | 实现 Publish content builder | pending | 0 |
 | 8 | TASK-008 | 实现 Publish IO service | pending | 0 |
@@ -94,3 +94,15 @@ source:
 - developer summary: 新增 helper 侧 Event validation adapter，统一 AJV schema、manifest、cross-reference validation issues 为 `EventEditorIssue`；支持 dot/bracket path 转 JSON Pointer，并尽量映射到 `basic` / `trigger` / `graph` / `effects` / `domain` / `review` editor location。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（24 files / 112 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/eventValidation.mjs apps/editor/helper/eventValidation.test.mjs apps/editor/package.json common/config/rush/pnpm-lock.yaml docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 editor helper validation adapter，无可交互 UI 面。
+
+### TASK-005: 添加 Draft 和 Domain helper routes
+- 状态: completed
+- 开始时间: 2026-05-05 10:37
+- 完成时间: 2026-05-05 11:35
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: developer 子任务新增了 `server.test.mjs` 的 event domain/draft route 测试，但未完成 `server.mjs` route 实现且长时间无响应；已关闭该子任务并保留测试改动，交给下一次尝试补完。
+  - 尝试 2: developer 子任务补全 `server.mjs` routes 并返回成功 summary；dispatcher 复核时追加了 URI route segment 解码修正，确保 unsafe encoded draft id 返回 400。
+- developer summary: 在 helper server 暴露 `POST /api/event-editor/domains`、`POST /api/event-editor/drafts`、`GET /api/event-editor/drafts/:draft_id`、`POST /api/event-editor/drafts/:draft_id/save`、`POST /api/event-editor/drafts/:draft_id/validate`；draft validate 只校验 envelope，publish validate 调用 `eventValidation.mjs` 并返回 generated content。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（24 files / 117 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/server.mjs apps/editor/helper/server.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改 editor helper HTTP routes，语义由 helper server tests 覆盖。
