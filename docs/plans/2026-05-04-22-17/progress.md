@@ -34,7 +34,7 @@ source:
 | 8 | TASK-008 | 实现 Publish IO service | completed | 2 |
 | 9 | TASK-009 | 添加 Publish helper route 和前端 client | completed | 3 |
 | 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | completed | 4 |
-| 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | pending | 0 |
+| 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | completed | 3 |
 | 12 | TASK-012 | 实现 Node capability registry 与 node templates | pending | 0 |
 | 13 | TASK-013 | 实现 Effect 与 Handler capability registry | pending | 0 |
 | 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | pending | 0 |
@@ -165,3 +165,16 @@ source:
 - developer summary: 新增 authoring draft envelope 默认模型、timestamp/draft id 生成、target/editor/hash 默认值、类型守卫、safe id/normalization、call template id 派生、默认 blocking/graph rules/text variant group，以及 schema-aligned event definition/call template shell。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（28 files / 149 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/draftEnvelope.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/draftEnvelope.test.ts apps/editor/src/event-editor/authoring/templates.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只新增纯 authoring model/template helper，无可交互 UI 面。
+
+### TASK-011: 实现 Trigger 与 Condition capability registry
+- 状态: completed
+- 开始时间: 2026-05-05 13:31
+- 完成时间: 2026-05-05 13:46
+- 尝试次数: 3
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区仅看到 `capabilityCatalog.test.ts`，未看到 `capabilityCatalog.ts` 或 `formRegistry.ts` 实现文件，交给下一次尝试补完。
+  - 尝试 2: developer 子任务长时间未返回，关闭时仍在运行；工作区看到 `formRegistry.ts`，但仍未看到核心 `capabilityCatalog.ts`，交给第三次尝试补完。
+  - 尝试 3: developer 子任务补齐 `capabilityCatalog.ts` 并返回成功 summary。
+- developer summary: 新增 Trigger/Condition capability catalog，覆盖全部当前 TriggerType/ConditionType；每个 capability 提供 label、description、field config、requiredFields、template 和 commonUse；`handler_condition` 从 `handler_registry.json` 过滤 condition handler 并暴露 select options。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（29 files / 154 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/capabilityCatalog.ts apps/editor/src/event-editor/authoring/formRegistry.ts apps/editor/src/event-editor/authoring/capabilityCatalog.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只新增纯 capability/form registry，无可交互 UI 面。
