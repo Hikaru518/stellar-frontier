@@ -271,6 +271,104 @@ describe("helper server", () => {
     );
   });
 
+  it("publishes event drafts through /api/event-editor/drafts/:draft_id/publish", async () => {
+    await restartWithTempEventRepo();
+    const created = await createTempDraft();
+    const saved = await savePublishableDraft(created);
+
+    const response = await postJson(`/api/event-editor/drafts/${created.draft.draft_id}/publish`, {
+      expected_draft_hash: saved.draft_hash,
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual(
+      expect.objectContaining({
+        published: true,
+        written_files: [
+          "content/events/definitions/forest.json",
+          "content/events/call_templates/forest.json",
+          "content/events/manifest.json",
+        ],
+        archived_draft_path: `content/events/drafts/archive/${created.draft.draft_id}.json`,
+        issues: [],
+      }),
+    );
+    expect(body.generated.definition).toEqual(
+      expect.objectContaining({
+        id: "forest_bridge_choice",
+        domain: "forest",
+        status: "ready_for_test",
+      }),
+    );
+    const definitions = await readTempJson("content/events/definitions/forest.json");
+    expect(definitions.event_definitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "forest_bridge_choice",
+          title: "Bridge choice",
+        }),
+      ]),
+    );
+    await expect(readTempJson(body.archived_draft_path)).resolves.toEqual(
+      expect.objectContaining({
+        status: "archived",
+        published_files: body.written_files,
+      }),
+    );
+  });
+
+  it("returns publish validation failures as HTTP 200 business responses", async () => {
+    await restartWithTempEventRepo();
+    const created = await createTempDraft();
+
+    const response = await postJson(`/api/event-editor/drafts/${created.draft.draft_id}/publish`, {});
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.published).toBe(false);
+    expect(body.written_files).toEqual([]);
+    expect(body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          severity: "error",
+          asset_type: "event_definition",
+          asset_id: "forest_bridge_choice",
+        }),
+      ]),
+    );
+  });
+
+  it("returns publish source conflicts as HTTP 200 without writing formal files", async () => {
+    await restartWithTempEventRepo();
+    const created = await createTempDraft();
+    const saved = await savePublishableDraft(created);
+    const before = await snapshotEventFormalFiles();
+
+    const response = await postJson(`/api/event-editor/drafts/${created.draft.draft_id}/publish`, {
+      expected_draft_hash: saved.draft_hash,
+      expected_source_hashes: {
+        "content/events/definitions/forest.json": "0".repeat(64),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.published).toBe(false);
+    expect(body.written_files).toEqual([]);
+    expect(body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "source_hash_conflict",
+          asset_type: "source_file",
+          asset_id: "content/events/definitions/forest.json",
+        }),
+      ]),
+    );
+    await expect(snapshotEventFormalFiles()).resolves.toEqual(before);
+    await expect(fs.access(path.join(tempRepoRoot, created.file_path))).resolves.toBeUndefined();
+  });
+
   it("serves the map editor library shape from /api/map-editor/library", async () => {
     const response = await fetch(`${baseUrl}/api/map-editor/library`);
     expect(response.status).toBe(200);
@@ -437,10 +535,14 @@ describe("helper server", () => {
     await fs.cp(path.join(repoRoot, "content/schemas"), path.join(tempRepoRoot, "content/schemas"), {
       recursive: true,
     });
+    const runtimeValidationTarget = path.join(tempRepoRoot, "apps/pc-client/src/events/validation.ts");
+    await fs.mkdir(path.dirname(runtimeValidationTarget), { recursive: true });
+    await fs.copyFile(path.join(repoRoot, "apps/pc-client/src/events/validation.ts"), runtimeValidationTarget);
     await writeTempJson("content/events/manifest.json", {
       schema_version: "event-manifest.v1",
       domains: [manifestDomain("forest"), manifestDomain("desert")],
     });
+    await writeTempJson("content/events/handler_registry.json", { handlers: [] });
     await writeTempJson("content/events/definitions/forest.json", {
       event_definitions: [minimalEventDefinition()],
     });
@@ -466,6 +568,38 @@ describe("helper server", () => {
     });
     expect(response.status).toBe(200);
     return response.json();
+  }
+
+  async function savePublishableDraft(created) {
+    const definitionId = created.draft.target.definition_id;
+    const callTemplateId = `${definitionId}_call`;
+    const response = await postJson(`/api/event-editor/drafts/${created.draft.draft_id}/save`, {
+      draft: {
+        ...created.draft,
+        working_definition: minimalEventDefinition({
+          id: definitionId,
+          title: "Bridge choice",
+          callTemplateId,
+        }),
+        working_call_templates: [
+          minimalCallTemplate({
+            id: callTemplateId,
+            eventDefinitionId: definitionId,
+          }),
+        ],
+      },
+      expected_draft_hash: created.draft.hashes.draft,
+    });
+    expect(response.status).toBe(200);
+    return response.json();
+  }
+
+  async function snapshotEventFormalFiles() {
+    return {
+      definitions: await fs.readFile(path.join(tempRepoRoot, "content/events/definitions/forest.json"), "utf8"),
+      callTemplates: await fs.readFile(path.join(tempRepoRoot, "content/events/call_templates/forest.json"), "utf8"),
+      manifest: await fs.readFile(path.join(tempRepoRoot, "content/events/manifest.json"), "utf8"),
+    };
   }
 
   async function postJson(pathname, body) {
@@ -539,13 +673,17 @@ function manifestDomain(id) {
   };
 }
 
-function minimalEventDefinition() {
+function minimalEventDefinition({
+  id = "forest_trace",
+  title = "Forest Trace",
+  callTemplateId = "forest_trace_call",
+} = {}) {
   return {
     schema_version: "event-program-model-v1",
-    id: "forest_trace",
+    id,
     version: 1,
     domain: "forest",
-    title: "Forest Trace",
+    title,
     summary: "A small trace in the forest.",
     tags: ["forest"],
     status: "draft",
@@ -564,12 +702,12 @@ function minimalEventDefinition() {
       scope: "world",
       max_trigger_count: null,
       cooldown_seconds: 0,
-      history_key_template: "event:forest_trace",
+      history_key_template: `event:${id}`,
       allow_while_active: false,
     },
     event_graph: {
       entry_node_id: "call",
-      nodes: [minimalCallNode(), minimalEndNode()],
+      nodes: [minimalCallNode({ callTemplateId }), minimalEndNode()],
       edges: [
         { from_node_id: "call", to_node_id: "end", via: "accept" },
         { from_node_id: "call", to_node_id: "end", via: "decline" },
@@ -590,14 +728,14 @@ function minimalEventDefinition() {
   };
 }
 
-function minimalCallNode() {
+function minimalCallNode({ callTemplateId = "forest_trace_call" } = {}) {
   return {
     id: "call",
     type: "call",
     title: "Call",
     blocking: minimalBlocking(),
     event_log_template_id: "call_log",
-    call_template_id: "forest_trace_call",
+    call_template_id: callTemplateId,
     speaker_crew_ref: { type: "primary_crew" },
     urgency: "normal",
     delivery: "incoming_call",
@@ -627,13 +765,16 @@ function minimalEndNode() {
   };
 }
 
-function minimalCallTemplate() {
+function minimalCallTemplate({
+  id = "forest_trace_call",
+  eventDefinitionId = "forest_trace",
+} = {}) {
   return {
     schema_version: "event-program-model-v1",
-    id: "forest_trace_call",
+    id,
     version: 1,
     domain: "forest",
-    event_definition_id: "forest_trace",
+    event_definition_id: eventDefinitionId,
     node_id: "call",
     render_context_fields: [],
     opening_lines: minimalVariantGroup("Opening"),

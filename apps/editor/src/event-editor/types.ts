@@ -104,7 +104,7 @@ export interface EventEditorIssue {
   severity: "error" | "warning";
   code: string;
   message: string;
-  asset_type?: "draft" | "event_definition" | "call_template" | "manifest" | "domain";
+  asset_type?: "draft" | "event_definition" | "call_template" | "manifest" | "domain" | "source_file";
   asset_id?: string;
   json_path?: string;
   editor_location?: {
@@ -117,6 +117,7 @@ export interface EventEditorIssue {
     call_template_id?: string;
     field_path?: string;
   };
+  details?: Record<string, unknown>;
 }
 
 export interface EventEditorLibraryResponse {
@@ -184,4 +185,20 @@ export interface ValidateDraftResponse {
     definition?: EventDefinition;
     call_templates?: CallTemplate[];
   };
+}
+
+export interface PublishDraftRequest {
+  expected_draft_hash?: string | null;
+  expected_source_hashes?: Record<string, string | null>;
+}
+
+export interface PublishDraftResponse {
+  published: boolean;
+  written_files: string[];
+  generated?: {
+    definition?: EventDraftWorkingDefinition;
+    call_templates?: EventDraftWorkingCallTemplate[];
+  };
+  archived_draft_path?: string;
+  issues: EventEditorIssue[];
 }

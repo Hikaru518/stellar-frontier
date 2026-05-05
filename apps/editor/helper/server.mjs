@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { loadEventEditorLibrary } from "./contentStore.mjs";
 import { createEventDraftStore } from "./eventDraftStore.mjs";
 import { createEventManifestStore } from "./eventManifestStore.mjs";
+import { createEventPublishService } from "./eventPublishService.mjs";
 import { validateEventAssetsForPublish } from "./eventValidation.mjs";
 import { loadMapEditorLibrary } from "./mapContentStore.mjs";
 import { validateMapEditorMap } from "./mapValidation.mjs";
@@ -107,6 +108,17 @@ async function routeRequest(request, response, { repoRoot }) {
       repoRoot,
       draftId: eventDraftRoute.draftId,
       body,
+    }));
+    return;
+  }
+
+  if (eventDraftRoute && request.method === "POST" && eventDraftRoute.action === "publish") {
+    const body = await readJsonBody(request);
+    const publishService = createEventPublishService({ repoRoot });
+    sendJson(response, 200, await publishService.publishDraft({
+      draftId: eventDraftRoute.draftId,
+      expectedDraftHash: body?.expected_draft_hash ?? null,
+      expectedSourceHashes: body?.expected_source_hashes ?? null,
     }));
     return;
   }
@@ -227,7 +239,11 @@ function matchEventDraftRoute(pathname) {
     };
   }
 
-  if (segments.length === 2 && segments[0] && (segments[1] === "save" || segments[1] === "validate")) {
+  if (
+    segments.length === 2
+    && segments[0]
+    && (segments[1] === "save" || segments[1] === "validate" || segments[1] === "publish")
+  ) {
     return {
       action: segments[1],
       draftId: decodeRouteSegment(segments[0], "invalid_draft_id"),

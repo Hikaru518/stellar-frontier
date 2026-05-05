@@ -6,10 +6,11 @@ import {
   createDraft,
   loadDraft,
   loadEventEditorLibrary,
+  publishDraft,
   saveDraft,
   validateDraft,
 } from "./apiClient";
-import type { CreateDraftRequest, EventDraftEnvelope, EventEditorLibraryResponse } from "./types";
+import type { CreateDraftRequest, EventDraftEnvelope, EventEditorLibraryResponse, PublishDraftResponse } from "./types";
 
 describe("event editor API client", () => {
   it("loads the event editor library from the helper API", async () => {
@@ -199,6 +200,42 @@ describe("event editor API client", () => {
     expect(readLastJsonBody(fetchImpl)).toEqual({
       draft,
       level: "draft",
+    });
+  });
+
+  it("publishes drafts with contract-only request bodies", async () => {
+    const draft = createDraftEnvelope();
+    const publishResponse: PublishDraftResponse = {
+      published: true,
+      written_files: [
+        "content/events/definitions/forest.json",
+        "content/events/call_templates/forest.json",
+        "content/events/manifest.json",
+      ],
+      archived_draft_path: "content/events/drafts/archive/forest_bridge_choice_20260505_153012.json",
+      generated: {
+        definition: draft.working_definition,
+        call_templates: draft.working_call_templates,
+      },
+      issues: [],
+    };
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(publishResponse), { status: 200 }));
+
+    await expect(publishDraft({
+      draftId: draft.draft_id,
+      expectedDraftHash: "a".repeat(64),
+      expectedSourceHashes: {
+        "content/events/definitions/forest.json": "b".repeat(64),
+      },
+      fetchImpl,
+    })).resolves.toEqual(publishResponse);
+
+    expect(fetchImpl).toHaveBeenCalledWith(`${DEFAULT_HELPER_BASE_URL}/api/event-editor/drafts/${draft.draft_id}/publish`, expect.any(Object));
+    expect(readLastJsonBody(fetchImpl)).toEqual({
+      expected_draft_hash: "a".repeat(64),
+      expected_source_hashes: {
+        "content/events/definitions/forest.json": "b".repeat(64),
+      },
     });
   });
 

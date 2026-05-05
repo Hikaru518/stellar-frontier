@@ -32,7 +32,7 @@ source:
 | 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | completed | 1 |
 | 7 | TASK-007 | 实现 Publish content builder | completed | 1 |
 | 8 | TASK-008 | 实现 Publish IO service | completed | 2 |
-| 9 | TASK-009 | 添加 Publish helper route 和前端 client | pending | 0 |
+| 9 | TASK-009 | 添加 Publish helper route 和前端 client | completed | 3 |
 | 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | pending | 0 |
 | 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | pending | 0 |
 | 12 | TASK-012 | 实现 Node capability registry 与 node templates | pending | 0 |
@@ -136,3 +136,16 @@ source:
 - developer summary: 新增 Publish IO service，读取 active draft，经 builder 生成正式内容后在内存中合成目标 definitions/call_templates，先执行 manifest、schema、cross-reference、source hash conflict、archive target 和重复 ID 校验，全部通过后写入正式 content 文件并 archive draft；失败路径保持 no-write。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（26 files / 133 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/eventPublishService.mjs apps/editor/helper/eventPublishService.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 editor helper publish IO service，语义由 helper service tests 覆盖。
+
+### TASK-009: 添加 Publish helper route 和前端 client
+- 状态: completed
+- 开始时间: 2026-05-05 12:34
+- 完成时间: 2026-05-05 12:53
+- 尝试次数: 3
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区仅看到 `server.test.mjs` 和 `apiClient.test.ts` 测试改动，未看到 route/client/types 实现，交给下一次尝试补完。
+  - 尝试 2: developer 子任务长时间未返回，关闭时仍在运行；工作区仍只看到 `server.test.mjs` 和 `apiClient.test.ts` 测试改动，未看到 `server.mjs`、`apiClient.ts` 或 `types.ts` 实现变化，交给第三次尝试补完。
+  - 尝试 3: developer 子任务补出 route/client/types 实现但未返回 summary；dispatcher 复核后修正了 server test 临时 repo 缺少 runtime validation fixture 导致的 500，并完成验证。
+- developer summary: 第三次尝试补齐 `POST /api/event-editor/drafts/:draft_id/publish` route、`publishDraft` 前端 API client、publish request/response 类型和 route/client 测试；route 将 `expected_draft_hash`、`expected_source_hashes` 转交 TASK-008 publish service，业务 publish failure 保持 HTTP 200。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（26 files / 137 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/server.mjs apps/editor/helper/server.test.mjs apps/editor/src/event-editor/apiClient.ts apps/editor/src/event-editor/types.ts apps/editor/src/event-editor/apiClient.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改 helper route、API client 和类型契约，无可交互 UI 面。

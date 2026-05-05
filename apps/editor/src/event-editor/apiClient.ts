@@ -5,6 +5,8 @@ import type {
   CreateDraftResponse,
   EventDraftEnvelope,
   EventEditorLibraryResponse,
+  PublishDraftRequest,
+  PublishDraftResponse,
   SaveDraftRequest,
   SaveDraftResponse,
   ValidateDraftRequest,
@@ -152,6 +154,27 @@ export async function validateDraft({
   });
 }
 
+export async function publishDraft({
+  draftId,
+  expectedDraftHash,
+  expectedSourceHashes,
+  baseUrl = DEFAULT_HELPER_BASE_URL,
+  fetchImpl = globalThis.fetch.bind(globalThis),
+}: {
+  draftId: string;
+  expectedDraftHash?: string | null;
+  expectedSourceHashes?: Record<string, string | null>;
+  baseUrl?: string;
+  fetchImpl?: FetchImpl;
+}): Promise<PublishDraftResponse> {
+  return postEventEditorJson<PublishDraftResponse>({
+    baseUrl,
+    fetchImpl,
+    path: `/api/event-editor/drafts/${encodeURIComponent(draftId)}/publish`,
+    body: buildPublishDraftRequest(expectedDraftHash, expectedSourceHashes),
+  });
+}
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -184,6 +207,16 @@ function buildValidateDraftRequest(level: ValidateDraftRequest["level"], draft: 
   return draft === undefined
     ? { level }
     : { draft, level };
+}
+
+function buildPublishDraftRequest(
+  expectedDraftHash: string | null | undefined,
+  expectedSourceHashes: Record<string, string | null> | undefined,
+): PublishDraftRequest {
+  return {
+    ...(expectedDraftHash !== undefined ? { expected_draft_hash: expectedDraftHash } : {}),
+    ...(expectedSourceHashes !== undefined ? { expected_source_hashes: { ...expectedSourceHashes } } : {}),
+  };
 }
 
 async function getEventEditorJson<T>({
