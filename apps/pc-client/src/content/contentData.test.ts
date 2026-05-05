@@ -8,56 +8,99 @@ import tilesetRegistry from "../../../../content/maps/tilesets/registry.json";
 import mapTilesetsSchema from "../../../../content/schemas/map-tilesets.schema.json";
 import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import { buildEventContentIndex } from "../events/contentIndex";
+import type { CallTemplate, EventDefinition, PresetDefinition } from "../events/types";
 import type { MapConfigDefinition } from "./contentData";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
 
-describe("generated event content exports", () => {
-  const structuredDomains = [
-    "crash_site",
-    "desert",
-    "forest",
-    "mainline_crash_site",
-    "mainline_ending",
-    "mainline_hive",
-    "mainline_medical",
-    "mainline_resources",
-    "mainline_village",
-    "mine",
-    "mountain",
-  ];
+interface EventManifest {
+  schema_version: string;
+  domains: Array<{
+    id: string;
+    definitions: string;
+    call_templates: string;
+    presets: string | null;
+  }>;
+}
 
+interface EventDefinitionsContent {
+  event_definitions: EventDefinition[];
+}
+
+interface CallTemplatesContent {
+  call_templates: CallTemplate[];
+}
+
+interface PresetsContent {
+  presets: PresetDefinition[];
+}
+
+const typedEventManifest = eventManifest as EventManifest;
+
+function readEventManifestJson<T>(manifestPath: string): T {
+  const filePath = path.join(repoRoot, "content/events", manifestPath);
+  return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+}
+
+function expectedDefinitionsFromManifest(): EventDefinition[] {
+  return typedEventManifest.domains.flatMap(
+    (domain) => readEventManifestJson<EventDefinitionsContent>(domain.definitions).event_definitions,
+  );
+}
+
+function expectedCallTemplatesFromManifest(): CallTemplate[] {
+  return typedEventManifest.domains.flatMap(
+    (domain) => readEventManifestJson<CallTemplatesContent>(domain.call_templates).call_templates,
+  );
+}
+
+function expectedPresetsFromManifest(): PresetDefinition[] {
+  return typedEventManifest.domains.flatMap((domain) =>
+    domain.presets ? readEventManifestJson<PresetsContent>(domain.presets).presets : [],
+  );
+}
+
+describe("event content exports", () => {
   it("tracks every authored structured event domain in the manifest", () => {
     expect(eventManifest.schema_version).toBe("event-manifest.v1");
-    expect(eventManifest.domains.map((domain) => domain.id).sort()).toEqual(structuredDomains);
+    expect(typedEventManifest.domains.length).toBeGreaterThan(0);
+    expect(new Set(typedEventManifest.domains.map((domain) => domain.id)).size).toBe(typedEventManifest.domains.length);
+  });
+
+  it("loads structured event runtime content from manifest-backed Vite globs", () => {
+    const contentDataSource = fs.readFileSync(path.join(repoRoot, "apps/pc-client/src/content/contentData.ts"), "utf8");
+
+    expect(contentDataSource).toContain('import eventManifest from "../../../../content/events/manifest.json"');
+    expect(contentDataSource).toContain('import.meta.glob("../../../../content/events/definitions/*.json"');
+    expect(contentDataSource).toContain('import.meta.glob("../../../../content/events/call_templates/*.json"');
+    expect(contentDataSource).toContain('import.meta.glob("../../../../content/events/presets/*.json"');
+    expect(contentDataSource).not.toContain("./generated/eventContentManifest");
+    expect(contentDataSource).not.toContain("generatedEvent");
+    expect(contentDataSource).not.toContain("drafts");
   });
 
   it("exposes authored definitions, call templates, handlers, and presets through eventContentLibrary", async () => {
     const contentData = await import("./contentData");
-    const generatedContent = await import("./generated/eventContentManifest");
-    const eventContentLibrary = contentData.eventContentLibrary as typeof contentData.eventContentLibrary & {
-      domains?: string[];
-    };
-    const generatedDomains = generatedContent as typeof generatedContent & {
-      generatedEventDomains?: readonly string[];
-    };
+    const expectedDomainIds = typedEventManifest.domains.map((domain) => domain.id);
+    const expectedEventDefinitions = expectedDefinitionsFromManifest();
+    const expectedCallTemplates = expectedCallTemplatesFromManifest();
+    const expectedPresets = expectedPresetsFromManifest();
 
-    expect(contentData.eventProgramDefinitions).toBe(generatedContent.generatedEventProgramDefinitions);
-    expect(contentData.callTemplates).toBe(generatedContent.generatedCallTemplates);
-    expect(contentData.presetDefinitions).toBe(generatedContent.generatedPresetDefinitions);
-    expect(generatedDomains.generatedEventDomains).toEqual(structuredDomains);
-    expect(eventContentLibrary.domains).toEqual(structuredDomains);
-
-    expect(new Set(contentData.eventProgramDefinitions.map((definition) => definition.domain))).toEqual(
-      new Set(structuredDomains),
-    );
-    expect(new Set(contentData.callTemplates.map((template) => template.domain))).toEqual(new Set(structuredDomains));
+    expect(contentData.eventContentLibrary.domains).toEqual(expectedDomainIds);
+    expect(contentData.eventProgramDefinitions).toEqual(expectedEventDefinitions);
+    expect(contentData.callTemplates).toEqual(expectedCallTemplates);
+    expect(contentData.presetDefinitions).toEqual(expectedPresets);
+    expect(contentData.eventContentLibrary.event_definitions).toBe(contentData.eventProgramDefinitions);
+    expect(contentData.eventContentLibrary.call_templates).toBe(contentData.callTemplates);
+    expect(contentData.eventContentLibrary.presets).toBe(contentData.presetDefinitions);
+    expect(new Set(contentData.eventProgramDefinitions.map((definition) => definition.domain))).toEqual(new Set(expectedDomainIds));
+    expect(new Set(contentData.callTemplates.map((template) => template.domain))).toEqual(new Set(expectedDomainIds));
     expect(contentData.eventContentLibrary.handlers.length).toBeGreaterThan(0);
 
     const indexResult = buildEventContentIndex(contentData.eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
-    expect(indexResult.index.definitionsByDomain.size).toBe(structuredDomains.length);
-    expect(indexResult.index.presetsById.size).toBe(generatedContent.generatedPresetDefinitions.length);
+    expect(indexResult.index.definitionsByDomain.size).toBe(expectedDomainIds.length);
+    expect(indexResult.index.presetsById.size).toBe(expectedPresets.length);
   });
 
   it("does not expose unsupported crew references in structured event content", async () => {
