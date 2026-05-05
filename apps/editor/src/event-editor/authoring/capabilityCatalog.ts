@@ -2,6 +2,8 @@ import handlerRegistryContent from "../../../../../content/events/handler_regist
 import type {
   Condition,
   ConditionType,
+  Effect,
+  EffectType,
   EventNode,
   EventNodeType,
   HandlerDefinition,
@@ -14,10 +16,11 @@ import {
   type FormFieldConfig,
   type FormSelectOption,
 } from "./formRegistry";
-import { createDefaultNodeTemplate, EVENT_NODE_TYPES } from "./templates";
+import { createDefaultEffectTemplate, createDefaultNodeTemplate, EVENT_NODE_TYPES } from "./templates";
 
 export type TriggerCapability = CapabilityDefinition<"trigger", TriggerType, TriggerDefinition>;
 export type ConditionCapability = CapabilityDefinition<"condition", ConditionType, Condition>;
+export type EffectCapability = CapabilityDefinition<"effect", EffectType, Effect>;
 export type NodeCapability = CapabilityDefinition<"node", EventNodeType, EventNode>;
 
 const triggerTypeOptions = [
@@ -57,6 +60,45 @@ const conditionTypeOptions = [
   option("handler_condition", "Handler condition", "Delegate condition evaluation to a registered handler."),
 ] as const satisfies readonly FormSelectOption[];
 
+const effectTypeOptions = [
+  option("add_crew_condition", "Add crew condition", "Add a condition marker to a crew member."),
+  option("remove_crew_condition", "Remove crew condition", "Remove a condition marker from a crew member."),
+  option("update_crew_attribute", "Update crew attribute", "Patch or set one crew attribute."),
+  option("add_personality_tag", "Add personality tag", "Add a personality tag to a crew member."),
+  option("remove_personality_tag", "Remove personality tag", "Remove a personality tag from a crew member."),
+  option("add_expertise_tag", "Add expertise tag", "Add an expertise tag to a crew member."),
+  option("update_crew_location", "Update crew location", "Move runtime crew location state."),
+  option("create_crew_action", "Create crew action", "Create a runtime crew action."),
+  option("cancel_crew_action", "Cancel crew action", "Cancel a runtime crew action."),
+  option("update_crew_action", "Update crew action", "Patch a runtime crew action."),
+  option("update_tile_field", "Update tile field", "Patch an authored tile runtime field."),
+  option("update_tile_state", "Update tile state", "Patch tile runtime state."),
+  option("add_tile_tag", "Add tile tag", "Add a tag to a tile."),
+  option("add_danger_tag", "Add danger tag", "Add a danger tag to a tile."),
+  option("set_discovery_state", "Set discovery state", "Set a tile discovery state."),
+  option("set_survey_state", "Set survey state", "Set a tile survey state."),
+  option("add_event_mark", "Add event mark", "Add an event-local mark."),
+  option("add_item", "Add item", "Add an item to an inventory."),
+  option("remove_item", "Remove item", "Remove an item from an inventory."),
+  option("transfer_item", "Transfer item", "Transfer an item between inventories."),
+  option("add_resource", "Add resource", "Add resource quantity."),
+  option("remove_resource", "Remove resource", "Remove resource quantity."),
+  option("update_tile_resource", "Update tile resource", "Patch tile resource data."),
+  option("create_objective", "Create objective", "Create a runtime objective."),
+  option("update_objective", "Update objective", "Patch a runtime objective."),
+  option("complete_objective", "Complete objective", "Complete a runtime objective."),
+  option("fail_objective", "Fail objective", "Fail a runtime objective."),
+  option("set_world_flag", "Set world flag", "Set a world flag value."),
+  option("increment_world_counter", "Increment world counter", "Increment a numeric world counter."),
+  option("write_world_history", "Write world history", "Write a world history entry."),
+  option("add_event_log", "Add event log", "Add an event log entry."),
+  option("add_diary_entry", "Add diary entry", "Add a crew diary entry."),
+  option("spawn_event", "Spawn event", "Spawn another event definition."),
+  option("unlock_event_definition", "Unlock event definition", "Unlock another event definition."),
+  option("handler_effect", "Handler effect", "Delegate effect execution to a registered handler."),
+  option("set_object_status", "Set object status", "Set a map object runtime status."),
+] as const satisfies readonly FormSelectOption[];
+
 const nodeTypeOptions: readonly FormSelectOption[] = EVENT_NODE_TYPES.map((type) => option(type, nodeLabel(type)));
 
 const compareOperatorOptions = [
@@ -87,6 +129,13 @@ const targetTypeOptions = [
   option("world_flags", "World flags"),
   option("world_history", "World history"),
   option("event_log", "Event log"),
+] as const satisfies readonly FormSelectOption[];
+
+const effectFailurePolicyOptions = [
+  option("fail_event", "Fail event"),
+  option("skip_effect", "Skip effect"),
+  option("skip_group", "Skip group"),
+  option("retry_later", "Retry later"),
 ] as const satisfies readonly FormSelectOption[];
 
 const objectiveStatusOptions = [
@@ -184,6 +233,15 @@ const handlerDefinitions = (handlerRegistryContent.handlers ?? []) as HandlerDef
 
 export const conditionHandlerOptions = handlerDefinitions
   .filter((handler) => handler.kind === "condition")
+  .map((handler) =>
+    option(handler.handler_type, labelFromId(handler.handler_type), handler.description, {
+      allowedTargetTypes: handler.allowed_target_types,
+      paramsSchemaRef: handler.params_schema_ref,
+    }),
+  );
+
+export const effectHandlerOptions = handlerDefinitions
+  .filter((handler) => handler.kind === "effect")
   .map((handler) =>
     option(handler.handler_type, labelFromId(handler.handler_type), handler.description, {
       allowedTargetTypes: handler.allowed_target_types,
@@ -464,6 +522,233 @@ export const conditionCapabilities = [
   }),
 ] as const satisfies readonly ConditionCapability[];
 
+export const effectCapabilities = [
+  effectCapability({
+    type: "add_crew_condition",
+    label: "Add crew condition",
+    description: "Adds a condition marker to a crew member.",
+    commonUse: "Record temporary injuries, learned state, or authored crew status markers.",
+  }),
+  effectCapability({
+    type: "remove_crew_condition",
+    label: "Remove crew condition",
+    description: "Removes a condition marker from a crew member.",
+    commonUse: "Clear temporary crew state after treatment, rest, or resolution.",
+  }),
+  effectCapability({
+    type: "update_crew_attribute",
+    label: "Update crew attribute",
+    description: "Updates a crew attribute value.",
+    commonUse: "Apply authored stat changes from special event outcomes.",
+  }),
+  effectCapability({
+    type: "add_personality_tag",
+    label: "Add personality tag",
+    description: "Adds a personality tag to a crew member.",
+    commonUse: "Record a lasting personality beat unlocked by an event.",
+  }),
+  effectCapability({
+    type: "remove_personality_tag",
+    label: "Remove personality tag",
+    description: "Removes a personality tag from a crew member.",
+    commonUse: "Replace or clear personality state after a story resolution.",
+  }),
+  effectCapability({
+    type: "add_expertise_tag",
+    label: "Add expertise tag",
+    description: "Adds an expertise tag to a crew member.",
+    commonUse: "Grant a lightweight specialty from training, discovery, or practice.",
+  }),
+  effectCapability({
+    type: "update_crew_location",
+    label: "Update crew location",
+    description: "Updates runtime crew location state.",
+    commonUse: "Move a crew member through event-driven relocation or rescue outcomes.",
+  }),
+  effectCapability({
+    type: "create_crew_action",
+    label: "Create crew action",
+    description: "Creates a runtime crew action.",
+    commonUse: "Start an authored action from an event effect.",
+  }),
+  effectCapability({
+    type: "cancel_crew_action",
+    label: "Cancel crew action",
+    description: "Cancels a runtime crew action.",
+    commonUse: "Interrupt or resolve a crew action after event consequences.",
+  }),
+  effectCapability({
+    type: "update_crew_action",
+    label: "Update crew action",
+    description: "Patches a runtime crew action.",
+    commonUse: "Change action status, metadata, or progress from authored outcomes.",
+  }),
+  effectCapability({
+    type: "update_tile_field",
+    label: "Update tile field",
+    description: "Updates a tile field.",
+    commonUse: "Patch authored tile state such as terrain notes or runtime annotations.",
+  }),
+  effectCapability({
+    type: "update_tile_state",
+    label: "Update tile state",
+    description: "Updates a tile runtime state field.",
+    commonUse: "Record tile-level progress, hazards, or authored state transitions.",
+  }),
+  effectCapability({
+    type: "add_tile_tag",
+    label: "Add tile tag",
+    description: "Adds a tag to a tile.",
+    commonUse: "Mark a tile with authored state that later conditions can inspect.",
+  }),
+  effectCapability({
+    type: "add_danger_tag",
+    label: "Add danger tag",
+    description: "Adds a danger tag to a tile.",
+    commonUse: "Record discovered or spawned hazards on the map.",
+  }),
+  effectCapability({
+    type: "set_discovery_state",
+    label: "Set discovery state",
+    description: "Sets a tile discovery state.",
+    commonUse: "Reveal, rediscover, or hide tile discovery state through an event.",
+  }),
+  effectCapability({
+    type: "set_survey_state",
+    label: "Set survey state",
+    description: "Sets a tile survey state.",
+    commonUse: "Record partial or complete survey progress on a tile.",
+  }),
+  effectCapability({
+    type: "add_event_mark",
+    label: "Add event mark",
+    description: "Adds a marker to event runtime state.",
+    commonUse: "Store event-local markers used by later branches or cleanup.",
+  }),
+  effectCapability({
+    type: "add_item",
+    label: "Add item",
+    description: "Adds an item to an inventory.",
+    commonUse: "Reward samples, tools, or traded goods from an event.",
+  }),
+  effectCapability({
+    type: "remove_item",
+    label: "Remove item",
+    description: "Removes an item from an inventory.",
+    commonUse: "Consume tools, samples, or trade goods during an event.",
+  }),
+  effectCapability({
+    type: "transfer_item",
+    label: "Transfer item",
+    description: "Transfers an item between inventories.",
+    commonUse: "Move loot, samples, or tools between crew and base inventory.",
+  }),
+  effectCapability({
+    type: "add_resource",
+    label: "Add resource",
+    description: "Adds resource quantity.",
+    commonUse: "Reward base or tile resources after gathering, repair, or trade.",
+  }),
+  effectCapability({
+    type: "remove_resource",
+    label: "Remove resource",
+    description: "Removes resource quantity.",
+    commonUse: "Spend resources as an event cost or repair requirement.",
+  }),
+  effectCapability({
+    type: "update_tile_resource",
+    label: "Update tile resource",
+    description: "Updates resource data on a tile.",
+    commonUse: "Patch authored resource availability at a map location.",
+  }),
+  effectCapability({
+    type: "create_objective",
+    label: "Create objective",
+    description: "Creates a runtime objective.",
+    commonUse: "Turn an event result into follow-up work visible to the player.",
+  }),
+  effectCapability({
+    type: "update_objective",
+    label: "Update objective",
+    description: "Patches a runtime objective.",
+    commonUse: "Change objective status, text, or metadata from event progress.",
+  }),
+  effectCapability({
+    type: "complete_objective",
+    label: "Complete objective",
+    description: "Marks a runtime objective completed.",
+    commonUse: "Resolve player-facing follow-up work after success.",
+  }),
+  effectCapability({
+    type: "fail_objective",
+    label: "Fail objective",
+    description: "Marks a runtime objective failed.",
+    commonUse: "Resolve player-facing follow-up work after failure or expiry.",
+  }),
+  effectCapability({
+    type: "set_world_flag",
+    label: "Set world flag",
+    description: "Sets a world flag value.",
+    commonUse: "Record global switches that later conditions and events can read.",
+  }),
+  effectCapability({
+    type: "increment_world_counter",
+    label: "Increment world counter",
+    description: "Increments a numeric world counter.",
+    commonUse: "Track repeated discoveries, encounters, or authored global tallies.",
+  }),
+  effectCapability({
+    type: "write_world_history",
+    label: "Write world history",
+    description: "Writes a world history entry.",
+    commonUse: "Persist hidden history used for dedupe, branching, or future context.",
+  }),
+  effectCapability({
+    type: "add_event_log",
+    label: "Add event log",
+    description: "Adds an event log entry.",
+    commonUse: "Write player-visible or internal event records.",
+  }),
+  effectCapability({
+    type: "add_diary_entry",
+    label: "Add diary entry",
+    description: "Adds a diary entry to a crew member.",
+    commonUse: "Unlock crew narrative notes after important outcomes.",
+  }),
+  effectCapability({
+    type: "spawn_event",
+    label: "Spawn event",
+    description: "Spawns another event definition.",
+    commonUse: "Start follow-up or child events from a resolved branch.",
+  }),
+  effectCapability({
+    type: "unlock_event_definition",
+    label: "Unlock event definition",
+    description: "Unlocks another event definition.",
+    commonUse: "Enable later content after a discovery or milestone.",
+  }),
+  effectCapability({
+    type: "handler_effect",
+    label: "Handler effect",
+    description: "Executes a registered effect handler with optional target and params.",
+    fields: [
+      selectField("handler_type", "Handler type", "Effect handler from content/events/handler_registry.json.", effectHandlerOptions),
+    ],
+    requiredFields: ["handler_type"],
+    template: createDefaultEffectTemplate({
+      type: "handler_effect",
+      handlerType: effectHandlerOptions[0]?.value ?? "TODO_HANDLER",
+    }),
+    commonUse: "Use bespoke runtime effects while keeping editor choices limited to effect handlers.",
+  }),
+  effectCapability({
+    type: "set_object_status",
+    label: "Set object status",
+    description: "Sets a map object runtime status.",
+    commonUse: "Update authored map object state after repair, damage, activation, or discovery.",
+  }),
+] as const satisfies readonly EffectCapability[];
+
 export const nodeCapabilities = [
   nodeCapability({
     type: "call",
@@ -613,6 +898,10 @@ const conditionCapabilityByType = new Map<ConditionType, ConditionCapability>(
   conditionCapabilities.map((capability) => [capability.type, capability]),
 );
 
+const effectCapabilityByType = new Map<EffectType, EffectCapability>(
+  effectCapabilities.map((capability) => [capability.type, capability]),
+);
+
 const nodeCapabilityByType = new Map<EventNodeType, NodeCapability>(
   nodeCapabilities.map((capability) => [capability.type, capability]),
 );
@@ -621,6 +910,14 @@ export function getConditionCapability(type: ConditionType): ConditionCapability
   const capability = conditionCapabilityByType.get(type);
   if (!capability) {
     throw new Error(`Unknown condition capability: ${type}`);
+  }
+  return capability;
+}
+
+export function getEffectCapability(type: EffectType): EffectCapability {
+  const capability = effectCapabilityByType.get(type);
+  if (!capability) {
+    throw new Error(`Unknown effect capability: ${type}`);
   }
   return capability;
 }
@@ -677,6 +974,27 @@ function conditionCapability(config: {
   };
 }
 
+function effectCapability(config: {
+  type: EffectType;
+  label: string;
+  description: string;
+  fields?: readonly FormFieldConfig[];
+  requiredFields?: readonly string[];
+  template?: Effect;
+  commonUse: string;
+}): EffectCapability {
+  return {
+    kind: "effect",
+    type: config.type,
+    label: config.label,
+    description: config.description,
+    fields: [...effectCommonFields(config.type), ...(config.fields ?? [])],
+    requiredFields: ["id", "type", "target", "params", "failure_policy", "record_policy", ...(config.requiredFields ?? [])],
+    template: config.template ?? createDefaultEffectTemplate({ type: config.type }),
+    commonUse: config.commonUse,
+  };
+}
+
 function nodeCapability(config: {
   type: EventNodeType;
   label: string;
@@ -719,6 +1037,17 @@ function triggerFields(type: TriggerType): readonly FormFieldConfig[] {
 
 function conditionTypeField(type: ConditionType): FormFieldConfig {
   return selectField("type", "Type", "Condition type id.", conditionTypeOptions, true, type);
+}
+
+function effectCommonFields(type: EffectType): readonly FormFieldConfig[] {
+  return [
+    textField("id", "Effect id", "Unique effect id within this effect group."),
+    selectField("type", "Type", "Effect type id.", effectTypeOptions, true, type),
+    targetField("Target object affected by this effect."),
+    jsonField("params", "Params", "Effect-specific params object.", true),
+    selectField("failure_policy", "Failure policy", "How runtime should continue if this effect fails.", effectFailurePolicyOptions, true, "fail_event"),
+    jsonField("record_policy", "Record policy", "Event log and world history write policy.", true),
+  ];
 }
 
 function nodeCommonFields(type: EventNodeType): readonly FormFieldConfig[] {

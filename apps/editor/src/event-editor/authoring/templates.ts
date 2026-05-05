@@ -6,6 +6,8 @@ import {
   type CallTemplate,
   type CheckNode,
   type EndNode,
+  type Effect,
+  type EffectType,
   type EventDefinition,
   type EventGraph,
   type EventNode,
@@ -44,6 +46,12 @@ export interface CreateDefaultNodeTemplateOptions {
   eventDefinitionId?: string;
   nodeId?: string;
   nextNodeId?: string;
+}
+
+export interface CreateDefaultEffectTemplateOptions {
+  type: EffectType;
+  effectId?: string;
+  handlerType?: string;
 }
 
 export const EVENT_NODE_TYPES = [
@@ -118,6 +126,26 @@ export function createTextVariantGroup(text = "TODO text."): TextVariantGroup {
     selection: "first_match",
     variants: [{ id: "default", text, priority: 1 }],
   };
+}
+
+export function createDefaultEffectTemplate({ type, effectId = type, handlerType }: CreateDefaultEffectTemplateOptions): Effect {
+  const effect: Effect = {
+    id: effectId,
+    type,
+    target: createDefaultEffectTarget(type),
+    params: {},
+    failure_policy: "fail_event",
+    record_policy: {
+      write_event_log: false,
+      write_world_history: false,
+    },
+  };
+
+  if (type === "handler_effect") {
+    effect.handler_type = handlerType ?? "TODO_HANDLER";
+  }
+
+  return effect;
 }
 
 export function createDefaultNodeTemplate({
@@ -382,4 +410,54 @@ function createDefaultCleanupPolicy(): EndNode["cleanup_policy"] {
     delete_active_calls: true,
     keep_player_summary: true,
   };
+}
+
+function createDefaultEffectTarget(type: EffectType): Effect["target"] {
+  switch (type) {
+    case "add_crew_condition":
+    case "remove_crew_condition":
+    case "update_crew_attribute":
+    case "add_personality_tag":
+    case "remove_personality_tag":
+    case "add_expertise_tag":
+    case "update_crew_location":
+    case "create_crew_action":
+    case "cancel_crew_action":
+    case "update_crew_action":
+    case "add_diary_entry":
+      return { type: "primary_crew" };
+    case "update_tile_field":
+    case "update_tile_state":
+    case "add_tile_tag":
+    case "add_danger_tag":
+    case "set_discovery_state":
+    case "set_survey_state":
+    case "update_tile_resource":
+    case "set_object_status":
+      return { type: "event_tile" };
+    case "add_item":
+    case "remove_item":
+    case "transfer_item":
+      return { type: "crew_inventory" };
+    case "add_resource":
+    case "remove_resource":
+      return { type: "base_resources" };
+    case "update_objective":
+    case "complete_objective":
+    case "fail_objective":
+      return { type: "objective_id" };
+    case "set_world_flag":
+    case "increment_world_counter":
+    case "unlock_event_definition":
+    case "handler_effect":
+      return { type: "world_flags" };
+    case "write_world_history":
+      return { type: "world_history" };
+    case "add_event_log":
+      return { type: "event_log" };
+    case "add_event_mark":
+    case "create_objective":
+    case "spawn_event":
+      return { type: "active_event" };
+  }
 }

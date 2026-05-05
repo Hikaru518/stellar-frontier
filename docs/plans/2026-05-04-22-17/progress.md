@@ -36,7 +36,7 @@ source:
 | 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | completed | 4 |
 | 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | completed | 3 |
 | 12 | TASK-012 | 实现 Node capability registry 与 node templates | completed | 2 |
-| 13 | TASK-013 | 实现 Effect 与 Handler capability registry | pending | 0 |
+| 13 | TASK-013 | 实现 Effect 与 Handler capability registry | completed | 2 |
 | 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | pending | 0 |
 | 15 | TASK-015 | 实现 Draft Browser 与 Create/Edit Draft 入口 | pending | 0 |
 | 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | pending | 0 |
@@ -190,3 +190,15 @@ source:
 - developer summary: 扩展 `templates.ts` 增加 `createDefaultNodeTemplate` 和 9 种 EventNodeType 的 schema-aligned 默认模板；扩展 `capabilityCatalog.ts`/`formRegistry.ts` 增加 `node` capability、`nodeCapabilities` 和 `getNodeCapability`；新增 node template tests 并扩展 capability coverage tests。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（30 files / 161 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/capabilityCatalog.ts apps/editor/src/event-editor/authoring/formRegistry.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/capabilityCatalog.test.ts apps/editor/src/event-editor/authoring/nodeTemplates.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改纯 node registry/template helper，无可交互 UI 面。
+
+### TASK-013: 实现 Effect 与 Handler capability registry
+- 状态: completed
+- 开始时间: 2026-05-05 13:58
+- 完成时间: 2026-05-05 14:07
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区看到 `effectRegistry.test.ts`、`capabilityCatalog.test.ts` 和 `formRegistry.ts` 的部分测试/类型改动，但未看到 `capabilityCatalog.ts` 或 `templates.ts` 的核心 effect registry/template 实现，交给下一次尝试补完。
+  - 尝试 2: developer 子任务补齐 effect templates、effect capability registry、effect handler options 和测试并返回成功 summary。
+- developer summary: 扩展 `templates.ts` 增加 `createDefaultEffectTemplate` 与 effect target defaults；扩展 `capabilityCatalog.ts`/`formRegistry.ts` 增加 `effect` capability、`effectCapabilities`、`getEffectCapability` 和 `effectHandlerOptions`；新增 effect registry tests，覆盖所有 runtime `EffectType`，并确保 handler effect 只读取 effect-kind handlers。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（31 files / 166 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/capabilityCatalog.ts apps/editor/src/event-editor/authoring/formRegistry.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/capabilityCatalog.test.ts apps/editor/src/event-editor/authoring/effectRegistry.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改纯 effect registry/template helper，无可交互 UI 面。

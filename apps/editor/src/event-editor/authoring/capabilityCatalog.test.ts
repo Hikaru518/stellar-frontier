@@ -3,6 +3,7 @@ import handlerRegistryContent from "../../../../../content/events/handler_regist
 import {
   conditionCapabilities,
   conditionHandlerOptions,
+  effectHandlerOptions,
   getConditionCapability,
   getNodeCapability,
   nodeCapabilities,
@@ -140,6 +141,9 @@ describe("event capability catalog", () => {
     const expectedConditionHandlers = handlerRegistryContent.handlers
       .filter((handler) => handler.kind === "condition")
       .map((handler) => handler.handler_type);
+    const expectedEffectHandlers = handlerRegistryContent.handlers
+      .filter((handler) => handler.kind === "effect")
+      .map((handler) => handler.handler_type);
     const handlerCondition = getConditionCapability("handler_condition");
     const handlerTypeField = handlerCondition.fields.find((field) => field.path === "handler_type");
 
@@ -150,6 +154,8 @@ describe("event capability catalog", () => {
     );
     expect(handlerTypeField?.input).toBe("select");
     expect(handlerTypeField?.options?.map((option) => option.value)).toEqual(conditionHandlerOptions.map((option) => option.value));
+    expect(intersection(conditionHandlerOptions.map((option) => option.value), expectedEffectHandlers)).toEqual([]);
+    expect(effectHandlerOptions.map((option) => option.value)).toEqual(expectedEffectHandlers);
   });
 });
 
@@ -166,4 +172,9 @@ function expectCoverage(label: string, actual: readonly string[], expected: read
 
 function formatIds(typeIds: readonly string[]): string {
   return typeIds.length > 0 ? typeIds.join(", ") : "(none)";
+}
+
+function intersection(left: readonly string[], right: readonly string[]): string[] {
+  const rightSet = new Set(right);
+  return left.filter((value) => rightSet.has(value));
 }

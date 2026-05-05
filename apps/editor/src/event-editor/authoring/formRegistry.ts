@@ -1,4 +1,4 @@
-export type CapabilityKind = "trigger" | "condition" | "handler_params" | "node";
+export type CapabilityKind = "trigger" | "condition" | "effect" | "handler_params" | "node";
 
 export type FormInputKind =
   | "text"
