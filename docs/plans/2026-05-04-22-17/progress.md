@@ -30,7 +30,7 @@ source:
 | 4 | TASK-004 | 实现 Event validation adapter | completed | 1 |
 | 5 | TASK-005 | 添加 Draft 和 Domain helper routes | completed | 2 |
 | 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | completed | 1 |
-| 7 | TASK-007 | 实现 Publish content builder | pending | 0 |
+| 7 | TASK-007 | 实现 Publish content builder | completed | 1 |
 | 8 | TASK-008 | 实现 Publish IO service | pending | 0 |
 | 9 | TASK-009 | 添加 Publish helper route 和前端 client | pending | 0 |
 | 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | pending | 0 |
@@ -115,3 +115,12 @@ source:
 - developer summary: 新增 Event Editor domain/draft API client：`createDomain`、`createDraft`、`loadDraft`、`saveDraft`、`validateDraft`；补齐 domain、draft envelope/summary、issue、request/response 类型契约；非 OK helper response 统一抛 `EventEditorApiError` 并保留 `code/status/details`，200 validation failure 正常返回。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（24 files / 123 tests）；`git diff --check -- apps/editor/src/event-editor/apiClient.ts apps/editor/src/event-editor/types.ts apps/editor/src/event-editor/apiClient.test.ts apps/editor/src/event-editor/EventBrowser.test.tsx apps/editor/src/event-editor/EventEditorPage.test.tsx apps/editor/src/event-editor/graphModel.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 API client/types/tests，无可交互 UI 面。
+
+### TASK-007: 实现 Publish content builder
+- 状态: completed
+- 开始时间: 2026-05-05 11:47
+- 完成时间: 2026-05-05 11:56
+- 尝试次数: 1
+- developer summary: 新增纯函数 Publish content builder，规范化 draft envelope 为 formal `EventDefinition` 和 `CallTemplate` 列表；覆盖 ID 锁定、`ready_for_test`、graph rules、call template id 派生/保留、`option_lines` 对齐、`content_refs` 规范化和 builder issue 返回。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（25 files / 127 tests）；`git diff --check -- apps/editor/helper/eventPublishBuilder.mjs apps/editor/helper/eventPublishBuilder.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed before staging；cached diff check passed after staging.
+- browser validation: 不适用；本任务只改 helper pure builder 和 tests，无可交互 UI 面。
