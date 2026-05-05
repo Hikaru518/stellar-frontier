@@ -128,6 +128,12 @@ export function createTextVariantGroup(text = "TODO text."): TextVariantGroup {
   };
 }
 
+export function createDefaultCallOptionTextVariantGroup(optionId: string): TextVariantGroup {
+  const label = optionId.replace(/[_-]+/g, " ").trim() || "option";
+
+  return createTextVariantGroup(`Choose ${label}.`);
+}
+
 export function createDefaultEffectTemplate({ type, effectId = type, handlerType }: CreateDefaultEffectTemplateOptions): Effect {
   const effect: Effect = {
     id: effectId,

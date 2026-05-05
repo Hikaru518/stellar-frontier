@@ -4,6 +4,7 @@ import {
   createDefaultCallTemplateShell,
   createDefaultEventDefinitionShell,
   createDefaultGraphRules,
+  createDefaultCallOptionTextVariantGroup,
   createTextVariantGroup,
   deriveCallTemplateId,
   isSafeEventId,
@@ -59,6 +60,13 @@ describe("event authoring templates", () => {
       variants: [{ id: "default", text: "Opening line.", priority: 1 }],
     });
     expect(createTextVariantGroup().variants[0]?.text).toBe("TODO text.");
+  });
+
+  it("creates stable default text for a newly authored call option", () => {
+    expect(createDefaultCallOptionTextVariantGroup("scan_bridge")).toEqual({
+      selection: "first_match",
+      variants: [{ id: "default", text: "Choose scan bridge.", priority: 1 }],
+    });
   });
 
   it("creates a schema-aligned default event definition shell with one call path", () => {

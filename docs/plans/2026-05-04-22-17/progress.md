@@ -37,7 +37,7 @@ source:
 | 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | completed | 3 |
 | 12 | TASK-012 | 实现 Node capability registry 与 node templates | completed | 2 |
 | 13 | TASK-013 | 实现 Effect 与 Handler capability registry | completed | 2 |
-| 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | pending | 0 |
+| 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | completed | 3 |
 | 15 | TASK-015 | 实现 Draft Browser 与 Create/Edit Draft 入口 | pending | 0 |
 | 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | pending | 0 |
 | 17 | TASK-017 | 实现 Basic step 结构化表单 | pending | 0 |
@@ -202,3 +202,16 @@ source:
 - developer summary: 扩展 `templates.ts` 增加 `createDefaultEffectTemplate` 与 effect target defaults；扩展 `capabilityCatalog.ts`/`formRegistry.ts` 增加 `effect` capability、`effectCapabilities`、`getEffectCapability` 和 `effectHandlerOptions`；新增 effect registry tests，覆盖所有 runtime `EffectType`，并确保 handler effect 只读取 effect-kind handlers。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（31 files / 166 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/capabilityCatalog.ts apps/editor/src/event-editor/authoring/formRegistry.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/capabilityCatalog.test.ts apps/editor/src/event-editor/authoring/effectRegistry.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改纯 effect registry/template helper，无可交互 UI 面。
+
+### TASK-014: 实现 Authoring reducer 与 call template sync
+- 状态: completed
+- 开始时间: 2026-05-05 14:08
+- 完成时间: 2026-05-05 14:22
+- 尝试次数: 3
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区未看到 `eventAuthoringReducer.ts` 或测试文件产出，交给下一次尝试重新实现。
+  - 尝试 2: developer 子任务长时间未返回，关闭时仍在运行；工作区看到 `eventAuthoringReducer.test.ts` 和 `templates.test.ts` 测试改动，但仍未看到 `eventAuthoringReducer.ts` 实现文件，交给第三次尝试补完。
+  - 尝试 3: developer 子任务补齐 `eventAuthoringReducer.ts` 和模板 helper 并返回成功 summary。
+- developer summary: 新增纯 `eventAuthoringReducer`，支持 step selection、call option add/remove/rename、delete node；同步维护 call node options、option_node_mapping、graph edges、call template option_lines，并在删除 call node 时清理对应 call template 和 `content_refs.call_template_ids`。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（32 files / 172 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/templates.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改纯 authoring reducer/helper，无可交互 UI 面。
