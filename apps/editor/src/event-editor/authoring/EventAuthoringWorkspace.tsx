@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { EventDraftEnvelope, EventEditorStep } from "../types";
 import BasicStep from "./BasicStep";
 import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
-import GraphPreviewPanel from "./GraphPreviewPanel";
+import GraphStructureEditor from "./GraphStructureEditor";
 import TriggerStep from "./TriggerStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
 
@@ -93,7 +93,7 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               <p className="muted-text">{activeStepConfig.responsibility}</p>
             </div>
             <span className="status-tag status-muted">
-              {activeStep === "basic" || activeStep === "trigger" ? "editable" : activeStep === "graph" ? "preview" : "placeholder"}
+              {activeStep === "basic" || activeStep === "trigger" || activeStep === "graph" ? "editable" : "placeholder"}
             </span>
           </div>
           {activeStep === "basic" ? (
@@ -106,7 +106,7 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               onDraftChange={onDraftChange}
             />
           ) : activeStep === "graph" ? (
-            <GraphPreviewPanel draft={draft} />
+            <GraphStructureEditor draft={draft} onDraftChange={onDraftChange} />
           ) : (
             <StepPlaceholder step={activeStepConfig} draft={draft} />
           )}

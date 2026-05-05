@@ -43,7 +43,7 @@ source:
 | 17 | TASK-017 | 实现 Basic step 结构化表单 | completed | 2 |
 | 18 | TASK-018 | 实现 Trigger step 与 capability insertion | completed | 3 |
 | 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | completed | 3 |
-| 20 | TASK-020 | 实现 Graph node editor 基础节点 | pending | 0 |
+| 20 | TASK-020 | 实现 Graph node editor 基础节点 | completed | 1 |
 | 21 | TASK-021 | 实现 Call/Check/Random graph editor | pending | 0 |
 | 22 | TASK-022 | 实现 Advanced node editors | pending | 0 |
 | 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | pending | 0 |
@@ -273,3 +273,13 @@ source:
 - developer summary: 新增 `GraphPreviewPanel`，从 draft `working_definition` 派生节点、transition 和结构健康摘要；`GraphCanvas` 支持 `interactive={false}`，Graph Preview 禁止拖拽/连线修改但保留只读选择；`graphModel` 增加 missing entry/terminal、unmapped call option、missing edge endpoint 检查，并过滤不可渲染 edge。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（39 files / 206 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/GraphPreviewPanel.tsx apps/editor/src/event-editor/authoring/GraphPreviewPanel.test.tsx apps/editor/src/event-editor/GraphPanel.tsx apps/editor/src/event-editor/GraphCanvas.tsx apps/editor/src/event-editor/graphModel.ts apps/editor/src/event-editor/graphModel.test.ts apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`；新建临时 draft `codex_task019_semantic_check_1777968079548_20260505_080119` 后确认空 working_definition 显示 `missing_event_graph` 且不崩溃；再从现有 `forest_trace_small_camp` 创建 edit draft，确认 Graph Preview 显示 healthy、3 nodes、2 transitions、Event graph canvas 可见；两次浏览器 console error 均为空。验证后已删除临时 draft 文件。
+
+### TASK-020: 实现 Graph node editor 基础节点
+- 状态: completed
+- 开始时间: 2026-05-05 16:03
+- 完成时间: 2026-05-05 16:20
+- 尝试次数: 1
+- developer summary: 新增 `GraphStructureEditor`，Graph step 现在支持结构化 node list、添加/选择/删除 node、通用字段编辑，并保留只读 `GraphPreviewPanel`；reducer 新增 add/select/update/delete node actions，以及 end/log_only/wait 的类型化字段更新；删除或改名 node 不重写其他引用，失效引用由 Graph Health 暴露。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（40 files / 216 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/GraphStructureEditor.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.test.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- dispatcher fix: browser 验证发现真实 Create Event route 会生成缺少 `event_graph` 的 draft，导致 Add node 被禁用；主线程修正为 missing graph 时允许添加第一个 node，并由 `add_node` 初始化默认 graph rules、entry 和 nodes。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task020_semantic_check_1777969002807_20260505_081642`；确认 missing `event_graph` 状态下可添加第一个 wait node，编辑 title/description/effect refs/duration/wake trigger/interrupt policy；添加 end node 并编辑 resolution/result_key/event_log_template_id；将 wait next 指向 end 后删除 end，确认 Graph Structure Health 和 Graph Preview 同时显示 `missing_terminal_node` / `missing_edge_target` warning；浏览器 console error 为空。验证后已删除临时 draft 文件。

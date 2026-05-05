@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CallNode, Condition, EventGraph } from "../../../../pc-client/src/events/types";
+import type { CallNode, Condition, EventGraph, EventNode, LogOnlyNode, WaitNode } from "../../../../pc-client/src/events/types";
+import { analyzeGraphHealth } from "../graphModel";
 import type { EventDraftEnvelope, EventDraftWorkingCallTemplate, EventEditorStep } from "../types";
 import { createDefaultNewDraftEnvelope } from "./draftEnvelope";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
@@ -315,6 +316,178 @@ describe("event authoring reducer", () => {
     });
   });
 
+  it("adds, selects, and edits base graph nodes without mutating the original graph", () => {
+    const draft = createDraft();
+
+    const withNode = eventAuthoringReducer(draft, {
+      type: "add_node",
+      nodeType: "wait",
+      nodeId: "delay",
+    });
+    const updated = eventAuthoringReducer(withNode, {
+      type: "update_node_common_fields",
+      nodeId: "delay",
+      fields: {
+        id: "pause_for_signal",
+        title: "Pause for signal",
+        description: "Wait for the relay to answer.",
+        enter_effect_refs: ["mark_waiting"],
+        exit_effect_refs: ["clear_waiting"],
+        auto_next_node_id: "end",
+        blocking: {
+          occupies_crew_action: true,
+          occupies_communication: true,
+          blocking_key_template: "bridge:{crew_id}",
+        },
+      },
+    });
+
+    expect(getGraph(withNode).nodes.map((node) => node.id)).toEqual(["call", "end", "delay"]);
+    expect(withNode.editor_state).toMatchObject({
+      active_step: "graph",
+      selection: { step: "graph", nodeId: "delay" },
+    });
+    expect(getWaitNode(updated, "pause_for_signal")).toMatchObject({
+      id: "pause_for_signal",
+      title: "Pause for signal",
+      description: "Wait for the relay to answer.",
+      enter_effect_refs: ["mark_waiting"],
+      exit_effect_refs: ["clear_waiting"],
+      auto_next_node_id: "end",
+      blocking: {
+        occupies_crew_action: true,
+        occupies_communication: true,
+        blocking_key_template: "bridge:{crew_id}",
+      },
+    });
+    expect(updated.editor_state).toMatchObject({
+      active_step: "graph",
+      selection: { step: "graph", nodeId: "pause_for_signal" },
+    });
+    expect(getGraph(draft).nodes.map((node) => node.id)).toEqual(["call", "end"]);
+  });
+
+  it("initializes a missing graph when adding the first node", () => {
+    const draft = createDraft({
+      working_definition: {
+        ...createDraft().working_definition,
+        event_graph: undefined,
+      },
+    });
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "add_node",
+      nodeType: "wait",
+      nodeId: "first_wait",
+    });
+
+    expect(getGraph(updated)).toMatchObject({
+      entry_node_id: "first_wait",
+      terminal_node_ids: [],
+      graph_rules: { acyclic: true, max_active_nodes: 1, allow_parallel_nodes: false },
+    });
+    expect(getGraph(updated).nodes.map((node) => node.id)).toEqual(["first_wait"]);
+    expect(getWaitNode(updated, "first_wait")).toMatchObject({
+      next_node_id: "first_wait",
+      duration_seconds: 60,
+    });
+    expect(updated.editor_state).toMatchObject({
+      active_step: "graph",
+      selection: { step: "graph", nodeId: "first_wait" },
+    });
+  });
+
+  it("renames a node id without rewriting graph references", () => {
+    const draft = createDraft();
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "update_node_common_fields",
+      nodeId: "end",
+      fields: {
+        id: "resolved_end",
+        title: "Resolved end",
+      },
+    });
+
+    expect(getGraph(updated).nodes.map((node) => node.id)).toEqual(["call", "resolved_end"]);
+    expect(getGraph(updated).terminal_node_ids).toEqual(["end"]);
+    expect(getGraph(updated).edges).toContainEqual({ from_node_id: "call", to_node_id: "end", via: "ack" });
+    expect(getCallNode(updated, "call").option_node_mapping).toEqual({ ack: "end" });
+    expect(updated.editor_state).toMatchObject({
+      active_step: "graph",
+      selection: { step: "graph", nodeId: "resolved_end" },
+    });
+  });
+
+  it("updates end, log-only, and wait node fields with typed node actions", () => {
+    const draftWithLog = eventAuthoringReducer(createDraft(), {
+      type: "add_node",
+      nodeType: "log_only",
+      nodeId: "record_signal",
+    });
+    const draftWithWait = eventAuthoringReducer(draftWithLog, {
+      type: "add_node",
+      nodeType: "wait",
+      nodeId: "delay",
+    });
+    const withEnd = eventAuthoringReducer(draftWithWait, {
+      type: "update_end_node",
+      nodeId: "end",
+      fields: {
+        resolution: "failed",
+        result_key: "bridge_failed",
+        event_log_template_id: "bridge_failed_log",
+        cleanup_policy: {
+          release_blocking_claims: false,
+          delete_active_calls: false,
+          keep_player_summary: true,
+        },
+      },
+    });
+    const withLog = eventAuthoringReducer(withEnd, {
+      type: "update_log_only_node",
+      nodeId: "record_signal",
+      fields: {
+        event_log_template_id: "signal_recorded_log",
+        effect_refs: ["write_marker", "grant_item"],
+        next_node_id: "delay",
+      },
+    });
+    const updated = eventAuthoringReducer(withLog, {
+      type: "update_wait_node",
+      nodeId: "delay",
+      fields: {
+        duration_seconds: 120,
+        wake_trigger_type: "event_node_finished",
+        next_node_id: "end",
+        interrupt_policy: "player_can_cancel",
+      },
+    });
+
+    expect(getNode(updated, "end")).toMatchObject({
+      type: "end",
+      resolution: "failed",
+      result_key: "bridge_failed",
+      event_log_template_id: "bridge_failed_log",
+      cleanup_policy: {
+        release_blocking_claims: false,
+        delete_active_calls: false,
+        keep_player_summary: true,
+      },
+    });
+    expect(getLogOnlyNode(updated, "record_signal")).toMatchObject({
+      event_log_template_id: "signal_recorded_log",
+      effect_refs: ["write_marker", "grant_item"],
+      next_node_id: "delay",
+    });
+    expect(getWaitNode(updated, "delay")).toMatchObject({
+      duration_seconds: 120,
+      wake_trigger_type: "event_node_finished",
+      next_node_id: "end",
+      interrupt_policy: "player_can_cancel",
+    });
+  });
+
   it("deletes a call node and removes its generated call template", () => {
     const draft = createDraftWithFollowupCall();
 
@@ -324,10 +497,35 @@ describe("event authoring reducer", () => {
     });
 
     expect(getGraph(updated).nodes.map((node) => node.id)).toEqual(["call", "end"]);
-    expect(getGraph(updated).edges).toEqual([{ from_node_id: "call", to_node_id: "end", via: "ack" }]);
-    expect(getGraph(updated).terminal_node_ids).toEqual(["end"]);
+    expect(getGraph(updated).edges).toEqual([
+      { from_node_id: "call", to_node_id: "end", via: "ack" },
+      { from_node_id: "call", to_node_id: "followup", via: "followup" },
+      { from_node_id: "followup", to_node_id: "end", via: "ack" },
+    ]);
+    expect(getGraph(updated).terminal_node_ids).toEqual(["end", "followup"]);
     expect(updated.working_call_templates.map((template) => template.id)).toEqual(["forest_bridge_choice.call.call"]);
     expect(updated.working_definition.content_refs?.call_template_ids).toEqual(["forest_bridge_choice.call.call"]);
+  });
+
+  it("deletes a referenced node without deleting other references so graph health can warn", () => {
+    const draft = createDraft();
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "delete_node",
+      nodeId: "end",
+    });
+    const health = analyzeGraphHealth(updated.working_definition);
+
+    expect(getGraph(updated).nodes.map((node) => node.id)).toEqual(["call"]);
+    expect(getGraph(updated).edges).toEqual([{ from_node_id: "call", to_node_id: "end", via: "ack" }]);
+    expect(getGraph(updated).terminal_node_ids).toEqual(["end"]);
+    expect(getCallNode(updated, "call").option_node_mapping).toEqual({ ack: "end" });
+    expect(health.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_terminal_node", nodeId: "end" }),
+        expect.objectContaining({ code: "missing_edge_target", targetNodeId: "end" }),
+      ]),
+    );
   });
 });
 
@@ -404,6 +602,36 @@ function getCallNode(draft: EventDraftEnvelope, nodeId: string): CallNode {
 
   if (!node || node.type !== "call") {
     throw new Error(`Expected call node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getWaitNode(draft: EventDraftEnvelope, nodeId: string): WaitNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "wait") {
+    throw new Error(`Expected wait node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getLogOnlyNode(draft: EventDraftEnvelope, nodeId: string): LogOnlyNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "log_only") {
+    throw new Error(`Expected log-only node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getNode(draft: EventDraftEnvelope, nodeId: string): EventNode {
+  const node = getGraph(draft).nodes.find((candidate) => candidate.id === nodeId);
+
+  if (!node) {
+    throw new Error(`Expected graph node ${nodeId}.`);
   }
 
   return node;
