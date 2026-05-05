@@ -1,5 +1,8 @@
+import { useState } from "react";
 import type { EventDraftEnvelope, EventEditorStep } from "../types";
 import BasicStep from "./BasicStep";
+import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
+import TriggerStep from "./TriggerStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
 
 type AuthoringStep = Exclude<EventEditorStep, "domain">;
@@ -41,6 +44,9 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
   const activeStep = resolveActiveStep(draft.editor_state.active_step);
   const activeStepConfig = AUTHORING_STEPS.find((step) => step.id === activeStep) ?? AUTHORING_STEPS[0];
   const isLockedTarget = draft.mode === "edit_existing";
+  const triggerConditions = draft.working_definition.trigger?.conditions ?? [];
+  const [conditionInsertIndex, setConditionInsertIndex] = useState(triggerConditions.length);
+  const resolvedConditionInsertIndex = Math.min(Math.max(conditionInsertIndex, 0), triggerConditions.length);
 
   return (
     <section className="event-authoring-workspace" aria-label="Event authoring workspace">
@@ -85,30 +91,68 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               <h3>{activeStepConfig.label}</h3>
               <p className="muted-text">{activeStepConfig.responsibility}</p>
             </div>
-            <span className="status-tag status-muted">{activeStep === "basic" ? "editable" : "placeholder"}</span>
+            <span className="status-tag status-muted">
+              {activeStep === "basic" || activeStep === "trigger" ? "editable" : "placeholder"}
+            </span>
           </div>
-          {activeStep === "basic" ? <BasicStep draft={draft} onDraftChange={onDraftChange} /> : <StepPlaceholder step={activeStepConfig} draft={draft} />}
+          {activeStep === "basic" ? (
+            <BasicStep draft={draft} onDraftChange={onDraftChange} />
+          ) : activeStep === "trigger" ? (
+            <TriggerStep
+              draft={draft}
+              conditionInsertIndex={resolvedConditionInsertIndex}
+              onConditionInsertIndexChange={setConditionInsertIndex}
+              onDraftChange={onDraftChange}
+            />
+          ) : (
+            <StepPlaceholder step={activeStepConfig} draft={draft} />
+          )}
         </section>
 
         <aside className="event-authoring-helper-panel" aria-label="Authoring helper panel">
-          <div className="event-authoring-section-heading">
-            <h3>Helper Panel</h3>
-            <span className="status-tag status-muted">later</span>
-          </div>
-          <ul className="event-authoring-helper-list">
-            <li>
-              <strong>Capability catalog</strong>
-              <span>Trigger, node, condition, effect, and handler references.</span>
-            </li>
-            <li>
-              <strong>Preview</strong>
-              <span>Generated definition and call template preview.</span>
-            </li>
-            <li>
-              <strong>Validation</strong>
-              <span>Draft and publish checks mapped back to authoring locations.</span>
-            </li>
-          </ul>
+          {activeStep === "trigger" ? (
+            <CapabilityCatalogPanel
+              onSelectTriggerTemplate={(template) =>
+                onDraftChange(
+                  eventAuthoringReducer(draft, {
+                    type: "update_trigger_type",
+                    triggerType: template.type,
+                  }),
+                )
+              }
+              onInsertConditionTemplate={(condition) => {
+                const nextDraft = eventAuthoringReducer(draft, {
+                  type: "add_trigger_condition",
+                  condition,
+                  index: resolvedConditionInsertIndex,
+                });
+
+                setConditionInsertIndex(resolvedConditionInsertIndex + 1);
+                onDraftChange(nextDraft);
+              }}
+            />
+          ) : (
+            <>
+              <div className="event-authoring-section-heading">
+                <h3>Helper Panel</h3>
+                <span className="status-tag status-muted">later</span>
+              </div>
+              <ul className="event-authoring-helper-list">
+                <li>
+                  <strong>Capability catalog</strong>
+                  <span>Trigger, node, condition, effect, and handler references.</span>
+                </li>
+                <li>
+                  <strong>Preview</strong>
+                  <span>Generated definition and call template preview.</span>
+                </li>
+                <li>
+                  <strong>Validation</strong>
+                  <span>Draft and publish checks mapped back to authoring locations.</span>
+                </li>
+              </ul>
+            </>
+          )}
         </aside>
       </div>
     </section>

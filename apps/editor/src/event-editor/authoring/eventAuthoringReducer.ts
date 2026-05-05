@@ -1,9 +1,12 @@
 import type {
   CallNode,
+  Condition,
   EventEdge,
   EventDefinition,
   EventGraph,
   EventNode,
+  TriggerDefinition,
+  TriggerType,
   TextVariantGroup,
 } from "../../../../pc-client/src/events/types";
 import type {
@@ -12,11 +15,13 @@ import type {
   EventDraftWorkingDefinition,
   EventEditorStep,
 } from "../types";
+import { triggerCapabilities } from "./capabilityCatalog";
 import { createDefaultCallOptionTextVariantGroup } from "./templates";
 
 type BasicFieldsUpdate = Partial<Pick<EventDefinition, "title" | "summary" | "tags">>;
 type CandidateSelectionUpdate = Partial<EventDefinition["candidate_selection"]>;
 type RepeatPolicyUpdate = Partial<EventDefinition["repeat_policy"]>;
+type TriggerProbability = TriggerDefinition["probability"];
 
 const DEFAULT_CANDIDATE_SELECTION: EventDefinition["candidate_selection"] = {
   priority: 0,
@@ -53,6 +58,32 @@ export type EventAuthoringAction =
       fields: RepeatPolicyUpdate;
     }
   | {
+      type: "update_trigger_type";
+      triggerType: TriggerType;
+    }
+  | {
+      type: "update_trigger_required_context";
+      requiredContext: string[];
+    }
+  | {
+      type: "update_trigger_probability";
+      probability: TriggerProbability | undefined;
+    }
+  | {
+      type: "add_trigger_condition";
+      condition: Condition;
+      index?: number;
+    }
+  | {
+      type: "update_trigger_condition";
+      index: number;
+      condition: Condition;
+    }
+  | {
+      type: "remove_trigger_condition";
+      index: number;
+    }
+  | {
       type: "add_call_option";
       nodeId: string;
       optionId: string;
@@ -84,6 +115,18 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
       return updateCandidateSelection(draft, action.fields);
     case "update_repeat_policy":
       return updateRepeatPolicy(draft, action.fields);
+    case "update_trigger_type":
+      return updateTriggerType(draft, action.triggerType);
+    case "update_trigger_required_context":
+      return updateTriggerRequiredContext(draft, action.requiredContext);
+    case "update_trigger_probability":
+      return updateTriggerProbability(draft, action.probability);
+    case "add_trigger_condition":
+      return addTriggerCondition(draft, action.condition, action.index);
+    case "update_trigger_condition":
+      return updateTriggerCondition(draft, action.index, action.condition);
+    case "remove_trigger_condition":
+      return removeTriggerCondition(draft, action.index);
     case "add_call_option":
       return addCallOption(draft, action.nodeId, action.optionId, action.nextNodeId);
     case "remove_call_option":
@@ -144,6 +187,89 @@ function updateRepeatPolicy(draft: EventDraftEnvelope, fields: RepeatPolicyUpdat
       },
     },
   };
+}
+
+function updateTriggerType(draft: EventDraftEnvelope, triggerType: TriggerType): EventDraftEnvelope {
+  const currentTrigger = getWorkingTrigger(draft);
+  const template = clonePlain(getTriggerTemplate(triggerType));
+  const currentConditions = currentTrigger.conditions;
+
+  return updateWorkingTrigger(draft, {
+    ...currentTrigger,
+    ...template,
+    conditions: Array.isArray(currentConditions) ? clonePlain(currentConditions) : (template.conditions ?? []),
+  });
+}
+
+function updateTriggerRequiredContext(draft: EventDraftEnvelope, requiredContext: string[]): EventDraftEnvelope {
+  return updateWorkingTrigger(draft, {
+    ...getWorkingTrigger(draft),
+    required_context: [...requiredContext],
+  });
+}
+
+function updateTriggerProbability(
+  draft: EventDraftEnvelope,
+  probability: TriggerProbability | undefined,
+): EventDraftEnvelope {
+  const currentTrigger = getWorkingTrigger(draft);
+
+  if (probability === undefined) {
+    const { probability: _removedProbability, ...triggerWithoutProbability } = currentTrigger;
+    return updateWorkingTrigger(draft, triggerWithoutProbability);
+  }
+
+  return updateWorkingTrigger(draft, {
+    ...currentTrigger,
+    probability: clonePlain(probability),
+  });
+}
+
+function addTriggerCondition(
+  draft: EventDraftEnvelope,
+  condition: Condition,
+  index: number | undefined,
+): EventDraftEnvelope {
+  const currentTrigger = getWorkingTrigger(draft);
+  const conditions = [...(currentTrigger.conditions ?? [])];
+  const insertIndex = clampInsertIndex(index ?? conditions.length, conditions.length);
+
+  conditions.splice(insertIndex, 0, clonePlain(condition));
+
+  return updateWorkingTrigger(draft, {
+    ...currentTrigger,
+    conditions,
+  });
+}
+
+function updateTriggerCondition(
+  draft: EventDraftEnvelope,
+  index: number,
+  condition: Condition,
+): EventDraftEnvelope {
+  const currentTrigger = getWorkingTrigger(draft);
+  const conditions = [...(currentTrigger.conditions ?? [])];
+
+  requireConditionIndex(conditions, index, "update");
+  conditions[index] = clonePlain(condition);
+
+  return updateWorkingTrigger(draft, {
+    ...currentTrigger,
+    conditions,
+  });
+}
+
+function removeTriggerCondition(draft: EventDraftEnvelope, index: number): EventDraftEnvelope {
+  const currentTrigger = getWorkingTrigger(draft);
+  const conditions = [...(currentTrigger.conditions ?? [])];
+
+  requireConditionIndex(conditions, index, "remove");
+  conditions.splice(index, 1);
+
+  return updateWorkingTrigger(draft, {
+    ...currentTrigger,
+    conditions,
+  });
 }
 
 function addCallOption(
@@ -342,6 +468,50 @@ function requireGraph(draft: EventDraftEnvelope): EventGraph {
   return graph;
 }
 
+function getWorkingTrigger(draft: EventDraftEnvelope): TriggerDefinition {
+  const trigger = draft.working_definition.trigger;
+
+  if (trigger) {
+    return trigger;
+  }
+
+  return clonePlain(getTriggerTemplate("arrival"));
+}
+
+function getTriggerTemplate(triggerType: TriggerType): TriggerDefinition {
+  const capability = triggerCapabilities.find((candidate) => candidate.type === triggerType);
+
+  if (!capability) {
+    throw new Error(`Unknown trigger capability: ${triggerType}`);
+  }
+
+  return capability.template;
+}
+
+function updateWorkingTrigger(draft: EventDraftEnvelope, trigger: TriggerDefinition): EventDraftEnvelope {
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      trigger,
+    },
+  };
+}
+
+function clampInsertIndex(index: number, length: number): number {
+  if (!Number.isInteger(index)) {
+    return length;
+  }
+
+  return Math.min(Math.max(index, 0), length);
+}
+
+function requireConditionIndex(conditions: Condition[], index: number, action: "update" | "remove"): void {
+  if (!Number.isInteger(index) || index < 0 || index >= conditions.length) {
+    throw new Error(`Cannot ${action} trigger condition at index ${index}.`);
+  }
+}
+
 function requireCallNode(graph: EventGraph, nodeId: string): CallNode {
   const node = graph.nodes.find((candidate) => candidate.id === nodeId);
 
@@ -453,4 +623,8 @@ function removeCallTemplateRef(
       call_template_ids: callTemplateIds.filter((candidate) => candidate !== callTemplateId),
     },
   };
+}
+
+function clonePlain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { CallNode, EventGraph } from "../../../../pc-client/src/events/types";
+import type { CallNode, Condition, EventGraph } from "../../../../pc-client/src/events/types";
 import type { EventDraftEnvelope, EventDraftWorkingCallTemplate, EventEditorStep } from "../types";
 import { createDefaultNewDraftEnvelope } from "./draftEnvelope";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
+import { triggerCapabilities } from "./capabilityCatalog";
 import { createDefaultCallTemplateShell, createDefaultNodeTemplate } from "./templates";
 
 const CREATED_AT = "2026-05-05T15:30:12.000Z";
@@ -129,6 +130,99 @@ describe("event authoring reducer", () => {
     });
   });
 
+  it("updates trigger type from the capability template while preserving reusable conditions and identity fields", () => {
+    const bridgeReadyCondition: Condition = {
+      type: "world_flag_equals",
+      field: "bridge_ready",
+      value: true,
+    };
+    const draft = createDraft({
+      working_definition: {
+        ...createDraft().working_definition,
+        trigger: {
+          type: "arrival",
+          required_context: ["crew_id"],
+          conditions: [bridgeReadyCondition],
+          probability: { base: 0.25, min: 0.1 },
+        },
+      },
+    });
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "update_trigger_type",
+      triggerType: "call_choice",
+    });
+
+    expect(updated.working_definition.trigger).toEqual({
+      type: "call_choice",
+      required_context: getTriggerTemplate("call_choice").required_context,
+      conditions: [bridgeReadyCondition],
+      probability: { base: 0.25, min: 0.1 },
+    });
+    expect(updated.draft_id).toBe(draft.draft_id);
+    expect(updated.source).toBe(draft.source);
+    expect(updated.target).toBe(draft.target);
+    expect(updated.hashes).toBe(draft.hashes);
+    expect(draft.working_definition.trigger?.type).toBe("arrival");
+    expect(draft.working_definition.trigger?.required_context).toEqual(["crew_id"]);
+  });
+
+  it("updates trigger required context and probability without mutating the existing trigger", () => {
+    const draft = createDraft();
+
+    const withContext = eventAuthoringReducer(draft, {
+      type: "update_trigger_required_context",
+      requiredContext: ["crew_id", "tile_id", "call_id"],
+    });
+    const updated = eventAuthoringReducer(withContext, {
+      type: "update_trigger_probability",
+      probability: { base: 0.75, max: 1 },
+    });
+
+    expect(updated.working_definition.trigger).toMatchObject({
+      type: "arrival",
+      required_context: ["crew_id", "tile_id", "call_id"],
+      probability: { base: 0.75, max: 1 },
+    });
+    expect(draft.working_definition.trigger?.required_context).toBeUndefined();
+    expect(draft.working_definition.trigger?.probability).toBeUndefined();
+  });
+
+  it("adds, updates, and removes trigger conditions at the requested index", () => {
+    const firstCondition: Condition = { type: "time_compare", op: "gte", value: 0 };
+    const insertedCondition: Condition = { type: "has_tag", target: { type: "primary_crew" }, value: "bridge_scout" };
+    const replacementCondition: Condition = { type: "world_flag_equals", field: "bridge_ready", value: true };
+    const draft = createDraft({
+      working_definition: {
+        ...createDraft().working_definition,
+        trigger: {
+          type: "arrival",
+          conditions: [firstCondition],
+        },
+      },
+    });
+
+    const withInsertedCondition = eventAuthoringReducer(draft, {
+      type: "add_trigger_condition",
+      condition: insertedCondition,
+      index: 0,
+    });
+    const withUpdatedCondition = eventAuthoringReducer(withInsertedCondition, {
+      type: "update_trigger_condition",
+      index: 1,
+      condition: replacementCondition,
+    });
+    const withRemovedCondition = eventAuthoringReducer(withUpdatedCondition, {
+      type: "remove_trigger_condition",
+      index: 0,
+    });
+
+    expect(withInsertedCondition.working_definition.trigger?.conditions).toEqual([insertedCondition, firstCondition]);
+    expect(withUpdatedCondition.working_definition.trigger?.conditions).toEqual([insertedCondition, replacementCondition]);
+    expect(withRemovedCondition.working_definition.trigger?.conditions).toEqual([replacementCondition]);
+    expect(draft.working_definition.trigger?.conditions).toEqual([firstCondition]);
+  });
+
   it("adds a call option and creates a matching option line in the call template", () => {
     const draft = createDraft();
 
@@ -237,14 +331,19 @@ describe("event authoring reducer", () => {
   });
 });
 
-function createDraft(): EventDraftEnvelope {
-  return createDefaultNewDraftEnvelope({
+function createDraft(overrides: Partial<EventDraftEnvelope> = {}): EventDraftEnvelope {
+  const draft = createDefaultNewDraftEnvelope({
     domain: "forest",
     definitionId: "forest_bridge_choice",
     title: "Bridge choice",
     summary: "Choose how to cross the bridge.",
     createdAt: CREATED_AT,
   });
+
+  return {
+    ...draft,
+    ...overrides,
+  };
 }
 
 function createDraftWithFollowupCall(): EventDraftEnvelope {
@@ -308,4 +407,14 @@ function getCallNode(draft: EventDraftEnvelope, nodeId: string): CallNode {
   }
 
   return node;
+}
+
+function getTriggerTemplate(triggerType: string) {
+  const capability = triggerCapabilities.find((candidate) => candidate.type === triggerType);
+
+  if (!capability) {
+    throw new Error(`Expected trigger capability ${triggerType}.`);
+  }
+
+  return capability.template;
 }
