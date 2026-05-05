@@ -4,6 +4,8 @@ import {
   conditionCapabilities,
   conditionHandlerOptions,
   getConditionCapability,
+  getNodeCapability,
+  nodeCapabilities,
   triggerCapabilities,
 } from "./capabilityCatalog";
 
@@ -44,6 +46,18 @@ const EXPECTED_CONDITION_TYPES = [
   "handler_condition",
 ] as const;
 
+const EXPECTED_NODE_TYPES = [
+  "call",
+  "wait",
+  "check",
+  "random",
+  "action_request",
+  "objective",
+  "spawn_event",
+  "log_only",
+  "end",
+] as const;
+
 describe("event capability catalog", () => {
   it("covers every current trigger type id", () => {
     expectCoverage(
@@ -58,6 +72,14 @@ describe("event capability catalog", () => {
       "condition capabilities",
       conditionCapabilities.map((capability) => capability.type),
       EXPECTED_CONDITION_TYPES,
+    );
+  });
+
+  it("covers every current node type id", () => {
+    expectCoverage(
+      "node capabilities",
+      nodeCapabilities.map((capability) => capability.type),
+      EXPECTED_NODE_TYPES,
     );
   });
 
@@ -87,6 +109,31 @@ describe("event capability catalog", () => {
       expect(typeof capability.template).toBe("object");
       expect(Array.isArray(capability.template)).toBe(false);
     }
+  });
+
+  it("defines complete node metadata and insert templates", () => {
+    for (const capability of nodeCapabilities) {
+      expect(capability.kind).toBe("node");
+      expect(capability.label).not.toHaveLength(0);
+      expect(capability.description).not.toHaveLength(0);
+      expect(capability.commonUse).not.toHaveLength(0);
+      expect(capability.fields.length).toBeGreaterThan(0);
+      expect(capability.requiredFields).toEqual(expect.arrayContaining(["id", "type", "title", "blocking"]));
+      expect(capability.template).toMatchObject({
+        id: expect.any(String),
+        type: capability.type,
+        title: expect.any(String),
+        blocking: {
+          occupies_crew_action: expect.any(Boolean),
+          occupies_communication: expect.any(Boolean),
+        },
+      });
+    }
+  });
+
+  it("looks up node capabilities by type", () => {
+    expect(getNodeCapability("call").template.type).toBe("call");
+    expect(getNodeCapability("end").template.type).toBe("end");
   });
 
   it("exposes only condition handler entries to handler_condition", () => {

@@ -2,6 +2,8 @@ import handlerRegistryContent from "../../../../../content/events/handler_regist
 import type {
   Condition,
   ConditionType,
+  EventNode,
+  EventNodeType,
   HandlerDefinition,
   TriggerDefinition,
   TriggerType,
@@ -12,9 +14,11 @@ import {
   type FormFieldConfig,
   type FormSelectOption,
 } from "./formRegistry";
+import { createDefaultNodeTemplate, EVENT_NODE_TYPES } from "./templates";
 
 export type TriggerCapability = CapabilityDefinition<"trigger", TriggerType, TriggerDefinition>;
 export type ConditionCapability = CapabilityDefinition<"condition", ConditionType, Condition>;
+export type NodeCapability = CapabilityDefinition<"node", EventNodeType, EventNode>;
 
 const triggerTypeOptions = [
   option("arrival", "Arrival", "Crew arrives at a tile."),
@@ -52,6 +56,8 @@ const conditionTypeOptions = [
   option("time_compare", "Time compare", "Compare elapsed game time or a time field."),
   option("handler_condition", "Handler condition", "Delegate condition evaluation to a registered handler."),
 ] as const satisfies readonly FormSelectOption[];
+
+const nodeTypeOptions: readonly FormSelectOption[] = EVENT_NODE_TYPES.map((type) => option(type, nodeLabel(type)));
 
 const compareOperatorOptions = [
   option("equals", "Equals"),
@@ -114,6 +120,64 @@ const crewActionStatusOptions = [
   option("failed", "Failed"),
   option("interrupted", "Interrupted"),
   option("cancelled", "Cancelled"),
+] as const satisfies readonly FormSelectOption[];
+
+const callUrgencyOptions = [
+  option("normal", "Normal"),
+  option("urgent", "Urgent"),
+  option("emergency", "Emergency"),
+] as const satisfies readonly FormSelectOption[];
+
+const callDeliveryOptions = [
+  option("incoming_call", "Incoming call"),
+  option("auto_report", "Auto report"),
+  option("queued_message", "Queued message"),
+] as const satisfies readonly FormSelectOption[];
+
+const wakeTriggerTypeOptions = [
+  option("time_wakeup", "Time wakeup"),
+  option("event_node_finished", "Event node finished"),
+] as const satisfies readonly FormSelectOption[];
+
+const interruptPolicyOptions = [
+  option("not_interruptible", "Not interruptible"),
+  option("player_can_cancel", "Player can cancel"),
+  option("event_can_cancel", "Event can cancel"),
+] as const satisfies readonly FormSelectOption[];
+
+const seedScopeOptions = [
+  option("event_instance", "Event instance"),
+  option("node_entry", "Node entry"),
+  option("trigger_context", "Trigger context"),
+] as const satisfies readonly FormSelectOption[];
+
+const actionTypeOptions = [
+  option("move", "Move"),
+  option("survey", "Survey"),
+  option("gather", "Gather"),
+  option("build", "Build"),
+  option("extract", "Extract"),
+  option("return_to_base", "Return to base"),
+  option("event_waiting", "Event waiting"),
+  option("guarding_event_site", "Guarding event site"),
+  option("custom_handler_action", "Custom handler action"),
+] as const satisfies readonly FormSelectOption[];
+
+const objectiveModeOptions = [
+  option("create_and_wait", "Create and wait"),
+  option("create_and_continue", "Create and continue"),
+] as const satisfies readonly FormSelectOption[];
+
+const spawnPolicyOptions = [
+  option("immediate", "Immediate"),
+  option("deferred_until_trigger", "Deferred until trigger"),
+] as const satisfies readonly FormSelectOption[];
+
+const terminalResolutionOptions = [
+  option("resolved", "Resolved"),
+  option("cancelled", "Cancelled"),
+  option("expired", "Expired"),
+  option("failed", "Failed"),
 ] as const satisfies readonly FormSelectOption[];
 
 const handlerDefinitions = (handlerRegistryContent.handlers ?? []) as HandlerDefinition[];
@@ -400,14 +464,171 @@ export const conditionCapabilities = [
   }),
 ] as const satisfies readonly ConditionCapability[];
 
+export const nodeCapabilities = [
+  nodeCapability({
+    type: "call",
+    label: "Call",
+    description: "Presents a communication beat with player-selectable options.",
+    fields: [
+      textField("call_template_id", "Call template", "Call template id bound to this node."),
+      targetRefField("speaker_crew_ref", "Speaker", "Crew or target reference used as the call speaker."),
+      selectField("urgency", "Urgency", "Call urgency.", callUrgencyOptions, true, "normal"),
+      selectField("delivery", "Delivery", "How the call is delivered to the player.", callDeliveryOptions, true, "queued_message"),
+      jsonField("options", "Options", "Call options available to the player.", true),
+      jsonField("option_node_mapping", "Option mapping", "Map option ids to next node ids.", true),
+    ],
+    requiredFields: ["call_template_id", "speaker_crew_ref", "urgency", "delivery", "options", "option_node_mapping"],
+    commonUse: "Ask for a player decision, deliver a report, or route the graph from a communication choice.",
+  }),
+  nodeCapability({
+    type: "wait",
+    label: "Wait",
+    description: "Pauses graph progress until a timer or node-finished trigger resumes it.",
+    fields: [
+      numberField("duration_seconds", "Duration", "Wait duration in game seconds.", true, 60),
+      selectField("wake_trigger_type", "Wake trigger", "Trigger that wakes the wait node.", wakeTriggerTypeOptions, true, "time_wakeup"),
+      textField("next_node_id", "Next node", "Node to enter when the wait completes."),
+      booleanField("set_next_wakeup_at", "Set wakeup", "Whether runtime should store the next wakeup timestamp.", true, true),
+      selectField("interrupt_policy", "Interrupt policy", "How this wait can be interrupted.", interruptPolicyOptions, true, "not_interruptible"),
+      jsonField("on_interrupted", "On interrupted", "Optional interruption transition.", false),
+    ],
+    requiredFields: ["duration_seconds", "wake_trigger_type", "next_node_id", "set_next_wakeup_at", "interrupt_policy"],
+    commonUse: "Delay follow-up calls, staged hazards, or objective checks without resolving the event.",
+  }),
+  nodeCapability({
+    type: "check",
+    label: "Check",
+    description: "Evaluates ordered condition branches and routes to the first match.",
+    fields: [
+      jsonField("branches", "Branches", "Ordered condition branches.", true),
+      textField("default_next_node_id", "Default next node", "Fallback node when no branch matches."),
+      selectField("evaluation_order", "Evaluation order", "How branches are evaluated.", [option("first_match", "First match")], true, "first_match"),
+    ],
+    requiredFields: ["branches", "default_next_node_id", "evaluation_order"],
+    commonUse: "Branch graph flow by world state, crew state, tags, objectives, or prior choices.",
+  }),
+  nodeCapability({
+    type: "random",
+    label: "Random",
+    description: "Chooses a weighted branch with deterministic seed scoping.",
+    fields: [
+      selectField("seed_scope", "Seed scope", "Stable seed source for the roll.", seedScopeOptions, true, "event_instance"),
+      jsonField("branches", "Branches", "Weighted random branches.", true),
+      textField("default_next_node_id", "Default next node", "Optional fallback node when no branch applies.", false),
+      textField("store_result_as", "Store result as", "Runtime key for the selected branch result."),
+    ],
+    requiredFields: ["seed_scope", "branches", "default_next_node_id", "store_result_as"],
+    commonUse: "Vary outcomes while keeping replayable event instances deterministic.",
+  }),
+  nodeCapability({
+    type: "action_request",
+    label: "Action request",
+    description: "Requests a crew action and waits for accepted, completed, or failed outcomes.",
+    fields: [
+      textField("request_id", "Request id", "Stable request id authored for this action request."),
+      selectField("action_type", "Action type", "Crew action type to request.", actionTypeOptions, true, "survey"),
+      targetRefField("target_crew_ref", "Target crew", "Crew target that should perform the action."),
+      targetRefField("target_tile_ref", "Target tile", "Optional tile target for the action.", false),
+      jsonField("action_params", "Action params", "Action-specific parameter object.", true),
+      jsonField("acceptance_conditions", "Acceptance conditions", "Optional conditions for accepting this request.", false),
+      jsonField("completion_trigger", "Completion trigger", "Trigger that completes this request.", true),
+      textField("on_accepted_node_id", "Accepted node", "Optional node entered when the action is accepted.", false),
+      textField("on_completed_node_id", "Completed node", "Node entered when the action completes."),
+      textField("on_failed_node_id", "Failed node", "Node entered when the action fails."),
+      booleanField("occupies_crew_action", "Occupies crew action", "Whether this request claims the crew action slot.", true, true),
+    ],
+    requiredFields: [
+      "request_id",
+      "action_type",
+      "target_crew_ref",
+      "action_params",
+      "completion_trigger",
+      "on_completed_node_id",
+      "on_failed_node_id",
+      "occupies_crew_action",
+    ],
+    commonUse: "Turn an event choice into a concrete crew task such as survey, gather, or repair.",
+  }),
+  nodeCapability({
+    type: "objective",
+    label: "Objective",
+    description: "Creates an objective and optionally waits for objective completion or failure.",
+    fields: [
+      jsonField("objective_template", "Objective template", "Objective title, summary, target, and required action.", true),
+      selectField("mode", "Mode", "Whether the graph waits after creating the objective.", objectiveModeOptions, true, "create_and_wait"),
+      textField("on_created_node_id", "Created node", "Optional node entered immediately after objective creation.", false),
+      textField("on_completed_node_id", "Completed node", "Node entered when the objective completes."),
+      textField("on_failed_node_id", "Failed node", "Optional node entered when the objective fails.", false),
+      booleanField("parent_event_link", "Parent event link", "Whether the objective is linked to the parent event.", true, true),
+    ],
+    requiredFields: ["objective_template", "mode", "on_completed_node_id", "parent_event_link"],
+    commonUse: "Create player-facing follow-up work that can outlive the immediate call.",
+  }),
+  nodeCapability({
+    type: "spawn_event",
+    label: "Spawn event",
+    description: "Starts another event definition and then continues this graph.",
+    fields: [
+      textField("event_definition_id", "Event definition", "Event definition id to spawn."),
+      selectField("spawn_policy", "Spawn policy", "When the child event is spawned.", spawnPolicyOptions, true, "immediate"),
+      jsonField("context_mapping", "Context mapping", "Mapping from child context fields to parent context fields.", true),
+      booleanField("parent_event_link", "Parent event link", "Whether the child is linked to this parent event.", true, true),
+      textField("dedupe_key_template", "Dedupe key", "Optional dedupe key for the spawned event.", false),
+      textField("next_node_id", "Next node", "Node entered after spawning."),
+    ],
+    requiredFields: ["event_definition_id", "spawn_policy", "context_mapping", "parent_event_link", "next_node_id"],
+    commonUse: "Split larger arcs into reusable child events while preserving parent context.",
+  }),
+  nodeCapability({
+    type: "log_only",
+    label: "Log only",
+    description: "Writes event log or history records, then immediately continues.",
+    fields: [
+      textField("event_log_template_id", "Event log template", "Event log template id to write."),
+      jsonField("effect_refs", "Effect refs", "Optional effect refs executed with this log node.", false),
+      jsonField("history_writes", "History writes", "Optional history writes.", false),
+      textField("next_node_id", "Next node", "Node entered after writing the log."),
+    ],
+    requiredFields: ["event_log_template_id", "next_node_id"],
+    commonUse: "Record a beat, marker, or hidden state transition without interrupting graph flow.",
+  }),
+  nodeCapability({
+    type: "end",
+    label: "End",
+    description: "Terminates the event with final result and cleanup behavior.",
+    fields: [
+      selectField("resolution", "Resolution", "Terminal event status.", terminalResolutionOptions, true, "resolved"),
+      textField("result_key", "Result key", "Stable result key stored on runtime history."),
+      jsonField("final_effect_refs", "Final effect refs", "Optional final effect refs.", false),
+      textField("event_log_template_id", "Event log template", "Event log template id written on resolution."),
+      jsonField("history_writes", "History writes", "History entries written on resolution.", true),
+      jsonField("cleanup_policy", "Cleanup policy", "Blocking and call cleanup behavior.", true),
+    ],
+    requiredFields: ["resolution", "result_key", "event_log_template_id", "history_writes", "cleanup_policy"],
+    commonUse: "Resolve, cancel, expire, or fail the active event and release runtime claims.",
+  }),
+] as const satisfies readonly NodeCapability[];
+
 const conditionCapabilityByType = new Map<ConditionType, ConditionCapability>(
   conditionCapabilities.map((capability) => [capability.type, capability]),
+);
+
+const nodeCapabilityByType = new Map<EventNodeType, NodeCapability>(
+  nodeCapabilities.map((capability) => [capability.type, capability]),
 );
 
 export function getConditionCapability(type: ConditionType): ConditionCapability {
   const capability = conditionCapabilityByType.get(type);
   if (!capability) {
     throw new Error(`Unknown condition capability: ${type}`);
+  }
+  return capability;
+}
+
+export function getNodeCapability(type: EventNodeType): NodeCapability {
+  const capability = nodeCapabilityByType.get(type);
+  if (!capability) {
+    throw new Error(`Unknown node capability: ${type}`);
   }
   return capability;
 }
@@ -456,6 +677,26 @@ function conditionCapability(config: {
   };
 }
 
+function nodeCapability(config: {
+  type: EventNodeType;
+  label: string;
+  description: string;
+  fields: readonly FormFieldConfig[];
+  requiredFields: readonly string[];
+  commonUse: string;
+}): NodeCapability {
+  return {
+    kind: "node",
+    type: config.type,
+    label: config.label,
+    description: config.description,
+    fields: [...nodeCommonFields(config.type), ...config.fields],
+    requiredFields: ["id", "type", "title", "blocking", ...config.requiredFields],
+    template: createDefaultNodeTemplate({ type: config.type }),
+    commonUse: config.commonUse,
+  };
+}
+
 function triggerFields(type: TriggerType): readonly FormFieldConfig[] {
   return [
     selectField("type", "Type", "Trigger type id.", triggerTypeOptions, true, type),
@@ -480,6 +721,15 @@ function conditionTypeField(type: ConditionType): FormFieldConfig {
   return selectField("type", "Type", "Condition type id.", conditionTypeOptions, true, type);
 }
 
+function nodeCommonFields(type: EventNodeType): readonly FormFieldConfig[] {
+  return [
+    textField("id", "Node id", "Unique node id within this event graph."),
+    selectField("type", "Type", "Event node type id.", nodeTypeOptions, true, type),
+    textField("title", "Title", "Short node title shown in the graph."),
+    jsonField("blocking", "Blocking", "Blocking claims requested while this node is active.", true),
+  ];
+}
+
 function conditionsField(description: string): FormFieldConfig {
   return defineField({
     path: "conditions",
@@ -494,6 +744,17 @@ function targetField(description: string, required = true): FormFieldConfig {
   return defineField({
     path: "target",
     label: "Target",
+    input: "target_ref",
+    description,
+    required,
+    options: targetTypeOptions,
+  });
+}
+
+function targetRefField(path: string, label: string, description: string, required = true): FormFieldConfig {
+  return defineField({
+    path,
+    label,
     input: "target_ref",
     description,
     required,
@@ -533,6 +794,38 @@ function valueSelectField(description: string, options: readonly FormSelectOptio
   return selectField("value", "Value", description, options, true);
 }
 
+function textField(path: string, label: string, description: string, required = true): FormFieldConfig {
+  return defineField({
+    path,
+    label,
+    input: "text",
+    description,
+    required,
+  });
+}
+
+function numberField(path: string, label: string, description: string, required = true, defaultValue?: number): FormFieldConfig {
+  return defineField({
+    path,
+    label,
+    input: "number",
+    description,
+    required,
+    defaultValue,
+  });
+}
+
+function booleanField(path: string, label: string, description: string, required = true, defaultValue?: boolean): FormFieldConfig {
+  return defineField({
+    path,
+    label,
+    input: "boolean",
+    description,
+    required,
+    defaultValue,
+  });
+}
+
 function jsonField(path: string, label: string, description: string, required = false): FormFieldConfig {
   return defineField({
     path,
@@ -568,6 +861,10 @@ function placeholderCondition(): Condition {
 
 function option(value: string, label: string, description?: string, meta?: unknown): FormSelectOption {
   return { value, label, description, meta };
+}
+
+function nodeLabel(type: EventNodeType): string {
+  return labelFromId(type);
 }
 
 function labelFromId(id: string): string {
