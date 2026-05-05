@@ -42,6 +42,93 @@ describe("event authoring reducer", () => {
     });
   });
 
+  it("updates basic definition fields without changing draft identity fields", () => {
+    const draft = createDraft();
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "update_basic_fields",
+      fields: {
+        title: "Revised bridge choice",
+        summary: "Choose whether to cross, repair, or retreat.",
+        tags: ["bridge", "crew_choice"],
+      },
+    });
+
+    expect(updated).not.toBe(draft);
+    expect(updated.working_definition).toMatchObject({
+      id: "forest_bridge_choice",
+      domain: "forest",
+      title: "Revised bridge choice",
+      summary: "Choose whether to cross, repair, or retreat.",
+      tags: ["bridge", "crew_choice"],
+    });
+    expect(updated.draft_id).toBe(draft.draft_id);
+    expect(updated.source).toBe(draft.source);
+    expect(updated.target).toBe(draft.target);
+    expect(updated.hashes).toBe(draft.hashes);
+    expect(draft.working_definition.title).toBe("Bridge choice");
+    expect(draft.working_definition.tags).toBeUndefined();
+  });
+
+  it("updates candidate selection fields without mutating the existing candidate selection", () => {
+    const draft = createDraft();
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "update_candidate_selection",
+      fields: {
+        priority: 12,
+        weight: 3.5,
+        mutex_group: "forest_bridge",
+        max_instances_per_trigger: 2,
+        requires_blocking_slot: true,
+      },
+    });
+
+    expect(updated.working_definition.candidate_selection).toEqual({
+      priority: 12,
+      weight: 3.5,
+      mutex_group: "forest_bridge",
+      max_instances_per_trigger: 2,
+      requires_blocking_slot: true,
+    });
+    expect(draft.working_definition.candidate_selection).toEqual({
+      priority: 0,
+      weight: 1,
+      max_instances_per_trigger: 1,
+      requires_blocking_slot: false,
+    });
+  });
+
+  it("updates repeat policy fields without mutating the existing repeat policy", () => {
+    const draft = createDraft();
+
+    const updated = eventAuthoringReducer(draft, {
+      type: "update_repeat_policy",
+      fields: {
+        scope: "crew_tile",
+        max_trigger_count: 4,
+        cooldown_seconds: 90,
+        history_key_template: "bridge:{crew_id}:{tile_id}",
+        allow_while_active: true,
+      },
+    });
+
+    expect(updated.working_definition.repeat_policy).toEqual({
+      scope: "crew_tile",
+      max_trigger_count: 4,
+      cooldown_seconds: 90,
+      history_key_template: "bridge:{crew_id}:{tile_id}",
+      allow_while_active: true,
+    });
+    expect(draft.working_definition.repeat_policy).toEqual({
+      scope: "event",
+      max_trigger_count: null,
+      cooldown_seconds: 0,
+      history_key_template: "forest_bridge_choice_triggered",
+      allow_while_active: false,
+    });
+  });
+
   it("adds a call option and creates a matching option line in the call template", () => {
     const draft = createDraft();
 

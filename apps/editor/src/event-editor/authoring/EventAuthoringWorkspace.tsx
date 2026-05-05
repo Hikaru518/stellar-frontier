@@ -1,4 +1,5 @@
 import type { EventDraftEnvelope, EventEditorStep } from "../types";
+import BasicStep from "./BasicStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
 
 type AuthoringStep = Exclude<EventEditorStep, "domain">;
@@ -84,26 +85,9 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
               <h3>{activeStepConfig.label}</h3>
               <p className="muted-text">{activeStepConfig.responsibility}</p>
             </div>
-            <span className="status-tag status-muted">placeholder</span>
+            <span className="status-tag status-muted">{activeStep === "basic" ? "editable" : "placeholder"}</span>
           </div>
-          <dl className="event-authoring-step-summary">
-            <div>
-              <dt>Current step</dt>
-              <dd>{activeStepConfig.id}</dd>
-            </div>
-            <div>
-              <dt>Expected responsibility</dt>
-              <dd>{activeStepConfig.responsibility}</dd>
-            </div>
-            <div>
-              <dt>Draft target</dt>
-              <dd>
-                <code>
-                  {draft.target.domain}/{draft.target.definition_id}
-                </code>
-              </dd>
-            </div>
-          </dl>
+          {activeStep === "basic" ? <BasicStep draft={draft} onDraftChange={onDraftChange} /> : <StepPlaceholder step={activeStepConfig} draft={draft} />}
         </section>
 
         <aside className="event-authoring-helper-panel" aria-label="Authoring helper panel">
@@ -139,6 +123,35 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange }: EventA
       }),
     );
   }
+}
+
+function StepPlaceholder({
+  step,
+  draft,
+}: {
+  step: (typeof AUTHORING_STEPS)[number];
+  draft: EventDraftEnvelope;
+}) {
+  return (
+    <dl className="event-authoring-step-summary">
+      <div>
+        <dt>Current step</dt>
+        <dd>{step.id}</dd>
+      </div>
+      <div>
+        <dt>Expected responsibility</dt>
+        <dd>{step.responsibility}</dd>
+      </div>
+      <div>
+        <dt>Draft target</dt>
+        <dd>
+          <code>
+            {draft.target.domain}/{draft.target.definition_id}
+          </code>
+        </dd>
+      </div>
+    </dl>
+  );
 }
 
 function MetaItem({

@@ -1,6 +1,7 @@
 import type {
   CallNode,
   EventEdge,
+  EventDefinition,
   EventGraph,
   EventNode,
   TextVariantGroup,
@@ -13,11 +14,43 @@ import type {
 } from "../types";
 import { createDefaultCallOptionTextVariantGroup } from "./templates";
 
+type BasicFieldsUpdate = Partial<Pick<EventDefinition, "title" | "summary" | "tags">>;
+type CandidateSelectionUpdate = Partial<EventDefinition["candidate_selection"]>;
+type RepeatPolicyUpdate = Partial<EventDefinition["repeat_policy"]>;
+
+const DEFAULT_CANDIDATE_SELECTION: EventDefinition["candidate_selection"] = {
+  priority: 0,
+  weight: 1,
+  mutex_group: null,
+  max_instances_per_trigger: 1,
+  requires_blocking_slot: false,
+};
+
+const DEFAULT_REPEAT_POLICY: EventDefinition["repeat_policy"] = {
+  scope: "event",
+  max_trigger_count: null,
+  cooldown_seconds: 0,
+  history_key_template: "",
+  allow_while_active: false,
+};
+
 export type EventAuthoringAction =
   | {
       type: "select_step";
       step: EventEditorStep;
       selection?: unknown;
+    }
+  | {
+      type: "update_basic_fields";
+      fields: BasicFieldsUpdate;
+    }
+  | {
+      type: "update_candidate_selection";
+      fields: CandidateSelectionUpdate;
+    }
+  | {
+      type: "update_repeat_policy";
+      fields: RepeatPolicyUpdate;
     }
   | {
       type: "add_call_option";
@@ -45,6 +78,12 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
   switch (action.type) {
     case "select_step":
       return selectStep(draft, action.step, action.selection);
+    case "update_basic_fields":
+      return updateBasicFields(draft, action.fields);
+    case "update_candidate_selection":
+      return updateCandidateSelection(draft, action.fields);
+    case "update_repeat_policy":
+      return updateRepeatPolicy(draft, action.fields);
     case "add_call_option":
       return addCallOption(draft, action.nodeId, action.optionId, action.nextNodeId);
     case "remove_call_option":
@@ -63,6 +102,46 @@ function selectStep(draft: EventDraftEnvelope, step: EventEditorStep, selection:
       ...draft.editor_state,
       active_step: step,
       selection: selection ?? null,
+    },
+  };
+}
+
+function updateBasicFields(draft: EventDraftEnvelope, fields: BasicFieldsUpdate): EventDraftEnvelope {
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      ...fields,
+      id: draft.working_definition.id,
+      domain: draft.working_definition.domain,
+    },
+  };
+}
+
+function updateCandidateSelection(draft: EventDraftEnvelope, fields: CandidateSelectionUpdate): EventDraftEnvelope {
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      candidate_selection: {
+        ...DEFAULT_CANDIDATE_SELECTION,
+        ...draft.working_definition.candidate_selection,
+        ...fields,
+      },
+    },
+  };
+}
+
+function updateRepeatPolicy(draft: EventDraftEnvelope, fields: RepeatPolicyUpdate): EventDraftEnvelope {
+  return {
+    ...draft,
+    working_definition: {
+      ...draft.working_definition,
+      repeat_policy: {
+        ...DEFAULT_REPEAT_POLICY,
+        ...draft.working_definition.repeat_policy,
+        ...fields,
+      },
     },
   };
 }

@@ -40,7 +40,7 @@ source:
 | 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | completed | 3 |
 | 15 | TASK-015 | 实现 Draft Browser 与 Create/Edit Draft 入口 | completed | 3 |
 | 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | completed | 1 |
-| 17 | TASK-017 | 实现 Basic step 结构化表单 | pending | 0 |
+| 17 | TASK-017 | 实现 Basic step 结构化表单 | completed | 2 |
 | 18 | TASK-018 | 实现 Trigger step 与 capability insertion | pending | 0 |
 | 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | pending | 0 |
 | 20 | TASK-020 | 实现 Graph node editor 基础节点 | pending | 0 |
@@ -237,3 +237,14 @@ source:
 - developer summary: 新增 EventAuthoringWorkspace shell，draft 打开后显示 Basic / Trigger / Graph / Effects / Review 五步导航；step 切换通过 `eventAuthoringReducer` 写回 `editor_state.active_step`；edit_existing draft 的 domain / definition id 在 header 标记 Locked；未加载 draft 时保留现有只读 inspector。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（35 files / 186 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.test.tsx apps/editor/src/event-editor/EventEditorPage.tsx apps/editor/src/event-editor/EventEditorPage.test.tsx apps/editor/src/styles.css docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，通过 UI 创建临时 draft `codex_task016_semantic_check_20260505_065337`，确认 workspace 可见、五个 step 按钮存在、切换到 Review 后 Draft metadata 中 active step 为 `review`，`aria-current=\"step\"` 位于 Review；浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-017: 实现 Basic step 结构化表单
+- 状态: completed
+- 开始时间: 2026-05-05 14:55
+- 完成时间: 2026-05-05 15:10
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区只看到 `BasicStep.test.tsx` 与 `eventAuthoringReducer.test.ts` 的测试改动，未看到 BasicStep 或 reducer 实现，交给下一次尝试补完。
+- developer summary: 新增 BasicStep 结构化表单，支持 title、summary、tags、candidate_selection 和 repeat_policy 编辑；invalid numeric input 保持在本地 UI state 并显示字段错误，不 dispatch 无效 draft；EventAuthoringWorkspace 在 Basic step 渲染 BasicStep，其余 step 保持 placeholder；reducer 新增 basic/candidate/repeat pure update actions。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（36 files / 193 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/BasicStep.tsx apps/editor/src/event-editor/authoring/BasicStep.test.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，通过 UI 创建临时 draft `codex_task017_semantic_check_20260505_070817`；确认 BasicStep 可编辑 title、summary、tags、priority、weight；输入 invalid `Max instances per trigger = not-a-number` 后显示字段 alert，`aria-invalid=true`，浏览器 console error 为空。验证后已删除临时 draft 文件。
