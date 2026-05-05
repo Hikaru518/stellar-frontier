@@ -8,6 +8,7 @@ import {
   loadEventEditorLibrary,
 } from "./apiClient";
 import DraftBrowser from "./authoring/DraftBrowser";
+import EventAuthoringWorkspace from "./authoring/EventAuthoringWorkspace";
 import EventBrowser from "./EventBrowser";
 import GraphPanel from "./GraphPanel";
 import SchemaPanel from "./SchemaPanel";
@@ -172,7 +173,7 @@ export default function EventEditorPage({
 
         <div className="event-detail-pane" aria-label="Selected event workspace">
           {activeDraft ? (
-            <DraftOpenCard draft={activeDraft} />
+            <EventAuthoringWorkspace draft={activeDraft} onDraftChange={setActiveDraft} />
           ) : activeAsset ? (
             <>
               <AssetHeaderStrip asset={activeAsset} />
@@ -409,39 +410,6 @@ function AssetHeaderStrip({ asset }: { asset: EditorEventAsset<unknown> }) {
           </dd>
         </div>
       </dl>
-    </section>
-  );
-}
-
-function DraftOpenCard({ draft }: { draft: EventDraftEnvelope }) {
-  return (
-    <section className="editor-state-card event-draft-open-card" aria-label="Open draft">
-      <h3>Draft open</h3>
-      <div className="asset-header-main">
-        <strong>{draft.draft_id}</strong>
-        <span className="status-tag status-warning">{draft.mode}</span>
-      </div>
-      <dl className="asset-header-meta">
-        <div>
-          <dt>Domain</dt>
-          <dd>{draft.target.domain}</dd>
-        </div>
-        <div>
-          <dt>Definition</dt>
-          <dd>{draft.target.definition_id}</dd>
-        </div>
-        <div>
-          <dt>Active step</dt>
-          <dd>{draft.editor_state.active_step}</dd>
-        </div>
-        <div>
-          <dt>Draft hash</dt>
-          <dd>
-            <code>{draft.hashes.draft ?? "unsaved"}</code>
-          </dd>
-        </div>
-      </dl>
-      <p className="muted-text">Authoring workspace shell is implemented in the next task. The draft is loaded and ready.</p>
     </section>
   );
 }

@@ -39,7 +39,7 @@ source:
 | 13 | TASK-013 | 实现 Effect 与 Handler capability registry | completed | 2 |
 | 14 | TASK-014 | 实现 Authoring reducer 与 call template sync | completed | 3 |
 | 15 | TASK-015 | 实现 Draft Browser 与 Create/Edit Draft 入口 | completed | 3 |
-| 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | pending | 0 |
+| 16 | TASK-016 | 实现 Authoring Workspace shell 与 wizard navigation | completed | 1 |
 | 17 | TASK-017 | 实现 Basic step 结构化表单 | pending | 0 |
 | 18 | TASK-018 | 实现 Trigger step 与 capability insertion | pending | 0 |
 | 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | pending | 0 |
@@ -228,3 +228,12 @@ source:
 - developer summary: dispatcher 主线程补齐 Draft Browser、Create Domain dialog、Event Browser definition edit action 和 EventEditorPage 的 draft/domain API 接入；创建/打开 draft 后显示轻量 Draft open 占位，完整 authoring workspace 留给 TASK-016；页面对旧 helper/mock response 做 domains/drafts normalization，避免入口崩溃。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（34 files / 183 tests）；`git diff --check -- apps/editor/src/event-editor/EventEditorPage.tsx apps/editor/src/event-editor/EventBrowser.tsx apps/editor/src/event-editor/EventEditorPage.test.tsx apps/editor/src/event-editor/EventBrowser.test.tsx apps/editor/src/event-editor/authoring/DraftBrowser.tsx apps/editor/src/event-editor/authoring/DomainDialog.tsx apps/editor/src/event-editor/authoring/DraftBrowser.test.tsx apps/editor/src/event-editor/authoring/DomainDialog.test.tsx apps/editor/src/styles.css docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，真实 helper 数据加载成功；确认 Draft Browser、Create Event、Edit Existing 按钮可见，Create Domain dialog 可打开/关闭，浏览器 console error 为空；未提交 create/edit 动作，避免写入真实 content。
+
+### TASK-016: 实现 Authoring Workspace shell 与 wizard navigation
+- 状态: completed
+- 开始时间: 2026-05-05 14:46
+- 完成时间: 2026-05-05 14:54
+- 尝试次数: 1
+- developer summary: 新增 EventAuthoringWorkspace shell，draft 打开后显示 Basic / Trigger / Graph / Effects / Review 五步导航；step 切换通过 `eventAuthoringReducer` 写回 `editor_state.active_step`；edit_existing draft 的 domain / definition id 在 header 标记 Locked；未加载 draft 时保留现有只读 inspector。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（35 files / 186 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.tsx apps/editor/src/event-editor/authoring/EventAuthoringWorkspace.test.tsx apps/editor/src/event-editor/EventEditorPage.tsx apps/editor/src/event-editor/EventEditorPage.test.tsx apps/editor/src/styles.css docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，通过 UI 创建临时 draft `codex_task016_semantic_check_20260505_065337`，确认 workspace 可见、五个 step 按钮存在、切换到 Review 后 Draft metadata 中 active step 为 `review`，`aria-current=\"step\"` 位于 Review；浏览器 console error 为空。验证后已删除临时 draft 文件。

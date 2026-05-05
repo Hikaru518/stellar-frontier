@@ -118,9 +118,39 @@ describe("EventEditorPage", () => {
         domain: "forest",
       });
     });
-    expect(await screen.findByText("Draft open")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Event Authoring Workspace" })).toBeInTheDocument();
     expect(screen.getByText("forest_signal_20260505_153012")).toBeInTheDocument();
-    expect(screen.getByText("basic")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Basic" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByLabelText("Draft domain")).toHaveTextContent("forest");
+    expect(screen.getByLabelText("Draft domain")).toHaveTextContent("Locked");
+    expect(screen.getByLabelText("Draft definition id")).toHaveTextContent("forest.signal");
+    expect(screen.getByLabelText("Draft definition id")).toHaveTextContent("Locked");
+  });
+
+  it("opens a draft into the authoring workspace and changes wizard steps", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        domains: [createDomainSummary("forest")],
+        drafts: [createDraftSummary("forest_bridge_choice_20260505_153012")],
+      }),
+    );
+    const loadDraftRequest = vi.fn(async (): Promise<EventDraftEnvelope> => createDraftEnvelope());
+
+    render(<EventEditorPage loadLibrary={loadLibrary} loadDraftRequest={loadDraftRequest} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open draft forest_bridge_choice_20260505_153012" }));
+
+    expect(await screen.findByRole("heading", { name: "Event Authoring Workspace" })).toBeInTheDocument();
+    const stepNav = screen.getByRole("navigation", { name: "Event authoring steps" });
+    for (const label of ["Basic", "Trigger", "Graph", "Effects", "Review"]) {
+      expect(within(stepNav).getByRole("button", { name: label })).toBeInTheDocument();
+    }
+
+    fireEvent.click(within(stepNav).getByRole("button", { name: "Review" }));
+
+    expect(within(stepNav).getByRole("button", { name: "Review" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Draft metadata")).toHaveTextContent("review");
   });
 
   it("creates a domain and refreshes library summaries", async () => {
