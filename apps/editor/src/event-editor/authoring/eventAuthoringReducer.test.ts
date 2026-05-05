@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type {
+  ActionRequestNode,
   CallNode,
   CheckNode,
   Condition,
   EventGraph,
   EventNode,
   LogOnlyNode,
+  ObjectiveNode,
   RandomNode,
+  SpawnEventNode,
   WaitNode,
 } from "../../../../pc-client/src/events/types";
 import { analyzeGraphHealth } from "../graphModel";
@@ -446,6 +449,139 @@ describe("event authoring reducer", () => {
     expect(getCheckNode(draft, "gate").branches[0]?.conditions).toEqual([]);
   });
 
+  it("updates advanced node fields with typed node actions", () => {
+    const completionCondition: Condition = {
+      type: "crew_action_status",
+      target: { type: "primary_crew" },
+      value: "completed",
+    };
+    const draftWithAction = eventAuthoringReducer(createDraft(), {
+      type: "add_node",
+      nodeType: "action_request",
+      nodeId: "survey_bridge",
+    });
+    const draftWithObjective = eventAuthoringReducer(draftWithAction, {
+      type: "add_node",
+      nodeType: "objective",
+      nodeId: "repair_objective",
+    });
+    const draftWithSpawn = eventAuthoringReducer(draftWithObjective, {
+      type: "add_node",
+      nodeType: "spawn_event",
+      nodeId: "spawn_rescue",
+    });
+
+    const withAction = eventAuthoringReducer(draftWithSpawn, {
+      type: "update_action_request_node",
+      nodeId: "survey_bridge",
+      fields: {
+        request_id: "bridge_survey_request",
+        action_type: "gather",
+        target_crew_ref: { type: "crew_id", id: "amy" },
+        target_tile_ref: { type: "tile_id", id: "forest_04" },
+        action_params: { resource_id: "bridge_planks", quantity: 2 },
+        completion_trigger: {
+          type: "action_complete",
+          required_context: ["action_id", "crew_id"],
+          conditions: [completionCondition],
+        },
+        on_accepted_node_id: "repair_objective",
+        on_completed_node_id: "missing_completed",
+        on_failed_node_id: "",
+        expires_in_seconds: 180,
+        occupies_crew_action: false,
+      },
+    });
+    const withObjective = eventAuthoringReducer(withAction, {
+      type: "update_objective_node",
+      nodeId: "repair_objective",
+      fields: {
+        objective_template: {
+          title: "Repair the bridge",
+          summary: "Use materials to make the bridge passable.",
+          target_tile_ref: { type: "tile_id", id: "forest_04" },
+          required_action_type: "build",
+          required_action_params: { structure_id: "rope_bridge" },
+          eligible_crew_conditions: [completionCondition],
+        },
+        mode: "create_and_continue",
+        on_created_node_id: "spawn_rescue",
+        on_completed_node_id: "",
+        on_failed_node_id: "objective_failed",
+        parent_event_link: false,
+      },
+    });
+    const updated = eventAuthoringReducer(withObjective, {
+      type: "update_spawn_event_node",
+      nodeId: "spawn_rescue",
+      fields: {
+        event_definition_id: "forest_rescue_followup",
+        spawn_policy: "deferred_until_trigger",
+        context_mapping: { crew_id: "trigger.crew_id", tile_id: "trigger.tile_id" },
+        parent_event_link: false,
+        dedupe_key_template: "rescue:{crew_id}",
+        next_node_id: "",
+      },
+    });
+
+    expect(getGraph(draftWithSpawn).nodes.map((node) => node.type)).toEqual([
+      "call",
+      "end",
+      "action_request",
+      "objective",
+      "spawn_event",
+    ]);
+    expect(getActionRequestNode(updated, "survey_bridge")).toMatchObject({
+      request_id: "bridge_survey_request",
+      action_type: "gather",
+      target_crew_ref: { type: "crew_id", id: "amy" },
+      target_tile_ref: { type: "tile_id", id: "forest_04" },
+      action_params: { resource_id: "bridge_planks", quantity: 2 },
+      completion_trigger: {
+        type: "action_complete",
+        required_context: ["action_id", "crew_id"],
+        conditions: [completionCondition],
+      },
+      on_accepted_node_id: "repair_objective",
+      on_completed_node_id: "missing_completed",
+      on_failed_node_id: "",
+      expires_in_seconds: 180,
+      occupies_crew_action: false,
+    });
+    expect(getObjectiveNode(updated, "repair_objective")).toMatchObject({
+      objective_template: {
+        title: "Repair the bridge",
+        summary: "Use materials to make the bridge passable.",
+        target_tile_ref: { type: "tile_id", id: "forest_04" },
+        eligible_crew_conditions: [completionCondition],
+        required_action_type: "build",
+        required_action_params: { structure_id: "rope_bridge" },
+      },
+      mode: "create_and_continue",
+      on_created_node_id: "spawn_rescue",
+      on_completed_node_id: "",
+      on_failed_node_id: "objective_failed",
+      parent_event_link: false,
+    });
+    expect(getSpawnEventNode(updated, "spawn_rescue")).toMatchObject({
+      event_definition_id: "forest_rescue_followup",
+      spawn_policy: "deferred_until_trigger",
+      context_mapping: { crew_id: "trigger.crew_id", tile_id: "trigger.tile_id" },
+      parent_event_link: false,
+      dedupe_key_template: "rescue:{crew_id}",
+      next_node_id: "",
+    });
+    expect(analyzeGraphHealth(updated.working_definition).issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "missing_edge_target", targetNodeId: "missing_completed" })]),
+    );
+    expect(getActionRequestNode(draftWithSpawn, "survey_bridge")).toMatchObject({
+      request_id: "TODO_REQUEST",
+      action_params: {},
+      on_completed_node_id: "end",
+      on_failed_node_id: "end",
+    });
+  });
+
   it("adds, selects, and edits base graph nodes without mutating the original graph", () => {
     const draft = createDraft();
 
@@ -800,6 +936,36 @@ function getRandomNode(draft: EventDraftEnvelope, nodeId: string): RandomNode {
 
   if (node.type !== "random") {
     throw new Error(`Expected random node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getActionRequestNode(draft: EventDraftEnvelope, nodeId: string): ActionRequestNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "action_request") {
+    throw new Error(`Expected action request node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getObjectiveNode(draft: EventDraftEnvelope, nodeId: string): ObjectiveNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "objective") {
+    throw new Error(`Expected objective node ${nodeId}.`);
+  }
+
+  return node;
+}
+
+function getSpawnEventNode(draft: EventDraftEnvelope, nodeId: string): SpawnEventNode {
+  const node = getNode(draft, nodeId);
+
+  if (node.type !== "spawn_event") {
+    throw new Error(`Expected spawn event node ${nodeId}.`);
   }
 
   return node;

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type {
+  ActionRequestNode,
   CallNode,
   CheckNode,
   Condition,
@@ -8,14 +9,19 @@ import type {
   EventNode,
   EventNodeType,
   EventTerminalStatus,
+  JsonObject,
   LogOnlyNode,
+  ObjectiveNode,
   RandomNode,
+  SpawnEventNode,
   TargetRef,
+  TriggerDefinition,
+  TriggerType,
   WaitNode,
 } from "../../../../pc-client/src/events/types";
 import { analyzeGraphHealth } from "../graphModel";
 import type { EventDraftEnvelope } from "../types";
-import { getNodeCapability } from "./capabilityCatalog";
+import { conditionCapabilities, getNodeCapability } from "./capabilityCatalog";
 import { eventAuthoringReducer, type EventAuthoringAction } from "./eventAuthoringReducer";
 import GraphPreviewPanel from "./GraphPreviewPanel";
 import { createDefaultGraphRules, isSafeEventId } from "./templates";
@@ -25,7 +31,10 @@ interface GraphStructureEditorProps {
   onDraftChange: (draft: EventDraftEnvelope) => void;
 }
 
-type EditableGraphNodeType = Extract<EventNodeType, "call" | "check" | "random" | "end" | "log_only" | "wait">;
+type EditableGraphNodeType = Extract<
+  EventNodeType,
+  "call" | "check" | "random" | "action_request" | "objective" | "spawn_event" | "end" | "log_only" | "wait"
+>;
 type UpdateNodeCommonFields = Extract<EventAuthoringAction, { type: "update_node_common_fields" }>["fields"];
 type UpdateEndNodeFields = Extract<EventAuthoringAction, { type: "update_end_node" }>["fields"];
 type UpdateLogOnlyNodeFields = Extract<EventAuthoringAction, { type: "update_log_only_node" }>["fields"];
@@ -34,8 +43,21 @@ type UpdateCallNodeFields = Extract<EventAuthoringAction, { type: "update_call_n
 type UpdateCallOptionFields = Extract<EventAuthoringAction, { type: "update_call_option" }>["fields"];
 type UpdateCheckNodeFields = Extract<EventAuthoringAction, { type: "update_check_node" }>["fields"];
 type UpdateRandomNodeFields = Extract<EventAuthoringAction, { type: "update_random_node" }>["fields"];
+type UpdateActionRequestNodeFields = Extract<EventAuthoringAction, { type: "update_action_request_node" }>["fields"];
+type UpdateObjectiveNodeFields = Extract<EventAuthoringAction, { type: "update_objective_node" }>["fields"];
+type UpdateSpawnEventNodeFields = Extract<EventAuthoringAction, { type: "update_spawn_event_node" }>["fields"];
 
-const EDITABLE_GRAPH_NODE_TYPES = ["call", "check", "random", "wait", "log_only", "end"] as const satisfies readonly EditableGraphNodeType[];
+const EDITABLE_GRAPH_NODE_TYPES = [
+  "call",
+  "check",
+  "random",
+  "action_request",
+  "objective",
+  "spawn_event",
+  "wait",
+  "log_only",
+  "end",
+] as const satisfies readonly EditableGraphNodeType[];
 const TERMINAL_RESOLUTIONS = ["resolved", "cancelled", "expired", "failed"] as const satisfies readonly EventTerminalStatus[];
 const WAKE_TRIGGER_TYPES = ["time_wakeup", "event_node_finished"] as const satisfies readonly WaitNode["wake_trigger_type"][];
 const INTERRUPT_POLICIES = [
@@ -45,6 +67,31 @@ const INTERRUPT_POLICIES = [
 ] as const satisfies readonly WaitNode["interrupt_policy"][];
 const CALL_URGENCIES = ["normal", "urgent", "emergency"] as const satisfies readonly CallNode["urgency"][];
 const CALL_DELIVERIES = ["incoming_call", "auto_report", "queued_message"] as const satisfies readonly CallNode["delivery"][];
+const ACTION_REQUEST_ACTION_TYPES = [
+  "move",
+  "survey",
+  "gather",
+  "build",
+  "extract",
+  "return_to_base",
+  "event_waiting",
+  "guarding_event_site",
+  "custom_handler_action",
+] as const satisfies readonly ActionRequestNode["action_type"][];
+const OBJECTIVE_MODES = ["create_and_wait", "create_and_continue"] as const satisfies readonly ObjectiveNode["mode"][];
+const SPAWN_POLICIES = ["immediate", "deferred_until_trigger"] as const satisfies readonly SpawnEventNode["spawn_policy"][];
+const TRIGGER_TYPES = [
+  "arrival",
+  "proximity",
+  "action_complete",
+  "idle_time",
+  "call_choice",
+  "event_node_finished",
+  "objective_created",
+  "objective_completed",
+  "world_flag_changed",
+  "time_wakeup",
+] as const satisfies readonly TriggerType[];
 const TARGET_REF_TYPES = [
   "primary_crew",
   "related_crew",
@@ -64,6 +111,8 @@ const TARGET_REF_TYPES = [
   "event_log",
 ] as const satisfies readonly TargetRef["type"][];
 const RANDOM_SEED_SCOPES = ["event_instance", "node_entry", "trigger_context"] as const satisfies readonly RandomNode["seed_scope"][];
+const CONDITION_TYPES = conditionCapabilities.map((capability) => capability.type) satisfies readonly Condition["type"][];
+const COMPARE_OPS = ["equals", "not_equals", "gt", "gte", "lt", "lte", "includes", "not_includes"] as const;
 
 export default function GraphStructureEditor({ draft, onDraftChange }: GraphStructureEditorProps) {
   const graph = readGraph(draft);
@@ -387,12 +436,17 @@ function TypedNodeFields({
   if (node.type === "random") {
     return <RandomNodeFields draft={draft} node={node} onDraftChange={onDraftChange} />;
   }
+  if (node.type === "action_request") {
+    return <ActionRequestNodeFields draft={draft} node={node} onDraftChange={onDraftChange} />;
+  }
+  if (node.type === "objective") {
+    return <ObjectiveNodeFields draft={draft} node={node} onDraftChange={onDraftChange} />;
+  }
+  if (node.type === "spawn_event") {
+    return <SpawnEventNodeFields draft={draft} node={node} onDraftChange={onDraftChange} />;
+  }
 
-  return (
-    <section aria-label="Unsupported node fields">
-      <p className="muted-text">{getNodeCapability(node.type).label} specific fields arrive in later graph editor tasks.</p>
-    </section>
-  );
+  return null;
 }
 
 function EndNodeFields({
@@ -1149,6 +1203,339 @@ function RandomNodeFields({
   }
 }
 
+function ActionRequestNodeFields({
+  draft,
+  node,
+  onDraftChange,
+}: {
+  draft: EventDraftEnvelope;
+  node: ActionRequestNode;
+  onDraftChange: (draft: EventDraftEnvelope) => void;
+}) {
+  return (
+    <fieldset aria-label="Action request node fields">
+      <legend>Action request node fields</legend>
+      <RequiredTransitionWarnings
+        transitions={[
+          { label: "Completed node id", value: node.on_completed_node_id },
+          { label: "Failed node id", value: node.on_failed_node_id },
+        ]}
+      />
+      <label>
+        Request id
+        <input
+          aria-label="Request id"
+          value={node.request_id}
+          onChange={(event) => updateActionRequestNode(draft, node.id, { request_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Action type
+        <select
+          aria-label="Action type"
+          value={node.action_type}
+          onChange={(event) =>
+            updateActionRequestNode(
+              draft,
+              node.id,
+              { action_type: event.target.value as ActionRequestNode["action_type"] },
+              onDraftChange,
+            )
+          }
+        >
+          {renderOptionsWithCurrent(ACTION_REQUEST_ACTION_TYPES, node.action_type)}
+        </select>
+      </label>
+      <TargetRefFields
+        label="Target crew"
+        value={node.target_crew_ref}
+        onUpdate={(target_crew_ref) => updateActionRequestNode(draft, node.id, { target_crew_ref }, onDraftChange)}
+      />
+      <TargetRefFields
+        label="Target tile"
+        value={node.target_tile_ref ?? { type: "event_tile" }}
+        onUpdate={(target_tile_ref) => updateActionRequestNode(draft, node.id, { target_tile_ref }, onDraftChange)}
+        onClear={() => updateActionRequestNode(draft, node.id, { target_tile_ref: null }, onDraftChange)}
+      />
+      <KeyValueObjectEditor
+        label="Action params"
+        value={node.action_params}
+        onUpdate={(action_params) => updateActionRequestNode(draft, node.id, { action_params }, onDraftChange)}
+      />
+      <StructuredConditionsEditor
+        label="Acceptance conditions"
+        conditions={node.acceptance_conditions ?? []}
+        onUpdate={(acceptance_conditions) =>
+          updateActionRequestNode(draft, node.id, { acceptance_conditions }, onDraftChange)
+        }
+      />
+      <TriggerDefinitionFields
+        label="Completion trigger"
+        trigger={node.completion_trigger}
+        onUpdate={(completion_trigger) => updateActionRequestNode(draft, node.id, { completion_trigger }, onDraftChange)}
+      />
+      <label>
+        Accepted node id
+        <input
+          aria-label="Accepted node id"
+          value={node.on_accepted_node_id ?? ""}
+          onChange={(event) => updateActionRequestNode(draft, node.id, { on_accepted_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Completed node id
+        <input
+          aria-label="Completed node id"
+          value={node.on_completed_node_id}
+          onChange={(event) => updateActionRequestNode(draft, node.id, { on_completed_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Failed node id
+        <input
+          aria-label="Failed node id"
+          value={node.on_failed_node_id}
+          onChange={(event) => updateActionRequestNode(draft, node.id, { on_failed_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Expires in seconds
+        <input
+          aria-label="Action request expires in seconds"
+          inputMode="decimal"
+          value={formatNullableNumber(node.expires_in_seconds)}
+          onChange={(event) => {
+            const expiresInSeconds = parseOptionalNonNegativeNumber(event.target.value);
+            if (expiresInSeconds !== undefined) {
+              updateActionRequestNode(draft, node.id, { expires_in_seconds: expiresInSeconds }, onDraftChange);
+            }
+          }}
+        />
+      </label>
+      <label>
+        <input
+          aria-label="Occupies crew action request"
+          type="checkbox"
+          checked={node.occupies_crew_action}
+          onChange={(event) => updateActionRequestNode(draft, node.id, { occupies_crew_action: event.target.checked }, onDraftChange)}
+        />
+        Occupies crew action
+      </label>
+    </fieldset>
+  );
+}
+
+function ObjectiveNodeFields({
+  draft,
+  node,
+  onDraftChange,
+}: {
+  draft: EventDraftEnvelope;
+  node: ObjectiveNode;
+  onDraftChange: (draft: EventDraftEnvelope) => void;
+}) {
+  const template = node.objective_template;
+
+  return (
+    <fieldset aria-label="Objective node fields">
+      <legend>Objective node fields</legend>
+      <RequiredTransitionWarnings transitions={[{ label: "Completed node id", value: node.on_completed_node_id }]} />
+      <label>
+        Objective title
+        <input
+          aria-label="Objective title"
+          value={template.title}
+          onChange={(event) =>
+            updateObjectiveNode(draft, node.id, { objective_template: { title: event.target.value } }, onDraftChange)
+          }
+        />
+      </label>
+      <label>
+        Objective summary
+        <textarea
+          aria-label="Objective summary"
+          value={template.summary}
+          onChange={(event) =>
+            updateObjectiveNode(draft, node.id, { objective_template: { summary: event.target.value } }, onDraftChange)
+          }
+        />
+      </label>
+      <TargetRefFields
+        label="Objective target tile"
+        value={template.target_tile_ref ?? { type: "event_tile" }}
+        onUpdate={(target_tile_ref) =>
+          updateObjectiveNode(draft, node.id, { objective_template: { target_tile_ref } }, onDraftChange)
+        }
+        onClear={() => updateObjectiveNode(draft, node.id, { objective_template: { target_tile_ref: null } }, onDraftChange)}
+      />
+      <StructuredConditionsEditor
+        label="Eligible crew conditions"
+        conditions={template.eligible_crew_conditions ?? []}
+        onUpdate={(eligible_crew_conditions) =>
+          updateObjectiveNode(draft, node.id, { objective_template: { eligible_crew_conditions } }, onDraftChange)
+        }
+      />
+      <label>
+        Required action type
+        <select
+          aria-label="Required action type"
+          value={template.required_action_type}
+          onChange={(event) =>
+            updateObjectiveNode(
+              draft,
+              node.id,
+              { objective_template: { required_action_type: event.target.value } },
+              onDraftChange,
+            )
+          }
+        >
+          {renderOptionsWithCurrent(ACTION_REQUEST_ACTION_TYPES, template.required_action_type)}
+        </select>
+      </label>
+      <KeyValueObjectEditor
+        label="Required action params"
+        value={template.required_action_params}
+        onUpdate={(required_action_params) =>
+          updateObjectiveNode(draft, node.id, { objective_template: { required_action_params } }, onDraftChange)
+        }
+      />
+      <label>
+        Mode
+        <select
+          aria-label="Mode"
+          value={node.mode}
+          onChange={(event) => updateObjectiveNode(draft, node.id, { mode: event.target.value as ObjectiveNode["mode"] }, onDraftChange)}
+        >
+          {OBJECTIVE_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Created node id
+        <input
+          aria-label="Created node id"
+          value={node.on_created_node_id ?? ""}
+          onChange={(event) => updateObjectiveNode(draft, node.id, { on_created_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Completed node id
+        <input
+          aria-label="Completed node id"
+          value={node.on_completed_node_id}
+          onChange={(event) => updateObjectiveNode(draft, node.id, { on_completed_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Failed node id
+        <input
+          aria-label="Failed node id"
+          value={node.on_failed_node_id ?? ""}
+          onChange={(event) => updateObjectiveNode(draft, node.id, { on_failed_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Expires in seconds
+        <input
+          aria-label="Objective expires in seconds"
+          inputMode="decimal"
+          value={formatNullableNumber(node.expires_in_seconds)}
+          onChange={(event) => {
+            const expiresInSeconds = parseOptionalNonNegativeNumber(event.target.value);
+            if (expiresInSeconds !== undefined) {
+              updateObjectiveNode(draft, node.id, { expires_in_seconds: expiresInSeconds }, onDraftChange);
+            }
+          }}
+        />
+      </label>
+      <label>
+        <input
+          aria-label="Parent event link"
+          type="checkbox"
+          checked={node.parent_event_link}
+          onChange={(event) => updateObjectiveNode(draft, node.id, { parent_event_link: event.target.checked }, onDraftChange)}
+        />
+        Parent event link
+      </label>
+    </fieldset>
+  );
+}
+
+function SpawnEventNodeFields({
+  draft,
+  node,
+  onDraftChange,
+}: {
+  draft: EventDraftEnvelope;
+  node: SpawnEventNode;
+  onDraftChange: (draft: EventDraftEnvelope) => void;
+}) {
+  return (
+    <fieldset aria-label="Spawn event node fields">
+      <legend>Spawn event node fields</legend>
+      <RequiredTransitionWarnings transitions={[{ label: "Next node id", value: node.next_node_id }]} />
+      <label>
+        Event definition id
+        <input
+          aria-label="Event definition id"
+          value={node.event_definition_id}
+          onChange={(event) => updateSpawnEventNode(draft, node.id, { event_definition_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Spawn policy
+        <select
+          aria-label="Spawn policy"
+          value={node.spawn_policy}
+          onChange={(event) =>
+            updateSpawnEventNode(draft, node.id, { spawn_policy: event.target.value as SpawnEventNode["spawn_policy"] }, onDraftChange)
+          }
+        >
+          {SPAWN_POLICIES.map((spawnPolicy) => (
+            <option key={spawnPolicy} value={spawnPolicy}>
+              {spawnPolicy}
+            </option>
+          ))}
+        </select>
+      </label>
+      <KeyValueObjectEditor
+        label="Context mapping"
+        value={node.context_mapping}
+        valueMode="string"
+        onUpdate={(context_mapping) => updateSpawnEventNode(draft, node.id, { context_mapping: stringifyRecord(context_mapping) }, onDraftChange)}
+      />
+      <label>
+        Dedupe key template
+        <input
+          aria-label="Dedupe key template"
+          value={node.dedupe_key_template ?? ""}
+          onChange={(event) => updateSpawnEventNode(draft, node.id, { dedupe_key_template: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        Next node id
+        <input
+          aria-label="Next node id"
+          value={node.next_node_id}
+          onChange={(event) => updateSpawnEventNode(draft, node.id, { next_node_id: event.target.value }, onDraftChange)}
+        />
+      </label>
+      <label>
+        <input
+          aria-label="Parent event link"
+          type="checkbox"
+          checked={node.parent_event_link}
+          onChange={(event) => updateSpawnEventNode(draft, node.id, { parent_event_link: event.target.checked }, onDraftChange)}
+        />
+        Parent event link
+      </label>
+    </fieldset>
+  );
+}
+
 function ConditionsArrayEditor({
   label,
   conditions,
@@ -1203,6 +1590,352 @@ function ConditionsArrayEditor({
       setConditionsError("Conditions must be valid JSON.");
     }
   }
+}
+
+function TriggerDefinitionFields({
+  label,
+  trigger,
+  onUpdate,
+}: {
+  label: string;
+  trigger: TriggerDefinition;
+  onUpdate: (trigger: TriggerDefinition) => void;
+}) {
+  return (
+    <fieldset aria-label={label}>
+      <legend>{label}</legend>
+      <label>
+        Type
+        <select
+          aria-label={`${label} type`}
+          value={trigger.type}
+          onChange={(event) => onUpdate({ ...trigger, type: event.target.value as TriggerType })}
+        >
+          {renderOptionsWithCurrent(TRIGGER_TYPES, trigger.type)}
+        </select>
+      </label>
+      <label>
+        Required context
+        <input
+          aria-label={`${label} required context`}
+          value={formatList(trigger.required_context)}
+          onChange={(event) => onUpdate({ ...trigger, required_context: parseList(event.target.value) })}
+        />
+      </label>
+      <label>
+        Dedupe key template
+        <input
+          aria-label={`${label} dedupe key template`}
+          value={trigger.dedupe_key_template ?? ""}
+          onChange={(event) => onUpdate({ ...trigger, dedupe_key_template: event.target.value.trim() || undefined })}
+        />
+      </label>
+      <StructuredConditionsEditor
+        label={`${label} conditions`}
+        conditions={trigger.conditions ?? []}
+        onUpdate={(conditions) => onUpdate({ ...trigger, conditions })}
+      />
+    </fieldset>
+  );
+}
+
+function StructuredConditionsEditor({
+  label,
+  conditions,
+  onUpdate,
+}: {
+  label: string;
+  conditions: Condition[];
+  onUpdate: (conditions: Condition[]) => void;
+}) {
+  return (
+    <fieldset aria-label={label}>
+      <legend>{label}</legend>
+      {conditions.length === 0 ? <p className="muted-text">No conditions.</p> : null}
+      {conditions.map((condition, index) => (
+        <fieldset key={index} aria-label={`${label} condition ${index + 1}`}>
+          <legend>Condition {index + 1}</legend>
+          <label>
+            Condition type
+            <select
+              aria-label={`${label} condition ${index + 1} type`}
+              value={condition.type}
+              onChange={(event) => updateCondition(index, { type: event.target.value as Condition["type"] })}
+            >
+              {renderOptionsWithCurrent(CONDITION_TYPES, condition.type)}
+            </select>
+          </label>
+          <TargetRefFields
+            label={`${label} condition ${index + 1} target`}
+            value={condition.target ?? { type: "primary_crew" }}
+            onUpdate={(target) => updateCondition(index, { target })}
+            onClear={() => updateCondition(index, { target: null })}
+          />
+          <label>
+            Field
+            <input
+              aria-label={`${label} condition ${index + 1} field`}
+              value={condition.field ?? ""}
+              onChange={(event) => updateCondition(index, { field: event.target.value.trim() || null })}
+            />
+          </label>
+          <label>
+            Operator
+            <select
+              aria-label={`${label} condition ${index + 1} operator`}
+              value={condition.op ?? ""}
+              onChange={(event) =>
+                updateCondition(index, { op: event.target.value ? (event.target.value as Condition["op"]) : null })
+              }
+            >
+              <option value="">none</option>
+              {COMPARE_OPS.map((op) => (
+                <option key={op} value={op}>
+                  {op}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Value
+            <input
+              aria-label={`${label} condition ${index + 1} value`}
+              value={formatScalarValue(condition.value)}
+              onChange={(event) => updateCondition(index, { value: parseScalarValue(event.target.value) })}
+            />
+          </label>
+          <label>
+            Handler type
+            <input
+              aria-label={`${label} condition ${index + 1} handler type`}
+              value={condition.handler_type ?? ""}
+              onChange={(event) => updateCondition(index, { handler_type: event.target.value.trim() || null })}
+            />
+          </label>
+          <KeyValueObjectEditor
+            label={`${label} condition ${index + 1} params`}
+            value={condition.params ?? {}}
+            onUpdate={(params) => updateCondition(index, { params })}
+          />
+          <button type="button" aria-label={`Delete ${label} condition ${index + 1}`} onClick={() => removeCondition(index)}>
+            Delete condition
+          </button>
+        </fieldset>
+      ))}
+      <button type="button" aria-label={`Add ${label} condition`} onClick={addCondition}>
+        Add condition
+      </button>
+    </fieldset>
+  );
+
+  function updateCondition(index: number, fields: Partial<Condition>): void {
+    onUpdate(conditions.map((condition, conditionIndex) => (conditionIndex === index ? { ...condition, ...fields } : condition)));
+  }
+
+  function addCondition(): void {
+    onUpdate([...conditions, { type: "world_flag_equals", field: "", value: "" }]);
+  }
+
+  function removeCondition(index: number): void {
+    onUpdate(conditions.filter((_condition, conditionIndex) => conditionIndex !== index));
+  }
+}
+
+function TargetRefFields({
+  label,
+  value,
+  onUpdate,
+  onClear,
+}: {
+  label: string;
+  value: TargetRef;
+  onUpdate: (value: TargetRef) => void;
+  onClear?: () => void;
+}) {
+  return (
+    <fieldset aria-label={`${label} ref`}>
+      <legend>{label}</legend>
+      <label>
+        Type
+        <select
+          aria-label={`${label} type`}
+          value={value.type}
+          onChange={(event) => onUpdate(normalizeTargetRef({ ...value, type: event.target.value as TargetRef["type"] }))}
+        >
+          {TARGET_REF_TYPES.map((targetType) => (
+            <option key={targetType} value={targetType}>
+              {targetType}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Id
+        <input
+          aria-label={`${label} id`}
+          value={value.id ?? ""}
+          onChange={(event) => onUpdate(normalizeTargetRef({ ...value, id: event.target.value }))}
+        />
+      </label>
+      <label>
+        Ref
+        <input
+          aria-label={`${label} ref`}
+          value={value.ref ?? ""}
+          onChange={(event) => onUpdate(normalizeTargetRef({ ...value, ref: event.target.value }))}
+        />
+      </label>
+      {onClear ? (
+        <button type="button" aria-label={`Clear ${label}`} onClick={onClear}>
+          Clear
+        </button>
+      ) : null}
+    </fieldset>
+  );
+}
+
+function KeyValueObjectEditor({
+  label,
+  value,
+  valueMode = "json",
+  onUpdate,
+}: {
+  label: string;
+  value: Record<string, unknown>;
+  valueMode?: "json" | "string";
+  onUpdate: (value: JsonObject) => void;
+}) {
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const entries = Object.entries(value);
+
+  return (
+    <fieldset aria-label={label}>
+      <legend>{label}</legend>
+      {entries.length === 0 ? <p className="muted-text">No params.</p> : null}
+      {entries.map(([entryKey, entryValue], index) => (
+        <fieldset key={entryKey} aria-label={`${label} row ${index + 1}`}>
+          <legend>{entryKey}</legend>
+          <label>
+            Key
+            <input
+              aria-label={`${label} row ${index + 1} key`}
+              value={entryKey}
+              onChange={(event) => updateEntryKey(entryKey, event.target.value)}
+            />
+          </label>
+          <label>
+            Value
+            <input
+              aria-label={`${label} row ${index + 1} value`}
+              value={formatScalarValue(entryValue)}
+              onChange={(event) => updateEntryValue(entryKey, event.target.value)}
+            />
+          </label>
+          <button type="button" aria-label={`Delete ${label} row ${index + 1}`} onClick={() => deleteEntry(entryKey)}>
+            Delete row
+          </button>
+        </fieldset>
+      ))}
+      <fieldset aria-label={`Add ${label} row`}>
+        <legend>Add {label} row</legend>
+        <label>
+          Key
+          <input
+            aria-label={`New ${label} key`}
+            value={newKey}
+            aria-invalid={Boolean(error)}
+            onChange={(event) => {
+              setNewKey(event.target.value);
+              setError(null);
+            }}
+          />
+        </label>
+        <label>
+          Value
+          <input
+            aria-label={`New ${label} value`}
+            value={newValue}
+            onChange={(event) => {
+              setNewValue(event.target.value);
+              setError(null);
+            }}
+          />
+        </label>
+        <FieldError id={`${label}-key-value-error`} message={error} />
+        <button type="button" onClick={addEntry}>
+          Add {label} row
+        </button>
+      </fieldset>
+    </fieldset>
+  );
+
+  function addEntry(): void {
+    const key = newKey.trim();
+    const validationError = validateObjectKey(value, key);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    setNewKey("");
+    setNewValue("");
+    onUpdate({
+      ...value,
+      [key]: parseObjectEditorValue(newValue, valueMode),
+    });
+  }
+
+  function updateEntryKey(currentKey: string, nextKeyValue: string): void {
+    const nextKey = nextKeyValue.trim();
+    const validationError = validateObjectKey(value, nextKey, currentKey);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    onUpdate(renameRecordKey(value, currentKey, nextKey));
+  }
+
+  function updateEntryValue(entryKey: string, nextValue: string): void {
+    onUpdate({
+      ...value,
+      [entryKey]: parseObjectEditorValue(nextValue, valueMode),
+    });
+  }
+
+  function deleteEntry(entryKey: string): void {
+    onUpdate(omitRecordKey(value, entryKey));
+  }
+}
+
+function RequiredTransitionWarnings({
+  transitions,
+}: {
+  transitions: Array<{ label: string; value: string | null | undefined }>;
+}) {
+  const missingTransitions = transitions.filter((transition) => !transition.value?.trim());
+
+  if (missingTransitions.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul aria-label="Required transition warnings" className="event-authoring-helper-list">
+      {missingTransitions.map((transition) => (
+        <li key={transition.label}>
+          <span role="alert" className="map-form-errors">
+            Missing required transition: {transition.label}.
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function updateEndNode(
@@ -1286,6 +2019,33 @@ function updateRandomNode(
   onDraftChange: (draft: EventDraftEnvelope) => void,
 ): void {
   onDraftChange(eventAuthoringReducer(draft, { type: "update_random_node", nodeId, fields }));
+}
+
+function updateActionRequestNode(
+  draft: EventDraftEnvelope,
+  nodeId: string,
+  fields: UpdateActionRequestNodeFields,
+  onDraftChange: (draft: EventDraftEnvelope) => void,
+): void {
+  onDraftChange(eventAuthoringReducer(draft, { type: "update_action_request_node", nodeId, fields }));
+}
+
+function updateObjectiveNode(
+  draft: EventDraftEnvelope,
+  nodeId: string,
+  fields: UpdateObjectiveNodeFields,
+  onDraftChange: (draft: EventDraftEnvelope) => void,
+): void {
+  onDraftChange(eventAuthoringReducer(draft, { type: "update_objective_node", nodeId, fields }));
+}
+
+function updateSpawnEventNode(
+  draft: EventDraftEnvelope,
+  nodeId: string,
+  fields: UpdateSpawnEventNodeFields,
+  onDraftChange: (draft: EventDraftEnvelope) => void,
+): void {
+  onDraftChange(eventAuthoringReducer(draft, { type: "update_spawn_event_node", nodeId, fields }));
 }
 
 function resolveSelectedNode(graph: EventGraph | null, selection: unknown): EventNode | null {
@@ -1413,6 +2173,90 @@ function normalizeTargetRef(value: TargetRef): TargetRef {
   }
 
   return normalized;
+}
+
+function renderOptionsWithCurrent(values: readonly string[], currentValue: string) {
+  const options = currentValue && !values.includes(currentValue) ? [...values, currentValue] : values;
+
+  return options.map((value) => (
+    <option key={value} value={value}>
+      {value}
+    </option>
+  ));
+}
+
+function parseOptionalNonNegativeNumber(value: string): number | null | undefined {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const numberValue = Number(trimmedValue);
+  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : undefined;
+}
+
+function formatScalarValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
+}
+
+function parseScalarValue(value: string): unknown {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue === "true") {
+    return true;
+  }
+  if (trimmedValue === "false") {
+    return false;
+  }
+  if (trimmedValue === "null") {
+    return null;
+  }
+  if (trimmedValue && /^-?\d+(\.\d+)?$/.test(trimmedValue)) {
+    return Number(trimmedValue);
+  }
+
+  return value;
+}
+
+function parseObjectEditorValue(value: string, valueMode: "json" | "string"): unknown {
+  return valueMode === "string" ? value : parseScalarValue(value);
+}
+
+function stringifyRecord(record: JsonObject): Record<string, string> {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, formatScalarValue(value)]));
+}
+
+function validateObjectKey(record: Record<string, unknown>, key: string, currentKey?: string): string | null {
+  if (!key) {
+    return "Key is required.";
+  }
+
+  if (key !== currentKey && Object.prototype.hasOwnProperty.call(record, key)) {
+    return `Key ${key} already exists.`;
+  }
+
+  return null;
+}
+
+function omitRecordKey(record: Record<string, unknown>, keyToOmit: string): JsonObject {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => key !== keyToOmit));
+}
+
+function renameRecordKey(record: Record<string, unknown>, fromKey: string, toKey: string): JsonObject {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key === fromKey ? toKey : key, value]));
 }
 
 function FieldError({ id, message }: { id: string; message: string | null }) {

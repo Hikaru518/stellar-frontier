@@ -1,4 +1,5 @@
 import type {
+  ActionRequestNode,
   BlockingRequirement,
   CallNode,
   CallOption,
@@ -11,8 +12,13 @@ import type {
   EventNode,
   EventNodeBase,
   EventNodeType,
+  JsonObject,
   LogOnlyNode,
+  ObjectiveNode,
+  ObjectiveTemplate,
   RandomNode,
+  SpawnEventNode,
+  TargetRef,
   TriggerDefinition,
   TriggerType,
   WaitNode,
@@ -38,7 +44,10 @@ type BasicFieldsUpdate = Partial<Pick<EventDefinition, "title" | "summary" | "ta
 type CandidateSelectionUpdate = Partial<EventDefinition["candidate_selection"]>;
 type RepeatPolicyUpdate = Partial<EventDefinition["repeat_policy"]>;
 type TriggerProbability = TriggerDefinition["probability"];
-type EditableGraphNodeType = Extract<EventNodeType, "call" | "check" | "random" | "end" | "log_only" | "wait">;
+type EditableGraphNodeType = Extract<
+  EventNodeType,
+  "call" | "check" | "random" | "action_request" | "objective" | "spawn_event" | "end" | "log_only" | "wait"
+>;
 type NodeCommonFieldsUpdate = Partial<
   Pick<EventNodeBase, "id" | "title" | "description" | "enter_effect_refs" | "exit_effect_refs" | "auto_next_node_id">
 > & {
@@ -57,6 +66,38 @@ type CallOptionFieldsUpdate = Partial<Pick<CallOption, "requirements" | "effect_
 };
 type CheckNodeFieldsUpdate = Partial<Pick<CheckNode, "branches" | "default_next_node_id" | "evaluation_order">>;
 type RandomNodeFieldsUpdate = Partial<Pick<RandomNode, "seed_scope" | "branches" | "default_next_node_id" | "store_result_as">>;
+type ActionRequestNodeFieldsUpdate = Partial<
+  Pick<
+    ActionRequestNode,
+    | "request_id"
+    | "action_type"
+    | "target_crew_ref"
+    | "target_tile_ref"
+    | "action_params"
+    | "acceptance_conditions"
+    | "completion_trigger"
+    | "on_accepted_node_id"
+    | "on_completed_node_id"
+    | "on_failed_node_id"
+    | "expires_in_seconds"
+    | "occupies_crew_action"
+  >
+>;
+type ObjectiveTemplateFieldsUpdate = Partial<ObjectiveTemplate>;
+type ObjectiveNodeFieldsUpdate = Partial<
+  Pick<
+    ObjectiveNode,
+    "mode" | "on_created_node_id" | "on_completed_node_id" | "on_failed_node_id" | "expires_in_seconds" | "parent_event_link"
+  >
+> & {
+  objective_template?: ObjectiveTemplateFieldsUpdate;
+};
+type SpawnEventNodeFieldsUpdate = Partial<
+  Pick<
+    SpawnEventNode,
+    "event_definition_id" | "spawn_policy" | "context_mapping" | "parent_event_link" | "dedupe_key_template" | "next_node_id"
+  >
+>;
 
 const DEFAULT_CANDIDATE_SELECTION: EventDefinition["candidate_selection"] = {
   priority: 0,
@@ -186,6 +227,21 @@ export type EventAuthoringAction =
       fields: RandomNodeFieldsUpdate;
     }
   | {
+      type: "update_action_request_node";
+      nodeId: string;
+      fields: ActionRequestNodeFieldsUpdate;
+    }
+  | {
+      type: "update_objective_node";
+      nodeId: string;
+      fields: ObjectiveNodeFieldsUpdate;
+    }
+  | {
+      type: "update_spawn_event_node";
+      nodeId: string;
+      fields: SpawnEventNodeFieldsUpdate;
+    }
+  | {
       type: "delete_node";
       nodeId: string;
     };
@@ -238,6 +294,12 @@ export function eventAuthoringReducer(draft: EventDraftEnvelope, action: EventAu
       return updateCheckNode(draft, action.nodeId, action.fields);
     case "update_random_node":
       return updateRandomNode(draft, action.nodeId, action.fields);
+    case "update_action_request_node":
+      return updateActionRequestNode(draft, action.nodeId, action.fields);
+    case "update_objective_node":
+      return updateObjectiveNode(draft, action.nodeId, action.fields);
+    case "update_spawn_event_node":
+      return updateSpawnEventNode(draft, action.nodeId, action.fields);
     case "delete_node":
       return deleteNode(draft, action.nodeId);
   }
@@ -741,6 +803,81 @@ function updateRandomNode(draft: EventDraftEnvelope, nodeId: string, fields: Ran
   return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
 }
 
+function updateActionRequestNode(
+  draft: EventDraftEnvelope,
+  nodeId: string,
+  fields: ActionRequestNodeFieldsUpdate,
+): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "action_request");
+  const updatedNode: ActionRequestNode = {
+    ...node,
+    request_id: fields.request_id ?? node.request_id,
+    action_type: fields.action_type ?? node.action_type,
+    target_crew_ref: hasOwn(fields, "target_crew_ref") ? clonePlain(fields.target_crew_ref ?? node.target_crew_ref) : node.target_crew_ref,
+    target_tile_ref: hasOwn(fields, "target_tile_ref") ? cloneNullableTargetRef(fields.target_tile_ref) : node.target_tile_ref,
+    action_params: hasOwn(fields, "action_params") ? cloneJsonObject(fields.action_params) : node.action_params,
+    acceptance_conditions: hasOwn(fields, "acceptance_conditions")
+      ? clonePlain(fields.acceptance_conditions ?? [])
+      : node.acceptance_conditions,
+    completion_trigger: hasOwn(fields, "completion_trigger")
+      ? clonePlain(fields.completion_trigger ?? node.completion_trigger)
+      : node.completion_trigger,
+    on_accepted_node_id: hasOwn(fields, "on_accepted_node_id")
+      ? normalizeNullableString(fields.on_accepted_node_id)
+      : node.on_accepted_node_id,
+    on_completed_node_id: hasOwn(fields, "on_completed_node_id")
+      ? normalizeRequiredString(fields.on_completed_node_id)
+      : node.on_completed_node_id,
+    on_failed_node_id: hasOwn(fields, "on_failed_node_id") ? normalizeRequiredString(fields.on_failed_node_id) : node.on_failed_node_id,
+    expires_in_seconds: hasOwn(fields, "expires_in_seconds") ? (fields.expires_in_seconds ?? null) : node.expires_in_seconds,
+    occupies_crew_action: fields.occupies_crew_action ?? node.occupies_crew_action,
+  };
+
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+}
+
+function updateObjectiveNode(draft: EventDraftEnvelope, nodeId: string, fields: ObjectiveNodeFieldsUpdate): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "objective");
+  const updatedNode: ObjectiveNode = {
+    ...node,
+    objective_template: fields.objective_template
+      ? updateObjectiveTemplate(node.objective_template, fields.objective_template)
+      : node.objective_template,
+    mode: fields.mode ?? node.mode,
+    on_created_node_id: hasOwn(fields, "on_created_node_id")
+      ? normalizeNullableString(fields.on_created_node_id)
+      : node.on_created_node_id,
+    on_completed_node_id: hasOwn(fields, "on_completed_node_id")
+      ? normalizeRequiredString(fields.on_completed_node_id)
+      : node.on_completed_node_id,
+    on_failed_node_id: hasOwn(fields, "on_failed_node_id") ? normalizeNullableString(fields.on_failed_node_id) : node.on_failed_node_id,
+    expires_in_seconds: hasOwn(fields, "expires_in_seconds") ? (fields.expires_in_seconds ?? null) : node.expires_in_seconds,
+    parent_event_link: fields.parent_event_link ?? node.parent_event_link,
+  };
+
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+}
+
+function updateSpawnEventNode(draft: EventDraftEnvelope, nodeId: string, fields: SpawnEventNodeFieldsUpdate): EventDraftEnvelope {
+  const graph = requireGraph(draft);
+  const node = requireTypedNode(graph, nodeId, "spawn_event");
+  const updatedNode: SpawnEventNode = {
+    ...node,
+    event_definition_id: fields.event_definition_id ?? node.event_definition_id,
+    spawn_policy: fields.spawn_policy ?? node.spawn_policy,
+    context_mapping: hasOwn(fields, "context_mapping") ? cloneStringRecord(fields.context_mapping) : node.context_mapping,
+    parent_event_link: fields.parent_event_link ?? node.parent_event_link,
+    dedupe_key_template: hasOwn(fields, "dedupe_key_template")
+      ? normalizeNullableString(fields.dedupe_key_template)
+      : node.dedupe_key_template,
+    next_node_id: hasOwn(fields, "next_node_id") ? normalizeRequiredString(fields.next_node_id) : node.next_node_id,
+  };
+
+  return updateDraftGraph(draft, replaceNode(graph, updatedNode), nodeId);
+}
+
 function deleteNode(draft: EventDraftEnvelope, nodeId: string): EventDraftEnvelope {
   const graph = requireGraph(draft);
   const node = graph.nodes.find((candidate) => candidate.id === nodeId);
@@ -1008,6 +1145,25 @@ function normalizeRandomBranch(branch: RandomNode["branches"][number]): RandomNo
   return updatedBranch;
 }
 
+function updateObjectiveTemplate(
+  template: ObjectiveTemplate,
+  fields: ObjectiveTemplateFieldsUpdate,
+): ObjectiveTemplate {
+  return {
+    ...template,
+    title: fields.title ?? template.title,
+    summary: fields.summary ?? template.summary,
+    target_tile_ref: hasOwn(fields, "target_tile_ref") ? cloneNullableTargetRef(fields.target_tile_ref) : template.target_tile_ref,
+    eligible_crew_conditions: hasOwn(fields, "eligible_crew_conditions")
+      ? clonePlain(fields.eligible_crew_conditions ?? [])
+      : template.eligible_crew_conditions,
+    required_action_type: fields.required_action_type ?? template.required_action_type,
+    required_action_params: hasOwn(fields, "required_action_params")
+      ? cloneJsonObject(fields.required_action_params)
+      : template.required_action_params,
+  };
+}
+
 function appendEdgeIfMissing(edges: EventEdge[], nextEdge: EventEdge): EventEdge[] {
   if (
     edges.some(
@@ -1139,6 +1295,27 @@ function appendIdIfMissing(values: string[], value: string): string[] {
 function normalizeOptionalString(value: string | undefined): string | undefined {
   const trimmedValue = value?.trim();
   return trimmedValue ? trimmedValue : undefined;
+}
+
+function normalizeNullableString(value: string | null | undefined): string | null {
+  const trimmedValue = value?.trim();
+  return trimmedValue ? trimmedValue : null;
+}
+
+function normalizeRequiredString(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function cloneNullableTargetRef(value: TargetRef | null | undefined): TargetRef | null {
+  return value ? clonePlain(value) : null;
+}
+
+function cloneJsonObject(value: JsonObject | undefined): JsonObject {
+  return value ? clonePlain(value) : {};
+}
+
+function cloneStringRecord(value: Record<string, string> | undefined): Record<string, string> {
+  return value ? { ...value } : {};
 }
 
 function hasOwn<T extends object, TKey extends PropertyKey>(value: T, key: TKey): value is T & Record<TKey, unknown> {

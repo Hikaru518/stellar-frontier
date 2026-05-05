@@ -45,7 +45,7 @@ source:
 | 19 | TASK-019 | 实现 Graph Preview adapter 与结构健康摘要 | completed | 3 |
 | 20 | TASK-020 | 实现 Graph node editor 基础节点 | completed | 1 |
 | 21 | TASK-021 | 实现 Call/Check/Random graph editor | completed | 1 |
-| 22 | TASK-022 | 实现 Advanced node editors | pending | 0 |
+| 22 | TASK-022 | 实现 Advanced node editors | completed | 1 |
 | 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | pending | 0 |
 | 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | pending | 0 |
 | 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | pending | 0 |
@@ -292,3 +292,12 @@ source:
 - developer summary: 扩展 `GraphStructureEditor` 支持 call/check/random 节点编辑；call 可编辑 speaker、urgency、delivery、expires、on_missed 和 options；check/random 可编辑 branches、conditions JSON、next/default next、effect refs、random weight/seed/store result；reducer 增加 typed update actions，并把 add node 扩展到 call/check/random，其中新增 call node 会同步创建 call template 和 `content_refs.call_template_ids`。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（41 files / 221 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/CallNodeEditor.test.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.test.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task021_semantic_check_1777970174710_20260505_083614`；确认可从 missing `event_graph` 状态添加 call node，编辑 speaker/urgency/delivery/expires，修改 `ack` option 指向缺失 node 后显示 warning；添加 `scan_bridge` option 并重命名为 `inspect_bridge`；添加 check/random node，确认 invalid conditions JSON 只显示 `aria-invalid=true` 不写入，valid JSON 后恢复；确认 check/random branch target/default target 指向缺失 node 时显示 Graph Health warning 且 draft 继续可编辑；`tab.dev.logs` 中浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-022: 实现 Advanced node editors
+- 状态: completed
+- 开始时间: 2026-05-05 16:38
+- 完成时间: 2026-05-05 16:56
+- 尝试次数: 1
+- developer summary: 扩展 `GraphStructureEditor` 支持 `action_request`、`objective`、`spawn_event` 三类高级节点；新增结构化 target ref、trigger definition、condition、key/value params 编辑器；reducer 增加 typed update actions 并保持缺失 transition 不阻塞继续编辑。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（42 files / 225 tests）；主线程补强高级节点 condition type 下拉为统一 `conditionCapabilities` 来源；`git diff --check -- apps/editor/src/event-editor/authoring/AdvancedNodeEditors.test.tsx apps/editor/src/event-editor/authoring/GraphStructureEditor.tsx apps/editor/src/event-editor/authoring/eventAuthoringReducer.ts apps/editor/src/event-editor/authoring/eventAuthoringReducer.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task022_semantic_check_1777971378192_20260505_085618`；确认可添加并编辑 `action_request` 的 request/action/target refs/action params/completion trigger conditions/accepted-completed-failed transitions，缺失 completed transition 显示 warning；确认可添加并编辑 `objective` 的 objective template/mode/required action params/created-completed-failed transitions，缺失 completed transition 显示 warning；确认可添加并编辑 `spawn_event` 的 event id/spawn policy/context mapping/dedupe/next transition，缺失 next transition 显示 warning；Graph Preview 显示三类节点且浏览器 console error 为空。验证后已删除临时 draft 文件。
