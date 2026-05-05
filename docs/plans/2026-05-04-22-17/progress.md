@@ -29,7 +29,7 @@ source:
 | 3 | TASK-003 | 实现 Draft envelope store | completed | 1 |
 | 4 | TASK-004 | 实现 Event validation adapter | completed | 1 |
 | 5 | TASK-005 | 添加 Draft 和 Domain helper routes | completed | 2 |
-| 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | pending | 0 |
+| 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | completed | 1 |
 | 7 | TASK-007 | 实现 Publish content builder | pending | 0 |
 | 8 | TASK-008 | 实现 Publish IO service | pending | 0 |
 | 9 | TASK-009 | 添加 Publish helper route 和前端 client | pending | 0 |
@@ -106,3 +106,12 @@ source:
 - developer summary: 在 helper server 暴露 `POST /api/event-editor/domains`、`POST /api/event-editor/drafts`、`GET /api/event-editor/drafts/:draft_id`、`POST /api/event-editor/drafts/:draft_id/save`、`POST /api/event-editor/drafts/:draft_id/validate`；draft validate 只校验 envelope，publish validate 调用 `eventValidation.mjs` 并返回 generated content。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（24 files / 117 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/server.mjs apps/editor/helper/server.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 editor helper HTTP routes，语义由 helper server tests 覆盖。
+
+### TASK-006: 添加 Event Editor API client 和类型契约
+- 状态: completed
+- 开始时间: 2026-05-05 11:36
+- 完成时间: 2026-05-05 11:46
+- 尝试次数: 1
+- developer summary: 新增 Event Editor domain/draft API client：`createDomain`、`createDraft`、`loadDraft`、`saveDraft`、`validateDraft`；补齐 domain、draft envelope/summary、issue、request/response 类型契约；非 OK helper response 统一抛 `EventEditorApiError` 并保留 `code/status/details`，200 validation failure 正常返回。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（24 files / 123 tests）；`git diff --check -- apps/editor/src/event-editor/apiClient.ts apps/editor/src/event-editor/types.ts apps/editor/src/event-editor/apiClient.test.ts apps/editor/src/event-editor/EventBrowser.test.tsx apps/editor/src/event-editor/EventEditorPage.test.tsx apps/editor/src/event-editor/graphModel.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改 API client/types/tests，无可交互 UI 面。

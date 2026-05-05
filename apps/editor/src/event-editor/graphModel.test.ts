@@ -76,6 +76,8 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
     handlers: [],
     schemas: {},
     ...overrides,
+    domains: overrides.domains ?? [],
+    drafts: overrides.drafts ?? [],
   };
 }
 
