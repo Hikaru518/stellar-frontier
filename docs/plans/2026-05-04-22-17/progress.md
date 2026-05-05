@@ -33,7 +33,7 @@ source:
 | 7 | TASK-007 | 实现 Publish content builder | completed | 1 |
 | 8 | TASK-008 | 实现 Publish IO service | completed | 2 |
 | 9 | TASK-009 | 添加 Publish helper route 和前端 client | completed | 3 |
-| 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | pending | 0 |
+| 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | completed | 4 |
 | 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | pending | 0 |
 | 12 | TASK-012 | 实现 Node capability registry 与 node templates | pending | 0 |
 | 13 | TASK-013 | 实现 Effect 与 Handler capability registry | pending | 0 |
@@ -149,3 +149,19 @@ source:
 - developer summary: 第三次尝试补齐 `POST /api/event-editor/drafts/:draft_id/publish` route、`publishDraft` 前端 API client、publish request/response 类型和 route/client 测试；route 将 `expected_draft_hash`、`expected_source_hashes` 转交 TASK-008 publish service，业务 publish failure 保持 HTTP 200。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（26 files / 137 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/server.mjs apps/editor/helper/server.test.mjs apps/editor/src/event-editor/apiClient.ts apps/editor/src/event-editor/types.ts apps/editor/src/event-editor/apiClient.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
 - browser validation: 不适用；本任务只改 helper route、API client 和类型契约，无可交互 UI 面。
+
+### TASK-010: 实现 Authoring draft model 与 ID/template helper
+- 状态: completed
+- 开始时间: 2026-05-05 12:54
+- 重新开始时间: 2026-05-05 13:23
+- 完成时间: 2026-05-05 13:30
+- 尝试次数: 4
+- 尝试记录:
+  - 尝试 1: developer 子任务长时间未返回，关闭时仍在运行；工作区未看到 `authoring/` 新文件产出，交给下一次尝试重新实现。
+  - 尝试 2: developer 子任务长时间未返回，关闭时仍在运行；工作区只看到 `draftEnvelope.test.ts` 和 `templates.test.ts`，未看到实现文件，交给第三次尝试补完。
+  - 尝试 3: developer 子任务长时间未返回，关闭时仍在运行；工作区仍未看到 `draftEnvelope.ts` 或 `templates.ts` 实现文件。
+  - 尝试 4: developer 子任务成功实现 `draftEnvelope.ts`、`templates.ts` 并补强测试覆盖。
+- retry note: 用户确认网络恢复，允许 TASK-010 额外重试 3 次；从尝试 4 开始继续分发。
+- developer summary: 新增 authoring draft envelope 默认模型、timestamp/draft id 生成、target/editor/hash 默认值、类型守卫、safe id/normalization、call template id 派生、默认 blocking/graph rules/text variant group，以及 schema-aligned event definition/call template shell。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（28 files / 149 tests）；`git diff --check -- apps/editor/src/event-editor/authoring/draftEnvelope.ts apps/editor/src/event-editor/authoring/templates.ts apps/editor/src/event-editor/authoring/draftEnvelope.test.ts apps/editor/src/event-editor/authoring/templates.test.ts docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只新增纯 authoring model/template helper，无可交互 UI 面。
