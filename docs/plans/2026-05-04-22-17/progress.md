@@ -31,7 +31,7 @@ source:
 | 5 | TASK-005 | 添加 Draft 和 Domain helper routes | completed | 2 |
 | 6 | TASK-006 | 添加 Event Editor API client 和类型契约 | completed | 1 |
 | 7 | TASK-007 | 实现 Publish content builder | completed | 1 |
-| 8 | TASK-008 | 实现 Publish IO service | pending | 0 |
+| 8 | TASK-008 | 实现 Publish IO service | completed | 2 |
 | 9 | TASK-009 | 添加 Publish helper route 和前端 client | pending | 0 |
 | 10 | TASK-010 | 实现 Authoring draft model 与 ID/template helper | pending | 0 |
 | 11 | TASK-011 | 实现 Trigger 与 Condition capability registry | pending | 0 |
@@ -124,3 +124,15 @@ source:
 - developer summary: 新增纯函数 Publish content builder，规范化 draft envelope 为 formal `EventDefinition` 和 `CallTemplate` 列表；覆盖 ID 锁定、`ready_for_test`、graph rules、call template id 派生/保留、`option_lines` 对齐、`content_refs` 规范化和 builder issue 返回。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（25 files / 127 tests）；`git diff --check -- apps/editor/helper/eventPublishBuilder.mjs apps/editor/helper/eventPublishBuilder.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed before staging；cached diff check passed after staging.
 - browser validation: 不适用；本任务只改 helper pure builder 和 tests，无可交互 UI 面。
+
+### TASK-008: 实现 Publish IO service
+- 状态: completed
+- 开始时间: 2026-05-05 11:57
+- 完成时间: 2026-05-05 12:32
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: developer 子任务新增了 `eventPublishService.test.mjs`，覆盖 new/edit publish、validation no-write、source hash conflict 和 archive，但未创建 `eventPublishService.mjs` 且长时间无响应；已关闭该子任务并保留测试改动，交给下一次尝试实现 service。
+  - 尝试 2: developer 子任务实现 `eventPublishService.mjs` 并补全测试，返回成功 summary。
+- developer summary: 新增 Publish IO service，读取 active draft，经 builder 生成正式内容后在内存中合成目标 definitions/call_templates，先执行 manifest、schema、cross-reference、source hash conflict、archive target 和重复 ID 校验，全部通过后写入正式 content 文件并 archive draft；失败路径保持 no-write。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（26 files / 133 tests）；`npm run validate:content` passed；`git diff --check -- apps/editor/helper/eventPublishService.mjs apps/editor/helper/eventPublishService.test.mjs docs/plans/2026-05-04-22-17/progress.md` passed。
+- browser validation: 不适用；本任务只改 editor helper publish IO service，语义由 helper service tests 覆盖。
