@@ -48,7 +48,7 @@ source:
 | 22 | TASK-022 | 实现 Advanced node editors | completed | 1 |
 | 23 | TASK-023 | 实现 Effects、Log Templates 与 History 结构化编辑 | completed | 1 |
 | 24 | TASK-024 | 实现 Validation Panel 与 editor-location jump | completed | 1 |
-| 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | pending | 0 |
+| 25 | TASK-025 | 实现分区结构化 Raw JSON Viewer | completed | 1 |
 | 26 | TASK-026 | 整合 Save Draft UI | pending | 0 |
 | 27 | TASK-027 | 整合 Publish Panel UI | pending | 0 |
 
@@ -321,3 +321,12 @@ source:
 - developer summary: 新增 `EventValidationPanel`，按 Basic/Trigger/Graph/Effects/Call Template/Domain/Review fallback 分组展示 `EventEditorIssue`，保留 severity/code/message/path/location；新增 `jsonPath` helper 处理 JSON Pointer 与 dot/bracket fallback；Review step 接入 publish validation 按钮并展示 helper 返回的 issues；reducer 新增 `jump_to_editor_location`，点击 issue 可写入 step/section/node/effect/call template selection。
 - dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（45 files / 237 tests）。
 - browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task024_semantic_check_1777973236313_20260505_092716` 并通过 helper 保存带缺失 graph target、缺失 effect group、缺失 effect handler 的验证 fixture；在 Review step 点击 Run publish validation 后确认 Validation Panel 显示 5 个 error，并按 Graph / Effects / Call Template 分组展示 code、message、JSON path；点击 Call Template `unknown_effect_ref` issue 跳转到 Graph step 且 `Node id = call`；点击 Effects `unknown_handler_type` issue 跳转到 Effects step 且显示当前 `bridge_effects` group；浏览器 console error 为空。验证后已删除临时 draft 文件。
+
+### TASK-025: 实现分区结构化 Raw JSON Viewer
+- 状态: completed
+- 开始时间: 2026-05-05 17:32
+- 完成时间: 2026-05-05 17:41
+- 尝试次数: 1
+- developer summary: 新增 `StructuredJsonViewer`，Review step 现在展示只读分区 Raw JSON；默认分区包括 Draft Envelope、Event Definition、Trigger、Graph Nodes、Effect Groups、Log Templates、Call Templates；大 section 默认折叠并显示数量摘要；搜索命中自动展开对应 section；section 和字段均提供 Copy path；`jsonPath` helper 增加正式 publish issue path 到 draft viewer path 的映射，使 issue JSON path 能定位 `/working_definition/**` 或 `/working_call_templates/**`。
+- dispatcher validation: `cd apps/editor && node ../../common/scripts/install-run-rushx.js lint` passed；`npm run editor:test` passed（46 files / 243 tests）。
+- browser validation: 使用 browser-use 打开 `http://localhost:5175/`，创建临时 draft `codex_task025_semantic_check_1777973831448_20260505_093711` 并通过 helper 保存带 graph/effect/call template 的验证 fixture；确认 Review step 显示 Raw JSON Viewer 的 7 个分区；Graph Nodes 默认折叠；搜索 `bridge_effects` 自动展开 Effect Groups 并显示命中；点击 section Copy path 入口时发现未聚焦页面会触发浏览器 Clipboard `NotAllowedError`，已修复为静默失败且保留可见 path；点击 validation issue 后跳转 Graph step，返回 Review 后 Graph Nodes 自动展开并定位 `/working_definition/event_graph/nodes/0/options/0/effect_refs/0`。验证后已删除临时 draft 文件。

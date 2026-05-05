@@ -121,6 +121,12 @@ describe("EventAuthoringWorkspace", () => {
         }),
       }),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+
+    expect(screen.getByRole("region", { name: "Structured raw JSON viewer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Graph Nodes" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("/working_definition/event_graph/nodes/0/option_node_mapping/ack")).toBeInTheDocument();
   });
 });
 

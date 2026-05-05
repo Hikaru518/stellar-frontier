@@ -1394,6 +1394,15 @@ p {
   min-width: 0;
 }
 
+.structured-json-viewer {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px dashed #b45b13;
+  background: rgba(255, 255, 255, 0.28);
+  padding: 9px;
+}
+
 .event-validation-toolbar,
 .validation-summary-tags {
   display: flex;
@@ -1408,6 +1417,95 @@ p {
 
 .validation-issue-location {
   color: #46505a;
+  font-size: 12px;
+}
+
+.structured-json-search {
+  display: grid;
+  gap: 4px;
+  color: #46505a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.structured-json-section-list {
+  display: grid;
+  gap: 8px;
+}
+
+.structured-json-section {
+  min-width: 0;
+  border: 1px solid #d0b69b;
+  background: rgba(247, 244, 236, 0.72);
+}
+
+.structured-json-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 7px;
+}
+
+.structured-json-section-header > button:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  text-align: left;
+}
+
+.structured-json-section-content {
+  border-top: 1px solid #d0b69b;
+  padding: 7px;
+}
+
+.structured-json-tree,
+.structured-json-tree ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  list-style: none;
+}
+
+.structured-json-tree {
+  padding-left: 0;
+}
+
+.structured-json-node {
+  min-width: 0;
+}
+
+.structured-json-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.42fr) minmax(86px, 0.2fr) minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  border-left: 2px solid transparent;
+  padding: 4px 5px;
+}
+
+.structured-json-row[data-focused="true"] {
+  border-left-color: #2f6f44;
+  background: #edf6ec;
+}
+
+.structured-json-row[data-search-match="true"] {
+  background: #fff7e8;
+}
+
+.structured-json-row code,
+.structured-json-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.structured-json-copy {
+  padding: 3px 6px;
   font-size: 12px;
 }
 

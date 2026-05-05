@@ -6,8 +6,10 @@ import CapabilityCatalogPanel from "./CapabilityCatalogPanel";
 import EffectsStep from "./EffectsStep";
 import EventValidationPanel from "./EventValidationPanel";
 import GraphStructureEditor from "./GraphStructureEditor";
+import StructuredJsonViewer from "./StructuredJsonViewer";
 import TriggerStep from "./TriggerStep";
 import { eventAuthoringReducer } from "./eventAuthoringReducer";
+import { mapIssueJsonPathToDraftPath } from "./jsonPath";
 
 type AuthoringStep = Exclude<EventEditorStep, "domain">;
 
@@ -57,6 +59,7 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
   const [validationIssues, setValidationIssues] = useState<EventEditorIssue[]>([]);
   const [validationStatus, setValidationStatus] = useState<"idle" | "running" | "complete" | "error">("idle");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [focusedJsonPath, setFocusedJsonPath] = useState<string | null>(null);
   const resolvedConditionInsertIndex = Math.min(Math.max(conditionInsertIndex, 0), triggerConditions.length);
   const resolvedSelectedEffectGroupId =
     selectedEffectGroupId && effectGroups.some((group) => group.id === selectedEffectGroupId)
@@ -69,6 +72,7 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
     setValidationIssues([]);
     setValidationStatus("idle");
     setValidationError(null);
+    setFocusedJsonPath(null);
   }, [draft.draft_id]);
 
   return (
@@ -148,6 +152,7 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
               issues={validationIssues}
               status={validationStatus}
               errorMessage={validationError}
+              focusedJsonPath={focusedJsonPath}
               onValidate={onValidateDraft ? runValidation : undefined}
               onIssueJump={jumpToIssue}
             />
@@ -252,6 +257,8 @@ export default function EventAuthoringWorkspace({ draft, onDraftChange, onValida
   }
 
   function jumpToIssue(issue: EventEditorIssue): void {
+    setFocusedJsonPath(mapIssueJsonPathToDraftPath(issue.json_path ?? issue.editor_location?.field_path ?? null));
+
     if (issue.editor_location?.effect_group_id) {
       setSelectedEffectGroupId(issue.editor_location.effect_group_id);
     }
@@ -271,6 +278,7 @@ function ReviewStep({
   issues,
   status,
   errorMessage,
+  focusedJsonPath,
   onValidate,
   onIssueJump,
 }: {
@@ -278,6 +286,7 @@ function ReviewStep({
   issues: EventEditorIssue[];
   status: "idle" | "running" | "complete" | "error";
   errorMessage: string | null;
+  focusedJsonPath: string | null;
   onValidate?: () => void;
   onIssueJump: (issue: EventEditorIssue) => void;
 }) {
@@ -308,6 +317,7 @@ function ReviewStep({
         onValidate={onValidate}
         onIssueJump={onIssueJump}
       />
+      <StructuredJsonViewer draft={draft} focusPath={focusedJsonPath} />
     </div>
   );
 }

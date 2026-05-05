@@ -4,7 +4,10 @@ import {
   encodeJsonPointerSegment,
   formatJsonPathForDisplay,
   getJsonPathLeaf,
+  isJsonPathWithin,
   joinJsonPointer,
+  mapIssueJsonPathToDraftPath,
+  normalizeJsonPathToPointer,
   parseJsonPointer,
 } from "./jsonPath";
 
@@ -31,7 +34,26 @@ describe("jsonPath helpers", () => {
     expect(formatJsonPathForDisplay("event_definitions[0].event_graph.nodes[1].id")).toBe(
       "event_definitions.0.event_graph.nodes.1.id",
     );
+    expect(formatJsonPathForDisplay("$.event_definitions[0].event_graph.nodes[1].id")).toBe(
+      "event_definitions.0.event_graph.nodes.1.id",
+    );
     expect(getJsonPathLeaf("event_definitions[0].event_graph.nodes[1].id")).toBe("id");
+  });
+
+  it("normalizes loose paths to pointers and checks parent containment", () => {
+    expect(normalizeJsonPathToPointer("$.event_definitions[0].event_graph.nodes[1].id")).toBe(
+      "/event_definitions/0/event_graph/nodes/1/id",
+    );
+    expect(isJsonPathWithin("/working_definition/event_graph/nodes/0/id", "/working_definition/event_graph/nodes")).toBe(true);
+    expect(isJsonPathWithin("/working_definition/effect_groups/0/id", "/working_definition/event_graph/nodes")).toBe(false);
+  });
+
+  it("maps publish issue paths back into the draft viewer path space", () => {
+    expect(mapIssueJsonPathToDraftPath("/event_definitions/0/event_graph/nodes/0/id")).toBe(
+      "/working_definition/event_graph/nodes/0/id",
+    );
+    expect(mapIssueJsonPathToDraftPath("/call_templates/0/option_lines/ack")).toBe("/working_call_templates/0/option_lines/ack");
+    expect(mapIssueJsonPathToDraftPath("/working_definition/title")).toBe("/working_definition/title");
   });
 
   it("encodes and decodes individual JSON Pointer segments", () => {
