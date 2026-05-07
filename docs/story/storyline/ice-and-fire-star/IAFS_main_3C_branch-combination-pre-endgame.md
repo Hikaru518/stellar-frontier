@@ -11,15 +11,19 @@
 
 ## Narrative Intent
 
-- 将第三阶段多线推进结果收敛为可执行的终局前置。
+- 将门域阶段多线推进结果收敛为可执行的终局前置。
 - 明确组合优劣，不让“任意组合”显得同质化。
 - 把未完成支线带来的短板显性写入风险面板。
 
 ## Tone Narrative
 
-到 3C 时，你手里已经有答案的形状了：不是“哪条路正确”，而是“你最后带了哪两条路去赌”。每一组组合都有可行性，也都有欠款。
+连续数轮行动后，指挥台上的标记终于开始收束。你们不再讨论“要不要分流”，而是被迫面对一个更具体的问题：最终到底带哪两条路线进入最后准备。每一种组合都能成立，每一种组合也都带着未偿还的代价。
 
-有的组合稳，有的组合快，有的组合灵活但昂贵。你不是在选最完美方案，而是在选“你愿意把哪种代价留给第四阶段”。
+如果你把潜入与沟通并在一起，整体风险更可控，但推进速度会被谨慎拖慢；如果你把潜入与清剿绑在一起，夺窗能力很强，却要承受更高的波动惩罚；如果你把沟通与清剿并行，战术弹性最高，却会把资源线拉到最紧。你不是在挑完美答案，而是在挑一份“自己愿意背到终局前”的不完美清单。
+
+真正让人沉默的是未完成项：任何一条没做完的支线，都会在风险面板上留下空洞，像一段缺页的说明书。没人能保证那一页不会在关键时刻刚好被翻到。你能做的，只是把现有筹码排成一套还算自洽的方案，然后承认它仍然有裂缝。
+
+当组合写回系统，你们得到的不只是“可以继续前进”的许可，更是一份明确的代价结构：谁来扛首轮失败、谁来守次级窗口、谁来承担补给断档。到这里，故事已经不再问“哪条路最好”，而是在问“哪条代价，你们愿意一起负责到底”。
 
 ## Event Journey (Story-Driven)
 
@@ -27,16 +31,16 @@
 
 - Trigger
   - `trigger.type`: `action_complete`
-  - recommended source action: 第三阶段策略支线推进后触发
+  - recommended source action: 门域策略支线推进后触发
   - required_context:
     - `trigger_type`
     - `occurred_at`
     - `source`
     - `payload.completed_branches`
 - Condition
-  - 已完成至少两条策略支线（A/B/C）
+  - 已完成至少两条策略支线（盲区测绘/七拍语法/边境清剿）
 - Event Node
-  - `n_check_branch_combo` (`check`): 识别 A+B / A+C / B+C
+  - `n_check_branch_combo` (`check`): 识别三类双线组合
 - Choice
   - 本阶段无额外显式选项（`N/A`）
 - Consequence
@@ -46,10 +50,10 @@
 
 - `result_3C_combo_AB`
   - 收益：潜入 + 沟通协同，整体风险更可控
-  - 主线耦合：第四阶段可优先走低冲突方案
+  - 主线耦合：终局执行前可优先走低冲突方案
 - `result_3C_combo_AC`
   - 收益：执行力强，夺取窗口能力高
-  - 主线耦合：第四阶段波动上升，失败惩罚更重
+  - 主线耦合：终局执行前波动上升，失败惩罚更重
 - `result_3C_combo_BC`
   - 收益：可谈可打，策略弹性最高
   - 主线耦合：资源消耗压力最大，容错窗口更窄
@@ -62,9 +66,9 @@
 | node_id | node_type | purpose | next |
 | --- | --- | --- | --- |
 | `n_check_branch_combo` | `check` | 识别策略支线组合 | combo mapping to terminal |
-| `n_end_3C_combo_AB` | `end` | A+B 组合结算 | terminal |
-| `n_end_3C_combo_AC` | `end` | A+C 组合结算 | terminal |
-| `n_end_3C_combo_BC` | `end` | B+C 组合结算 | terminal |
+| `n_end_3C_combo_AB` | `end` | 盲区测绘 + 七拍语法组合结算 | terminal |
+| `n_end_3C_combo_AC` | `end` | 盲区测绘 + 边境清剿组合结算 | terminal |
+| `n_end_3C_combo_BC` | `end` | 七拍语法 + 边境清剿组合结算 | terminal |
 | `n_end_3C_incomplete` | `end` | 未满足两线完成结算 | terminal |
 
 terminal_node_ids:

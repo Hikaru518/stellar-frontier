@@ -13,13 +13,17 @@
 
 - 让玩家在互相矛盾的证据与资源压力下做连续抉择。
 - 将策略分流成本显性化，避免“无代价多线并进”。
-- 为 3C 的组合结算准备可追踪前置状态。
+- 为后续组合结算准备可追踪前置状态。
 
 ## Tone Narrative
 
-3A 的首次接触结束后，你拿到的不是方向，而是三套都自洽却彼此冲突的解释。聚落口述、技术测绘、现场反馈各说各话，谁都能自圆其说，谁也都可能把队伍带进坑里。
+首次接触结束后的第一个夜班，指挥舱像临时搭起来的法庭。聚落使者摊开口述记录，坚持“神谕顺序不能打乱”；技术组把热图投到墙上，强调“只有测绘值能复现”；外勤队员把头盔往桌上一放，只问一句“下一次出去，到底先保命还是先取证”。三套说法都自洽，三套说法也都互相否定。
 
-时间在压、物资在掉、队员在疲劳。你不再能假装“先都试试”，因为每推进一条，另外两条的成本都会上升。3B 的核心不是选哪条路，而是承认每条路都要付钱。
+你很快意识到，这不是“谁更有道理”的问题，而是“谁先承担代价”的问题。若先走口述链，沟通线会更完整，但技术证据会滞后；若先走技术链，参数更稳，却可能错过对方可对话窗口；若先按现场压力推进，短期最实用，却会把长期解释空间一点点压缩掉。每推进一条，另外两条都会变贵。
+
+冲突最尖锐的时刻，不在简报会，而在资源分配表落地的那一分钟：你批准哪支小队先动，哪条线路就拿走更多电量、药品和可用窗口。有人会因此觉得你在“押注真相”，也有人会觉得你在“放弃真相”。但你很清楚，这一段路没有不偏不倚，只有偏向之后能不能付清账单。
+
+所以这一段分流的核心，从来不是漂亮地选一条路，而是诚实地承认：每条路都要付钱，而且账不会在今天结清。你当下写进系统的优先级，会在后续组合收束时变成真实的阻力与筹码。
 
 ## Event Journey (Story-Driven)
 
@@ -27,14 +31,14 @@
 
 - Trigger
   - `trigger.type`: `action_complete`
-  - recommended source action: 3A 结算后触发
+  - recommended source action: 首次接触倾向结算后触发
   - required_context:
     - `trigger_type`
     - `occurred_at`
     - `source`
     - `payload.action_type`
 - Condition
-  - 已写入 3A 倾向标记之一
+  - 已写入首次接触倾向标记之一
 - Event Node
   - `n_call_conflict_briefing` (`call`): 汇总口述/技术/现场三类冲突证据
 - Choice
@@ -81,9 +85,9 @@
 | `n_path_tech` | `check` | 技术测绘优先路径 | `n_branch_cost_update` |
 | `n_path_field` | `check` | 现场压力优先路径 | `n_branch_cost_update` |
 | `n_branch_cost_update` | `check` | 更新未选路线成本 | terminal mapping |
-| `n_end_3B_lore_priority` | `end` | 3B 口述优先结算 | terminal |
-| `n_end_3B_tech_priority` | `end` | 3B 技术优先结算 | terminal |
-| `n_end_3B_field_priority` | `end` | 3B 执行优先结算 | terminal |
+| `n_end_3B_lore_priority` | `end` | 口述优先结算 | terminal |
+| `n_end_3B_tech_priority` | `end` | 技术优先结算 | terminal |
+| `n_end_3B_field_priority` | `end` | 执行优先结算 | terminal |
 
 terminal_node_ids:
 
@@ -131,4 +135,4 @@ graph_rules:
 
 ## Open Questions
 
-- 3B 成本抬升是否按固定值，还是按 3A 倾向动态加权。
+- 成本抬升是否按固定值，还是按首次接触倾向动态加权。
