@@ -17,9 +17,9 @@
 | main | 2A | 第二阶段开场：双区调查启动 | `IAFS_story.md` -> 第二阶段 `### 开场局势` | `IAFS_main_2A_dual-zone-investigation-init.md` | todo | P1 |
 | main | 2B | 第二阶段推进：聚落与周边取证 | `IAFS_story.md` -> 第二阶段 `### 情境/冲突` | `IAFS_main_2B_settlement-perimeter-investigation.md` | todo | P1 |
 | main | 2C | 第二阶段结算：样本与坐标碎片成型 | `IAFS_story.md` -> 第二阶段 `### 选择/后果/阶段收束` | `IAFS_main_2C_sample-and-shard-consolidation.md` | todo | P1 |
-| main | 3A | 第三阶段开场：门域首次接触 | `IAFS_story.md` -> 第三阶段 `### 开场局势/### 情境（前半）` | `IAFS_main_3A_gate-contact-setup.md` | todo | P0 |
-| main | 3B | 第三阶段推进：策略分流与双证据冲突 | `IAFS_story.md` -> 第三阶段 `### 情境（后半）/### 冲突` | `IAFS_main_3B_strategy-fork-and-evidence-conflict.md` | todo | P0 |
-| main | 3C | 第三阶段结算：策略组合进入终局前置 | `IAFS_story.md` -> 第三阶段 `### 后果/阶段收束` | `IAFS_main_3C_branch-combination-pre-endgame.md` | todo | P0 |
+| main | 3A | 第三阶段开场：门域首次接触 | `IAFS_story.md` -> 第三阶段 `### 开场局势/### 情境（前半）` | `IAFS_main_3A_gate-contact-setup.md` | done | P0 |
+| main | 3B | 第三阶段推进：策略分流与双证据冲突 | `IAFS_story.md` -> 第三阶段 `### 情境（后半）/### 冲突` | `IAFS_main_3B_strategy-fork-and-evidence-conflict.md` | done | P0 |
+| main | 3C | 第三阶段结算：策略组合进入终局前置 | `IAFS_story.md` -> 第三阶段 `### 后果/阶段收束` | `IAFS_main_3C_branch-combination-pre-endgame.md` | done | P0 |
 | main | 4A | 第四阶段开场：离场窗口与解释分裂 | `IAFS_story.md` -> 第四阶段 `### 开场局势` | `IAFS_main_4A_departure-window-and-interpretation-split.md` | todo | P1 |
 | main | 4B | 第四阶段执行：终局行动链与强制抉择 | `IAFS_story.md` -> 第四阶段 `### 情境/### 冲突/### 选择` | `IAFS_main_4B_final-operation-chain.md` | todo | P1 |
 | main | 4C | 第四阶段结算：终局结果与章节遗留状态 | `IAFS_story.md` -> 第四阶段 `### 后果/阶段收束` | `IAFS_main_4C_endings-and-carryover-state.md` | todo | P1 |
@@ -35,9 +35,9 @@
 | side | 05 | 妖精弃巢（生态观察） | `IAFS_story.md` -> `### 支线 05：妖精弃巢（生态观察）` | `IAFS_side_05_fairy-abandoned-nest.md` | todo | P1 |
 | side | 06 | 双村停火（社会线） | `IAFS_story.md` -> `### 支线 06：双村停火（社会线）` | `IAFS_side_06_dual-settlement-ceasefire.md` | todo | P1 |
 | side | 07 | 最后一班矿车（战斗撤离） | `IAFS_story.md` -> `### 支线 07：最后一班矿车（战斗撤离）` | `IAFS_side_07_last-minecart-evac.md` | todo | P1 |
-| side | 08 | 盲区测绘（第三阶段策略分支） | `IAFS_story.md` -> `支线 A：盲区测绘` | `IAFS_side_08_blind-zone-mapping.md` | todo | P0 |
-| side | 09 | 七拍语法（第三阶段策略分支） | `IAFS_story.md` -> `支线 B：七拍语法` | `IAFS_side_09_seventh-beat-protocol.md` | todo | P0 |
-| side | 10 | 边境清剿（第三阶段策略分支） | `IAFS_story.md` -> `支线 C：边境清剿` | `IAFS_side_10_border-purge.md` | todo | P0 |
+| side | 08 | 盲区测绘（第三阶段策略分支） | `IAFS_story.md` -> `支线 A：盲区测绘` | `IAFS_side_08_blind-zone-mapping.md` | done | P0 |
+| side | 09 | 七拍语法（第三阶段策略分支） | `IAFS_story.md` -> `支线 B：七拍语法` | `IAFS_side_09_seventh-beat-protocol.md` | done | P0 |
+| side | 10 | 边境清剿（第三阶段策略分支） | `IAFS_story.md` -> `支线 C：边境清剿` | `IAFS_side_10_border-purge.md` | done | P0 |
 
 ## 4) 与 Wiki 同步提示
 

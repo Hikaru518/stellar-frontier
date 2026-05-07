@@ -161,18 +161,28 @@
   - 推荐阶段：第二阶段后段至第三阶段前置。
   - 核心冲突：居民安全与门域推进抢资源。
   - 主线耦合：决定是否出现“孢子回潮”惩罚事件，并影响第三阶段窗口冗余。
+  - story-event 映射：`IAFS_side_04_spore-quarantine-zone.md`
 - [妖精弃巢]（科幻）：
   - 推荐阶段：第三阶段前半。
   - 核心冲突：可复现知识与一次性战利品取舍。
   - 主线耦合：影响 [门芯相位钥] 线索质量、门域警戒值与终局参数置信度。
+  - story-event 映射：`IAFS_side_05_fairy-abandoned-nest.md`
 - [双村停火]（严肃）：
   - 推荐阶段：第三阶段前半或中段。
   - 核心冲突：即时站队收益与长期协作网络冲突。
   - 主线耦合：决定跨区补给稳定性，放大或缓和终局前政治摩擦。
+  - story-event 映射：`IAFS_side_06_dual-settlement-ceasefire.md`
 - [最后一班矿车]（哲学）：
   - 推荐阶段：第三阶段后段。
   - 核心冲突：人命优先与供能优先的价值排序。
   - 主线耦合：影响烬炉信任、社会线公信力，以及终局前资源与舆情状态。
+  - story-event 映射：`IAFS_side_07_last-minecart-evac.md`
+
+### 第三阶段策略支线映射
+
+- 支线 A [盲区测绘]：`IAFS_side_08_blind-zone-mapping.md`
+- 支线 B [七拍语法]：`IAFS_side_09_seventh-beat-protocol.md`
+- 支线 C [边境清剿]：`IAFS_side_10_border-purge.md`
 
 ### 主线同步注记
 
