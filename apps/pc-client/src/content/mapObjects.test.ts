@@ -16,7 +16,7 @@ const crashSiteObjectIds = ["iafs_generator", "iafs_life_support", "iafs_shuttle
 
 describe("mapObjects content", () => {
   it("loads the authored IAFS crash-site object catalog", () => {
-    expect(mapObjectDefinitions.map((definition) => definition.id)).toEqual(expect.arrayContaining(crashSiteObjectIds));
+    expect(mapObjectDefinitions.map((definition) => definition.id)).toEqual(expect.arrayContaining([...crashSiteObjectIds]));
     expect(mapObjectDefinitionById.size).toBeGreaterThanOrEqual(crashSiteObjectIds.length);
   });
 
@@ -190,7 +190,7 @@ describe("mapObjects content", () => {
   });
 
   it("does not route any universal action through a removed event id", () => {
-    expect(universalActions.every((action) => !isRemovedEventId(action.event_id))).toBe(true);
+    expect(universalActions.every((action) => action.event_id === undefined || !isRemovedEventId(action.event_id))).toBe(true);
   });
 
   it("does not route any map-object action through a removed event id", () => {
