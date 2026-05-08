@@ -32,6 +32,30 @@ export type ActionCategory = "universal" | "object";
 /** Display strategy when an action's conditions fail. `undefined` = hide (default); `"disabled"` = show greyed-out with hint. */
 export type ActionUnavailableDisplay = "disabled";
 
+export interface LocalActionSetObjectStatusEffect {
+  type: "set_object_status";
+  object_id: string;
+  status: string;
+}
+
+export interface TimedRepairSuccessCheck {
+  attribute: "agility";
+  base: number;
+  ratio: number;
+  bias: number;
+  difficulty: number;
+  min: number;
+  max: number;
+}
+
+export interface TimedRepairLocalActionDef {
+  kind: "timed_repair";
+  duration_seconds: number;
+  success_check: TimedRepairSuccessCheck;
+  success_effects: LocalActionSetObjectStatusEffect[];
+  failure_effects: LocalActionSetObjectStatusEffect[];
+}
+
 export interface ActionDef {
   /** Globally unique string id; for object-inline actions, prefix with the object id; for universal actions, prefix with `"universal:"` (convention, not enforced). */
   id: string;
@@ -42,14 +66,16 @@ export interface ActionDef {
   tone?: "neutral" | "muted" | "accent" | "danger" | "success";
   /** Visibility/availability conditions; an empty array = always visible. Evaluator: `events/conditions.ts`. */
   conditions: Condition[];
-  /** Event id launched on selection; references `EventDefinition.id` from `events/types.ts`. */
-  event_id: string;
+  /** Event id launched on selection for immediate event-backed actions. */
+  event_id?: string;
   /** Display mode when conditions fail; omit = hide. */
   display_when_unavailable?: ActionUnavailableDisplay;
   /** Override hint text shown when greyed-out; if absent, generated from the failed condition. */
   unavailable_hint?: string;
   /** Reserved for a future shared-action table. The schema accepts it but the loader ignores it this round. */
   action_ref?: string;
+  /** Local timed action payload for non-event object actions such as repair. */
+  local_action?: TimedRepairLocalActionDef;
 }
 
 export interface MapObjectDefinition {

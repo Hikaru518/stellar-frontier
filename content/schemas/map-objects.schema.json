@@ -44,7 +44,8 @@
     "actionDef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "category", "label", "conditions", "event_id"],
+      "required": ["id", "category", "label", "conditions"],
+      "anyOf": [{ "required": ["event_id"] }, { "required": ["local_action"] }],
       "properties": {
         "id": {
           "$ref": "#/$defs/id"
@@ -79,6 +80,86 @@
         "action_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "local_action": {
+          "$ref": "#/$defs/localAction"
+        }
+      }
+    },
+    "localActionEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "object_id", "status"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["set_object_status"]
+        },
+        "object_id": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "localRepairSuccessCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "base", "ratio", "bias", "difficulty", "min", "max"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "enum": ["agility"]
+        },
+        "base": {
+          "type": "number"
+        },
+        "ratio": {
+          "type": "number"
+        },
+        "bias": {
+          "type": "number"
+        },
+        "difficulty": {
+          "type": "number"
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        }
+      }
+    },
+    "localAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "duration_seconds", "success_check", "success_effects", "failure_effects"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["timed_repair"]
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "success_check": {
+          "$ref": "#/$defs/localRepairSuccessCheck"
+        },
+        "success_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/localActionEffect"
+          }
+        },
+        "failure_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/localActionEffect"
+          }
         }
       }
     },

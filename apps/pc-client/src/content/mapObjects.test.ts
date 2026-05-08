@@ -1,5 +1,6 @@
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, expectTypeOf, it } from "vitest";
+import defaultMapJson from "../../../../content/maps/default-map.json";
 import mapObjectsSchema from "../../../../content/schemas/map-objects.schema.json";
 import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import universalActionsSchema from "../../../../content/schemas/universal-actions.schema.json";
@@ -11,12 +12,12 @@ import {
   universalActions,
 } from "./mapObjects";
 
+const crashSiteObjectIds = ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"] as const;
+
 describe("mapObjects content", () => {
-  it("loads at least one mainline object via the glob loader", () => {
-    const mainlineObjects = mapObjectDefinitions.filter((definition) =>
-      (definition.tags ?? []).includes("mainline"),
-    );
-    expect(mainlineObjects.length).toBeGreaterThan(0);
+  it("loads the authored IAFS crash-site object catalog", () => {
+    expect(mapObjectDefinitions.map((definition) => definition.id)).toEqual(expect.arrayContaining(crashSiteObjectIds));
+    expect(mapObjectDefinitionById.size).toBeGreaterThanOrEqual(crashSiteObjectIds.length);
   });
 
   it("does not load removed migration-only object content", () => {
@@ -37,14 +38,59 @@ describe("mapObjects content", () => {
   it("indexes every loaded definition by id", () => {
     expect(mapObjectDefinitionById.size).toBe(mapObjectDefinitions.length);
     const sampleId = mapObjectDefinitions[0]?.id;
-    expect(sampleId).toBeTruthy();
-    expect(getMapObjectDefinition(sampleId!)).toEqual(mapObjectDefinitions[0]);
+    if (sampleId) {
+      expect(getMapObjectDefinition(sampleId)).toEqual(mapObjectDefinitions[0]);
+    }
   });
 
   it("ensures every object has a non-empty status_options containing initial_status", () => {
     for (const definition of mapObjectDefinitions) {
       expect(definition.status_options.length).toBeGreaterThan(0);
       expect(definition.status_options).toContain(definition.initial_status);
+    }
+  });
+
+  it("defines a timed local repair action on each IAFS crash-site object", () => {
+    for (const objectId of crashSiteObjectIds) {
+      const definition = getMapObjectDefinition(objectId);
+
+      expect(definition).toBeDefined();
+      expect(definition?.initial_status).toBe("damaged");
+      expect(definition?.status_options).toEqual(["damaged", "repaired"]);
+
+      const repairAction = definition?.actions.find((action) => action.id === `${objectId}:repair`);
+      expect(repairAction).toBeDefined();
+      expect(repairAction).toMatchObject({
+        category: "object",
+        label: "维修",
+        local_action: {
+          kind: "timed_repair",
+          duration_seconds: 180,
+          success_check: {
+            attribute: "agility",
+            base: 0,
+            ratio: 0.2,
+            bias: 0,
+            difficulty: 0,
+            min: 0,
+            max: 1,
+          },
+          success_effects: [{ type: "set_object_status", object_id: objectId, status: "repaired" }],
+          failure_effects: [],
+        },
+      });
+    }
+  });
+
+  it("places the three IAFS crash-site objects on tile 4-4 and blocks the surrounding mountain ring", () => {
+    const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "4-4");
+    const ringTileIds = ["3-3", "3-4", "3-5", "4-3", "4-5", "5-3", "5-4", "5-5"];
+
+    expect(crashTile?.objectIds).toEqual(crashSiteObjectIds);
+
+    for (const tileId of ringTileIds) {
+      const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
+      expect(tile?.terrain).toBe("山体 / 不可通行");
     }
   });
 
@@ -148,7 +194,9 @@ describe("mapObjects content", () => {
   });
 
   it("does not route any map-object action through a removed event id", () => {
-    const eventIds = mapObjectDefinitions.flatMap((definition) => definition.actions.map((action) => action.event_id));
+    const eventIds = mapObjectDefinitions.flatMap((definition) =>
+      definition.actions.map((action) => action.event_id).filter((eventId): eventId is string => typeof eventId === "string"),
+    );
     expect(eventIds.every((eventId) => !isRemovedEventId(eventId))).toBe(true);
   });
 
