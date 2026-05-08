@@ -199,6 +199,12 @@ describe("settleAction", () => {
     });
 
     expect(patch.map.mapObjects?.["iafs_generator"]?.status_enum).toBe("repaired");
+    expect(patch.member).toMatchObject({ status: "维修完成，待命中。", statusTone: "success", activeAction: undefined });
+    expect(patch.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: "Mike 完成维修，目标已恢复。", tone: "success" }),
+      ]),
+    );
     expect(patch.triggerContexts).toEqual([
       expect.objectContaining({
         trigger_type: "action_complete",
@@ -248,8 +254,14 @@ describe("settleAction", () => {
     });
 
     expect(patch.map.mapObjects?.["iafs_generator"]?.status_enum).toBe("damaged");
+    expect(patch.member).toMatchObject({ status: "维修失败，待命中。", statusTone: "muted", activeAction: undefined });
     expect(patch.resources).toEqual(resources);
     expect(patch.baseInventory).toEqual([]);
+    expect(patch.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: "Mike 完成维修尝试，但未能修复目标。", tone: "muted" }),
+      ]),
+    );
     expect(patch.triggerContexts).toEqual([
       expect.objectContaining({
         payload: expect.objectContaining({

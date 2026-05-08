@@ -57,6 +57,20 @@ test("PS-001 opens basic normal-call actions for Mike, Amy, and Garry", async ({
   }
 });
 
+test("IAFS bootstrap starts at the crash site and exposes the three repair actions", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeVisible();
+  await page.getByRole("button", { name: /通讯台/ }).click();
+  await startNormalCrewCall(page, "Mike，神秘幸存者");
+
+  await expect(page.getByText(/地点：IAFS坠毁点 \(0,0\)/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "发电机" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "维生装置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "穿梭机核心" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "维修" })).toHaveCount(3);
+});
+
 test("PS-002 keeps removed object actions hidden after current-area survey", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,

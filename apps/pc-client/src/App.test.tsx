@@ -115,6 +115,12 @@ describe("App", () => {
     expect(saved.saveVersion).toBe(GAME_SAVE_VERSION);
     expect(saved.map).toMatchObject({ rows: 8, cols: 8, originTileId: "4-4", discoveredTileIds: ["3-3", "3-4", "3-5", "4-3", "4-4", "4-5", "5-3", "5-4", "5-5"] });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike"]);
+    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "4-4", location: "IAFS坠毁点 (0,0)" });
+    expect(saved.map.mapObjects).toMatchObject({
+      iafs_generator: { status_enum: "damaged" },
+      iafs_life_support: { status_enum: "damaged" },
+      iafs_shuttle_core: { status_enum: "damaged" },
+    });
     expect(saved.tiles).toHaveLength(64);
   });
 
@@ -433,7 +439,40 @@ describe("App", () => {
         }),
       ]),
     );
+    const savedCrew = (saved?.crew ?? []) as Array<{ status: string; activeAction?: { actionType?: string; targetTile?: string } }>;
+    expect(savedCrew[0]).toMatchObject({
+      status: "正在维修发电机。",
+      activeAction: expect.objectContaining({ actionType: "repair", targetTile: "4-4" }),
+    });
     expect(saved?.active_calls).toEqual({});
+  });
+
+  it("allows retrying a repair after a failed attempt has cleared the lock", () => {
+    const retryResult = dispatchTimedLocalAction(
+      createSavedCrashSiteState({
+        elapsedGameSeconds: 180,
+        crew: [
+          {
+            ...createSavedCrashSiteState().crew[0],
+            status: "维修失败，待命中。",
+            statusTone: "muted",
+            activeAction: undefined,
+          },
+        ],
+      }) as never,
+      "mike",
+      "iafs_generator:repair",
+    );
+
+    expect(retryResult.accepted).toBe(true);
+    expect(Object.values(retryResult.state.crew_actions)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "repair",
+          action_params: expect.objectContaining({ object_id: "iafs_generator" }),
+        }),
+      ]),
+    );
   });
 
   it("rejects repeat repair submissions when the object is already locked or repaired", () => {

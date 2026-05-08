@@ -255,6 +255,15 @@ describe("map-object-action pipeline integration", () => {
     expect(action).toBeDefined();
     expect(action?.disabled).toBe(true);
     expect(action?.disabledReason).toContain("其他队员");
+
+    const unlockedRepairTargets = buildCallView({ member, tile: createCrashSiteTile(), gameState: state }).groups
+      .flatMap((group) => group.actions)
+      .filter((entry) => entry.id === "iafs_life_support:repair" || entry.id === "iafs_shuttle_core:repair");
+    expect(unlockedRepairTargets).toHaveLength(2);
+    expect(unlockedRepairTargets[0]).toMatchObject({ id: "iafs_life_support:repair" });
+    expect(unlockedRepairTargets[0]?.disabled).toBeUndefined();
+    expect(unlockedRepairTargets[1]).toMatchObject({ id: "iafs_shuttle_core:repair" });
+    expect(unlockedRepairTargets[1]?.disabled).toBeUndefined();
   });
 
   it("keeps repair visible but disables it with a self-repair reason when the same crew is already repairing it", () => {
@@ -295,6 +304,16 @@ describe("map-object-action pipeline integration", () => {
       .find((entry) => entry.id === "iafs_generator:repair");
 
     expect(action).toBeUndefined();
+  });
+
+  it("keeps repair available for retry after a failed attempt leaves the object damaged", () => {
+    const member = createCrashSiteMember({ status: "维修失败，待命中。", statusTone: "muted" });
+    const action = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState({ crew: [member] }) }).groups
+      .flatMap((group) => group.actions)
+      .find((entry) => entry.id === "iafs_generator:repair");
+
+    expect(action).toMatchObject({ id: "iafs_generator:repair", label: "维修" });
+    expect(action?.disabled).toBeUndefined();
   });
 
   it("PS-002: tool-gated action greys out without the item and enables once delivered", () => {
