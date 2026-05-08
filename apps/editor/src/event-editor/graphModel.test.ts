@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { CallTemplate, EventDefinition } from "../../../pc-client/src/events/types";
+import type { CallNode, CallTemplate, EventDefinition } from "../../../pc-client/src/events/types";
 import type { EventEditorLibraryResponse } from "./types";
-import { deriveGraphEdges, findCallTemplate, formatEdgeMechanism, layoutGraph, resolveEffectRefs, resolveLogTemplate } from "./graphModel";
+import {
+  analyzeGraphHealth,
+  deriveGraphEdges,
+  filterRenderableGraphEdges,
+  findCallTemplate,
+  formatEdgeMechanism,
+  layoutGraph,
+  resolveEffectRefs,
+  resolveLogTemplate,
+} from "./graphModel";
 
 describe("graphModel", () => {
   it("derives readable transitions from every supported event node shape", () => {
@@ -66,6 +75,44 @@ describe("graphModel", () => {
     expect(layout.triggerPosition.x).toBeLessThan(layout.nodePositions.call.x);
     expect(layout.nodePositions.mark_end.x).toBeGreaterThan(layout.nodePositions.call.x);
   });
+
+  it("summarizes structural graph health issues without throwing on incomplete graphs", () => {
+    const definition = createGraphDefinition();
+    const callNode = definition.event_graph.nodes.find((node): node is CallNode => node.type === "call")!;
+    definition.event_graph.entry_node_id = "missing_entry";
+    definition.event_graph.terminal_node_ids = ["mark_end", "missing_terminal"];
+    callNode.options.push({ id: "unmapped" });
+    callNode.option_node_mapping.mark = "missing_target";
+    definition.event_graph.edges.push({ from_node_id: "missing_source", to_node_id: "mark_end", via: "manual" });
+
+    const summary = analyzeGraphHealth(definition);
+
+    expect(summary.status).toBe("incomplete");
+    expect(summary.canRenderPreview).toBe(false);
+    expect(summary.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_entry_node", nodeId: "missing_entry" }),
+        expect.objectContaining({ code: "missing_terminal_node", nodeId: "missing_terminal" }),
+        expect.objectContaining({ code: "unmapped_call_option", nodeId: "call", optionId: "unmapped" }),
+        expect.objectContaining({ code: "missing_edge_target", targetNodeId: "missing_target" }),
+        expect.objectContaining({ code: "missing_edge_source", sourceNodeId: "missing_source" }),
+      ]),
+    );
+  });
+
+  it("filters transition edges that cannot be rendered because an endpoint is missing", () => {
+    const definition = createGraphDefinition();
+    const callNode = definition.event_graph.nodes.find((node): node is CallNode => node.type === "call")!;
+    callNode.option_node_mapping.mark = "missing_target";
+    definition.event_graph.edges.push({ from_node_id: "missing_source", to_node_id: "mark_end", via: "manual" });
+
+    const edges = deriveGraphEdges(definition);
+    const renderableEdges = filterRenderableGraphEdges(definition.event_graph.nodes, edges);
+
+    expect(renderableEdges.some((edge) => edge.toNodeId === "missing_target")).toBe(false);
+    expect(renderableEdges.some((edge) => edge.fromNodeId === "missing_source")).toBe(false);
+    expect(renderableEdges.some((edge) => edge.toNodeId === "missed_end")).toBe(true);
+  });
 });
 
 function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = {}): EventEditorLibraryResponse {
@@ -76,6 +123,8 @@ function createLibraryResponse(overrides: Partial<EventEditorLibraryResponse> = 
     handlers: [],
     schemas: {},
     ...overrides,
+    domains: overrides.domains ?? [],
+    drafts: overrides.drafts ?? [],
   };
 }
 

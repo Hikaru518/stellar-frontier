@@ -1,15 +1,67 @@
 import handlerRegistryContent from "../../../../content/events/handler_registry.json";
+import eventManifest from "../../../../content/events/manifest.json";
 import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
 import type { EventContentLibrary } from "../events/contentIndex";
-import type { HandlerDefinition } from "../events/types";
-import {
-  generatedCallTemplates,
-  generatedEventDomains,
-  generatedEventProgramDefinitions,
-  generatedPresetDefinitions,
-} from "./generated/eventContentManifest";
+import type { CallTemplate, EventDefinition, HandlerDefinition, PresetDefinition } from "../events/types";
+
+interface EventManifestContent {
+  schema_version: "event-manifest.v1";
+  domains: EventManifestDomain[];
+}
+
+interface EventManifestDomain {
+  id: string;
+  definitions: string;
+  call_templates: string;
+  presets: string | null;
+}
+
+interface EventDefinitionsContent {
+  event_definitions: EventDefinition[];
+}
+
+interface CallTemplatesContent {
+  call_templates: CallTemplate[];
+}
+
+interface PresetsContent {
+  presets: PresetDefinition[];
+}
+
+const eventDefinitionModules = import.meta.glob("../../../../content/events/definitions/*.json", {
+  eager: true,
+  import: "default",
+}) as Record<string, EventDefinitionsContent>;
+
+const callTemplateModules = import.meta.glob("../../../../content/events/call_templates/*.json", {
+  eager: true,
+  import: "default",
+}) as Record<string, CallTemplatesContent>;
+
+const presetModules = import.meta.glob("../../../../content/events/presets/*.json", {
+  eager: true,
+  import: "default",
+}) as Record<string, PresetsContent>;
+
+const eventManifestContent = eventManifest as EventManifestContent;
+const eventManifestDomains = eventManifestContent.domains;
+
+function eventContentModulePath(manifestPath: string): string {
+  return `../../../../content/events/${manifestPath}`;
+}
+
+function readManifestContentFile<T>(modules: Record<string, T>, manifestPath: string): T {
+  const modulePath = eventContentModulePath(manifestPath);
+  const content = modules[modulePath];
+
+  if (!content) {
+    throw new Error(`Missing structured event content file listed in content/events/manifest.json: ${manifestPath}`);
+  }
+
+  return content;
+}
 
 export type Tone = "neutral" | "muted" | "accent" | "danger" | "success";
 export type CrewStatus = "idle" | "moving" | "working" | "lost" | "dead";
@@ -159,12 +211,22 @@ export interface MapConfigDefinition {
   visual?: MapVisualDefinition;
 }
 
-export const eventProgramDefinitions = generatedEventProgramDefinitions;
-export const callTemplates = generatedCallTemplates;
+export const eventProgramDefinitions = eventManifestDomains.flatMap(
+  (domain) => readManifestContentFile(eventDefinitionModules, domain.definitions).event_definitions,
+);
+
+export const callTemplates = eventManifestDomains.flatMap(
+  (domain) => readManifestContentFile(callTemplateModules, domain.call_templates).call_templates,
+);
+
 export const handlerDefinitions = handlerRegistryContent.handlers as unknown as HandlerDefinition[];
-export const presetDefinitions = generatedPresetDefinitions;
+
+export const presetDefinitions = eventManifestDomains.flatMap((domain) =>
+  domain.presets ? readManifestContentFile(presetModules, domain.presets).presets : [],
+);
+
 export const eventContentLibrary: EventContentLibrary = {
-  domains: generatedEventDomains,
+  domains: eventManifestDomains.map((domain) => domain.id),
   event_definitions: eventProgramDefinitions,
   call_templates: callTemplates,
   handlers: handlerDefinitions,

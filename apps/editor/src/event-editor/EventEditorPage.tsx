@@ -1,14 +1,49 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { EventEditorApiError, HELPER_START_COMMAND, loadEventEditorLibrary } from "./apiClient";
+import {
+  createDomain,
+  createDraft,
+  EventEditorApiError,
+  HELPER_START_COMMAND,
+  loadDraft,
+  loadEventEditorLibrary,
+  publishDraft,
+  saveDraft,
+  validateDraft,
+} from "./apiClient";
+import DraftBrowser from "./authoring/DraftBrowser";
+import EventAuthoringWorkspace from "./authoring/EventAuthoringWorkspace";
 import EventBrowser from "./EventBrowser";
 import GraphPanel from "./GraphPanel";
 import SchemaPanel from "./SchemaPanel";
-import type { EditorEventAsset, EventEditorLibraryResponse } from "./types";
+import type {
+  CreateDomainResponse,
+  CreateDraftRequest,
+  CreateDraftResponse,
+  EditorEventAsset,
+  EventDraftEnvelope,
+  EventEditorIssue,
+  EventEditorLibraryResponse,
+  PublishDraftResponse,
+  SaveDraftResponse,
+  ValidateDraftResponse,
+} from "./types";
 
 type LoadLibrary = () => Promise<EventEditorLibraryResponse>;
+type CreateDraftRequestHandler = (request: CreateDraftRequest) => Promise<CreateDraftResponse>;
+type LoadDraftRequestHandler = (draftId: string) => Promise<EventDraftEnvelope>;
+type CreateDomainRequestHandler = (domainId: string) => Promise<CreateDomainResponse>;
+type ValidateDraftRequestHandler = (draft: EventDraftEnvelope) => Promise<ValidateDraftResponse>;
+type SaveDraftRequestHandler = (draft: EventDraftEnvelope, expectedDraftHash: string | null) => Promise<SaveDraftResponse>;
+type PublishDraftRequestHandler = (draft: EventDraftEnvelope) => Promise<PublishDraftResponse>;
 
 interface EventEditorPageProps {
   loadLibrary?: LoadLibrary;
+  createDraftRequest?: CreateDraftRequestHandler;
+  loadDraftRequest?: LoadDraftRequestHandler;
+  createDomainRequest?: CreateDomainRequestHandler;
+  validateDraftRequest?: ValidateDraftRequestHandler;
+  saveDraftRequest?: SaveDraftRequestHandler;
+  publishDraftRequest?: PublishDraftRequestHandler;
 }
 
 type InspectorTab = "schema" | "graph";
@@ -18,11 +53,35 @@ const DEFAULT_BROWSER_PANE_WIDTH = 320;
 const MIN_BROWSER_PANE_WIDTH = 220;
 const MAX_BROWSER_PANE_WIDTH = 720;
 
-export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }: EventEditorPageProps) {
+export default function EventEditorPage({
+  loadLibrary = loadEventEditorLibrary,
+  createDraftRequest = defaultCreateDraftRequest,
+  loadDraftRequest = defaultLoadDraftRequest,
+  createDomainRequest = defaultCreateDomainRequest,
+  validateDraftRequest = defaultValidateDraftRequest,
+  saveDraftRequest = defaultSaveDraftRequest,
+  publishDraftRequest = defaultPublishDraftRequest,
+}: EventEditorPageProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [library, setLibrary] = useState<EventEditorLibraryResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [actionError, setActionError] = useState<Error | null>(null);
+  const [domainActionError, setDomainActionError] = useState<Error | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [activeAsset, setActiveAsset] = useState<EditorEventAsset<unknown> | null>(null);
+  const [activeDraft, setActiveDraft] = useState<EventDraftEnvelope | null>(null);
+  const [isActiveDraftDirty, setIsActiveDraftDirty] = useState(false);
+  const [saveState, setSaveState] = useState<{
+    status: "idle" | "saving" | "saved" | "error";
+    errorMessage: string | null;
+    issues: EventEditorIssue[];
+  }>({ status: "idle", errorMessage: null, issues: [] });
+  const [publishState, setPublishState] = useState<{
+    status: "idle" | "publishing" | "published" | "error";
+    errorMessage: string | null;
+    issues: EventEditorIssue[];
+    result: PublishDraftResponse | null;
+  }>({ status: "idle", errorMessage: null, issues: [], result: null });
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("schema");
   const [browserPaneState, setBrowserPaneState] = useState(loadBrowserPaneState);
 
@@ -84,7 +143,11 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     );
   }
 
-  if (browserAssets.length === 0) {
+  if (!library) {
+    return null;
+  }
+
+  if (browserAssets.length === 0 && library.domains.length === 0 && library.drafts.length === 0) {
     return (
       <section className="panel panel-accent editor-main">
         <Header statusLabel="EMPTY" />
@@ -96,14 +159,11 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
     );
   }
 
-  if (!library) {
-    return null;
-  }
-
   return (
     <section className="panel panel-accent editor-main">
       <Header statusLabel="READY" />
       <EventLibraryStatusBar library={library} />
+      {actionError ? <ActionErrorCard error={actionError} /> : null}
 
       <div
         className={browserPaneState.collapsed ? "event-workspace-2col event-workspace-browser-collapsed" : "event-workspace-2col"}
@@ -117,11 +177,46 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
           onExpand={() => setBrowserPaneState((current) => ({ ...current, collapsed: false }))}
           onResizeStart={startBrowserResize}
         >
-          <EventBrowser library={library} selectedAsset={activeAsset} onSelectAsset={setActiveAsset} />
+          <DraftBrowser
+            domains={library.domains}
+            drafts={library.drafts}
+            isBusy={busyAction !== null}
+            busyLabel={busyAction}
+            errorMessage={actionError ? formatActionError(actionError).message : null}
+            domainErrorMessage={domainActionError ? formatActionError(domainActionError).message : null}
+            onOpenDraft={handleOpenDraft}
+            onCreateDraft={handleCreateDraft}
+            onCreateDomain={handleCreateDomain}
+          />
+          <EventBrowser
+            library={library}
+            selectedAsset={activeAsset}
+            onSelectAsset={(asset) => {
+              setActiveDraft(null);
+              setActiveAsset(asset);
+            }}
+            onEditDefinition={handleEditDefinition}
+          />
         </EventBrowserPane>
 
         <div className="event-detail-pane" aria-label="Selected event workspace">
-          {activeAsset ? (
+          {activeDraft ? (
+            <EventAuthoringWorkspace
+              draft={activeDraft}
+              isDirty={isActiveDraftDirty}
+              isSaving={saveState.status === "saving"}
+              saveErrorMessage={saveState.errorMessage}
+              saveIssues={saveState.issues}
+              isPublishing={publishState.status === "publishing"}
+              publishErrorMessage={publishState.errorMessage}
+              publishIssues={publishState.issues}
+              publishResult={publishState.result}
+              onDraftChange={handleActiveDraftChange}
+              onSaveDraft={handleSaveActiveDraft}
+              onPublishDraft={handlePublishActiveDraft}
+              onValidateDraft={validateDraftRequest}
+            />
+          ) : activeAsset ? (
             <>
               <AssetHeaderStrip asset={activeAsset} />
               <EventInspectorPanel
@@ -143,10 +238,173 @@ export default function EventEditorPage({ loadLibrary = loadEventEditorLibrary }
   );
 
   function applyLoadedLibrary(nextLibrary: EventEditorLibraryResponse): void {
+    const normalizedLibrary = normalizeEventEditorLibrary(nextLibrary);
+    const assets = getBrowserAssets(normalizedLibrary);
+    setLibrary(normalizedLibrary);
+    setActiveAsset(assets[0] ?? null);
+    setActiveDraft(null);
+    setIsActiveDraftDirty(false);
+    setSaveState({ status: "idle", errorMessage: null, issues: [] });
+    setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
+    setInspectorTab("schema");
+  }
+
+  async function refreshLibraryAfterAction({ keepDraft = false }: { keepDraft?: boolean } = {}): Promise<void> {
+    const nextLibrary = normalizeEventEditorLibrary(await loadLibrary());
     const assets = getBrowserAssets(nextLibrary);
     setLibrary(nextLibrary);
-    setActiveAsset(assets[0] ?? null);
-    setInspectorTab("schema");
+
+    if (!keepDraft) {
+      setActiveDraft(null);
+      setActiveAsset(resolvePreservedAsset(activeAsset, assets) ?? assets[0] ?? null);
+    }
+  }
+
+  async function handleCreateDraft(request: CreateDraftRequest): Promise<void> {
+    setBusyAction("Creating draft...");
+    setActionError(null);
+    setDomainActionError(null);
+
+    try {
+      const response = await createDraftRequest(request);
+      setActiveDraft(response.draft);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "idle", errorMessage: null, issues: [] });
+      setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
+      setActiveAsset(null);
+      await refreshLibraryAfterAction({ keepDraft: true });
+    } catch (nextError: unknown) {
+      setActionError(toError(nextError));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleOpenDraft(draftId: string): Promise<void> {
+    setBusyAction("Opening draft...");
+    setActionError(null);
+    setDomainActionError(null);
+
+    try {
+      const draft = await loadDraftRequest(draftId);
+      setActiveDraft(draft);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "idle", errorMessage: null, issues: [] });
+      setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
+      setActiveAsset(null);
+    } catch (nextError: unknown) {
+      setActionError(toError(nextError));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleCreateDomain(domainId: string): Promise<void> {
+    setBusyAction("Creating domain...");
+    setActionError(null);
+    setDomainActionError(null);
+
+    try {
+      await createDomainRequest(domainId);
+      await refreshLibraryAfterAction({ keepDraft: activeDraft !== null });
+    } catch (nextError: unknown) {
+      const normalizedError = toError(nextError);
+      setDomainActionError(normalizedError);
+      throw normalizedError;
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function handleEditDefinition(asset: EventEditorLibraryResponse["definitions"][number]): void {
+    void handleCreateDraft({
+      mode: "edit_existing",
+      definition_id: asset.id,
+      domain: asset.domain,
+    });
+  }
+
+  function handleActiveDraftChange(nextDraft: EventDraftEnvelope, options: { markDirty?: boolean } = {}): void {
+    setActiveDraft(nextDraft);
+    setIsActiveDraftDirty((current) => (options.markDirty === false ? current : true));
+    setSaveState((current) => ({
+      status: current.status === "saving" ? "saving" : "idle",
+      errorMessage: null,
+      issues: [],
+    }));
+    setPublishState({ status: "idle", errorMessage: null, issues: [], result: null });
+  }
+
+  async function handleSaveActiveDraft(): Promise<void> {
+    if (!activeDraft) {
+      return;
+    }
+
+    setSaveState({ status: "saving", errorMessage: null, issues: [] });
+    setActionError(null);
+
+    try {
+      const response = await saveDraftRequest(activeDraft, activeDraft.hashes.draft);
+      if (!response.saved) {
+        setSaveState({
+          status: "error",
+          errorMessage: "Draft save did not complete.",
+          issues: response.issues ?? [],
+        });
+        setIsActiveDraftDirty(true);
+        return;
+      }
+
+      setActiveDraft(response.draft);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "saved", errorMessage: null, issues: response.issues ?? [] });
+      await refreshLibraryAfterAction({ keepDraft: true });
+    } catch (nextError: unknown) {
+      setSaveState({
+        status: "error",
+        errorMessage: toError(nextError).message,
+        issues: [],
+      });
+      setIsActiveDraftDirty(true);
+    }
+  }
+
+  async function handlePublishActiveDraft(): Promise<void> {
+    if (!activeDraft || isActiveDraftDirty) {
+      return;
+    }
+
+    setPublishState({ status: "publishing", errorMessage: null, issues: [], result: null });
+    setActionError(null);
+
+    try {
+      const response = await publishDraftRequest(activeDraft);
+      if (!response.published) {
+        setPublishState({
+          status: "error",
+          errorMessage: "Publish validation failed.",
+          issues: response.issues ?? [],
+          result: response,
+        });
+        return;
+      }
+
+      const nextLibrary = normalizeEventEditorLibrary(await loadLibrary());
+      const assets = getBrowserAssets(nextLibrary);
+      setLibrary(nextLibrary);
+      setActiveDraft(null);
+      setIsActiveDraftDirty(false);
+      setSaveState({ status: "idle", errorMessage: null, issues: [] });
+      setPublishState({ status: "published", errorMessage: null, issues: response.issues ?? [], result: response });
+      setActiveAsset(assets.find((asset) => asset.asset_type === "event_definition" && asset.id === activeDraft.target.definition_id) ?? assets[0] ?? null);
+    } catch (nextError: unknown) {
+      setPublishState({
+        status: "error",
+        errorMessage: toError(nextError).message,
+        issues: [],
+        result: null,
+      });
+    }
   }
 
   function startBrowserResize(event: ReactMouseEvent<HTMLDivElement>): void {
@@ -177,6 +435,8 @@ function EventLibraryStatusBar({ library }: { library: EventEditorLibraryRespons
       <span>{formatCount(library.call_templates.length, "call template")}</span>
       <span>{formatCount(library.presets.length, "preset")}</span>
       <span>{formatCount(library.handlers.length, "handler")}</span>
+      <span>{formatCount(library.domains.length, "domain")}</span>
+      <span>{formatCount(library.drafts.filter((draft) => draft.status === "active").length, "active draft")}</span>
     </div>
   );
 }
@@ -288,12 +548,22 @@ function AssetHeaderStrip({ asset }: { asset: EditorEventAsset<unknown> }) {
   );
 }
 
+function ActionErrorCard({ error }: { error: Error }) {
+  const formatted = formatActionError(error);
+  return (
+    <div className="editor-state-card event-action-error-card" role="alert">
+      <h3>{formatted.title}</h3>
+      <p>{formatted.message}</p>
+    </div>
+  );
+}
+
 function Header({ statusLabel }: { statusLabel: string }) {
   return (
     <div className="editor-panel-heading">
       <div>
-        <h2 className="panel-title">Event Inspector</h2>
-        <p className="muted-text">Read-only view of structured event assets served by the local helper.</p>
+        <h2 className="panel-title">Event Editor</h2>
+        <p className="muted-text">Structured event assets, drafts, and local helper authoring actions.</p>
       </div>
       <span className="status-tag status-success">{statusLabel}</span>
     </div>
@@ -302,6 +572,34 @@ function Header({ statusLabel }: { statusLabel: string }) {
 
 function getBrowserAssets(library: EventEditorLibraryResponse): EditorEventAsset<unknown>[] {
   return [...library.definitions, ...library.call_templates, ...library.presets, ...library.handlers];
+}
+
+function normalizeEventEditorLibrary(library: EventEditorLibraryResponse): EventEditorLibraryResponse {
+  return {
+    definitions: library.definitions ?? [],
+    call_templates: library.call_templates ?? [],
+    presets: library.presets ?? [],
+    handlers: library.handlers ?? [],
+    schemas: library.schemas ?? {},
+    domains: library.domains ?? [],
+    drafts: library.drafts ?? [],
+  };
+}
+
+function resolvePreservedAsset(
+  currentAsset: EditorEventAsset<unknown> | null,
+  assets: EditorEventAsset<unknown>[],
+): EditorEventAsset<unknown> | null {
+  if (!currentAsset) {
+    return null;
+  }
+
+  const currentKey = getAssetKey(currentAsset);
+  return assets.find((asset) => getAssetKey(asset) === currentKey) ?? null;
+}
+
+function getAssetKey(asset: EditorEventAsset<unknown>): string {
+  return `${asset.asset_type}:${asset.file_path}:${asset.id}`;
 }
 
 function formatCount(count: number, singular: string): string {
@@ -339,4 +637,62 @@ function clampBrowserPaneWidth(width: number): number {
 
 function isHelperUnavailable(error: Error | null): boolean {
   return error instanceof EventEditorApiError && error.code === "helper_unavailable";
+}
+
+function formatActionError(error: Error): { title: string; message: string } {
+  if (isHelperUnavailable(error)) {
+    return {
+      title: "Helper unavailable",
+      message: error.message,
+    };
+  }
+
+  return {
+    title: "Action failed",
+    message: error.message || "The local helper returned an unknown error.",
+  };
+}
+
+function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error("Unknown helper error.");
+}
+
+function defaultCreateDraftRequest(request: CreateDraftRequest): Promise<CreateDraftResponse> {
+  return createDraft({ request });
+}
+
+function defaultLoadDraftRequest(draftId: string): Promise<EventDraftEnvelope> {
+  return loadDraft({ draftId });
+}
+
+function defaultCreateDomainRequest(domainId: string): Promise<CreateDomainResponse> {
+  return createDomain({ domainId });
+}
+
+function defaultValidateDraftRequest(draft: EventDraftEnvelope): Promise<ValidateDraftResponse> {
+  return validateDraft({ draftId: draft.draft_id, draft, level: "publish" });
+}
+
+function defaultSaveDraftRequest(draft: EventDraftEnvelope, expectedDraftHash: string | null): Promise<SaveDraftResponse> {
+  return saveDraft({ draftId: draft.draft_id, draft, expectedDraftHash });
+}
+
+function defaultPublishDraftRequest(draft: EventDraftEnvelope): Promise<PublishDraftResponse> {
+  return publishDraft({
+    draftId: draft.draft_id,
+    expectedDraftHash: draft.hashes.draft,
+    expectedSourceHashes: expectedSourceHashesForPublish(draft),
+  });
+}
+
+function expectedSourceHashesForPublish(draft: EventDraftEnvelope): Record<string, string | null> | undefined {
+  if (draft.mode !== "edit_existing" || !draft.source) {
+    return undefined;
+  }
+
+  return {
+    [draft.source.definition_file_path]: draft.hashes.source_definition_file,
+    [draft.source.call_template_file_path]: draft.hashes.source_call_template_file,
+    [draft.source.manifest_file_path]: draft.hashes.source_manifest,
+  };
 }

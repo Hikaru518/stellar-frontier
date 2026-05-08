@@ -3,6 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadEventEditorLibrary } from "./contentStore.mjs";
+import { createEventDraftStore } from "./eventDraftStore.mjs";
+import { createEventManifestStore } from "./eventManifestStore.mjs";
+import { createEventPublishService } from "./eventPublishService.mjs";
+import { validateEventAssetsForPublish } from "./eventValidation.mjs";
 import { loadMapEditorLibrary } from "./mapContentStore.mjs";
 import { validateMapEditorMap } from "./mapValidation.mjs";
 import { createPathGuard } from "./pathGuard.mjs";
@@ -62,6 +66,60 @@ async function routeRequest(request, response, { repoRoot }) {
 
   if (request.method === "GET" && url.pathname === "/api/event-editor/library") {
     sendJson(response, 200, await loadEventEditorLibrary({ repoRoot }));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/event-editor/domains") {
+    const body = await readJsonBody(request);
+    const store = createEventManifestStore({ repoRoot });
+    sendJson(response, 200, await store.createDomain(body?.domain_id));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/event-editor/drafts") {
+    const body = await readJsonBody(request);
+    const store = createEventDraftStore({ repoRoot });
+    sendJson(response, 200, await store.createDraft(body));
+    return;
+  }
+
+  const eventDraftRoute = matchEventDraftRoute(url.pathname);
+  if (eventDraftRoute && request.method === "GET" && eventDraftRoute.action === "read") {
+    const store = createEventDraftStore({ repoRoot });
+    const includeArchived = url.searchParams.get("include_archived") === "true";
+    sendJson(response, 200, await store.loadDraft(eventDraftRoute.draftId, { includeArchived }));
+    return;
+  }
+
+  if (eventDraftRoute && request.method === "POST" && eventDraftRoute.action === "save") {
+    const body = await readJsonBody(request);
+    const store = createEventDraftStore({ repoRoot });
+    sendJson(response, 200, await store.saveDraft({
+      draftId: eventDraftRoute.draftId,
+      draft: body?.draft,
+      expectedDraftHash: body?.expected_draft_hash ?? null,
+    }));
+    return;
+  }
+
+  if (eventDraftRoute && request.method === "POST" && eventDraftRoute.action === "validate") {
+    const body = await readJsonBody(request);
+    sendJson(response, 200, await validateEventDraftRequest({
+      repoRoot,
+      draftId: eventDraftRoute.draftId,
+      body,
+    }));
+    return;
+  }
+
+  if (eventDraftRoute && request.method === "POST" && eventDraftRoute.action === "publish") {
+    const body = await readJsonBody(request);
+    const publishService = createEventPublishService({ repoRoot });
+    sendJson(response, 200, await publishService.publishDraft({
+      draftId: eventDraftRoute.draftId,
+      expectedDraftHash: body?.expected_draft_hash ?? null,
+      expectedSourceHashes: body?.expected_source_hashes ?? null,
+    }));
     return;
   }
 
@@ -156,13 +214,156 @@ function isKnownRouteWithWrongMethod(pathname, method) {
   const supportedMethodsByPath = {
     "/api/health": ["GET"],
     "/api/event-editor/library": ["GET"],
+    "/api/event-editor/domains": ["POST"],
+    "/api/event-editor/drafts": ["POST"],
     "/api/map-editor/library": ["GET"],
     "/api/map-editor/validate": ["POST"],
     "/api/map-editor/save": ["POST"],
     "/api/map-editor/assets": ["GET"],
   };
-  const supportedMethods = supportedMethodsByPath[pathname];
+  const supportedMethods = supportedMethodsByPath[pathname] ?? supportedEventDraftRouteMethods(pathname);
   return Boolean(supportedMethods && !supportedMethods.includes(method));
+}
+
+function matchEventDraftRoute(pathname) {
+  const prefix = "/api/event-editor/drafts/";
+  if (!pathname.startsWith(prefix)) {
+    return null;
+  }
+
+  const segments = pathname.slice(prefix.length).split("/");
+  if (segments.length === 1 && segments[0]) {
+    return {
+      action: "read",
+      draftId: decodeRouteSegment(segments[0], "invalid_draft_id"),
+    };
+  }
+
+  if (
+    segments.length === 2
+    && segments[0]
+    && (segments[1] === "save" || segments[1] === "validate" || segments[1] === "publish")
+  ) {
+    return {
+      action: segments[1],
+      draftId: decodeRouteSegment(segments[0], "invalid_draft_id"),
+    };
+  }
+
+  return null;
+}
+
+function supportedEventDraftRouteMethods(pathname) {
+  const route = matchEventDraftRoute(pathname);
+  if (!route) {
+    return null;
+  }
+
+  return route.action === "read" ? ["GET"] : ["POST"];
+}
+
+async function validateEventDraftRequest({ repoRoot, draftId, body }) {
+  if (body?.level !== "draft" && body?.level !== "publish") {
+    throw httpError(400, "invalid_validation_level", "Draft validation level must be draft or publish.");
+  }
+
+  const draft = body?.draft ?? await createEventDraftStore({ repoRoot }).loadDraft(draftId);
+  const draftValidation = validateDraftEnvelope(draft, draftId);
+
+  if (body.level === "draft") {
+    return draftValidation;
+  }
+
+  const generated = {
+    definition: draft?.working_definition,
+    call_templates: Array.isArray(draft?.working_call_templates) ? draft.working_call_templates : [],
+  };
+
+  const publishValidation = await validateEventAssetsForPublish({
+    repoRoot,
+    eventDefinitions: [generated.definition],
+    callTemplates: generated.call_templates,
+  });
+
+  return {
+    valid: draftValidation.valid && publishValidation.valid,
+    issues: [...draftValidation.issues, ...publishValidation.issues],
+    generated,
+  };
+}
+
+function validateDraftEnvelope(draft, routeDraftId) {
+  const issues = [];
+  const assetId = typeof draft?.draft_id === "string" ? draft.draft_id : routeDraftId;
+  const addIssue = (code, message, jsonPath) => {
+    issues.push({
+      severity: "error",
+      code,
+      message,
+      asset_type: "draft",
+      asset_id: assetId,
+      json_path: jsonPath,
+      editor_location: {
+        step: "review",
+        section: "draft_envelope",
+        field_path: jsonPath,
+      },
+    });
+  };
+
+  if (!isPlainObject(draft)) {
+    addIssue("invalid_draft_envelope", "Draft envelope must be an object.", "/");
+    return {
+      valid: false,
+      issues,
+    };
+  }
+
+  if (draft.schema_version !== "event-editor-draft-v1") {
+    addIssue("invalid_draft_schema_version", "Draft schema_version must be event-editor-draft-v1.", "/schema_version");
+  }
+  if (draft.draft_id !== routeDraftId) {
+    addIssue("draft_id_mismatch", "Draft id must match the route draft id.", "/draft_id");
+  }
+  if (draft.mode !== "new" && draft.mode !== "edit_existing") {
+    addIssue("invalid_draft_mode", "Draft mode must be new or edit_existing.", "/mode");
+  }
+  if (draft.status !== "active" && draft.status !== "archived") {
+    addIssue("invalid_draft_status", "Draft status must be active or archived.", "/status");
+  }
+  if (draft.mode === "new" && draft.source !== null) {
+    addIssue("invalid_draft_source", "New event drafts must not include source refs.", "/source");
+  }
+  if (draft.mode === "edit_existing" && !isPlainObject(draft.source)) {
+    addIssue("invalid_draft_source", "Edit-existing drafts must include source refs.", "/source");
+  }
+  if (!isPlainObject(draft.target)) {
+    addIssue("invalid_draft_target", "target must be an object.", "/target");
+  } else {
+    if (!isSafeDraftId(draft.target.domain)) {
+      addIssue("invalid_target_domain", "target.domain must be lowercase and filename-safe.", "/target/domain");
+    }
+    if (!isSafeDraftId(draft.target.definition_id)) {
+      addIssue("invalid_target_definition_id", "target.definition_id must be lowercase and filename-safe.", "/target/definition_id");
+    }
+  }
+  if (!isPlainObject(draft.working_definition)) {
+    addIssue("invalid_working_definition", "working_definition must be an object.", "/working_definition");
+  }
+  if (!Array.isArray(draft.working_call_templates)) {
+    addIssue("invalid_working_call_templates", "working_call_templates must be an array.", "/working_call_templates");
+  }
+  if (!isPlainObject(draft.editor_state)) {
+    addIssue("invalid_editor_state", "editor_state must be an object.", "/editor_state");
+  }
+  if (!isPlainObject(draft.hashes)) {
+    addIssue("invalid_draft_hashes", "hashes must be an object.", "/hashes");
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+  };
 }
 
 async function readJsonBody(request) {
@@ -223,6 +424,25 @@ function isAllowedAssetPath(assetPath) {
     && path.posix.normalize(assetPath) === assetPath
     && assetPath.startsWith("assets/")
     && assetPath.endsWith(".png");
+}
+
+function isPlainObject(value) {
+  return value !== null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function isSafeDraftId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9_-]*$/.test(value);
+}
+
+function decodeRouteSegment(value, code) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw httpError(400, code, "Route parameter must be valid URI encoding.");
+  }
 }
 
 function httpError(statusCode, code, message) {

@@ -27,6 +27,38 @@
 
 本轮先保证 schema、ID / 引用、图可达性、终点路径、option / template 对齐、condition / effect 字段类型、handler 参数 schema 和样例事件 dry-run。
 
+## Event Editor 编辑版后续扩展
+
+**当前状态**：在 `docs/plans/2026-05-04-22-17/` 的 Event Editor 编辑版头脑风暴中，MVP 范围先收敛为可编辑 `event_definitions` 与 `call_templates`，用于让策划快速修改事件定义与通话模板。`presets`、`handlers`、`schemas` 和复杂图编辑能力暂不进入 MVP。
+
+**后续要补充的能力**：
+
+- `presets` 编辑：先补齐 preset schema 与校验边界，再开放 condition / effect / effect_group / probability_modifier 等复用片段的创建、编辑、引用检查。
+- `handlers` 编辑或管理：明确 handler registry 是否允许策划改动；如允许，需要 handler 参数 schema、目标类型、确定性 / 随机性、失败策略等字段的专用编辑与强校验。
+- schema 只读参考增强：不直接编辑 runtime schema，但提供字段说明、枚举来源、示例值和跳转定位，帮助策划理解错误。
+- Graph 结构编辑：新增 / 删除 / 重命名节点、修改入口和终点、编辑 transition / option mapping，并提供断链、不可达、循环和终点路径反馈。
+- condition / effect builder：用专用控件编辑 `target + field + op + value`、`type + params + failure_policy + record_policy`，避免策划手写复杂 JSON。
+- sample context dry-run：从 entry 或指定 node 运行事件预览，展示通话 transcript、可用 / 不可用选项、effect diff、event log 和终点 resolution。
+- 教程式能力文档 / handbook：在编辑器内或 `docs/` 中为每种 trigger / node / condition / effect 类型补充完整示例、设计建议、常见坑和可复制案例；MVP 先做可插入模板的工作目录，不做长篇教程。
+- 保存事务与版本检查：在多文件联动保存、manifest 更新或批量操作前，引入更严格的 diff、mtime / 版本检查、失败恢复和原子写入策略。
+- 内容生产分析：补充事件分支覆盖率、variant 命中率、隐藏选项原因、事件池概率 / 优先级 / 互斥关系等编辑器级报告。
+
+本轮 MVP 先解决已有 definition 与 call template 的安全编辑、校验、diff 和保存；以上能力留到后续 Event Editor 增强轮次处理。
+
+## Content 加载架构统一
+
+**当前状态**：在 `docs/plans/2026-05-04-22-17/` 的 Event Editor 编辑版头脑风暴中，MVP 决定只调整 structured event 内容加载：PC client 不再依赖 `apps/pc-client/src/content/generated/eventContentManifest.ts`，改为通过 `content/events/manifest.json` + Vite `import.meta.glob` 加载 event definitions / call templates / presets。crew、items、maps、map objects、universal actions 等其他 content 类型暂时保持现有加载方式。
+
+**后续要补充的能力**：
+
+- 统一所有 `content/` 加载模式：评估是否把 crew、items、maps、map objects、tilesets、universal actions 等也迁移到 manifest / glob / registry 驱动，减少手写 import 与生成文件。
+- content loader 迁移策略：如果未来范围较大，设计 generated loader 与 glob loader 的兼容期、迁移检查、回滚方式和测试覆盖。
+- content HMR / editor 联动：评估 editor 保存内容后，PC dev server 是否能稳定感知新增文件、manifest 更新和热更新边界。
+- manifest 责任边界：统一定义哪些内容必须出现在 manifest / registry，哪些允许目录扫描，避免不同内容类型各自演化出不一致规则。
+- 其他编辑器迁移：当 Character / Item / NPC 等 editor 从只读或未实现走向 authoring 时，统一评估它们是否也应采用 manifest / registry / glob 驱动的内容发现与保存边界，避免每个 editor 维护一套互不兼容的 loader 规则。
+
+本轮不做全仓 content loader 统一，也不保留 event generated TS 与 glob loader 的长期双轨；先只解决 Event Editor 新建 domain 时不应修改 generated TypeScript 的问题。
+
 ## Wiki 索引页 / 子系统总览（已收口于 audit-wiki skill）
 
 **当前状态**：已由 `audit-wiki` skill 处理。
