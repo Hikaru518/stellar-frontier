@@ -804,7 +804,7 @@ function createInitialGameState(): GameState {
   const now = new Date().toISOString();
   const emptyEventState = createEmptyEventRuntimeState();
 
-  if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
+  if (saved && isSavedBaselineCompatible(saved) && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       const normalizedMember = normalizeCrewMember(member as CrewMember, initialMember as CrewMember);
@@ -859,6 +859,14 @@ function createInitialGameState(): GameState {
   };
 
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
+}
+
+function isSavedBaselineCompatible(saved: SavedGameState) {
+  if (!saved.map || typeof saved.map !== "object") {
+    return false;
+  }
+
+  return saved.map.configId === defaultMapConfig.id && saved.map.configVersion === defaultMapConfig.version;
 }
 
 function getMoveTargetSelectionLabel(_map: GameMapState, tileId: string) {

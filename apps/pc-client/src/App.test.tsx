@@ -45,9 +45,9 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
       },
     ],
     baseInventory: [],
-    map: {
-      configId: "default-map",
-      configVersion: 1,
+      map: {
+        configId: "default-map",
+        configVersion: 2,
       rows: 8,
       cols: 8,
       originTileId: "4-4",
@@ -138,6 +138,44 @@ describe("App", () => {
     expect(saved.elapsedGameSeconds).toBe(0);
     expect(saved.map.originTileId).toBe("4-4");
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike"]);
+  });
+
+  it("ignores compatible-schema saves whose authored map baseline is outdated", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          elapsedGameSeconds: 999,
+          crew: [
+            {
+              ...createSavedCrashSiteState().crew[0],
+              currentTile: "1-1",
+              location: "起点",
+              coord: "(-3,3)",
+            },
+          ],
+          map: {
+            ...(createSavedCrashSiteState().map as Record<string, unknown>),
+            configVersion: 1,
+            discoveredTileIds: ["1-1"],
+            tilesById: {
+              "1-1": {
+                discovered: true,
+                investigated: false,
+                revealedObjectIds: [],
+              },
+            },
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(saved.elapsedGameSeconds).toBe(0);
+    expect(saved.map.originTileId).toBe("4-4");
+    expect((saved.crew as Array<{ currentTile: string }>)[0]?.currentTile).toBe("4-4");
   });
 
   it("shows one crew card in the communication station and an empty inventory modal", () => {

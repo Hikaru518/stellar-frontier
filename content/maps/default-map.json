@@ -2,7 +2,7 @@
   "$schema": "../schemas/maps.schema.json",
   "id": "default-map",
   "name": "Blank Map",
-  "version": 1,
+  "version": 2,
   "size": {
     "rows": 8,
     "cols": 8
