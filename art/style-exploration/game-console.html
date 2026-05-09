@@ -1,0 +1,1490 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Final Hybrid Console</title>
+  <style>
+    :root {
+      --room: #17130f;
+      --shell-dark: #241d16;
+      --shell-mid: #30261c;
+      --shell-light: #3a2d21;
+      --shell-ink: #e7d0a4;
+      --shell-ink-soft: #8f7a5d;
+      --trim: #9b6a3b;
+      --trim-soft: rgba(197, 138, 76, 0.42);
+      --ink: #120f0c;
+      --green: #78ff9a;
+      --green-dim: #2f9f57;
+      --green-soft: #5dc57a;
+      --green-bright: #a9ffbe;
+      --apple-cream: #f6f0c3;
+      --apple-amber: #ffb85a;
+      --apple-cyan: #72d7ff;
+      --apple-blue: #5b88ff;
+      --apple-magenta: #ff79b0;
+      --apple-lime: #9bff83;
+      --crt-bg: #071109;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 16%, rgba(240, 166, 77, 0.13), transparent 34%),
+        linear-gradient(135deg, #201610 0%, #17130f 48%, #0e1110 100%);
+      color: var(--shell-ink);
+      font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Courier New", monospace;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 30;
+      background:
+        repeating-linear-gradient(0deg, rgba(231, 208, 164, 0.05) 0 1px, transparent 1px 4px),
+        radial-gradient(circle at center, transparent 66%, rgba(0, 0, 0, 0.28));
+      mix-blend-mode: screen;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .console {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      width: 100vw;
+      height: 100svh;
+      padding: 14px;
+      background:
+        linear-gradient(90deg, rgba(240, 166, 77, 0.045) 1px, transparent 1px),
+        linear-gradient(rgba(240, 166, 77, 0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    .topbar,
+    .footer,
+    .panel,
+    .display-case {
+      border: 2px solid var(--trim);
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.42) inset,
+        0 16px 34px rgba(0, 0, 0, 0.28);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) auto minmax(260px, 0.8fr);
+      gap: 14px;
+      align-items: center;
+      min-height: 78px;
+      padding: 12px 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 204, 126, 0.06), transparent 60%),
+        var(--shell-mid);
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      margin-top: 5px;
+      color: #f0a64d;
+      font-size: clamp(22px, 3vw, 36px);
+      letter-spacing: 0;
+      text-shadow: 0 0 14px rgba(240, 166, 77, 0.28);
+    }
+
+    .kicker,
+    .label,
+    .tiny {
+      color: var(--shell-ink-soft);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .system-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(72px, 1fr));
+      gap: 8px;
+      min-width: 410px;
+    }
+
+    .readout {
+      border: 1px solid var(--trim-soft);
+      background: #15120e;
+      padding: 8px;
+    }
+
+    .readout strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--shell-ink);
+      font-size: 14px;
+    }
+
+    .signal-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(155, 106, 59, 0.28);
+      color: #74a6a6;
+      font-size: 12px;
+    }
+
+    .signal-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 160px;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .signal-copy {
+      display: grid;
+      gap: 0;
+      min-width: 0;
+    }
+
+    .signal-copy strong,
+    .scope-readout span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scope-box {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .scope-canvas {
+      width: 100%;
+      height: 44px;
+      border: 1px solid rgba(155, 106, 59, 0.34);
+      background:
+        radial-gradient(circle, rgba(21, 23, 19, 0.18) 1px, transparent 1px),
+        #15120e;
+      background-size: 5px 5px;
+      image-rendering: pixelated;
+    }
+
+    .scope-readout {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      color: #74a6a6;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.72fr) minmax(560px, 1.9fr) minmax(250px, 0.86fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    .panel.mode {
+      background:
+        radial-gradient(circle, rgba(240, 166, 77, 0.07) 1px, transparent 1px),
+        var(--shell-light);
+      background-size: 8px 8px;
+    }
+
+    .panel.crew {
+      background:
+        repeating-linear-gradient(0deg, rgba(231, 208, 164, 0.04) 0 1px, transparent 1px 5px),
+        color-mix(in srgb, var(--shell-mid) 78%, #17130f 22%);
+      background-size: auto;
+    }
+
+    .panel.events {
+      background:
+        radial-gradient(circle at 35% 20%, rgba(240, 166, 77, 0.08), transparent 45%),
+        color-mix(in srgb, var(--shell-mid) 70%, #14110d 30%);
+      background-size: auto;
+    }
+
+    .panel.telemetry {
+      background:
+        repeating-linear-gradient(90deg, rgba(231, 208, 164, 0.035) 0 1px, transparent 1px 7px),
+        color-mix(in srgb, var(--shell-mid) 74%, #12100d 26%);
+      background-size: auto;
+    }
+
+    .panel h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: #f0a64d;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .panel h2::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--trim-soft), transparent);
+    }
+
+    .control-list,
+    .case-list,
+    .telemetry-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .button,
+    .event-button {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 38px;
+      border: 1px solid rgba(155, 106, 59, 0.5);
+      background: #18130f;
+      color: var(--shell-ink);
+      padding: 7px 8px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+    }
+
+    .button:hover,
+    .event-button:hover,
+    .button[aria-pressed="true"],
+    .event-button[aria-pressed="true"] {
+      border-color: #f0a64d;
+      color: #f0a64d;
+      background: #221a13;
+      box-shadow: 0 0 12px rgba(240, 166, 77, 0.16) inset;
+    }
+
+    .lamp {
+      width: 10px;
+      height: 10px;
+      border: 1px solid rgba(173, 255, 194, 0.75);
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(120, 255, 154, 0.74);
+    }
+
+    .button[aria-pressed="false"] .lamp,
+    .event-button[aria-pressed="false"] .lamp {
+      background: #4d4235;
+      box-shadow: none;
+    }
+
+    .button small,
+    .event-button small {
+      color: #8f7a5d;
+      font-size: 10px;
+    }
+
+    .crew-card,
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(155, 106, 59, 0.3);
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(155, 106, 59, 0.54);
+      background: rgba(27, 23, 19, 0.42);
+      color: #f0a64d;
+      font-weight: 700;
+    }
+
+    .crew-card strong,
+    .telemetry-row strong {
+      display: block;
+      color: var(--shell-ink);
+      font-size: 12px;
+    }
+
+    .crew-card span,
+    .telemetry-row span {
+      color: var(--shell-ink-soft);
+      font-size: 11px;
+    }
+
+    .display-case {
+      position: relative;
+      display: flex;
+      min-height: 0;
+      padding: 15px;
+      border-color: rgba(155, 106, 59, 0.62);
+      background:
+        linear-gradient(180deg, rgba(255, 204, 126, 0.06), transparent 42%),
+        color-mix(in srgb, var(--shell-dark) 78%, #120f0c 22%);
+    }
+
+    .display-case::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      pointer-events: none;
+      border: 1px solid rgba(24, 19, 15, 0.58);
+    }
+
+    .bezel {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      flex: 1 1 auto;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      border: 18px solid #4a4439;
+      border-radius: 14px 14px 10px 10px;
+      background: var(--crt-bg);
+      box-shadow:
+        0 0 0 2px #2c2924 inset,
+        0 0 36px rgba(0, 0, 0, 0.52) inset,
+        0 18px 38px rgba(0, 0, 0, 0.32);
+    }
+
+    .bezel::before {
+      content: "APPLE ][ SITUATION DISPLAY";
+      position: absolute;
+      left: 18px;
+      top: -14px;
+      z-index: 3;
+      padding: 0 8px;
+      background: color-mix(in srgb, var(--shell-dark) 70%, #2a2119 30%);
+      color: var(--shell-ink);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .screen-head,
+    .screen-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 42px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(246, 240, 195, 0.16);
+      background:
+        linear-gradient(180deg, rgba(246, 240, 195, 0.05), transparent),
+        #09140c;
+      color: var(--apple-cream);
+      z-index: 2;
+    }
+
+    .screen-foot {
+      border-top: 1px solid rgba(246, 240, 195, 0.16);
+      border-bottom: 0;
+    }
+
+    .apple-screen {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      padding: 18px 22px;
+      --glitch-shift: 0px;
+      --glitch-band: 46%;
+      --glitch-opacity: 0;
+      background:
+        radial-gradient(circle at 46% 38%, rgba(114, 215, 255, 0.07), transparent 34%),
+        radial-gradient(circle at 58% 64%, rgba(255, 184, 90, 0.06), transparent 28%),
+        linear-gradient(180deg, #102515, #071109);
+      color: var(--apple-lime);
+      user-select: none;
+      cursor: crosshair;
+    }
+
+    .apple-screen::before,
+    .apple-screen::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .apple-screen::before {
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.16)),
+        repeating-linear-gradient(0deg, rgba(246, 240, 195, 0.055) 0 1px, transparent 1px 4px);
+      mix-blend-mode: screen;
+    }
+
+    .apple-screen::after {
+      background:
+        linear-gradient(
+          180deg,
+          transparent calc(var(--glitch-band) - 6%),
+          rgba(246, 240, 195, calc(var(--glitch-opacity) * 0.18)) calc(var(--glitch-band) - 2%),
+          rgba(255, 121, 176, calc(var(--glitch-opacity) * 0.12)) var(--glitch-band),
+          rgba(0, 0, 0, calc(var(--glitch-opacity) * 0.34)) calc(var(--glitch-band) + 5%),
+          transparent calc(var(--glitch-band) + 10%)
+        ),
+        radial-gradient(circle at center, transparent 66%, rgba(0, 0, 0, 0.34));
+    }
+
+    .apple-screen[data-glitch="on"] .screen-line:nth-child(odd) {
+      transform: translateX(var(--glitch-shift));
+    }
+
+    .apple-screen[data-glitch="on"] .screen-line:nth-child(3n) {
+      transform: translateX(calc(var(--glitch-shift) * -0.6));
+    }
+
+    .apple-screen[data-glitch="on"] {
+      filter: contrast(1.06) saturate(1.08);
+    }
+
+    .screen-line {
+      position: relative;
+      z-index: 1;
+      min-height: 16px;
+      white-space: pre;
+      font-size: 14px;
+      line-height: 16px;
+    }
+
+    .screen-line span {
+      display: inline;
+    }
+
+    .phosphor {
+      color: var(--apple-lime);
+      text-shadow: 0 0 7px rgba(155, 255, 131, 0.42);
+    }
+
+    .dim {
+      color: #4fa35d;
+      text-shadow: 0 0 5px rgba(79, 163, 93, 0.24);
+    }
+
+    .amber {
+      color: var(--apple-amber);
+      text-shadow: 0 0 8px rgba(255, 184, 90, 0.32);
+    }
+
+    .cyan {
+      color: var(--apple-cyan);
+      text-shadow: 0 0 8px rgba(114, 215, 255, 0.34);
+    }
+
+    .rose {
+      color: var(--apple-magenta);
+      text-shadow: 0 0 8px rgba(255, 121, 176, 0.32);
+    }
+
+    .blue {
+      color: var(--apple-blue);
+      text-shadow: 0 0 8px rgba(91, 136, 255, 0.32);
+    }
+
+    .cream {
+      color: var(--apple-cream);
+      text-shadow: 0 0 7px rgba(246, 240, 195, 0.28);
+    }
+
+    .footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      min-height: 58px;
+      padding: 10px 12px;
+      background:
+        linear-gradient(180deg, rgba(237, 215, 178, 0.18), transparent 60%),
+        color-mix(in srgb, var(--shell-mid) 84%, #211912 16%);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .tool {
+      min-width: 112px;
+      border: 1px solid rgba(155, 106, 59, 0.5);
+      background: #18130f;
+      color: var(--shell-ink);
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+    }
+
+    .tool:hover {
+      border-color: #f0a64d;
+      color: #f0a64d;
+      background: #241b14;
+    }
+
+    .tool:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 1050px) {
+      body {
+        overflow: auto;
+      }
+
+      .console {
+        height: auto;
+        min-height: 100svh;
+      }
+
+      .topbar,
+      .main,
+      .footer {
+        grid-template-columns: 1fr;
+      }
+
+      .system-strip {
+        min-width: 0;
+      }
+
+      .display-case {
+        min-height: 560px;
+      }
+
+      .screen-head,
+      .screen-foot {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .console {
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .topbar {
+        gap: 10px;
+      }
+
+      .system-strip {
+        grid-template-columns: repeat(2, minmax(92px, 1fr));
+      }
+
+      .main {
+        gap: 10px;
+      }
+
+      .display-case {
+        min-height: 500px;
+        padding: 12px;
+      }
+
+      .bezel {
+        border-width: 12px;
+      }
+
+      .apple-screen {
+        padding: 14px 14px;
+      }
+
+      .actions {
+        justify-content: stretch;
+      }
+
+      .tool {
+        flex: 1 1 32%;
+        min-width: 88px;
+      }
+
+      .screen-line {
+        font-size: 13px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .button,
+      .event-button,
+      .tool {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="console">
+    <header class="topbar">
+      <section>
+        <p class="kicker">STELLAR FRONTIER / FINAL STYLE DIRECTION</p>
+        <h1>控制中心操作台</h1>
+      </section>
+      <section class="system-strip">
+        <div class="readout"><span class="label">VIEW</span><strong id="viewReadout">MAP</strong></div>
+        <div class="readout"><span class="label">CASE</span><strong id="caseReadout">IAFS-1A</strong></div>
+        <div class="readout"><span class="label">LINK</span><strong>CRT-2E</strong></div>
+        <div class="readout"><span class="label">SYNC</span><strong id="syncReadout">072%</strong></div>
+      </section>
+      <section class="signal-panel">
+        <div class="signal-copy">
+          <div class="signal-line"><span>PHOSPHOR</span><strong>APPLE II CRT</strong></div>
+          <div class="signal-line"><span>CONTROL UI</span><strong>RETRO LOFI / BASE CONSOLE</strong></div>
+          <div class="signal-line"><span>LAYOUT</span><strong>MAIN / MAP / CALL / LOG</strong></div>
+        </div>
+        <div class="scope-box">
+          <canvas class="scope-canvas" id="scopeCanvas" aria-label="signal scope"></canvas>
+          <div class="scope-readout">
+            <span id="scopeMode">fax</span>
+            <span id="scopeLock">72%</span>
+          </div>
+        </div>
+      </section>
+    </header>
+
+    <section class="main">
+      <aside class="stack">
+        <section class="panel mode">
+          <h2>Interface View</h2>
+          <div class="control-list">
+            <button class="button" id="mainButton" type="button" aria-pressed="true"><span class="lamp"></span><span>前沿基地控制中心</span><small>MAIN</small></button>
+            <button class="button" id="mapButton" type="button" aria-pressed="false"><span class="lamp"></span><span>卫星雷达地图</span><small>MAP</small></button>
+            <button class="button" id="eventButton" type="button" aria-pressed="false"><span class="lamp"></span><span>通话事件界面</span><small>CALL</small></button>
+            <button class="button" id="logButton" type="button" aria-pressed="false"><span class="lamp"></span><span>事件日志记录</span><small>LOG</small></button>
+          </div>
+        </section>
+        <section class="panel crew">
+          <h2>Crew Link</h2>
+          <article class="crew-card"><span class="avatar">M</span><p><strong>Mike</strong><span>north ridge / route queued</span></p></article>
+          <article class="crew-card"><span class="avatar">A</span><p><strong>Amy</strong><span>thermal seam / sampling</span></p></article>
+          <article class="crew-card"><span class="avatar">G</span><p><strong>Garry</strong><span>relay shadow / low signal</span></p></article>
+        </section>
+      </aside>
+
+      <section class="display-case">
+        <section class="bezel">
+          <div class="screen-head">
+            <p><span class="label">CRT SITUATION MAP</span> <strong id="screenTitle">主线 1A / 坠毁倒计时</strong></p>
+            <p class="tiny" id="screenMeta">CLICK / DRAG / WHEEL</p>
+          </div>
+          <div class="apple-screen" id="appleScreen" aria-label="Apple II style situation display"></div>
+          <div class="screen-foot">
+            <p id="commandLine">] RUN MAP.BAS</p>
+            <p class="tiny" id="coordLine">CENTER 0.00,0.00 / ZOOM 1.00</p>
+          </div>
+        </section>
+      </section>
+
+      <aside class="stack">
+        <section class="panel events">
+          <h2 id="rightPanelTitle">Base Modules</h2>
+          <div class="case-list" id="caseList"></div>
+        </section>
+        <section class="panel telemetry">
+          <h2>Telemetry</h2>
+          <div class="telemetry-list">
+            <article class="telemetry-row"><span class="avatar">T</span><p><strong id="heatReadout">HEAT 0.72</strong><span>retro panel color test</span></p></article>
+            <article class="telemetry-row"><span class="avatar">S</span><p><strong id="signalReadout">SIGNAL 0.64</strong><span>phosphor contrast stable</span></p></article>
+            <article class="telemetry-row"><span class="avatar">R</span><p><strong id="riskReadout">RISK HIGH</strong><span>case-driven display tone</span></p></article>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <footer class="footer">
+      <p>
+        <strong id="footerStatus">] READY.</strong><br />
+        Retro lowfi game console with three switchable interfaces: main base, radar map, and event call page.
+      </p>
+      <div class="actions">
+        <button class="tool" id="zoomInButton" type="button">放大</button>
+        <button class="tool" id="zoomOutButton" type="button">缩小</button>
+        <button class="tool" id="centerButton" type="button">回中心</button>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const cases = [
+      {
+        id: "IAFS-1A",
+        label: "主线 1A",
+        title: "坠毁倒计时",
+        risk: "CRITICAL",
+        tone: "amber",
+        meta: "核心失压 / 备用电源临界 / 生命支持倒计时",
+        caption: "点名、分工、首轮回收：先活下来，再谈探索。",
+        art: [
+          "            __..----====----..__",
+          "       _.-'  _..--.  COCKPIT .--'",
+          "  _..-'__..-'  ___/\\___   _.-'",
+          " <___==___====/__/  \\__\\===>",
+          "      /__ WING PANEL _\\      ~~",
+          "  ___/____   IMPACT   ____\\___",
+          " /  /  /  \\__________/  \\  \\  \\",
+          "    FIRE: ####     HULL: 42%"
+        ]
+      },
+      {
+        id: "IAFS-3A",
+        label: "主线 3A",
+        title: "门域首次接触",
+        risk: "HIGH",
+        tone: "cyan",
+        meta: "潜入窗口 / 协议信道 / 强攻回路并列推演",
+        caption: "不是怎么过去，而是以怎样的身份过去。",
+        art: [
+          "        ________ GATE CROWN ________",
+          "      /|                              |\\",
+          "     /_|      ((  ((  ||  ))  ))      |_\\",
+          "       |       \\   \\  ||  /   /       |",
+          "       |        \\___\\_||_/___/        |",
+          "       |          [ CONTACT ]          |",
+          "      /_|__   PILON A    PILON B   __|_\\",
+          "     /____/________________________\\____\\"
+        ]
+      },
+      {
+        id: "IAFS-S08",
+        label: "支线 S08",
+        title: "盲区测绘",
+        risk: "MEDIUM",
+        tone: "blue",
+        meta: "外围警戒环 / 快扫与慢扫 / 低暴露潜入",
+        caption: "盲区不是没人巡逻，而是那几分钟对方以为不用巡逻。",
+        art: [
+          "  GRID A-13     WATCH ARC      GRID A-17",
+          "  |----|----|----|----|----|----|----|",
+          "  |  ^       relay tower       ^      |",
+          "  | / \\    . . . . . . .     / \\     |",
+          "  |  |   scout route ----->    |      |",
+          "  |  |      blind sector       |      |",
+          "  |____ depot shadow __________|______|",
+          "  EXPOSURE LOW / MAP ERROR 18%"
+        ]
+      },
+      {
+        id: "IAFS-S09",
+        label: "支线 S09",
+        title: "七拍语法",
+        risk: "MEDIUM",
+        tone: "cream",
+        meta: "采样 / 对照 / 共振发声器 / 实测误译风险",
+        caption: "最危险的不是听不懂，而是确信自己听懂了。",
+        art: [
+          "      SEVEN-BEAT RESONANCE TABLE",
+          "   | 1 | 2 | 3 | 4 | 5 | 6 | 7 |",
+          "   |---|---|---|---|---|---|---|",
+          "   | / | \\ | / | | | \\ | / | ! |",
+          "   |___|___|___|___|___|___|___|",
+          "        \\    PHRASE CORE    /",
+          "         \\__ SAMPLE LOOP __/",
+          "  MISTRANSLATION RISK: 31%"
+        ]
+      }
+    ];
+
+    const baseModules = [
+      { id: "COMM", label: "通讯台 / Communication Station", state: "READY" },
+      { id: "RADAR", label: "卫星雷达 / Map Uplink", state: "ONLINE" },
+      { id: "OPS", label: "任务态势 / Mission Board", state: "TRACKING" },
+      { id: "SUPPORT", label: "后勤支持 / Field Support", state: "QUEUE" }
+    ];
+
+    const crewStates = [
+      { name: "Mike", status: "north ridge / route queued" },
+      { name: "Amy", status: "thermal seam / sampling" },
+      { name: "Garry", status: "relay shadow / low signal" }
+    ];
+
+    const mapRegions = [
+      {
+        id: "ashfrost",
+        name: "灰烬霜带",
+        type: "REGION",
+        tone: "cream",
+        x1: -2.7,
+        y1: -2.7,
+        x2: 2.7,
+        y2: 2.7,
+        overlayChar: "+"
+      },
+      {
+        id: "frostbay",
+        name: "霜湾聚落",
+        type: "SETTLEMENT",
+        tone: "blue",
+        x1: -1.3,
+        y1: 2.7,
+        x2: 1.3,
+        y2: 4.3,
+        overlayChar: "~"
+      },
+      {
+        id: "cinderforge",
+        name: "烬炉城寨",
+        type: "SETTLEMENT",
+        tone: "amber",
+        x1: -1.3,
+        y1: -4.3,
+        x2: 1.3,
+        y2: -2.7,
+        overlayChar: "="
+      },
+      {
+        id: "gate-realm",
+        name: "门域",
+        type: "ZONE",
+        tone: "rose",
+        x1: 1.0,
+        y1: 0.7,
+        x2: 5.0,
+        y2: 4.7,
+        overlayChar: "*"
+      }
+    ];
+
+    const mapFeatures = [
+      { id: "crash", name: "坠毁初始落点", short: "CRASH", type: "SITE", tone: "rose", x: 0, y: 0, icon: "@", info: "灰烬霜带中心，主线开场点。" },
+      { id: "scavenger", name: "拾荒营地", short: "SCAV", type: "OUTPOST", tone: "amber", x: 0.33, y: 0.67, icon: "S", info: "灰烬霜带内部临时据点，支线 03 到达点。" },
+      { id: "old-route", name: "灰烬霜带旧路", short: "ROUTE", type: "PATH", tone: "cream", x: 0, y: 1.33, icon: "/", info: "连接霜湾与烬炉的旧边界通道。" },
+      { id: "frostbay", name: "霜湾聚落", short: "FROST", type: "SETTLEMENT", tone: "blue", x: 0, y: 3.33, icon: "F", info: "冷端稳健落脚点，霜湾侧主聚落。" },
+      { id: "windbarrier", name: "风障塔列", short: "TOWER", type: "TOWER", tone: "cyan", x: -1.33, y: 4.67, icon: "T", info: "霜湾外缘观测线，风向与窗口预判数据源。" },
+      { id: "stilltide", name: "静潮仓", short: "DEPOT", type: "DEPOT", tone: "cream", x: 1.0, y: 3.0, icon: "D", info: "霜湾后勤区，补给与断供记录节点。" },
+      { id: "cinderforge", name: "烬炉城寨", short: "CINDER", type: "SETTLEMENT", tone: "amber", x: 0, y: -3.33, icon: "C", info: "热端推进点，锻造与激进扩张中心。" },
+      { id: "meltwell", name: "熔井回廊", short: "MELT", type: "INDUSTRY", tone: "amber", x: -1.33, y: -4.67, icon: "M", info: "烬炉中层矿道核心，热流脉冲日志区。" },
+      { id: "ashbridge", name: "灰桥驿台", short: "BRIDGE", type: "RELAY", tone: "cyan", x: 1.0, y: -3.0, icon: "R", info: "烬炉外联与撤离节点。" },
+      { id: "outer", name: "门域外围警戒环", short: "OUTER", type: "PERIM", tone: "rose", x: 2.33, y: 2.0, icon: "O", info: "高巡逻密度，用于盲区测绘与试探行动。" },
+      { id: "patrol", name: "巡逻回廊", short: "PATROL", type: "CORRIDOR", tone: "cyan", x: 3.17, y: 2.5, icon: "P", info: "巡逻路径重叠区，失败易触发追击。" },
+      { id: "transition", name: "节律过渡带", short: "RHYTHM", type: "BAND", tone: "cream", x: 3.5, y: 2.83, icon: "B", info: "七拍语法实测区，误译会抬升警戒。" },
+      { id: "control", name: "核心控制结点", short: "NEXUS", type: "CORE", tone: "rose", x: 4.33, y: 4.0, icon: "N", info: "驱逐线封停目标点，可短时夺取控制权。" }
+    ];
+
+    const appleScreen = document.getElementById("appleScreen");
+    const scopeCanvas = document.getElementById("scopeCanvas");
+    const scopeCtx = scopeCanvas.getContext("2d");
+    const caseList = document.getElementById("caseList");
+    const mainButton = document.getElementById("mainButton");
+    const mapButton = document.getElementById("mapButton");
+    const eventButton = document.getElementById("eventButton");
+    const logButton = document.getElementById("logButton");
+    const rightPanelTitle = document.getElementById("rightPanelTitle");
+    const screenTitle = document.getElementById("screenTitle");
+    const screenMeta = document.getElementById("screenMeta");
+    const commandLine = document.getElementById("commandLine");
+    const coordLine = document.getElementById("coordLine");
+    const footerStatus = document.getElementById("footerStatus");
+    const viewReadout = document.getElementById("viewReadout");
+    const caseReadout = document.getElementById("caseReadout");
+    const syncReadout = document.getElementById("syncReadout");
+    const heatReadout = document.getElementById("heatReadout");
+    const signalReadout = document.getElementById("signalReadout");
+    const riskReadout = document.getElementById("riskReadout");
+    const scopeMode = document.getElementById("scopeMode");
+    const scopeLock = document.getElementById("scopeLock");
+
+    const state = {
+      view: "main",
+      selectedCase: 0,
+      grid: true,
+      pulse: true,
+      x: 0,
+      y: 0,
+      zoom: 1,
+      marker: { x: 2.3, y: -1.4 },
+      dragging: null,
+      frame: 0
+    };
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (prefersReducedMotion.matches) {
+      state.pulse = false;
+    }
+
+    function resizeScope() {
+      const rect = scopeCanvas.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      scopeCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      scopeCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      scopeCtx.imageSmoothingEnabled = false;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function toneForHeight(value) {
+      if (value < -0.56) return { char: ".", tone: "dim" };
+      if (value < -0.28) return { char: ":", tone: "dim" };
+      if (value < -0.08) return { char: "-", tone: "phosphor" };
+      if (value < 0.16) return { char: "+", tone: "phosphor" };
+      if (value < 0.4) return { char: "#", tone: "phosphor" };
+      return { char: "@", tone: "phosphor" };
+    }
+
+    function noise(x, y) {
+      return Math.sin(x * 1.12) * 0.44 +
+        Math.cos(y * 1.46 - x * 0.25) * 0.28 +
+        Math.sin((x + y) * 0.72) * 0.22;
+    }
+
+    function line(text = "", tone = "phosphor", segments = null) {
+      return { text, tone, segments };
+    }
+
+    function renderLine(row) {
+      const div = document.createElement("div");
+      div.className = `screen-line ${row.tone || "phosphor"}`;
+      if (row.segments) {
+        row.segments.forEach((segment) => {
+          const span = document.createElement("span");
+          span.className = segment.tone;
+          span.textContent = segment.text;
+          div.appendChild(span);
+        });
+      } else {
+        div.textContent = row.text;
+      }
+      return div;
+    }
+
+    function measureGrid() {
+      const rect = appleScreen.getBoundingClientRect();
+      const cols = clamp(Math.floor((rect.width - 44) / 8.4), 48, 118);
+      const rows = clamp(Math.floor((rect.height - 36) / 16) - 6, 18, 44);
+      return { cols, rows };
+    }
+
+    function targetLineCount() {
+      const rect = appleScreen.getBoundingClientRect();
+      return clamp(Math.floor((rect.height - 12) / 16), 18, 44);
+    }
+
+    function pointInRegion(wx, wy, region) {
+      return wx >= region.x1 && wx <= region.x2 && wy >= region.y1 && wy <= region.y2;
+    }
+
+    function nearestFeature(point) {
+      let nearest = null;
+      let bestDistance = Infinity;
+      mapFeatures.forEach((feature) => {
+        const distance = Math.hypot(point.x - feature.x, point.y - feature.y);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          nearest = feature;
+        }
+      });
+      return { feature: nearest, distance: bestDistance };
+    }
+
+    function drawMap() {
+      const { cols, rows } = measureGrid();
+      const inner = cols - 2;
+      const markerX = Math.floor((state.marker.x - state.x) * 8.5 * state.zoom + inner / 2);
+      const markerY = Math.floor((state.marker.y - state.y) * 5.8 * state.zoom + rows / 2);
+      const lines = [
+        line("] RUN SITUATION-MAP.BAS", "amber"),
+        line(`CENTER ${state.x.toFixed(2)},${state.y.toFixed(2)}  ZOOM ${state.zoom.toFixed(2)}  CLICK/DRAG/WHEEL`, "cyan"),
+        line("+" + "-".repeat(inner) + "+", "dim")
+      ];
+
+      for (let r = 0; r < rows; r += 1) {
+        const segments = [{ text: "|", tone: "dim" }];
+        for (let c = 0; c < inner; c += 1) {
+          const wx = state.x + (c - inner / 2) / (8.5 * state.zoom);
+          const wy = state.y + (r - rows / 2) / (5.8 * state.zoom);
+          const value = noise(wx, wy);
+          const route = Math.abs(wy - Math.sin(wx * 0.86) * 0.72);
+          const ridge = Math.abs(value * 6 - Math.round(value * 6));
+          const beacon = Math.abs(Math.hypot(c - markerX, r - markerY) - 4.5);
+          const region = mapRegions.find((item) => pointInRegion(wx, wy, item));
+          const feature = mapFeatures.find((item) => Math.abs(wx - item.x) < 0.14 / state.zoom && Math.abs(wy - item.y) < 0.16 / state.zoom);
+          let cell = toneForHeight(value);
+          if (ridge < 0.05 && value > -0.4) cell = { char: ":", tone: "dim" };
+          if (region && value > -0.5) cell = { char: region.overlayChar, tone: region.tone };
+          if (state.grid && (c % 12 === 0 || r % 6 === 0)) cell = { char: c % 12 === 0 ? ":" : "-", tone: "dim" };
+          if (route < 0.075) cell = { char: "=", tone: "amber" };
+          if (state.pulse && beacon < 0.45) cell = { char: "o", tone: "cyan" };
+          if (state.pulse && Math.abs(c - markerX) <= 1 && r === markerY) cell = { char: "-", tone: "cyan" };
+          if (state.pulse && Math.abs(r - markerY) <= 1 && c === markerX) cell = { char: "|", tone: "cyan" };
+          if (feature) cell = { char: feature.icon, tone: feature.tone };
+          if (c === markerX && r === markerY) cell = { char: "@", tone: "rose" };
+          segments.push({ text: cell.char, tone: cell.tone });
+        }
+        segments.push({ text: "|", tone: "dim" });
+        lines.push(line("", "phosphor", segments));
+      }
+
+      const markerInfo = nearestFeature(state.marker);
+      lines.push(line("+" + "-".repeat(inner) + "+", "dim"));
+      lines.push(line("BASE MAP: PHOSPHOR CONTOUR / COLOR OVERLAY = REGION + STRUCTURE", "cream"));
+      lines.push(line(`MARKER ${state.marker.x.toFixed(2)},${state.marker.y.toFixed(2)} / ${markerInfo.feature ? `${markerInfo.feature.name} / ${markerInfo.feature.type}` : "NO FEATURE LOCK"}`, markerInfo.distance < 1.2 ? markerInfo.feature.tone : "amber"));
+      lines.push(line(markerInfo.distance < 1.2 ? `NOTE: ${markerInfo.feature.info}` : "NOTE: MOVE MARKER CLOSE TO A STRUCTURE FOR SITE READOUT.", markerInfo.distance < 1.2 ? "cream" : "dim"));
+      return lines;
+    }
+
+    function drawMain() {
+      return [
+        line("] RUN CONTROL-CENTER.BAS", "amber"),
+        line("BASE STATUS: FRONTIER OUTPOST / PRIMARY LOOP STABLE", "cyan"),
+        line(""),
+        line("[ FACILITIES ]", "dim"),
+        line("1) COMMUNICATION STATION ......... READY", "phosphor"),
+        line("2) SATELLITE RADAR MAP ........... ONLINE", "phosphor"),
+        line("3) MISSION BOARD ................. TRACKING", "phosphor"),
+        line("4) FIELD SUPPORT ................. QUEUE", "phosphor"),
+        line(""),
+        line("[ EVENT SITUATION ]", "dim"),
+        line(`ACTIVE CASE: ${cases[state.selectedCase].label} ${cases[state.selectedCase].title}`, "amber"),
+        line(`INCOMING PRIORITY: ${cases[state.selectedCase].risk}`, "rose"),
+        line(""),
+        line("[ CREW LINK ]", "dim"),
+        ...crewStates.map((member, index) => line(`${index + 1}) ${member.name.toUpperCase()}  ${member.status.toUpperCase()}`, "phosphor")),
+        line(""),
+        line("SHORTCUT: [M] MAIN  [R] MAP  [C] CALL  [L] LOG", "cyan"),
+        line("READY.", "phosphor")
+      ];
+    }
+
+    function drawEventScene() {
+      const item = cases[state.selectedCase];
+      const { cols } = measureGrid();
+      const inner = Math.max(52, cols - 2);
+      const topRule = "+-" + "[EVENT VIEW]".padEnd(Math.max(18, inner - 2), "-") + "+";
+      const divider = ".".repeat(inner + 2);
+      const infoWidth = Math.min(40, inner - 8);
+      const sceneWidth = inner - 4;
+      const pad = (text) => text.length >= sceneWidth ? text.slice(0, sceneWidth) : text + " ".repeat(sceneWidth - text.length);
+      const infoBox = [
+        "+-" + "[IAFS EVENT]".padEnd(infoWidth, "-") + "+",
+        `| ${`${item.label} / ${item.title}`.padEnd(infoWidth - 1, " ")}|`,
+        `| ${item.meta.padEnd(infoWidth - 1, " ")}|`,
+        `| ${item.caption.padEnd(infoWidth - 1, " ")}|`
+      ];
+
+      const scenes = {
+        "IAFS-1A": [
+          "              ^^^^^^^^                                  ",
+          "            ^^^^^^^^^^^                                 ",
+          "          ^^^^|^^^^^^^|                                 ",
+          "        ^^^^^^|^^^^^^^|^^^^            ##########        ",
+          "      ^^^^^^^^|^^^^^^^|^^^^^^          ##########        ",
+          "    ^^^^^^^^^^|^^^^^^^|^^^^^^^^        ##########        ",
+          "  :::::::::::::::::::::::::::::::   ~~                 **",
+          "::::::::::::::::::::::::::::::::::     \\__|__/      **  ",
+          "::::::::::::::::::::::::::::::::::      /_X_\\\\____***   ",
+          "::::::::::::::::::::::::::::::::::    _/__/ \\__\\\\       ",
+          "::::::::::::::::::::::::::::::::::      /____\\\\         ",
+          "::::::::::::::::::::::::::::::::::        oo            ",
+          "::::::::::::::::::::::::::::::::::                      "
+        ],
+        "IAFS-3A": [
+          "              ^^^^^^^                                   ",
+          "            ^^^^^^^^^                                  ",
+          "          ^^^^^^^^^^^             ##########            ",
+          "        ^^^^^^^^^^^^^^^           ##########            ",
+          "      ^^^^^^^^^^^^^^^^^^^         ##########            ",
+          "    ^^^^^^^^^^^^^^^^^^^^^^^                             ",
+          "::::::::::::::::::::::::::::::      .-----------.      ",
+          "::::::::::::::::::::::::::::::   .-'  .-===-.    '-.   ",
+          "::::::::::::::::::::::::::::::  /   .'  7|7  '.     \\  ",
+          ":::::::::::::::::::::::::::::: |   /  -- | --   \\    | ",
+          ":::::::::::::::::::::::::::::: |   \\   __|__    /    | ",
+          "::::::::::::::::::::::::::::::  \\   '._     _.'     /  ",
+          "::::::::::::::::::::::::::::::    '-.   '---'    .-'   "
+        ],
+        "IAFS-S08": [
+          "             ^^^^^^^                                   ",
+          "          ^^^^^^^^^^^^^                                ",
+          "       ^^^^^^^^^^^^^^^^^^^                             ",
+          "    ^^^^^^^^^^^^^^^^^^^^^^^^          +--+--+--+--+    ",
+          "  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^       |##|  |##|  |    ",
+          "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^      +--+--+--+--+    ",
+          "::::::::::::::::::::::::::::::        route: ....>     ",
+          "::::::::::::::::::::::::::::::   ~~~  blind slot       ",
+          "::::::::::::::::::::::::::::::      \\\\                * ",
+          "::::::::::::::::::::::::::::::       \\\\     tower   *  ",
+          "::::::::::::::::::::::::::::::        \\\\   ^       *   ",
+          "::::::::::::::::::::::::::::::         \\\\ / \\\\    *    ",
+          "::::::::::::::::::::::::::::::          depot shadow   "
+        ],
+        "IAFS-S09": [
+          "                ^^^^^^                                  ",
+          "            ^^^^^^^^^^^^^                               ",
+          "         ^^^^^^^^^^^^^^^^^^^                            ",
+          "      ^^^^^^^^^^^^^^^^^^^^^^^^^                         ",
+          "::::::::::::::::::::::::::::::      1 2 3 4 5 6 7      ",
+          "::::::::::::::::::::::::::::::      | | | | | | *      ",
+          "::::::::::::::::::::::::::::::   .-----------------.   ",
+          "::::::::::::::::::::::::::::::   | resonance rig   |   ",
+          "::::::::::::::::::::::::::::::   |  ))  ))  ))     |   ",
+          "::::::::::::::::::::::::::::::   '-----------------'   ",
+          "::::::::::::::::::::::::::::::      / phrase core \\    ",
+          "::::::::::::::::::::::::::::::     / sample loop  \\    ",
+          "::::::::::::::::::::::::::::::                        "
+        ]
+      };
+
+      const scene = scenes[item.id] || scenes["IAFS-1A"];
+      const rows = [
+        line(topRule, "cyan"),
+        line(`| ${`${item.label} / ${item.title}`.padEnd(inner - 1, " ")}|`, "cream"),
+        line(`|${divider.padEnd(inner + 1, ".")}|`, "dim"),
+        line("")
+      ];
+
+      infoBox.forEach((row, index) => {
+        rows.push(line(`   ${row}`, index === 0 ? "cyan" : index === 1 ? "cream" : index === 2 ? item.tone : "phosphor"));
+      });
+
+      rows.push(line(""));
+      scene.forEach((row) => rows.push(line(`  ${pad(row)}`, row.includes("#") ? "amber" : row.includes("*") ? "cream" : row.includes(":") ? "phosphor" : item.tone)));
+      rows.push(line(""));
+      rows.push(line(`  ${pad(`CALL OPEN / RISK ${item.risk} / ${item.caption}`)}`, "cyan"));
+      return rows;
+    }
+
+    function drawEventLog() {
+      const item = cases[state.selectedCase];
+      return [
+        line(`] LOAD ${item.id}`, "amber"),
+        line(`] RUN ${item.title.toUpperCase()}.BAS`, "amber"),
+        line(""),
+        line(`CASE: ${item.label} / ${item.title}`, "cyan"),
+        line(`RISK: ${item.risk}`, item.risk === "CRITICAL" || item.risk === "HIGH" ? "rose" : "cream"),
+        line("-".repeat(58), "dim"),
+        line(""),
+        ...item.art.map((text) => line(`      ${text}`, item.tone)),
+        line(""),
+        line(`META: ${item.meta}`, "phosphor"),
+        line(`NOTE: ${item.caption}`, "cream"),
+        line("1) RECORD EVIDENCE", "amber"),
+        line("2) DISPATCH CREW", "cyan"),
+        line("3) OPEN CALL CHANNEL", "rose"),
+        line(""),
+        line("READY.", "phosphor")
+      ];
+    }
+
+    function renderScreen() {
+      const rows = state.view === "main"
+        ? drawMain()
+        : state.view === "map"
+          ? drawMap()
+          : state.view === "event"
+            ? drawEventScene()
+            : drawEventLog();
+      const target = targetLineCount();
+      appleScreen.innerHTML = "";
+      while (rows.length < target) rows.push(line(""));
+      rows.forEach((row) => appleScreen.appendChild(renderLine(row)));
+    }
+
+    function setView(view) {
+      state.view = view;
+      updateUi();
+    }
+
+    function updateUi() {
+      const item = cases[state.selectedCase];
+      const inMap = state.view === "map";
+      const inEvent = state.view === "event";
+      const inLog = state.view === "log";
+      mainButton.setAttribute("aria-pressed", String(state.view === "main"));
+      mapButton.setAttribute("aria-pressed", String(inMap));
+      eventButton.setAttribute("aria-pressed", String(inEvent));
+      logButton.setAttribute("aria-pressed", String(inLog));
+      viewReadout.textContent = state.view.toUpperCase();
+      caseReadout.textContent = item.id;
+      syncReadout.textContent = `${Math.round(68 + Math.sin(state.frame * 0.04) * 7)}%`;
+      screenTitle.textContent = state.view === "main"
+        ? "前沿基地控制中心 / Frontline Base Control"
+        : state.view === "map"
+          ? "卫星雷达地图 / Satellite Radar"
+          : state.view === "event"
+            ? `${item.label} / ${item.title} / Live Call`
+            : `${item.label} / ${item.title} / Incident Log`;
+      screenMeta.textContent = state.view === "main"
+        ? "STATUS / FACILITY / EVENT OVERVIEW"
+        : state.view === "map"
+          ? "CLICK / DRAG / WHEEL"
+          : state.view === "event"
+            ? "ASCII EVENT SCENE / LIVE VISUAL RETURN"
+            : "TEXT LOG / EVIDENCE / CALL TRACE";
+      commandLine.textContent = state.view === "main"
+        ? "] RUN MAIN-CENTER.BAS"
+        : state.view === "map"
+          ? "] RUN MAP.BAS"
+          : state.view === "event"
+            ? `] RUN CALL-${item.id}.BAS`
+            : `] RUN LOG-${item.id}.BAS`;
+      coordLine.textContent = `CENTER ${state.x.toFixed(2)},${state.y.toFixed(2)} / ZOOM ${state.zoom.toFixed(2)}`;
+      footerStatus.textContent = state.view === "main"
+        ? "] MAIN READY: FRONTLINE CONTROL CENTER"
+        : state.view === "map"
+          ? "] MAP READY: SATELLITE RADAR"
+          : state.view === "event"
+            ? `] CALL READY: ${item.title}`
+            : `] LOG READY: ${item.title}`;
+      heatReadout.textContent = state.view === "main"
+        ? "POWER 0.81"
+        : state.view === "map"
+          ? `HEAT ${(0.62 + state.selectedCase * 0.08).toFixed(2)}`
+          : state.view === "event"
+            ? "VOICE LINK 0.76"
+            : "LOG DEPTH 0.68";
+      signalReadout.textContent = state.view === "main"
+        ? "UPLINK 0.74"
+        : state.view === "map"
+          ? `SIGNAL ${(0.72 - state.selectedCase * 0.04).toFixed(2)}`
+          : state.view === "event"
+            ? "CALL STABLE 0.68"
+            : "ARCHIVE 0.83";
+      riskReadout.textContent = state.view === "main"
+        ? "PRIORITY WATCH"
+        : state.view === "map"
+          ? `RISK ${item.risk}`
+          : state.view === "event"
+            ? `EVENT ${item.risk}`
+            : `LOG ${item.risk}`;
+
+      rightPanelTitle.textContent = state.view === "main" ? "Base Modules" : state.view === "map" ? "Radar Layers" : "Case Files";
+      scopeMode.textContent = state.view === "main" ? "fax" : state.view === "map" ? "scan" : state.view === "event" ? "echo" : "log";
+      scopeLock.textContent = syncReadout.textContent;
+      renderCases();
+      renderScreen();
+
+      document.getElementById("zoomInButton").disabled = !inMap;
+      document.getElementById("zoomOutButton").disabled = !inMap;
+      document.getElementById("centerButton").disabled = !inMap;
+    }
+
+    function updateGlitch() {
+      if (prefersReducedMotion.matches) {
+        appleScreen.dataset.glitch = "off";
+        appleScreen.style.setProperty("--glitch-shift", "0px");
+        appleScreen.style.setProperty("--glitch-band", "46%");
+        appleScreen.style.setProperty("--glitch-opacity", "0");
+        return;
+      }
+
+      const burst = state.frame % 118 < 7 || Math.sin(state.frame * 0.071) > 0.992;
+      appleScreen.dataset.glitch = burst ? "on" : "off";
+      appleScreen.style.setProperty("--glitch-shift", burst ? `${Math.round(Math.sin(state.frame * 1.7) * 3)}px` : "0px");
+      appleScreen.style.setProperty("--glitch-band", `${32 + (state.frame * 7) % 36}%`);
+      appleScreen.style.setProperty("--glitch-opacity", burst ? "1" : "0");
+    }
+
+    function drawScope() {
+      const w = scopeCanvas.width / Math.max(1, window.devicePixelRatio || 1);
+      const h = scopeCanvas.height / Math.max(1, window.devicePixelRatio || 1);
+      const tone = state.view === "event" ? "#ffb85a" : state.view === "log" ? "#f6f0c3" : "#72d7ff";
+      const fillTone = state.view === "event" ? "rgba(255,184,90,0.22)" : state.view === "log" ? "rgba(246,240,195,0.18)" : "rgba(114,215,255,0.18)";
+      const freq = 1.8 + state.selectedCase * 0.42 + (state.view === "map" ? 0.5 : state.view === "main" ? 0.16 : 0.28);
+
+      scopeCtx.fillStyle = "#15120e";
+      scopeCtx.fillRect(0, 0, w, h);
+
+      scopeCtx.strokeStyle = "rgba(116,166,166,0.16)";
+      scopeCtx.lineWidth = 1;
+      for (let x = 0; x < w; x += 16) {
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(x, 0);
+        scopeCtx.lineTo(x, h);
+        scopeCtx.stroke();
+      }
+      for (let y = 0; y < h; y += 10) {
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(0, y);
+        scopeCtx.lineTo(w, y);
+        scopeCtx.stroke();
+      }
+
+      const bandX = (state.frame * 1.7) % w;
+      scopeCtx.fillStyle = "rgba(240,166,77,0.12)";
+      scopeCtx.fillRect(bandX, 0, 4, h);
+
+      for (let x = 0; x < w; x += 3) {
+        const t = x / w;
+        const wave = Math.sin(t * Math.PI * 2 * freq + state.frame * 0.08);
+        const beat = Math.sin(t * Math.PI * (6 + state.selectedCase) - state.frame * 0.04);
+        const y = h / 2 + (wave * 0.28 + beat * 0.12) * h;
+        scopeCtx.fillStyle = fillTone;
+        scopeCtx.fillRect(x, Math.round(y / 3) * 3, 3, 3);
+        if ((x / 3 + Math.floor(state.frame * 0.6)) % 6 === 0) {
+          scopeCtx.fillStyle = tone;
+          scopeCtx.fillRect(x, Math.round(y / 3) * 3, 3, 3);
+        }
+      }
+    }
+
+    function renderCases() {
+      caseList.innerHTML = "";
+      if (state.view === "main") {
+        baseModules.forEach((module) => {
+          const button = document.createElement("button");
+          button.className = "event-button";
+          button.type = "button";
+          button.setAttribute("aria-pressed", "false");
+          button.innerHTML = `<span class="lamp"></span><span>${module.id} ${module.label}</span><small>${module.state}</small>`;
+          button.addEventListener("click", () => {
+            if (module.id === "RADAR") setView("map");
+            if (module.id === "COMM") setView("event");
+          });
+          caseList.appendChild(button);
+        });
+        return;
+      }
+
+      if (state.view === "map") {
+        const layers = [
+          { id: "L1", label: "地形基底 / TERRAIN", state: state.grid ? "ON" : "OFF" },
+          { id: "L2", label: "航线预测 / ROUTE", state: "ON" },
+          { id: "L3", label: "脉冲回波 / PULSE", state: state.pulse ? "ON" : "OFF" },
+          { id: "L4", label: "队员信标 / CREW BEACON", state: "ON" }
+        ];
+        layers.forEach((layer) => {
+          const button = document.createElement("button");
+          button.className = "event-button";
+          button.type = "button";
+          button.setAttribute("aria-pressed", String(layer.state === "ON"));
+          button.innerHTML = `<span class="lamp"></span><span>${layer.id} ${layer.label}</span><small>${layer.state}</small>`;
+          button.addEventListener("click", () => {
+            if (layer.id === "L1") state.grid = !state.grid;
+            if (layer.id === "L3") state.pulse = !state.pulse;
+            updateUi();
+          });
+          caseList.appendChild(button);
+        });
+        return;
+      }
+
+      cases.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.className = "event-button";
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(index === state.selectedCase));
+        button.innerHTML = `<span class="lamp"></span><span>${item.label} ${item.title}</span><small>${item.risk}</small>`;
+        button.addEventListener("click", () => {
+          state.selectedCase = index;
+          if (state.view !== "log") state.view = "event";
+          updateUi();
+        });
+        caseList.appendChild(button);
+      });
+    }
+
+    function pointerToMap(event) {
+      const rect = appleScreen.getBoundingClientRect();
+      const { cols, rows } = measureGrid();
+      const x = event.clientX - rect.left - 22;
+      const y = event.clientY - rect.top - 66;
+      return {
+        x: state.x + (x / Math.max(1, rect.width - 44) * (cols - 2) - (cols - 2) / 2) / (8.5 * state.zoom),
+        y: state.y + (y / Math.max(1, rect.height - 102) * rows - rows / 2) / (5.8 * state.zoom)
+      };
+    }
+
+    mainButton.addEventListener("click", () => setView("main"));
+    mapButton.addEventListener("click", () => setView("map"));
+    eventButton.addEventListener("click", () => setView("event"));
+    logButton.addEventListener("click", () => setView("log"));
+    document.getElementById("zoomInButton").addEventListener("click", () => {
+      state.zoom = clamp(state.zoom * 1.18, 0.6, 4);
+      updateUi();
+    });
+    document.getElementById("zoomOutButton").addEventListener("click", () => {
+      state.zoom = clamp(state.zoom / 1.18, 0.6, 4);
+      updateUi();
+    });
+    document.getElementById("centerButton").addEventListener("click", () => {
+      state.x = 0;
+      state.y = 0;
+      state.zoom = 1;
+      updateUi();
+    });
+
+    appleScreen.addEventListener("pointerdown", (event) => {
+      if (state.view !== "map") return;
+      event.preventDefault();
+      state.marker = pointerToMap(event);
+      state.dragging = { x: event.clientX, y: event.clientY };
+      appleScreen.setPointerCapture(event.pointerId);
+      updateUi();
+    });
+
+    appleScreen.addEventListener("pointermove", (event) => {
+      if (state.view !== "map" || !state.dragging) return;
+      const dx = event.clientX - state.dragging.x;
+      const dy = event.clientY - state.dragging.y;
+      state.dragging = { x: event.clientX, y: event.clientY };
+      state.x -= dx / (66 * state.zoom);
+      state.y -= dy / (44 * state.zoom);
+      updateUi();
+    });
+
+    appleScreen.addEventListener("pointerup", (event) => {
+      state.dragging = null;
+      if (appleScreen.hasPointerCapture(event.pointerId)) appleScreen.releasePointerCapture(event.pointerId);
+    });
+
+    appleScreen.addEventListener("wheel", (event) => {
+      if (state.view !== "map") return;
+      event.preventDefault();
+      state.zoom = clamp(state.zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12), 0.6, 4);
+      updateUi();
+    }, { passive: false });
+
+    window.addEventListener("resize", () => {
+      resizeScope();
+      updateUi();
+    });
+
+    function tick() {
+      state.frame += prefersReducedMotion.matches ? 0.25 : 1;
+      updateGlitch();
+      drawScope();
+      if (state.frame % (prefersReducedMotion.matches ? 18 : 6) < 1) updateUi();
+      requestAnimationFrame(tick);
+    }
+
+    resizeScope();
+    updateUi();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
