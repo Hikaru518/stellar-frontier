@@ -293,173 +293,6 @@ describe("App", () => {
     expect(saved.tiles).toHaveLength(64);
   });
 
-  it("settles Garry gathering on a mineral_deposit tile into Garry's inventory", () => {
-    vi.useFakeTimers();
-    const mineralTile = findTileWithObjectTag("mineral_deposit");
-    const action = garryGatherAction(mineralTile.id, "iron-ridge-deposit");
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [{ id: "garry", currentTile: mineralTile.id, hasIncoming: false }],
-        tiles: initialTiles,
-        map: createMapWithDiscoveredTiles(mineralTile.id),
-        logs: initialLogs,
-        resources: initialResources,
-        crew_actions: { [action.id]: action },
-      })),
-    );
-
-    render(<App />);
-
-    const initialSaved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const initialGarry = savedCrew(initialSaved, "garry");
-    expect(initialGarry.currentTile).toBe(mineralTile.id);
-    expect(initialSaved.crew_actions[action.id]).toMatchObject({ type: "gather", target_tile_id: mineralTile.id });
-
-    act(() => {
-      vi.advanceTimersByTime(300_000);
-    });
-
-    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const garry = savedCrew(saved, "garry");
-    expect(garry.inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
-    expect(saved.resources.iron).toBe(1240);
-    expect(screen.getByText(/Garry 完成采集，获得 5 个 iron_ore/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
-    const contactsPanel = screen.getByText(/通讯录 ·/).closest("section");
-    expect(contactsPanel).not.toBeNull();
-    const garryCard = within(contactsPanel as HTMLElement).getByText("Garry，退休老大爷").closest("article");
-    expect(garryCard).not.toBeNull();
-    fireEvent.click(within(garryCard as HTMLElement).getByRole("button", { name: "查看背包" }));
-
-    expect(screen.getByRole("heading", { name: "Garry / 背包" })).toBeInTheDocument();
-    expect(screen.getByText("铁矿石")).toBeInTheDocument();
-    expect(screen.getByText("x9")).toBeInTheDocument();
-  });
-
-  it("creates and resolves Garry's mine anomaly call after gathering on a mineral_deposit tile", () => {
-    vi.useFakeTimers();
-    const mineralTile = findTileWithObjectTag("mineral_deposit");
-    const action = garryGatherAction(mineralTile.id, "iron-ridge-deposit");
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [{ id: "garry", currentTile: mineralTile.id, hasIncoming: false }],
-        tiles: initialTiles,
-        map: createMapWithDiscoveredTiles(mineralTile.id),
-        logs: initialLogs,
-        resources: initialResources,
-        crew_actions: { [action.id]: action },
-      })),
-    );
-
-    render(<App />);
-
-    act(() => {
-      vi.advanceTimersByTime(300_000);
-    });
-
-    const gathered = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const mineEvent = findRuntimeEvent(gathered, "mine_anomaly_report");
-    expect(mineEvent).toBeDefined();
-    const mineCall = gathered.active_calls[mineEvent?.active_call_id ?? ""];
-    expect(mineCall).toMatchObject({
-      crew_id: "garry",
-      status: "awaiting_choice",
-    });
-    expect(mineCall.severity ?? mineCall.render_context_snapshot?.severity).not.toBe("high");
-
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
-    const runtimeCallPanel = screen.getByText("事件通话 · 1 条").closest("section");
-    expect(runtimeCallPanel).not.toBeNull();
-    expect(within(runtimeCallPanel as HTMLElement).getByText("普通")).toBeInTheDocument();
-    fireEvent.click(within(runtimeCallPanel as HTMLElement).getByRole("button", { name: "接通" }));
-
-    expect(screen.getByText(`Garry 报告 ${mineralTile.id} 的矿脉深处传来异常空声。`)).toBeInTheDocument();
-    expect(screen.getByText("敲击回波不像实心矿体，更像有一段被掏空的裂腔。")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "记录矿脉异常，采矿流程保持不变。" }));
-
-    const resolved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    const garry = savedCrew(resolved, "garry");
-    expect(resolved.event_logs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ summary: "Garry 记录了铁脊矿带矿脉中的异常空声。" }),
-      ]),
-    );
-    expect(garry.conditions).toContain("noted_mine_anomaly");
-    expect(garry.inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
-  });
-
-  it("does not create Garry's mine anomaly call when gathering lacks the mineral_deposit tag", () => {
-    vi.useFakeTimers();
-    const untaggedIronObject = mapObjectDefinitionById.get("iron-ridge-outcrop");
-    expect(untaggedIronObject?.tags ?? []).not.toContain("mineral_deposit");
-    const untaggedIronTile = defaultMapConfig.tiles.find((tile) => tile.objectIds.includes("iron-ridge-outcrop"));
-    expect(untaggedIronTile).toBeDefined();
-    const action = garryGatherAction(untaggedIronTile!.id, "iron-ridge-outcrop", 180);
-
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [
-          {
-            id: "amy",
-            currentTile: untaggedIronTile?.id,
-            location: untaggedIronTile?.areaName,
-            coord: `(${untaggedIronTile?.row},${untaggedIronTile?.col})`,
-            status: "裸露矿床采集中。",
-            statusTone: "accent",
-            hasIncoming: false,
-          },
-        ],
-        tiles: initialTiles,
-        map: createMapWithDiscoveredTiles(untaggedIronTile?.id ?? "3-4"),
-        logs: initialLogs,
-        resources: initialResources,
-        crew_actions: { [action.id]: action },
-      })),
-    );
-
-    render(<App />);
-
-    act(() => {
-      vi.advanceTimersByTime(180_000);
-    });
-
-    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
-    expect(findRuntimeEvent(saved, "mine_anomaly_report")).toBeUndefined();
-    expect(savedCrew(saved, "garry").inventory).toContainEqual({ itemId: "iron_ore", quantity: 9 });
-  });
-
-  it("does not expose removed object survey as a call decision", () => {
-    vi.useFakeTimers();
-    const mineralTile = findTileWithObjectTag("mineral_deposit");
-    window.localStorage.setItem(
-      GAME_SAVE_KEY,
-      JSON.stringify(createCompatibleSavedGameState({
-        elapsedGameSeconds: 0,
-        crew: [
-          {
-            id: "garry",
-            currentTile: mineralTile.id,
-            location: mineralTile.areaName,
-            coord: `(${mineralTile.row},${mineralTile.col})`,
-            status: "矿带待命。",
-            statusTone: "neutral",
-            hasIncoming: false,
-            activeAction: null,
-          },
-        ],
-        tiles: initialTiles,
-        map: createMapWithDiscoveredTiles(mineralTile.id),
-        logs: initialLogs,
-        resources: initialResources,
-      })),
-    );
 
   it("dispatches a repair selection into a timed repair crew action", () => {
     window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
@@ -679,3 +512,333 @@ describe("App", () => {
     expect(repairedResult.reason).toContain("已经修复");
   });
 });
+
+function lastElement<T>(items: T[]): T {
+  return items[items.length - 1];
+}
+
+type SavedCrewForTest = {
+  id: string;
+  currentTile?: string;
+  activeAction?: Record<string, unknown>;
+  inventory?: Array<{ itemId: string; quantity: number }>;
+  unavailable?: boolean;
+  conditions?: string[];
+};
+
+function savedCrew(saved: { crew?: SavedCrewForTest[] }, crewId: string) {
+  const member = saved.crew?.find((item) => item.id === crewId);
+  expect(member).toBeDefined();
+  return member!;
+}
+
+function hasCrewItemCondition(itemId: string, minQuantity = 1) {
+  return {
+    type: "inventory_has_item" as const,
+    target: { type: "crew_inventory" as const },
+    value: itemId,
+    params: { min_quantity: minQuantity },
+  };
+}
+
+function addCrewItemEffect(itemId: string, quantity: number): Effect {
+  return inventoryEffect("add_item", itemId, quantity);
+}
+
+function removeCrewItemEffect(itemId: string, quantity: number): Effect {
+  return inventoryEffect("remove_item", itemId, quantity);
+}
+
+function inventoryEffect(type: "add_item" | "remove_item", itemId: string, quantity: number): Effect {
+  return {
+    id: `${type}:${itemId}`,
+    type,
+    target: { type: "crew_inventory" },
+    params: { item_id: itemId, quantity },
+    failure_policy: "fail_event",
+    record_policy: { write_event_log: false, write_world_history: false },
+  };
+}
+
+function findRuntimeEvent(saved: { active_events?: Record<string, unknown> }, eventDefinitionId: string) {
+  return Object.values(saved.active_events ?? {}).find(
+    (event) => (event as { event_definition_id: string }).event_definition_id === eventDefinitionId,
+  ) as { active_call_id: string | null } | undefined;
+}
+
+function readSavedGameState() {
+  return JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+}
+
+function findSavedEvent(saved: { active_events?: Record<string, unknown> }, eventDefinitionId: string) {
+  const event = Object.values(saved.active_events ?? {}).find(
+    (item) => (item as { event_definition_id?: string }).event_definition_id === eventDefinitionId,
+  );
+  expect(event).toBeDefined();
+  return event as {
+    active_call_id?: string | null;
+    blocking_claim_ids: string[];
+    current_node_id: string;
+    status: string;
+  };
+}
+
+function startAmyBeastEmergencyFromSurvey() {
+  window.localStorage.setItem(
+    GAME_SAVE_KEY,
+    JSON.stringify(createCompatibleSavedGameState({
+      elapsedGameSeconds: 0,
+      crew: [
+        {
+          id: "amy",
+          currentTile: "2-3",
+          location: "森林 / 山",
+          coord: "(2,3)",
+          status: "森林边缘待命。",
+          statusTone: "neutral",
+          hasIncoming: false,
+          canCommunicate: true,
+          unavailable: false,
+          activeAction: null,
+        },
+      ],
+      tiles: initialTiles,
+      map: createInitialMapState(),
+      logs: initialLogs,
+      resources: initialResources,
+    })),
+  );
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+  const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
+  expect(amyCard).not.toBeNull();
+  fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));
+  fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
+}
+
+function findTileWithObjectTag(tag: string, filters: { visibility?: string } = {}) {
+  const tile = defaultMapConfig.tiles.find((item) =>
+    item.objectIds.some((objectId) => {
+      const object = mapObjectDefinitionById.get(objectId);
+      return Boolean(object?.tags?.includes(tag) && (!filters.visibility || object.visibility === filters.visibility));
+    }),
+  );
+  expect(tile).toBeDefined();
+  return tile!;
+}
+
+function createMapWithDiscoveredTiles(...tileIds: string[]) {
+  const map = createInitialMapState();
+  for (const tileId of tileIds) {
+    map.discoveredTileIds = Array.from(new Set([...map.discoveredTileIds, tileId]));
+    map.tilesById[tileId] = {
+      ...map.tilesById[tileId],
+      discovered: true,
+    };
+  }
+  return map;
+}
+
+function createMapWithHiddenObject(tileId: string, objectId: string) {
+  const map = createMapWithDiscoveredTiles(tileId);
+  map.tilesById[tileId] = {
+    ...map.tilesById[tileId],
+    investigated: false,
+    revealedObjectIds: (map.tilesById[tileId]?.revealedObjectIds ?? []).filter((id) => id !== objectId),
+  };
+  return map;
+}
+
+function createCompatibleSavedGameState(state: Record<string, unknown>) {
+  return {
+    saveVersion: GAME_SAVE_VERSION,
+    schema_version: GAME_SAVE_SCHEMA_VERSION,
+    created_at_real_time: "2026-04-27T00:00:00.000Z",
+    updated_at_real_time: "2026-04-27T00:00:00.000Z",
+    map: createInitialMapState(),
+    ...createEmptyEventRuntimeState(),
+    ...state,
+  };
+}
+
+function eventCrewAction(overrides: Partial<CrewActionState>): CrewActionState {
+  return {
+    id: "event-action",
+    crew_id: "mike",
+    type: "move",
+    status: "active",
+    source: "event_action_request",
+    parent_event_id: "event-1",
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: "1-1",
+    to_tile_id: null,
+    target_tile_id: "1-2",
+    path_tile_ids: [],
+    started_at: 0,
+    ends_at: null,
+    progress_seconds: 0,
+    duration_seconds: 60,
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+    action_params: {},
+    ...overrides,
+  };
+}
+
+function garryGatherAction(tileId: string, objectId: string, durationSeconds = 300): CrewActionState {
+  return eventCrewAction({
+    id: `gather:${objectId}:${tileId}:0`,
+    crew_id: "garry",
+    source: "player_command",
+    type: "gather",
+    target_tile_id: tileId,
+    started_at: 0,
+    ends_at: durationSeconds,
+    duration_seconds: durationSeconds,
+    action_params: {
+      object_id: objectId,
+      resource_id: "iron_ore",
+      perRoundYieldByResource: {
+        iron_ore: 5,
+      },
+    },
+  });
+}
+
+function createRuntimeCall(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "runtime-call",
+    event_id: "event-call-test",
+    event_node_id: "call-node",
+    call_template_id: "test.call",
+    crew_id: "garry",
+    status: "incoming",
+    created_at: 0,
+    connected_at: null,
+    ended_at: null,
+    expires_at: null,
+    render_context_snapshot: {},
+    rendered_lines: [runtimeLine("事件通话等待接入。", "garry")],
+    available_options: [
+      {
+        option_id: "acknowledge",
+        template_variant_id: "acknowledge-default",
+        text: "收到。",
+        is_default: true,
+      },
+    ],
+    selected_option_id: null,
+    blocking_claim_id: null,
+    ...overrides,
+  };
+}
+
+function runtimeLine(text: string, speakerCrewId: string) {
+  return {
+    template_variant_id: `${speakerCrewId}-line`,
+    text,
+    speaker_crew_id: speakerCrewId,
+  };
+}
+
+function createVolcanicObjectiveState() {
+  const eventId = "volcanic_ash_trace:480";
+  const objectiveId = `${eventId}:ash_cross_crew_objective:objective`;
+  const actionId = "amy-ash-survey";
+
+  return {
+    eventId,
+    objectiveId,
+    actionId,
+    eventState: {
+      active_events: {
+        [eventId]: {
+          id: eventId,
+          event_definition_id: "volcanic_ash_trace",
+          event_definition_version: 1,
+          status: "waiting_objective",
+          current_node_id: "ash_cross_crew_objective",
+          primary_crew_id: "garry",
+          related_crew_ids: [],
+          primary_tile_id: "4-3",
+          related_tile_ids: [],
+          parent_event_id: null,
+          child_event_ids: [],
+          objective_ids: [objectiveId],
+          active_call_id: null,
+          selected_options: {
+            ash_trace_call: "assign_probe",
+          },
+          random_results: {},
+          blocking_claim_ids: [],
+          created_at: 480,
+          updated_at: 480,
+          deadline_at: null,
+          next_wakeup_at: null,
+          trigger_context_snapshot: {
+            trigger_type: "action_complete",
+            occurred_at: 480,
+            source: "crew_action",
+            crew_id: "garry",
+            tile_id: "4-3",
+            action_id: "garry-survey-4-3",
+            event_id: eventId,
+            event_definition_id: "volcanic_ash_trace",
+            node_id: null,
+            call_id: null,
+            objective_id: null,
+            selected_option_id: null,
+            world_flag_key: null,
+            proximity: null,
+            payload: {
+              action_type: "survey",
+            },
+          },
+          history_keys: [],
+          result_key: null,
+          result_summary: null,
+        },
+      },
+      objectives: {
+        [objectiveId]: {
+          id: objectiveId,
+          status: "assigned",
+          parent_event_id: eventId,
+          created_by_node_id: "ash_cross_crew_objective",
+          title: "Survey the volcanic ash trace",
+          summary: "Send another crew member to verify the ash line before it blows over.",
+          target_tile_id: "4-3",
+          eligible_crew_conditions: [],
+          required_action_type: "survey",
+          required_action_params: {
+            duration_seconds: 45,
+            can_interrupt: true,
+          },
+          assigned_crew_id: "amy",
+          action_id: actionId,
+          created_at: 481,
+          assigned_at: 482,
+          completed_at: null,
+          deadline_at: 1080,
+          completion_trigger_type: "objective_completed",
+          result_key: null,
+        },
+      },
+    },
+  };
+}
+
+function volcanicTiles() {
+  return initialTiles.map((tile) =>
+    tile.id === "4-3"
+      ? {
+          ...tile,
+          terrain: "火山灰沙漠",
+          crew: ["garry", "amy"],
+          status: "复核中",
+        }
+      : tile,
+  );
+}
