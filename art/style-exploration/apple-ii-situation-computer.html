@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apple II Situation Computer</title>
+  <style>
+    :root {
+      --bg: #b9ad98;
+      --case: #d8cfb9;
+      --case-hi: #eee5cf;
+      --case-lo: #9d917d;
+      --bezel: #5f584f;
+      --screen: #06120a;
+      --screen-2: #0b2111;
+      --phosphor: #66ff8f;
+      --phosphor-dim: #2e9f55;
+      --key: #f2ead7;
+      --key-side: #b8aa92;
+      --brown: #5b4a36;
+      --orange: #d26b2f;
+      --blue: #4b7e8d;
+      --red: #a44535;
+      --cream: #2f281f;
+      --muted: #746850;
+      --green: #3d7f45;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 248, 225, 0.58), transparent 34%),
+        linear-gradient(135deg, #c9bea9 0%, #aa9d88 100%),
+        var(--bg);
+      color: var(--cream);
+      font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Apple SD Gothic Neo", "Courier New", monospace;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent 22%, transparent 78%, rgba(78, 63, 45, 0.16)),
+        radial-gradient(circle at center, transparent 70%, rgba(55, 43, 29, 0.18));
+      z-index: 30;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .terminal {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      width: min(1500px, calc(100vw - 28px));
+      height: calc(100svh - 28px);
+      margin: 14px auto;
+      padding: 18px 18px 20px;
+      border: 2px solid #8b7d68;
+      border-radius: 18px 18px 28px 28px;
+      background:
+        linear-gradient(180deg, var(--case-hi), var(--case) 42%, #c8bda6 100%);
+      box-shadow:
+        0 2px 0 rgba(255, 255, 255, 0.65) inset,
+        0 -5px 0 rgba(96, 79, 55, 0.22) inset,
+        0 28px 70px rgba(54, 42, 26, 0.42);
+    }
+
+    .top,
+    .bottom,
+    .panel,
+    .scanner {
+      border: 1px solid var(--case-lo);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 58%),
+        #cec2aa;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.7) inset,
+        0 -2px 0 rgba(91, 74, 54, 0.16) inset;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 76px;
+      padding: 12px 14px;
+      border-radius: 10px 10px 6px 6px;
+    }
+
+    .kicker,
+    .label,
+    .small {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      margin-top: 4px;
+      color: var(--brown);
+      font-size: clamp(20px, 3vw, 34px);
+      letter-spacing: 0;
+    }
+
+    .case-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(72px, 1fr));
+      gap: 8px;
+      min-width: 420px;
+    }
+
+    .case-chip {
+      border: 1px solid #a99b82;
+      background: #e7dec9;
+      padding: 8px;
+      box-shadow: 0 2px 0 rgba(255, 255, 255, 0.58) inset;
+    }
+
+    .case-chip strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--brown);
+      font-size: 14px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(230px, 0.78fr) minmax(520px, 1.85fr) minmax(250px, 0.92fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .panel {
+      min-height: 0;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .panel h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: var(--brown);
+      color: var(--brown);
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .panel h2::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(91, 74, 54, 0.42), transparent);
+    }
+
+    .case-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .case-button,
+    .tool-button {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid #9e9078;
+      border-bottom-color: #6f624f;
+      background:
+        linear-gradient(180deg, #fff8e8, var(--key));
+      color: var(--brown);
+      padding: 8px;
+      text-align: left;
+      cursor: pointer;
+      box-shadow:
+        0 2px 0 rgba(255, 255, 255, 0.84) inset,
+        0 3px 0 var(--key-side);
+    }
+
+    .case-button:hover,
+    .tool-button:hover,
+    .case-button[aria-pressed="true"],
+    .tool-button[aria-pressed="true"] {
+      border-color: var(--orange);
+      color: #8a3f1f;
+      transform: translateY(1px);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.6) inset,
+        0 1px 0 var(--key-side);
+    }
+
+    .case-button small,
+    .tool-button small {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .scanner {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+      overflow: hidden;
+      background: #10110f;
+      border: 16px solid var(--bezel);
+      border-radius: 14px 14px 10px 10px;
+      box-shadow:
+        0 0 0 2px #3f3931 inset,
+        0 10px 24px rgba(60, 48, 35, 0.28);
+    }
+
+    .scanner::before {
+      content: "APPLE ][ FIELD SITUATION COMPUTER";
+      position: absolute;
+      left: 18px;
+      top: -13px;
+      color: #312a23;
+      background: var(--case);
+      padding: 0 8px;
+      font-size: 10px;
+      z-index: 4;
+    }
+
+    .scanner-head,
+    .scanner-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 44px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(102, 255, 143, 0.3);
+      background: #071409;
+      color: var(--phosphor);
+      z-index: 3;
+    }
+
+    .scanner-foot {
+      border-top: 1px solid rgba(102, 255, 143, 0.3);
+      border-bottom: 0;
+    }
+
+    .scan-stage {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 46%, rgba(102, 255, 143, 0.12), transparent 38%),
+        linear-gradient(180deg, var(--screen-2), var(--screen));
+      box-shadow: 0 0 42px rgba(102, 255, 143, 0.12) inset;
+    }
+
+    .scan-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(to bottom, rgba(102, 255, 143, 0.12) 0 1px, transparent 1px 4px),
+        linear-gradient(rgba(102, 255, 143, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(102, 255, 143, 0.06) 1px, transparent 1px);
+      background-size: auto, 28px 28px, 28px 28px;
+      opacity: 0.95;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .apple-screen {
+      position: absolute;
+      inset: 24px;
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid rgba(102, 255, 143, 0.45);
+      background:
+        linear-gradient(180deg, rgba(102, 255, 143, 0.06), transparent 40%),
+        #06120a;
+      color: var(--phosphor);
+      font-family: "Fusion Pixel 10px Monospaced latin", "Courier New", monospace;
+      font-size: clamp(10px, 1.15vw, 14px);
+      line-height: 1.12;
+      letter-spacing: 0;
+      padding: 18px;
+      text-shadow: 0 0 7px rgba(102, 255, 143, 0.5);
+      white-space: pre;
+      z-index: 2;
+      cursor: text;
+    }
+
+    .apple-screen-line {
+      display: block;
+      min-height: 1.12em;
+      white-space: pre;
+    }
+
+    .apple-screen-line span {
+      white-space: pre;
+    }
+
+    .phosphor {
+      color: var(--phosphor);
+    }
+
+    .amber {
+      color: #f0b45f;
+      text-shadow: 0 0 7px rgba(240, 180, 95, 0.42);
+    }
+
+    .cyan {
+      color: #7fd6d0;
+      text-shadow: 0 0 7px rgba(127, 214, 208, 0.38);
+    }
+
+    .rose {
+      color: #e78f78;
+      text-shadow: 0 0 7px rgba(231, 143, 120, 0.38);
+    }
+
+    .dim {
+      color: var(--phosphor-dim);
+    }
+
+    .cream-screen {
+      color: #d8d09a;
+      text-shadow: 0 0 6px rgba(216, 208, 154, 0.32);
+    }
+
+    .case-overlay {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: 22px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+      border: 1px solid rgba(102, 255, 143, 0.48);
+      background: rgba(3, 13, 5, 0.92);
+      padding: 10px;
+      z-index: 5;
+      color: var(--phosphor);
+    }
+
+    .scan-stage[data-display="PLOT"] .apple-screen {
+      color: #9dff78;
+      text-shadow: 0 0 6px rgba(157, 255, 120, 0.45);
+    }
+
+    .scan-stage[data-display="TEXT"] .apple-screen {
+      color: #b6ffbf;
+      font-size: clamp(11px, 1.28vw, 15px);
+      line-height: 1.24;
+    }
+
+    .scan-stage[data-display="MAP"] .apple-screen {
+      cursor: crosshair;
+      color: #78ff96;
+      text-shadow: 0 0 8px rgba(120, 255, 150, 0.56);
+    }
+
+    .case-overlay strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--phosphor);
+    }
+
+    .evidence-list,
+    .log-list {
+      display: grid;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .evidence {
+      border-left: 2px solid #93856f;
+      background: rgba(238, 229, 207, 0.55);
+      padding: 8px;
+    }
+
+    .evidence strong {
+      display: block;
+      color: var(--brown);
+      margin-bottom: 3px;
+    }
+
+    .severity {
+      color: var(--red);
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 9px;
+    }
+
+    .bar {
+      height: 10px;
+      border: 1px solid #9e9078;
+      background: #e7dec9;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #6f9d61, #d26b2f);
+    }
+
+    .bottom {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      min-height: 58px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      border-radius: 4px 4px 18px 18px;
+      background:
+        linear-gradient(180deg, #c5baa3, #afa188);
+    }
+
+    .command {
+      color: #1e6f36;
+    }
+
+    .tools {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .tool-button {
+      width: auto;
+      min-width: 124px;
+    }
+
+    .tools .tool-button,
+    .bottom .tool-button {
+      min-height: 38px;
+      border-radius: 3px;
+      text-align: center;
+    }
+
+    @keyframes scanPulse {
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    @keyframes scanBar {
+      from {
+        transform: translateX(-100%);
+      }
+      to {
+        transform: translateX(620%);
+      }
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+
+      .terminal {
+        height: auto;
+        min-height: 100svh;
+      }
+
+      .top,
+      .main,
+      .bottom {
+        grid-template-columns: 1fr;
+      }
+
+      .case-strip {
+        min-width: 0;
+      }
+
+      .scanner {
+        min-height: 560px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="terminal">
+    <header class="top">
+      <section>
+        <p class="kicker">STELLAR FRONTIER / APPLE ][ FIELD UNIT</p>
+        <h1>SITUATION COMPUTER</h1>
+      </section>
+      <section class="case-strip">
+        <div class="case-chip"><span class="label">CASE</span><strong id="caseId">IAFS-1A</strong></div>
+        <div class="case-chip"><span class="label">STATUS</span><strong id="caseStatus">ACTIVE</strong></div>
+        <div class="case-chip"><span class="label">RISK</span><strong id="caseRisk">CRITICAL</strong></div>
+        <div class="case-chip"><span class="label">MODE</span><strong id="scanMode">GREEN</strong></div>
+      </section>
+    </header>
+
+    <section class="main">
+      <aside class="stack">
+        <section class="panel">
+          <h2>Disk Directory</h2>
+          <div class="case-list" id="caseList"></div>
+        </section>
+        <section class="panel">
+          <h2>Display Mode</h2>
+          <div class="case-list">
+            <button class="tool-button" type="button" data-tool="GREEN" aria-pressed="true"><span>绿屏态势</span><small>GRN</small></button>
+            <button class="tool-button" type="button" data-tool="MAP" aria-pressed="false"><span>地图程序</span><small>MAP</small></button>
+            <button class="tool-button" type="button" data-tool="PLOT" aria-pressed="false"><span>低清绘图</span><small>PLOT</small></button>
+            <button class="tool-button" type="button" data-tool="TEXT" aria-pressed="false"><span>文本证据</span><small>TEXT</small></button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="scanner">
+        <div class="scanner-head">
+          <p><span class="label">CRT Situation Map</span> <strong id="caseTitle">主线 1A / 坠毁倒计时</strong></p>
+          <p class="small" id="caseMeta">核心失压 / 备用电源临界 / 生命支持倒计时</p>
+        </div>
+        <div class="scan-stage" id="scanStage">
+          <div class="apple-screen" id="appleScreen" aria-label="Apple II style ASCII situation display"></div>
+          <section class="case-overlay">
+            <p><strong id="overlayTitle">CRASH COUNTDOWN</strong><span id="overlayText">点名、分工、首轮回收：先活下来，再谈探索。</span></p>
+            <p class="small" id="overlayMode">lo-res plot / confidence 72%</p>
+          </section>
+        </div>
+        <div class="scanner-foot">
+          <p class="command" id="commandLine">&gt; disk ready / choose program file</p>
+          <p class="small" id="scanStats">heat 0.91 / structure 0.34 / signal 0.52</p>
+        </div>
+      </section>
+
+      <aside class="stack">
+        <section class="panel">
+          <h2>Program Notes</h2>
+          <div class="evidence-list" id="evidenceList"></div>
+        </section>
+        <section class="panel">
+          <h2>Pressure</h2>
+          <div class="bar-row"><span>TIME</span><div class="bar"><span id="timeBar" style="width: 82%"></span></div></div>
+          <div class="bar-row"><span>TRUST</span><div class="bar"><span id="trustBar" style="width: 35%"></span></div></div>
+          <div class="bar-row"><span>NOISE</span><div class="bar"><span id="noiseBar" style="width: 58%"></span></div></div>
+        </section>
+      </aside>
+    </section>
+
+    <footer class="bottom">
+      <p>
+        <span class="command" id="footerCommand">&gt; awaiting keyboard command</span>
+        <br />
+        Apple II palette test: matte cream shell, dark bezel, phosphor green screen, beige keycaps.
+      </p>
+      <div class="tools">
+        <button class="tool-button" type="button" id="lockEvidence"><span>记录证据</span><small>RETURN</small></button>
+        <button class="tool-button" type="button" id="dispatchCrew"><span>派遣队员</span><small>OPEN-APPLE</small></button>
+        <button class="tool-button" type="button" id="openCall"><span>打开通话</span><small>RESET</small></button>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const cases = [
+      {
+        id: "IAFS-1A",
+        label: "主线 1A",
+        title: "坠毁倒计时",
+        risk: "CRITICAL",
+        meta: "核心失压 / 备用电源临界 / 生命支持倒计时",
+        summary: "点名、分工、首轮回收：先活下来，再谈探索。",
+        evidence: ["核心失压日志", "备用电源红线", "外勤回收窗口"],
+        bars: [82, 35, 58],
+        tone: "crash",
+        art: [
+          "        __|__        ",
+          "  _____/ /_\\ \\____   ",
+          "--====/ /___\\ \\===---",
+          "     /_/ XX \\_\\      ",
+          "    /__/____\\__\\     "
+        ]
+      },
+      {
+        id: "IAFS-3A",
+        label: "主线 3A",
+        title: "门域首次接触",
+        risk: "HIGH",
+        meta: "潜入窗口 / 协议信道 / 强攻回路并列推演",
+        summary: "不是怎么过去，而是以怎样的身份过去。",
+        evidence: ["门域外圈节律", "三策略推演图", "首次被观测记录"],
+        bars: [62, 48, 76],
+        tone: "gate",
+        art: [
+          "      .-----------.      ",
+          "   .-'  .-===-.    '-.   ",
+          "  /   .'  7|7  '.     \\  ",
+          " |   /  -- | --   \\    | ",
+          " |   \\   __|__    /    | ",
+          "  \\   '._     _.'     /  ",
+          "   '-.   '---'    .-'    ",
+          "      '-----------'      "
+        ]
+      },
+      {
+        id: "IAFS-S01",
+        label: "支线 01",
+        title: "失温婚约",
+        risk: "SOCIAL",
+        meta: "霜湾信物 / 烬炉誓物 / 封锁令取证",
+        summary: "把春天送到另一半冬天里。",
+        evidence: ["火烫暗纹誓物", "巡逻记录", "封锁令版本差异"],
+        bars: [45, 71, 32],
+        tone: "vow",
+        art: [
+          "   * FROST RELAY *       ",
+          "      .----.      .----. ",
+          "     / ICE  \\____/ FIRE \\",
+          "     \\______/    \\______/",
+          "        \\   VOW TOKEN  / ",
+          "         '---><---'      "
+        ]
+      },
+      {
+        id: "IAFS-S02",
+        label: "支线 02",
+        title: "火井税单",
+        risk: "GOV",
+        meta: "事故簿 / 配额流向 / 公开质询",
+        summary: "一张行政文书，读起来像生存判决。",
+        evidence: ["税单条款", "矿道事故簿", "异常配额流向"],
+        bars: [54, 42, 66],
+        tone: "tax",
+        art: [
+          "   HEAT FORGE LEDGER     ",
+          "  +------------------+   ",
+          "  | TAX: ######      |   ",
+          "  | RISK COST: HIGH  |   ",
+          "  | PERMIT?  Y / N   |   ",
+          "  +------------------+   ",
+          "      /\\ MINE SHAFT /\\   "
+        ]
+      },
+      {
+        id: "IAFS-S08",
+        label: "支线 08",
+        title: "盲区测绘",
+        risk: "STEALTH",
+        meta: "外围警戒环 / 快扫与慢扫 / 低暴露潜入",
+        summary: "盲区不是没人巡逻，而是那几分钟对方以为不用巡逻。",
+        evidence: ["巡逻网格密度", "快扫粗轨迹", "低暴露窗口"],
+        bars: [68, 39, 82],
+        tone: "blind",
+        art: [
+          " PATROL MESH DENSITY      ",
+          "  +--+--+--+--+--+--+    ",
+          "  |##|  |##|  |##|  |    ",
+          "  +--+--+--+--+--+--+    ",
+          "       ROUTE: ....>      ",
+          "  BLIND SLOT [00:37]     "
+        ]
+      },
+      {
+        id: "IAFS-S09",
+        label: "支线 09",
+        title: "七拍语法",
+        risk: "LING",
+        meta: "采样 / 对照 / 共振发声器 / 实测误译风险",
+        summary: "最危险的不是听不懂，而是确信自己听懂了。",
+        evidence: ["七拍回声", "夜间样本缺口", "共振发声器读数"],
+        bars: [58, 51, 89],
+        tone: "beat",
+        art: [
+          "  BEAT: 1 2 3 4 5 6 7    ",
+          "        | | | | | | *    ",
+          "   .-----------------.   ",
+          "   | RESONANCE RIG   |   ",
+          "   |  ))  ))  ))     |   ",
+          "   '-----------------'   "
+        ]
+      }
+    ];
+
+    const caseList = document.getElementById("caseList");
+    const evidenceList = document.getElementById("evidenceList");
+    const caseId = document.getElementById("caseId");
+    const caseRisk = document.getElementById("caseRisk");
+    const caseTitle = document.getElementById("caseTitle");
+    const caseMeta = document.getElementById("caseMeta");
+    const overlayTitle = document.getElementById("overlayTitle");
+    const overlayText = document.getElementById("overlayText");
+    const appleScreen = document.getElementById("appleScreen");
+    const commandLine = document.getElementById("commandLine");
+    const footerCommand = document.getElementById("footerCommand");
+    const scanStage = document.getElementById("scanStage");
+    const scanMode = document.getElementById("scanMode");
+    const timeBar = document.getElementById("timeBar");
+    const trustBar = document.getElementById("trustBar");
+    const noiseBar = document.getElementById("noiseBar");
+    const toolButtons = Array.from(document.querySelectorAll("[data-tool]"));
+    let selectedCase = 0;
+    let selectedTool = "GREEN";
+    const mapState = {
+      x: 0,
+      y: 0,
+      zoom: 1.35,
+      marker: { x: 2.2, y: -1.1 },
+      signalTick: 0,
+      cols: 64,
+      rows: 25,
+      dragging: null
+    };
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function sampleTerrain(x, y) {
+      return Math.sin(x * 1.15) * 0.42 + Math.sin(y * 1.55 + x * 0.28) * 0.3 + Math.cos((x + y) * 0.74) * 0.22;
+    }
+
+    function screenLine(text, tone = "phosphor", segments = null) {
+      return { text, tone, segments };
+    }
+
+    function segment(text, tone = "phosphor") {
+      return { text, tone };
+    }
+
+    function terrainTone(level) {
+      if (level < 0.25) return "cyan";
+      if (level < 0.58) return "phosphor";
+      if (level < 0.76) return "cream-screen";
+      return "amber";
+    }
+
+    function measureMapGrid() {
+      const rect = appleScreen.getBoundingClientRect();
+      const styles = window.getComputedStyle(appleScreen);
+      const fontSize = parseFloat(styles.fontSize) || 12;
+      const lineHeight = parseFloat(styles.lineHeight) || fontSize * 1.12;
+      const charWidth = fontSize * 0.62;
+      const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+      const cols = clamp(Math.floor((rect.width - horizontalPadding) / Math.max(1, charWidth)), 48, 118);
+      const totalRows = clamp(Math.floor((rect.height - verticalPadding) / Math.max(1, lineHeight)), 20, 42);
+      return {
+        width: cols,
+        height: Math.max(12, totalRows - 6),
+        totalRows,
+        charWidth,
+        lineHeight
+      };
+    }
+
+    function buildMapScreen() {
+      const measured = measureMapGrid();
+      const width = measured.width;
+      const height = measured.height;
+      mapState.cols = width;
+      mapState.rows = height;
+      const ramp = " .,:;irsXA253hMHGS#9B&@";
+      const lines = [];
+      const border = `+${"-".repeat(width - 2)}+`;
+      lines.push(screenLine("] RUN MAP.BAS", "amber"));
+      lines.push(screenLine(`CENTER ${mapState.x.toFixed(2)},${mapState.y.toFixed(2)}  ZOOM ${mapState.zoom.toFixed(2)}  CLICK/DRAG/WHEEL`, "cyan"));
+      lines.push(screenLine(border, "dim"));
+
+      for (let row = 0; row < height; row += 1) {
+        const pieces = [segment("|", "dim")];
+        for (let col = 0; col < width - 2; col += 1) {
+          const wx = mapState.x + (col - (width - 2) / 2) / (10 * mapState.zoom);
+          const wy = mapState.y + (row - height / 2) / (6 * mapState.zoom);
+          const e = sampleTerrain(wx, wy);
+          const level = clamp((e + 1.05) / 2.1, 0, 1);
+          let ch = ramp[Math.floor(level * (ramp.length - 1))];
+          let tone = terrainTone(level);
+          const contour = Math.abs(e * 5 - Math.round(e * 5));
+          if (contour < 0.035) {
+            ch = "=";
+            tone = "amber";
+          }
+          if (col % 10 === 0 || row % 5 === 0) {
+            ch = "+";
+            tone = "dim";
+          }
+          const pulseRadius = (mapState.signalTick * 0.035) % Math.min(width - 2, height);
+          const dist = Math.hypot(col - (width - 2) / 2, row - height / 2);
+          if (Math.abs(dist - pulseRadius) < 0.55) {
+            ch = "o";
+            tone = "cyan";
+          }
+          if (mapState.marker) {
+            const mx = Math.floor((mapState.marker.x - mapState.x) * 10 * mapState.zoom + (width - 2) / 2);
+            const my = Math.floor((mapState.marker.y - mapState.y) * 6 * mapState.zoom + height / 2);
+            if (Math.abs(col - mx) <= 1 && Math.abs(row - my) <= 1) {
+              ch = col === mx && row === my ? "X" : "*";
+              tone = "rose";
+            }
+          }
+          const last = pieces[pieces.length - 1];
+          if (last && last.tone === tone) last.text += ch;
+          else pieces.push(segment(ch, tone));
+        }
+        pieces.push(segment("|", "dim"));
+        lines.push(screenLine("", "phosphor", pieces));
+      }
+
+      lines.push(screenLine(border, "dim"));
+      lines.push(screenLine("MAP MODULE: READ ONLY / COMMANDS RETURN THROUGH CALL CHANNEL", "cream-screen"));
+      lines.push(screenLine(mapState.marker ? `MARKER ${mapState.marker.x.toFixed(2)},${mapState.marker.y.toFixed(2)} READY.` : "NO MARKER.", mapState.marker ? "rose" : "dim"));
+      return lines;
+    }
+
+    function buildAppleScreen(item) {
+      const artTone = item.tone === "crash" || item.tone === "tax" ? "amber" : item.tone === "gate" || item.tone === "blind" ? "cyan" : item.tone === "beat" ? "cream-screen" : "phosphor";
+      return [
+        screenLine(`] LOAD ${item.id}`, "amber"),
+        screenLine(`] RUN ${item.tone.toUpperCase()}.BAS`, "amber"),
+        screenLine(""),
+        screenLine(`CASE: ${item.label} / ${item.title}`, "cyan"),
+        screenLine(`RISK: ${item.risk}`, item.risk === "CRITICAL" || item.risk === "HIGH" ? "rose" : "cream-screen"),
+        screenLine("----------------------------------------", "dim"),
+        ...item.art.map((line) => screenLine(`        ${line}`, artTone)),
+        screenLine("----------------------------------------", "dim"),
+        screenLine(`META: ${item.meta}`, "phosphor"),
+        screenLine(`NOTE: ${item.summary}`, "cream-screen"),
+        screenLine(""),
+        screenLine("1) RECORD EVIDENCE", "amber"),
+        screenLine("2) DISPATCH CREW", "cyan"),
+        screenLine("3) OPEN CALL CHANNEL", "rose"),
+        screenLine(""),
+        screenLine("READY.", "phosphor")
+      ];
+    }
+
+    function buildTextScreen(item) {
+      return [
+        screenLine(`]CATALOG ${item.id}`, "amber"),
+        screenLine(""),
+        screenLine(`PROGRAM: ${item.title}`, "cyan"),
+        screenLine(`RISK   : ${item.risk}`, item.risk === "CRITICAL" || item.risk === "HIGH" ? "rose" : "cream-screen"),
+        screenLine(""),
+        screenLine("EVIDENCE FILES:", "phosphor"),
+        ...item.evidence.map((entry, index) => screenLine(` ${index + 1}. ${entry}`, index === 0 ? "amber" : index === 1 ? "cyan" : "cream-screen")),
+        screenLine(""),
+        screenLine(`SUMMARY: ${item.summary}`, "cream-screen"),
+        screenLine(""),
+        screenLine("COMMANDS:", "phosphor"),
+        screenLine(" RETURN      RECORD EVIDENCE", "amber"),
+        screenLine(" OPEN-APPLE  DISPATCH CREW", "cyan"),
+        screenLine(" RESET       OPEN CALL", "rose"),
+        screenLine(""),
+        screenLine("READY.", "phosphor")
+      ];
+    }
+
+    function updateAppleScreen() {
+      const item = cases[selectedCase];
+      const lines = selectedTool === "MAP" ? buildMapScreen() : selectedTool === "TEXT" ? buildTextScreen(item) : buildAppleScreen(item);
+      appleScreen.innerHTML = "";
+      lines.forEach((line) => {
+        const row = document.createElement("span");
+        row.className = `apple-screen-line ${line.tone || "phosphor"}`;
+        if (line.segments) {
+          line.segments.forEach((part) => {
+            const span = document.createElement("span");
+            span.className = part.tone || "phosphor";
+            span.textContent = part.text;
+            row.appendChild(span);
+          });
+        } else {
+          row.textContent = line.text;
+        }
+        appleScreen.appendChild(row);
+      });
+    }
+
+    function renderCases() {
+      caseList.innerHTML = "";
+      cases.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.className = "case-button";
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(index === selectedCase));
+        button.innerHTML = `<span>${item.label} ${item.title}</span><small>${item.risk}</small>`;
+        button.addEventListener("click", () => selectCase(index));
+        caseList.appendChild(button);
+      });
+    }
+
+    function renderEvidence(item) {
+      evidenceList.innerHTML = "";
+      item.evidence.forEach((entry, index) => {
+        const evidence = document.createElement("article");
+        evidence.className = "evidence";
+        evidence.innerHTML = `<strong>${String(index + 1).padStart(2, "0")} / ${entry}</strong><span>${index === 0 ? "primary source" : index === 1 ? "conflict check" : "next action"}</span>`;
+        evidenceList.appendChild(evidence);
+      });
+    }
+
+    function selectCase(index) {
+      selectedCase = index;
+      const item = cases[selectedCase];
+      caseId.textContent = item.id;
+      caseRisk.textContent = item.risk;
+      caseTitle.textContent = `${item.label} / ${item.title}`;
+      caseMeta.textContent = item.meta;
+      overlayTitle.textContent = item.title.toUpperCase();
+      overlayText.textContent = item.summary;
+      commandLine.textContent = `> LOAD ${item.id} / ${item.meta}`;
+      footerCommand.textContent = `> case selected: ${item.title}`;
+      scanStage.dataset.tone = item.tone;
+      timeBar.style.width = `${item.bars[0]}%`;
+      trustBar.style.width = `${item.bars[1]}%`;
+      noiseBar.style.width = `${item.bars[2]}%`;
+      renderCases();
+      renderEvidence(item);
+      updateAppleScreen();
+    }
+
+    function setTool(tool) {
+      selectedTool = tool;
+      scanMode.textContent = tool;
+      toolButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.tool === tool)));
+      commandLine.textContent = `> DISPLAY MODE ${tool}`;
+      scanStage.dataset.display = tool;
+      scanStage.style.filter = tool === "PLOT" ? "contrast(1.18) brightness(1.08)" : tool === "TEXT" ? "contrast(1.28)" : "none";
+      updateAppleScreen();
+    }
+
+    toolButtons.forEach((button) => button.addEventListener("click", () => setTool(button.dataset.tool)));
+    function mapPointFromPointer(event) {
+      const rect = appleScreen.getBoundingClientRect();
+      const measured = measureMapGrid();
+      const styles = window.getComputedStyle(appleScreen);
+      const padLeft = parseFloat(styles.paddingLeft) || 0;
+      const padTop = parseFloat(styles.paddingTop) || 0;
+      const col = clamp(Math.floor((event.clientX - rect.left - padLeft) / Math.max(1, measured.charWidth)) - 1, 0, mapState.cols - 3);
+      const row = clamp(Math.floor((event.clientY - rect.top - padTop) / Math.max(1, measured.lineHeight)) - 3, 0, mapState.rows - 1);
+      return {
+        x: mapState.x + (col - (mapState.cols - 2) / 2) / (10 * mapState.zoom),
+        y: mapState.y + (row - mapState.rows / 2) / (6 * mapState.zoom)
+      };
+    }
+
+    appleScreen.addEventListener("pointerdown", (event) => {
+      if (selectedTool !== "MAP") return;
+      event.preventDefault();
+      const point = mapPointFromPointer(event);
+      mapState.marker = point;
+      mapState.dragging = { x: event.clientX, y: event.clientY };
+      appleScreen.setPointerCapture(event.pointerId);
+      commandLine.textContent = `> MAP MARK ${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+      updateAppleScreen();
+    });
+
+    appleScreen.addEventListener("pointermove", (event) => {
+      if (selectedTool !== "MAP" || !mapState.dragging) return;
+      const dx = event.clientX - mapState.dragging.x;
+      const dy = event.clientY - mapState.dragging.y;
+      mapState.dragging = { x: event.clientX, y: event.clientY };
+      mapState.x -= dx / (82 * mapState.zoom);
+      mapState.y -= dy / (54 * mapState.zoom);
+      commandLine.textContent = `> MAP PAN ${mapState.x.toFixed(2)},${mapState.y.toFixed(2)}`;
+      updateAppleScreen();
+    });
+
+    appleScreen.addEventListener("pointerup", (event) => {
+      mapState.dragging = null;
+      if (appleScreen.hasPointerCapture(event.pointerId)) appleScreen.releasePointerCapture(event.pointerId);
+    });
+
+    appleScreen.addEventListener("wheel", (event) => {
+      if (selectedTool !== "MAP") return;
+      event.preventDefault();
+      mapState.zoom = clamp(mapState.zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12), 0.6, 5);
+      commandLine.textContent = `> MAP ZOOM ${mapState.zoom.toFixed(2)}`;
+      updateAppleScreen();
+    }, { passive: false });
+    document.getElementById("lockEvidence").addEventListener("click", () => {
+      footerCommand.textContent = `> SAVE EVIDENCE ${cases[selectedCase].id}`;
+    });
+    document.getElementById("dispatchCrew").addEventListener("click", () => {
+      footerCommand.textContent = `> DISPATCH DRAFTED / CALL CONFIRMATION REQUIRED`;
+    });
+    document.getElementById("openCall").addEventListener("click", () => {
+      footerCommand.textContent = `> CALL CHANNEL OPENED: ${cases[selectedCase].title}`;
+    });
+
+    renderCases();
+    selectCase(0);
+    setInterval(() => {
+      if (selectedTool !== "MAP") return;
+      mapState.signalTick += 1;
+      updateAppleScreen();
+    }, 120);
+    window.addEventListener("resize", () => {
+      if (selectedTool === "MAP") updateAppleScreen();
+    });
+  </script>
+</body>
+</html>
