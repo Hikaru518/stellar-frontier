@@ -9,7 +9,7 @@ import { settleAction, type ActionSettlementPatch } from "./callActionSettlement
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
-import { buildCallView } from "./callActions";
+import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
 import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
@@ -548,6 +548,27 @@ function App() {
       });
       if (updateCurrentCall) {
         setCurrentCall((call) => (call ? { ...call, settled: true, result: "行动指令已提交。" } : call));
+      }
+      return;
+    }
+
+    const localTimedResult = dispatchTimedLocalAction(authoritativeState, crewId, actionId);
+    if (localTimedResult.matched) {
+      if (localTimedResult.accepted) {
+        logger.log({
+          type: "player.action.dispatch",
+          source: "player_command",
+          payload: {
+            crew_id: crewId,
+            action_id: actionId,
+            action_kind: "repair",
+          },
+          gameSeconds: authoritativeState.elapsedGameSeconds,
+        });
+      }
+      setGameState(localTimedResult.state);
+      if (updateCurrentCall) {
+        setCurrentCall((call) => (call ? { ...call, settled: localTimedResult.accepted, result: localTimedResult.reason } : call));
       }
       return;
     }
@@ -1104,7 +1125,13 @@ function settleGameTime(state: GameState): GameState {
   return processAppEventWakeups(nextState);
 }
 
-type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" };
+type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" | "repair" };
+export interface TimedLocalDispatchResult {
+  matched: boolean;
+  accepted: boolean;
+  reason: string;
+  state: GameState;
+}
 
 function collectDueCrewActions(crewActions: Record<Id, CrewActionState>, elapsedGameSeconds: number): Map<Id, CrewActionState> {
   const dueActions = Object.values(crewActions)
@@ -1260,7 +1287,7 @@ function settleStopCrewActionState(
 function canSettleWithRuntimeHandler(
   action: CrewActionState,
 ): action is RuntimeSettleableCrewAction {
-  return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract";
+  return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract" || action.type === "repair";
 }
 
 function createCrewActionCompleteTrigger(action: CrewActionState, member: CrewMember, elapsedGameSeconds: number): TriggerContext {
@@ -1462,16 +1489,29 @@ function findVisibleLocationStoryAction(
   crewId: CrewId,
   actionId: string,
 ): LocationStoryActionSelection | undefined {
-  const member = state.crew.find((item) => item.id === crewId);
-  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
-  if (!member || !tile) {
+  const selection = findLocationStoryActionSelection(state, crewId, actionId);
+  if (!selection) {
     return undefined;
   }
 
-  const visibleEnabled = buildCallView({ member, tile, gameState: state }).groups.some((group) =>
+  const visibleEnabled = buildCallView({ member: selection.member, tile: selection.tile, gameState: state }).groups.some((group) =>
     group.actions.some((action) => action.id === actionId && !action.disabled),
   );
   if (!visibleEnabled) {
+    return undefined;
+  }
+
+  return selection;
+}
+
+function findLocationStoryActionSelection(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
+  const member = state.crew.find((item) => item.id === crewId);
+  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
+  if (!member || !tile) {
     return undefined;
   }
 
@@ -1480,10 +1520,123 @@ function findVisibleLocationStoryAction(
     if (!action) {
       continue;
     }
-    return { member, object, action };
+    return { member, tile, object, action };
   }
 
   return undefined;
+}
+
+export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actionId: string): TimedLocalDispatchResult {
+  const selection = findLocationStoryActionSelection(state, crewId, actionId);
+  if (!selection || selection.action.local_action?.kind !== "timed_repair") {
+    return {
+      matched: false,
+      accepted: false,
+      reason: "",
+      state,
+    };
+  }
+
+  if (isMapObjectRepaired(state, selection.object.id)) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: "该对象已经修复，不能重复维修。",
+      state,
+    };
+  }
+
+  const lockReason = getTimedRepairLockReason(state.crew_actions, crewId, selection.object.id);
+  if (lockReason) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: lockReason,
+      state,
+    };
+  }
+
+  const blockingAction = selectActiveCrewActionForCrew(state.crew_actions, crewId);
+  if (blockingAction) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: "该队员已有进行中的主要行动。",
+      state,
+    };
+  }
+
+  const action = createRepairCrewActionState(state, selection);
+  const nextMember = {
+    ...selection.member,
+    status: `正在维修${selection.object.name}。`,
+    statusTone: "accent" as Tone,
+    activeAction: {
+      id: action.id,
+      actionType: "repair" as const,
+      status: "inProgress" as const,
+      startTime: state.elapsedGameSeconds,
+      durationSeconds: action.duration_seconds,
+      finishTime: action.ends_at ?? state.elapsedGameSeconds + action.duration_seconds,
+      targetTile: selection.member.currentTile,
+      params: action.action_params,
+    },
+  };
+  const nextState = {
+    ...state,
+    crew: state.crew.map((member) => (member.id === nextMember.id ? nextMember : member)),
+    crew_actions: {
+      ...state.crew_actions,
+      [action.id]: action,
+    },
+    logs: appendLogEntry(
+      state.logs,
+      `${selection.member.name} 开始维修${selection.object.name}，预计 ${formatDuration(action.duration_seconds)}。`,
+      "accent",
+      state.elapsedGameSeconds,
+    ),
+  };
+
+  return {
+    matched: true,
+    accepted: true,
+    reason: "维修指令已提交。",
+    state: nextState,
+  };
+}
+
+function createRepairCrewActionState(
+  state: GameState,
+  selection: LocationStoryActionSelection,
+): CrewActionState {
+  const localAction = selection.action.local_action!;
+  const actionId = `repair:${selection.member.id}:${selection.object.id}:${state.elapsedGameSeconds}`;
+  return {
+    id: actionId,
+    crew_id: selection.member.id,
+    type: "repair",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: selection.member.currentTile,
+    to_tile_id: null,
+    target_tile_id: selection.member.currentTile,
+    path_tile_ids: [],
+    started_at: state.elapsedGameSeconds,
+    ends_at: state.elapsedGameSeconds + localAction.duration_seconds,
+    progress_seconds: 0,
+    duration_seconds: localAction.duration_seconds,
+    action_params: {
+      object_id: selection.object.id,
+      success_check: localAction.success_check,
+      success_effects: localAction.success_effects,
+      failure_effects: localAction.failure_effects,
+    },
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+  };
 }
 
 function triggerLocationStoryAction(
