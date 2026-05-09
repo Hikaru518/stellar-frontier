@@ -14,3 +14,4 @@
 - Added task summary for `mobile-communication-device-gameplay`.
 - Added current decision that mobile active mode replaces the PC Communication Station UI while PC remains authoritative.
 - Added trust-boundary decision / pattern for phone-origin gameplay intents: paired client identity, monotonic sequence, payload validation, and authoritative PC lookup before dispatch.
+- Added task summary for `fix-iafs-editor-manifest-tests` and recorded an event manifest testing pattern: manifest fixtures must stay self-consistent and avoid legacy domain ordering assumptions.
