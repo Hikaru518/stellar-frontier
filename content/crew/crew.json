@@ -5,181 +5,29 @@
     {
       "crewId": "mike",
       "name": "Mike",
-      "role": "特战干员",
-      "currentTile": "1-1",
-      "status": "idle",
-      "statusTone": "neutral",
-      "attributes": {
-        "physical": 5,
-        "agility": 5,
-        "intellect": 3,
-        "perception": 4,
-        "luck": 3
-      },
-      "skills": ["scavenger", "field_operator"],
-      "inventory": [
-        { "itemId": "folding_rifle", "quantity": 1 },
-        { "itemId": "signal_flare", "quantity": 2 },
-        { "itemId": "old_compass", "quantity": 1 },
-        { "itemId": "ration", "quantity": 1 }
-      ],
-      "profile": {
-        "originWorld": "旧矿业边境 / 第七码头带",
-        "originProfession": "安全承包队特战干员",
-        "experience": "在几个名字被总部涂黑的矿区待过太久，习惯先检查出口，再相信任何地图。",
-        "selfIntro": "我不是来当英雄的。英雄通常死得太吵。"
-      },
-      "voiceTone": "短句、低声、带一点不耐烦；危险越近越少解释，但会把关键坐标说两遍。",
-      "personalityTags": ["嘴硬心软", "不信任总部", "旧矿区幸存者", "会偷偷给队友留补给"],
-      "expertise": [
-        {
-          "expertiseId": "scavenger",
-          "name": "拾荒者",
-          "description": "调查废弃地点时更容易发现能用的边角物资。",
-          "ruleEffect": {
-            "type": "surveyBonus",
-            "resourceId": "basic_tool",
-            "amount": 1,
-            "chance": 0.3,
-            "customLogText": "Mike 从一堆被烧焦的设备里拆出还能用的基础工具。"
-          }
-        },
-        {
-          "expertiseId": "field_operator",
-          "name": "野外行动",
-          "description": "行动报告更关注路线、掩体和撤离窗口。"
-        }
-      ],
-      "diaryEntries": [
-        {
-          "entryId": "mike_init_lake",
-          "triggerNode": "初始行进",
-          "gameSecond": 0,
-          "text": "湖的位置不对。不是地图错，是湖在移动。把这句话写下来听起来很蠢，但它确实离我更近了。",
-          "availability": "delivered"
-        },
-        {
-          "entryId": "mike_init_compass",
-          "triggerNode": "装备检查",
-          "gameSecond": 0,
-          "text": "指南针正常，步枪正常，通讯台的建议不正常。至少前三样里有两样能用。",
-          "availability": "delivered"
-        }
-      ],
-      "canCommunicate": true,
-      "lastContactTime": 0
-    },
-    {
-      "crewId": "amy",
-      "name": "Amy",
-      "role": "千金大小姐",
-      "currentTile": "2-3",
-      "status": "idle",
-      "statusTone": "neutral",
-      "attributes": {
-        "physical": 2,
-        "agility": 3,
-        "intellect": 4,
-        "perception": 4,
-        "luck": 5
-      },
-      "skills": ["negotiator"],
-      "inventory": [
-        { "itemId": "perfume", "quantity": 1 },
-        { "itemId": "medical_injector", "quantity": 1 },
-        { "itemId": "chocolate", "quantity": 1 },
-        { "itemId": "hq_credit", "quantity": 1 }
-      ],
-      "profile": {
-        "originWorld": "内环商业城 / 白塔区",
-        "originProfession": "财团继承人助理，实际负责危机公关",
-        "experience": "她不承认自己被流放，只说这是一次糟糕到无法写进履历的外勤。",
-        "selfIntro": "如果你想听我尖叫，请先给我一个像样的理由。"
-      },
-      "voiceTone": "礼貌、刻薄、速度很快；恐惧时会更精确地挑剔别人的用词。",
-      "personalityTags": ["骄傲但不迟钝", "害怕欠人情", "会用礼貌包装威胁", "讨厌脏水"],
-      "expertise": [
-        {
-          "expertiseId": "negotiator",
-          "name": "谈判本能",
-          "description": "在压力下仍能抓住对方语气里的退路，适合处理需要说服的事件。"
-        },
-        {
-          "expertiseId": "expensive_luck",
-          "name": "昂贵的运气",
-          "description": "她随身物品里总有一件东西在荒野里不合时宜地派上用场。"
-        }
-      ],
-      "diaryEntries": [
-        {
-          "entryId": "amy_init_forest",
-          "triggerNode": "森林紧急来电前",
-          "gameSecond": 0,
-          "text": "森林里没有路，只有一堆互相假装不是树枝的障碍物。我开始理解为什么地图没有写“令人讨厌”。",
-          "availability": "delivered"
-        }
-      ],
-      "canCommunicate": true,
-      "lastContactTime": 0
-    },
-    {
-      "crewId": "garry",
-      "name": "Garry",
-      "role": "退休老大爷",
-      "currentTile": "3-3",
+      "role": "神秘幸存者",
+      "currentTile": "4-4",
       "status": "idle",
       "statusTone": "neutral",
       "attributes": {
         "physical": 3,
-        "agility": 2,
-        "intellect": 4,
-        "perception": 4,
+        "agility": 3,
+        "intellect": 3,
+        "perception": 3,
         "luck": 3
       },
-      "skills": ["veteran_miner", "repair_habit"],
-      "inventory": [
-        { "itemId": "mining_pick", "quantity": 1 },
-        { "itemId": "mercury_thermometer", "quantity": 1 },
-        { "itemId": "old_pipe", "quantity": 1 },
-        { "itemId": "iron_ore", "quantity": 4 }
-      ],
+      "skills": [],
+      "inventory": [],
       "profile": {
-        "originWorld": "重力井采矿带 / 退役矿站 12",
-        "originProfession": "矿工、维修工、所有年轻人的反面教材",
-        "experience": "他声称自己退休过三次，每次都被更糟糕的设备重新雇用。",
-        "selfIntro": "机器会坏，人也会。区别是机器坏了还知道闭嘴。"
+        "originWorld": "未知",
+        "originProfession": "未知",
+        "experience": "关于他的过去没有可靠记录。",
+        "selfIntro": "我先走，别问太多。"
       },
-      "voiceTone": "慢、干、带抱怨；经常先说坏消息，再补一句更坏的。",
-      "personalityTags": ["坏消息先说", "对机器比对人耐心", "爱讲冷笑话", "相信老工具"],
-      "expertise": [
-        {
-          "expertiseId": "veteran_miner",
-          "name": "老矿工",
-          "description": "调查矿床时能凭声音和温度判断矿脉走向。",
-          "ruleEffect": {
-            "type": "surveyBonus",
-            "resourceId": "iron_ore",
-            "amount": 1,
-            "chance": 0.5,
-            "tileId": "3-3",
-            "customLogText": "Garry 敲了三下岩壁，找出一条地图没有标注的铁矿细脉。"
-          }
-        },
-        {
-          "expertiseId": "repair_habit",
-          "name": "维修习惯",
-          "description": "看到松动螺栓会自动伸手，哪怕没人感谢。"
-        }
-      ],
-      "diaryEntries": [
-        {
-          "entryId": "garry_init_mine",
-          "triggerNode": "初始采矿",
-          "gameSecond": 0,
-          "text": "矿床还算诚实，至少它不会说自己“正在优化工作流”。温度计有点不对劲，先记着。",
-          "availability": "delivered"
-        }
-      ],
+      "voiceTone": "简短、克制、信息很少。",
+      "personalityTags": ["神秘", "寡言", "谨慎"],
+      "expertise": [],
+      "diaryEntries": [],
       "canCommunicate": true,
       "lastContactTime": 0
     }
