@@ -62,7 +62,7 @@ test("IAFS bootstrap starts at the crash site and exposes the three repair actio
 
   await expect(page.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeVisible();
   await page.getByRole("button", { name: /通讯台/ }).click();
-  await startNormalCrewCall(page, "Mike，神秘幸存者");
+  await startNormalCrewCall(page, "Mike，特战干员");
 
   await expect(page.getByText(/地点：IAFS坠毁点 \(0,0\)/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "发电机" })).toBeVisible();
@@ -108,7 +108,7 @@ test("PS-003 resolves Mike's crash-site runtime call and reveals the wreckage ob
 
   await page.goto("/");
   await page.getByRole("button", { name: /通讯台/ }).click();
-  await startNormalCrewCall(page, "Mike，特战干员");
+  await startNormalCrewCall(page, "Mike，神秘幸存者");
   await page.getByRole("button", { name: "调查当前区域" }).click();
   await page.clock.runFor(121_000);
   await page.getByRole("button", { name: "结束通话" }).last().click();
@@ -204,7 +204,7 @@ test("loads the app and opens the incoming Amy call without saved emergency choi
   await page.getByRole("button", { name: /通讯台/ }).click();
 
   await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
-  const amyCard = page.getByText("Amy，千金大小姐").locator("xpath=ancestor::article[1]");
+  const amyCard = getCrewCard(page, "Amy");
   await amyCard.getByRole("button", { name: "通话" }).click();
 
   await expect(page.getByRole("heading", { name: "通话页面：Amy 状态确认" })).toBeVisible();
@@ -221,7 +221,7 @@ test("opens the communication station and shows a crew inventory", async ({ page
 
   await page.getByRole("button", { name: /通讯台/ }).click();
 
-  const mikeCard = page.getByText("Mike，特战干员").locator("xpath=ancestor::article[1]");
+  const mikeCard = getCrewCard(page, "Mike");
   await mikeCard.getByRole("button", { name: "查看背包" }).click();
 
   await expect(page.getByRole("heading", { name: "Mike / 背包" })).toBeVisible();
@@ -261,6 +261,102 @@ test("shows the full authored map on a new map", async ({ page }) => {
   expect(await semanticLayer.getByRole("button", { name: /北部玄武高地/ }).count()).toBeGreaterThan(0);
   await expect(semanticLayer.getByRole("button", { name: /未探索区域/ })).toHaveCount(0);
   await expect(page.getByText(/4x4|4 x 4/)).toHaveCount(0);
+});
+
+test("shows the quest sidebar on the control center and supports collapse, expansion, and filters", async ({ page }) => {
+  await page.goto("/");
+
+  const sidebar = page.getByLabel("任务侧边栏");
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar.getByText("未完成 2")).toBeVisible();
+  await expect(sidebar.getByText("主要 1")).toBeVisible();
+
+  await sidebar.getByRole("button", { name: "展开任务" }).click();
+  await expect(sidebar.getByRole("heading", { name: "任务追踪" })).toBeVisible();
+  await expect(sidebar.getByRole("heading", { name: "重整坠毁现场" })).toBeVisible();
+
+  await sidebar.getByRole("group", { name: "完成状态" }).getByRole("button", { name: "已完成" }).click();
+  await expect(sidebar.getByText("当前筛选下没有任务。")).toBeVisible();
+
+  await sidebar.getByRole("group", { name: "完成状态" }).getByRole("button", { name: "全部" }).click();
+  await sidebar.getByRole("group", { name: "任务类型" }).getByRole("button", { name: "次要" }).click();
+  await expect(sidebar.getByRole("heading", { name: "记录南侧通道" })).toBeVisible();
+  await expect(sidebar.getByText("重整坠毁现场")).toHaveCount(0);
+
+  await sidebar.getByRole("button", { name: "折叠" }).click();
+  await expect(sidebar.getByRole("button", { name: "展开任务" })).toBeVisible();
+});
+
+test("completes a quest todo through the crash-site event and preserves it after reload", async ({ page }) => {
+  await installSave(page, {
+    elapsedGameSeconds: 0,
+    crew: [idleCrew("mike", "4-4", { status: "坠毁区域待命。" })],
+    map: createMapWithDiscoveredTiles("4-4"),
+    logs: initialLogs,
+    resources: initialResources,
+  });
+  await page.goto("/");
+
+  await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
+  await expect(page.getByText("调查 IAFS 坠毁点")).toBeVisible();
+
+  await page.getByRole("button", { name: "通讯台 查看通讯录" }).click();
+  await startNormalCrewCall(page, "Mike，神秘幸存者");
+  await page.getByRole("button", { name: "调查当前区域" }).click();
+  await page.clock.runFor(16_000);
+  await page.getByRole("button", { name: /返回通讯台|结束通话/ }).last().click();
+
+  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
+  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
+  await page.getByRole("button", { name: "标记这些可用设施。" }).click();
+
+  const saved = await readSave(page);
+  expect(saved.quest_state.quests.regroup_after_crash.subquests.inspect_crash_modules.todos.survey_crash_site).toMatchObject({
+    status: "completed",
+  });
+
+  await page.reload();
+  await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
+  const surveyTodo = page.locator(".quest-todo").filter({ hasText: "调查 IAFS 坠毁点" });
+  await expect(surveyTodo.getByText("已完成")).toBeVisible();
+});
+
+test("quest navigation opens context without starting calls or movement", async ({ page }) => {
+  await page.goto("/");
+
+  const sidebar = page.getByLabel("任务侧边栏");
+  await sidebar.getByRole("button", { name: "展开任务" }).click();
+
+  await sidebar.getByRole("button", { name: "联系 Mike" }).click();
+  await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /通话页面：/ })).toHaveCount(0);
+  expect((await readSave(page)).crew_actions).toEqual({});
+
+  await sidebar.getByRole("button", { name: "查看 IAFS 坠毁点" }).first().click();
+  await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
+  await expect(page.getByText("坐标详情：(0,0)")).toBeVisible();
+  expect((await readSave(page)).crew_actions).toEqual({});
+});
+
+test("quest sidebar layout leaves core controls reachable on station, call, and map pages", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
+  await expectQuestLayoutDoesNotOverlap(page);
+
+  await page.getByRole("button", { name: "通讯台 查看通讯录" }).click();
+  await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /通话/ }).first()).toBeVisible();
+  await expectQuestLayoutDoesNotOverlap(page);
+
+  await startNormalCrewCall(page, "Mike，神秘幸存者");
+  await expect(page.getByRole("heading", { name: /通话页面：Mike/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
+  await expectQuestLayoutDoesNotOverlap(page);
+
+  await page.getByRole("button", { name: /地图二级菜单/ }).click();
+  await expect(page.locator(".phaser-map-stage")).toBeVisible();
+  await expect(page.getByLabel("任务侧边栏").getByRole("button", { name: "折叠" })).toBeVisible();
+  await expectQuestLayoutDoesNotOverlap(page);
 });
 
 test("renders the Phaser canvas inside a stable fixed map viewport", async ({ page }) => {
@@ -397,7 +493,7 @@ test("moves Garry to a full-map tile selected from the complete target list", as
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
-  const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
+  const garryCard = getCrewCard(page, "Garry");
   await garryCard.getByRole("button", { name: "通话" }).click();
   await page.getByRole("button", { name: "移动到指定区域" }).click();
 
@@ -480,7 +576,7 @@ test("does not create the removed Garry mine anomaly call from the default surve
   await page.goto("/");
 
   await page.getByRole("button", { name: /通讯台/ }).click();
-  const garryCard = page.getByText("Garry，退休老大爷").locator("xpath=ancestor::article[1]");
+  const garryCard = getCrewCard(page, "Garry");
   await garryCard.getByRole("button", { name: "通话" }).click();
   await page.getByRole("button", { name: "调查当前区域" }).click();
 
@@ -637,7 +733,9 @@ async function installSave(page: Page, partial: Record<string, unknown>) {
 
   await page.addInitScript(
     ({ key, value }) => {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      if (!window.localStorage.getItem(key)) {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      }
     },
     { key: GAME_SAVE_KEY, value: save },
   );
@@ -648,8 +746,12 @@ async function readSave(page: Page) {
 }
 
 async function startNormalCrewCall(page: Page, crewLabel: string) {
-  const crewCard = page.getByText(crewLabel).locator("xpath=ancestor::article[1]");
+  const crewCard = crewLabel.includes("，") ? getCrewCard(page, crewLabel.split("，")[0]) : getCrewCard(page, crewLabel);
   await crewCard.getByRole("button", { name: "通话" }).click();
+}
+
+function getCrewCard(page: Page, crewName: string) {
+  return page.locator("article").filter({ hasText: crewName });
 }
 
 async function clickPhaserMapTile(page: Page, tileId: string) {
@@ -663,6 +765,14 @@ async function setDebugTimeMultiplier(page: Page, multiplierLabel: "1x" | "2x" |
   await page.getByRole("button", { name: "[DEBUG]" }).click();
   await page.getByRole("button", { name: multiplierLabel }).click();
   await page.getByRole("button", { name: "关闭" }).click();
+}
+
+async function expectQuestLayoutDoesNotOverlap(page: Page) {
+  const mainBox = await page.locator(".quest-layout-main").boundingBox();
+  const sidebarBox = await page.getByLabel("任务侧边栏").boundingBox();
+  expect(mainBox).toBeTruthy();
+  expect(sidebarBox).toBeTruthy();
+  expect((mainBox?.x ?? 0) + (mainBox?.width ?? 0)).toBeLessThanOrEqual((sidebarBox?.x ?? 0) + 1);
 }
 
 function idleCrew(
@@ -1057,7 +1167,66 @@ function createEmptyEventRuntimeState() {
     world_flags: {},
     crew_actions: {},
     inventories: {},
+    quest_state: createInitialQuestStateForE2e(),
     rng_state: null,
+  };
+}
+
+function createInitialQuestStateForE2e() {
+  return {
+    quests: {
+      regroup_after_crash: {
+        id: "regroup_after_crash",
+        status: "incomplete",
+        current_node_id: "crash_site_unsecured",
+        updated_at: 0,
+        completed_at: null,
+        subquests: {
+          establish_survivor_contact: {
+            id: "establish_survivor_contact",
+            status: "incomplete",
+            current_node_id: "contact_pending",
+            updated_at: 0,
+            completed_at: null,
+            todos: {
+              call_mike: { id: "call_mike", status: "incomplete", updated_at: 0, completed_at: null },
+            },
+          },
+          inspect_crash_modules: {
+            id: "inspect_crash_modules",
+            status: "incomplete",
+            current_node_id: "modules_unknown",
+            updated_at: 0,
+            completed_at: null,
+            todos: {
+              survey_crash_site: { id: "survey_crash_site", status: "incomplete", updated_at: 0, completed_at: null },
+              inspect_generator: { id: "inspect_generator", status: "incomplete", updated_at: 0, completed_at: null },
+              inspect_life_support: { id: "inspect_life_support", status: "incomplete", updated_at: 0, completed_at: null },
+            },
+          },
+        },
+      },
+      survey_south_passage: {
+        id: "survey_south_passage",
+        status: "incomplete",
+        current_node_id: "survey_not_started",
+        updated_at: 0,
+        completed_at: null,
+        subquests: {
+          mark_passage_tiles: {
+            id: "mark_passage_tiles",
+            status: "incomplete",
+            current_node_id: "passage_unmarked",
+            updated_at: 0,
+            completed_at: null,
+            todos: {
+              check_tile_5_4: { id: "check_tile_5_4", status: "incomplete", updated_at: 0, completed_at: null },
+            },
+          },
+        },
+      },
+    },
+    updated_quest_ids: [],
   };
 }
 

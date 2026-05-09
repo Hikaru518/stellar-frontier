@@ -250,7 +250,7 @@ p {
 
 .control-layout {
   display: grid;
-  grid-template-columns: 260px minmax(360px, 1fr) 360px;
+  grid-template-columns: minmax(220px, 260px) minmax(300px, 1fr) minmax(280px, 360px);
   grid-template-areas:
     "resource facilities log"
     "hint facilities log";
@@ -264,7 +264,7 @@ p {
 .facility-grid {
   grid-area: facilities;
   display: grid;
-  grid-template-columns: repeat(6, minmax(82px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
   grid-auto-rows: minmax(104px, auto);
   gap: 12px;
 }
