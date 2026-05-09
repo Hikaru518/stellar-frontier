@@ -51,6 +51,21 @@ import {
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
 import { logger } from "./logger";
+import {
+  acquireYuanDualDeviceTerminal,
+  createDualDeviceMessage,
+  createPairingSession,
+  DUAL_DEVICE_PC_EVENT_METHOD,
+  DUAL_DEVICE_PHONE_DELIVERY_METHOD,
+  provideDualDeviceService,
+  requestDualDeviceMessage,
+  shouldEnablePcFallback,
+  validatePhoneChoiceSelectPayload,
+  type DualDeviceMessage,
+  type DualDevicePairingSession,
+  type PhoneChoiceSelectPayload,
+  type YuanDualDeviceTerminal,
+} from "@stellar-frontier/dual-device";
 
 const eventContentIndexResult = buildEventContentIndex(eventContentLibrary);
 if (eventContentIndexResult.errors.length > 0) {
@@ -58,12 +73,60 @@ if (eventContentIndexResult.errors.length > 0) {
 }
 const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
+const MOBILE_FALLBACK_AFTER_MS = 10000;
 
 type SavedCrewMember = Partial<CrewMember> & { id: CrewId };
 
 type SavedGameState = Partial<Omit<GameState, "crew">> & {
   crew?: SavedCrewMember[];
 };
+
+type MobileMode = "waiting" | "active" | "fallback";
+type MobileSessionStatus = "waiting" | "connected" | "offline";
+
+interface MobileSessionState {
+  status: MobileSessionStatus;
+  lastHeartbeatAt?: number;
+  fallbackAfterMs: number;
+}
+
+export interface PcMobileStatusCard {
+  mode: MobileMode;
+  lastHeartbeatAt?: number;
+  fallbackAfterMs: number;
+  unreadCount: number;
+  emergencyCount: number;
+}
+
+export function validatePhoneMessageEnvelope(
+  message: DualDeviceMessage,
+  pairingSession: Pick<DualDevicePairingSession, "roomId" | "phoneTerminalId">,
+  lastAcceptedSequence: number,
+): { ok: true; nextSequence: number } | { ok: false; reason: "room_mismatch" | "client_mismatch" | "invalid_sequence" | "replayed_sequence" } {
+  if (message.roomId !== pairingSession.roomId) {
+    return { ok: false, reason: "room_mismatch" };
+  }
+  if (message.clientId !== pairingSession.phoneTerminalId) {
+    return { ok: false, reason: "client_mismatch" };
+  }
+  if (!Number.isSafeInteger(message.sequence) || message.sequence <= 0) {
+    return { ok: false, reason: "invalid_sequence" };
+  }
+  if (message.sequence <= lastAcceptedSequence) {
+    return { ok: false, reason: "replayed_sequence" };
+  }
+  return { ok: true, nextSequence: message.sequence };
+}
+
+export function resolvePhoneRuntimeCallCrewId(
+  payloadCrewId: Extract<PhoneChoiceSelectPayload, { kind: "runtime_call_option" }>["crewId"],
+  authoritativeCrewId: string,
+): { ok: true; crewId: string } | { ok: false; reason: "crew_mismatch" } {
+  if (payloadCrewId !== null && payloadCrewId !== authoritativeCrewId) {
+    return { ok: false, reason: "crew_mismatch" };
+  }
+  return { ok: true, crewId: authoritativeCrewId };
+}
 
 function App() {
   const initialState = useMemo(createInitialGameState, []);
@@ -73,12 +136,29 @@ function App() {
   const [mapReturnTarget, setMapReturnTarget] = useState<MapReturnTarget>("control");
   const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
+  const [mobileSession, setMobileSession] = useState<MobileSessionState>({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
+  const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
+  const mobileSequenceRef = useRef(1);
+  const lastAcceptedPhoneSequenceRef = useRef(0);
+  const gameStateRef = useRef(gameState);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const { elapsedGameSeconds, crew, map, tiles, logs, resources } = gameState;
   const gameTimeLabel = formatGameTime(elapsedGameSeconds);
   const returnHomeCompleted = gameState.world_flags.return_home_completed?.value === true;
   const returnHomeCompletedAt = getWorldFlagNumber(gameState, "return_home_completed_at");
   const completedAtLabel = formatGameTime(returnHomeCompletedAt ?? elapsedGameSeconds);
+  const mobileFallback = shouldEnablePcFallback({ transport: mobileSession.status === "offline" ? "offline" : "yuan-wss", lastHeartbeatAt: mobileSession.lastHeartbeatAt, fallbackAfterMs: mobileSession.fallbackAfterMs }, nowMs);
+  const mobileMode: MobileMode = typeof mobileSession.lastHeartbeatAt === "number" && !mobileFallback ? "active" : mobileFallback ? "fallback" : "waiting";
+  const activeMobileCalls = getActiveRuntimeCalls(gameState, elapsedGameSeconds);
+  const mobileStatusCard = {
+    mode: mobileMode,
+    lastHeartbeatAt: mobileSession.lastHeartbeatAt,
+    fallbackAfterMs: mobileSession.fallbackAfterMs,
+    unreadCount: activeMobileCalls.length + crew.filter((member) => member.hasIncoming).length,
+    emergencyCount: activeMobileCalls.filter(isUrgentRuntimeCallState).length,
+  };
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -94,7 +174,43 @@ function App() {
   }, [timeMultiplier]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldStartYuanTerminal()) {
+      return;
+    }
+
+    setMobileSession((session) => ({ ...session, status: "waiting" }));
+    const lease = acquireYuanDualDeviceTerminal({
+      hostUrl: mobilePairingSession.hostUrl,
+      terminalId: mobilePairingSession.pcTerminalId,
+      token: mobilePairingSession.token,
+      tenantPublicKey: mobilePairingSession.tenantPublicKey,
+      name: "Stellar Frontier PC Authority",
+      enableWebRTC: true,
+    });
+    const { terminal } = lease;
+    terminalRef.current = terminal;
+    const connectionSubscription = terminal.isConnected$.subscribe((connected) => {
+      setMobileSession((session) => ({ ...session, status: connected ? session.status : "offline" }));
+    });
+    const service = provideDualDeviceService(terminal, DUAL_DEVICE_PC_EVENT_METHOD, handlePhoneEventMessage);
+    return () => {
+      service.dispose();
+      connectionSubscription.unsubscribe();
+      if (terminalRef.current === terminal) {
+        terminalRef.current = null;
+      }
+      lease.dispose();
+    };
+  }, [mobilePairingSession]);
+
+  useEffect(() => {
     saveGameState(gameState);
+    gameStateRef.current = gameState;
   }, [gameState]);
 
   useEffect(() => {
@@ -211,6 +327,96 @@ function App() {
     setDebugOpen(false);
   }
 
+  function regenerateMobilePairingSession() {
+    setMobilePairingSession(createPhoneTerminalPairingSession());
+    lastAcceptedPhoneSequenceRef.current = 0;
+    setMobileSession({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
+  }
+
+  async function sendMobileSnapshot(messageType: "phone.message.delivered" | "phone.call.incoming" = "phone.message.delivered", extraPayload: Record<string, unknown> = {}) {
+    if (!terminalRef.current) {
+      return;
+    }
+    const message = createDualDeviceMessage({
+      type: messageType,
+      roomId: mobilePairingSession.roomId,
+      clientId: mobilePairingSession.pcTerminalId,
+      sequence: mobileSequenceRef.current,
+      payload: { ...buildMobileViewModel(gameStateRef.current, gameStateRef.current.elapsedGameSeconds), fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS, ...extraPayload },
+    });
+    mobileSequenceRef.current += 1;
+    await requestDualDeviceMessage({ terminal: terminalRef.current, targetTerminalId: mobilePairingSession.phoneTerminalId, method: DUAL_DEVICE_PHONE_DELIVERY_METHOD, message }).catch(() => undefined);
+  }
+
+  function enableMobileFallback() {
+    setMobileSession((session) => ({ ...session, status: "offline" }));
+    void sendMobileSnapshot("phone.message.delivered", { kind: "phone_fallback_enabled", reason: "pc_manual_fallback" });
+  }
+
+  async function handlePhoneEventMessage(message: DualDeviceMessage) {
+    const trusted = validatePhoneMessageEnvelope(message, mobilePairingSession, lastAcceptedPhoneSequenceRef.current);
+    if (!trusted.ok) {
+      return;
+    }
+    lastAcceptedPhoneSequenceRef.current = trusted.nextSequence;
+    if (message.type === "link.heartbeat") {
+      setMobileSession((session) => ({ ...session, status: "connected", lastHeartbeatAt: Date.now() }));
+      void sendMobileSnapshot();
+      return;
+    }
+    if (message.type === "phone.message.read" || message.type === "phone.call.answer") {
+      setMobileSession((session) => ({ ...session, status: "connected", lastHeartbeatAt: Date.now() }));
+      return;
+    }
+    if (message.type === "phone.choice.select") {
+      const accepted = await handlePhoneChoiceSelect(message.payload, message.clientId);
+      void sendIntentAck(message.payload, accepted.ok ? "accepted" : "rejected", accepted.ok ? undefined : accepted.reason);
+    }
+  }
+
+  async function sendIntentAck(payload: Record<string, unknown>, status: "accepted" | "rejected", reason?: string) {
+    if (typeof payload.clientRequestId !== "string") {
+      return;
+    }
+    await sendMobileSnapshot("phone.message.delivered", { kind: "intent_ack", clientRequestId: payload.clientRequestId, status, reason });
+  }
+
+  async function handlePhoneChoiceSelect(payload: unknown, _clientId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const authoritativeState = gameStateRef.current;
+    if (!validatePhoneChoiceSelectPayload(payload)) {
+      appendLog("手机指令被拒绝：payload 无效。", "muted");
+      return { ok: false, reason: "invalid_payload" };
+    }
+    if (payload.kind === "runtime_call_option") {
+      const call = authoritativeState.active_calls[payload.callId];
+      if (!call || !isRuntimeCallActiveForState(call, authoritativeState.elapsedGameSeconds) || !call.available_options.some((option) => option.option_id === payload.optionId)) {
+        appendLog("手机事件选项被拒绝：通话已过期或选项不可用。", "muted");
+        return { ok: false, reason: "call_or_option_unavailable" };
+      }
+      const resolvedCrew = resolvePhoneRuntimeCallCrewId(payload.crewId, call.crew_id);
+      if (!resolvedCrew.ok) {
+        appendLog("手机事件选项被拒绝：队员与通话不匹配。", "muted");
+        return { ok: false, reason: "crew_mismatch" };
+      }
+      dispatchRuntimeCallOption(payload.callId, resolvedCrew.crewId, payload.optionId);
+      return { ok: true };
+    }
+    if (payload.kind === "basic_action") {
+      if (!authoritativeState.crew.some((member) => member.id === payload.crewId)) {
+        appendLog("手机基础行动被拒绝：队员不存在。", "muted");
+        return { ok: false, reason: "crew_unavailable" };
+      }
+      dispatchBasicOrStoryAction(payload.crewId as CrewId, payload.actionId);
+      return { ok: true };
+    }
+    if (!authoritativeState.crew.some((member) => member.id === payload.crewId) || !findVisibleLocationStoryAction(authoritativeState, payload.crewId as CrewId, payload.actionId)) {
+      appendLog("手机地点行动被拒绝：行动不可见或不可执行。", "muted");
+      return { ok: false, reason: "story_action_unavailable" };
+    }
+    dispatchBasicOrStoryAction(payload.crewId as CrewId, payload.actionId);
+    return { ok: true };
+  }
+
   function startCall(crewId: CrewId) {
     const member = crew.find((item) => item.id === crewId);
     const runtimeCall = findRuntimeCallForCrew(gameState, crewId);
@@ -251,28 +457,7 @@ function App() {
       if (currentCall.settled) {
         return;
       }
-      logger.log({
-        type: "player.call.choice",
-        source: "player_command",
-        payload: {
-          call_id: currentCall.runtimeCallId!,
-          choice_key: actionId,
-          crew_id: currentCall.crewId ?? null,
-        },
-        gameSeconds: gameState.elapsedGameSeconds,
-      });
-      setGameState((state) =>
-        mergeEventRuntimeState(
-          state,
-          selectCallOption({
-            state: toEventEngineState(state),
-            index: eventContentIndex,
-            call_id: currentCall.runtimeCallId!,
-            option_id: actionId,
-            occurred_at: state.elapsedGameSeconds,
-          }).state,
-        ),
-      );
+      dispatchRuntimeCallOption(currentCall.runtimeCallId!, currentCall.crewId ?? null, actionId);
       setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
       return;
     }
@@ -292,35 +477,57 @@ function App() {
       return;
     }
 
+    if (currentCall.settled) {
+      return;
+    }
+
+    dispatchBasicOrStoryAction(currentCall.crewId, actionId, true);
+  }
+
+  function dispatchRuntimeCallOption(callId: string, crewId: string | null, optionId: string) {
+    const authoritativeState = gameStateRef.current;
+    logger.log({
+      type: "player.call.choice",
+      source: "player_command",
+      payload: {
+        call_id: callId,
+        choice_key: optionId,
+        crew_id: crewId,
+      },
+      gameSeconds: authoritativeState.elapsedGameSeconds,
+    });
+    setGameState((state) =>
+      mergeEventRuntimeState(
+        state,
+        selectCallOption({
+          state: toEventEngineState(state),
+          index: eventContentIndex,
+          call_id: callId,
+          option_id: optionId,
+          occurred_at: state.elapsedGameSeconds,
+        }).state,
+      ),
+    );
+  }
+
+  function dispatchBasicOrStoryAction(crewId: CrewId, actionId: string, updateCurrentCall = false) {
+    const authoritativeState = gameStateRef.current;
     if (actionId === "universal:survey") {
-      if (currentCall.settled) {
-        return;
-      }
       logger.log({
         type: "player.action.dispatch",
         source: "player_command",
         payload: {
-          crew_id: currentCall.crewId,
+          crew_id: crewId,
           action_id: "universal:survey",
           action_kind: "survey",
         },
-        gameSeconds: gameState.elapsedGameSeconds,
+        gameSeconds: authoritativeState.elapsedGameSeconds,
       });
-      const applied = triggerCurrentAreaSurvey(gameState, currentCall.crewId);
+      const applied = triggerCurrentAreaSurvey(authoritativeState, crewId);
       setGameState(applied.state);
-      setCurrentCall((call) =>
-        call
-          ? {
-              ...call,
-              settled: true,
-              result: applied.createdEvent ? "调查事件已进入通讯队列。" : CURRENT_AREA_SURVEY_EMPTY_RESULT,
-            }
-          : call,
-      );
-      return;
-    }
-
-    if (currentCall.settled) {
+      if (updateCurrentCall) {
+        setCurrentCall((call) => (call ? { ...call, settled: true, result: applied.createdEvent ? "调查事件已进入通讯队列。" : CURRENT_AREA_SURVEY_EMPTY_RESULT } : call));
+      }
       return;
     }
 
@@ -329,44 +536,29 @@ function App() {
         type: "player.action.dispatch",
         source: "player_command",
         payload: {
-          crew_id: currentCall.crewId,
+          crew_id: crewId,
           action_id: actionId,
           action_kind: actionId === "universal:standby" ? "standby" : "stop",
         },
-        gameSeconds: gameState.elapsedGameSeconds,
+        gameSeconds: authoritativeState.elapsedGameSeconds,
       });
       setGameState((state) => {
-        const nextState =
-          actionId === "universal:standby"
-            ? createStandbyCrewAction(state, currentCall.crewId, state.elapsedGameSeconds)
-            : createStopCrewAction(state, currentCall.crewId, state.elapsedGameSeconds);
+        const nextState = actionId === "universal:standby" ? createStandbyCrewAction(state, crewId, state.elapsedGameSeconds) : createStopCrewAction(state, crewId, state.elapsedGameSeconds);
         return settleGameTime(nextState);
       });
-      setCurrentCall((call) =>
-        call
-          ? {
-              ...call,
-              settled: true,
-              result: "行动指令已提交。",
-            }
-          : call,
-      );
+      if (updateCurrentCall) {
+        setCurrentCall((call) => (call ? { ...call, settled: true, result: "行动指令已提交。" } : call));
+      }
       return;
     }
 
-    const selectedStoryAction = findVisibleLocationStoryAction(gameState, currentCall.crewId, actionId);
+    const selectedStoryAction = findVisibleLocationStoryAction(authoritativeState, crewId, actionId);
     if (selectedStoryAction) {
-      const applied = triggerLocationStoryAction(gameState, selectedStoryAction);
+      const applied = triggerLocationStoryAction(authoritativeState, selectedStoryAction);
       setGameState(applied.state);
-      setCurrentCall((call) =>
-        call
-          ? {
-              ...call,
-              settled: true,
-              result: applied.createdEvent ? "地点事件已进入通讯队列。" : "当前地点没有可触发的地点事件。",
-            }
-          : call,
-      );
+      if (updateCurrentCall) {
+        setCurrentCall((call) => (call ? { ...call, settled: true, result: applied.createdEvent ? "地点事件已进入通讯队列。" : "当前地点没有可触发的地点事件。" } : call));
+      }
       return;
     }
 
@@ -504,6 +696,11 @@ function App() {
         elapsedGameSeconds={elapsedGameSeconds}
         tiles={tiles}
         gameTimeLabel={gameTimeLabel}
+        pairingSession={mobilePairingSession}
+        mobileSessionStatus={mobileSession.status}
+        onRegeneratePairing={regenerateMobilePairingSession}
+        onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
+        onEnablePhoneFallback={enableMobileFallback}
         onBack={() => setPage("control")}
         onStartCall={startCall}
       />
@@ -565,6 +762,7 @@ function App() {
         onOpenDebug={() => setDebugOpen(true)}
         onAppendLog={appendLog}
         map={map}
+        mobileStatus={mobileStatusCard}
       />
       {debugOpen ? (
         <DebugToolbox
@@ -1860,6 +2058,99 @@ function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
 
 function addUnique<T>(items: T[], ...values: T[]) {
   return [...items, ...values.filter((value) => !items.includes(value))];
+}
+
+function createPhoneTerminalPairingSession(): DualDevicePairingSession {
+  return createPairingSession({
+    hostUrl: getConfiguredYuanHostUrl(),
+    mobileBaseUrl: getConfiguredMobileTerminalUrl(),
+  });
+}
+
+function shouldStartYuanTerminal() {
+  return import.meta.env.MODE !== "test" && import.meta.env.VITE_DISABLE_YUAN_TERMINAL !== "true" && typeof WebSocket !== "undefined";
+}
+
+function getConfiguredYuanHostUrl() {
+  const configured = import.meta.env.VITE_YUAN_HOST_URL as string | undefined;
+  if (configured) {
+    return configured;
+  }
+
+  const url = new URL(window.location.href);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.port = "8888";
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function getConfiguredMobileTerminalUrl() {
+  const configured = import.meta.env.VITE_MOBILE_TERMINAL_URL as string | undefined;
+  if (configured) {
+    return configured;
+  }
+
+  const url = new URL(window.location.href);
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+    url.port = "5174";
+    url.pathname = "/";
+  } else {
+    url.pathname = `${url.pathname.replace(/\/$/, "")}/mobile/`;
+  }
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function buildMobileViewModel(state: GameState, elapsedGameSeconds: number) {
+  const activeCalls = getActiveRuntimeCalls(state, elapsedGameSeconds);
+  const contacts = state.crew.map((member) => ({ id: member.id, name: member.name, role: member.role, status: member.status }));
+  const threads = state.crew.map((member) => {
+    const call = activeCalls.find((item) => item.crew_id === member.id);
+    const tile = state.tiles.find((item) => item.id === member.currentTile);
+    const callView = tile ? buildCallView({ member, tile, gameState: state }) : null;
+    return {
+      id: `crew:${member.id}`,
+      crewId: member.id,
+      title: member.name,
+      preview: call?.rendered_lines[0]?.text ?? member.status,
+      priority: call && isUrgentRuntimeCallState(call) ? "emergency" : call ? "call" : "normal",
+      messages: call?.rendered_lines.map((line) => ({ id: `${call.id}:${line.speaker_crew_id}:${line.text}`, speaker: line.speaker_crew_id, text: line.text })) ?? [],
+      options: call
+        ? call.available_options.map((option) => ({ id: option.option_id, label: option.text, payload: { version: 1, kind: "runtime_call_option", callId: call.id, crewId: call.crew_id, optionId: option.option_id } }))
+        : [
+            { id: "universal:survey", label: "调查当前区域", payload: { version: 1, kind: "basic_action", crewId: member.id, actionId: "universal:survey" } },
+            { id: "universal:standby", label: "原地待命", payload: { version: 1, kind: "basic_action", crewId: member.id, actionId: "universal:standby" } },
+            { id: "universal:stop", label: "停止当前行动", payload: { version: 1, kind: "basic_action", crewId: member.id, actionId: "universal:stop" } },
+            ...(callView?.groups.flatMap((group) => group.actions.filter((action) => action.id !== "universal:move" && !action.id.startsWith("universal:") && !action.disabled).map((action) => ({ id: action.id, label: action.label, payload: { version: 1, kind: "story_action", crewId: member.id, actionId: action.id } }))) ?? []),
+            { id: "universal:move", label: "移动（请回到 PC 地图流程）", disabled: true, payload: null },
+          ],
+    };
+  });
+  return {
+    kind: activeCalls.some(isUrgentRuntimeCallState) ? "emergency_snapshot" : "snapshot",
+    title: activeCalls[0]?.rendered_lines[0]?.text ?? "移动通讯设备已同步",
+    body: activeCalls[0]?.rendered_lines[1]?.text ?? "PC 权威端已下发通讯快照。",
+    contacts,
+    threads,
+    taskSummary: Object.values(state.objectives).filter((objective) => objective.status === "available" || objective.status === "assigned" || objective.status === "in_progress").slice(0, 3).map((objective) => objective.title),
+    recentEvents: state.event_logs.filter((log) => log.visibility === "player_visible").slice(-3).map((log) => log.summary),
+  };
+}
+
+function getActiveRuntimeCalls(state: GameState, elapsedGameSeconds: number): RuntimeCall[] {
+  return Object.values(state.active_calls).filter((call) => isRuntimeCallActiveForState(call, elapsedGameSeconds));
+}
+
+function isRuntimeCallActiveForState(call: RuntimeCall, elapsedGameSeconds: number) {
+  return (call.status === "incoming" || call.status === "connected" || call.status === "awaiting_choice") && (typeof call.expires_at !== "number" || call.expires_at > elapsedGameSeconds);
+}
+
+function isUrgentRuntimeCallState(call: RuntimeCall) {
+  const severity = (call as RuntimeCall & { severity?: unknown }).severity ?? call.render_context_snapshot.severity;
+  return severity === "high" || severity === "critical";
 }
 
 function appendArrivalDiary(member: CrewMember, elapsedGameSeconds: number) {

@@ -2,20 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
   createDualDeviceMessage,
-  createPairingSession,
-  acquireYuanDualDeviceTerminal,
   describeYuanRealtimeLink,
-  DUAL_DEVICE_PC_EVENT_METHOD,
-  DUAL_DEVICE_PHONE_DELIVERY_METHOD,
   getLatencyTarget,
   isPairingSessionExpired,
-  provideDualDeviceService,
-  requestDualDeviceMessage,
   selectPreferredTransport,
   yuanBackedDualDevicePlan,
   type DualDevicePairingSession,
-  type DualDeviceMessage,
-  type YuanDualDeviceTerminal,
 } from "@stellar-frontier/dual-device";
 import { ConsoleShell, FieldList, Modal, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
@@ -39,6 +31,11 @@ interface CommunicationStationProps {
   elapsedGameSeconds: number;
   tiles: MapTile[];
   gameTimeLabel: string;
+  pairingSession: DualDevicePairingSession;
+  mobileSessionStatus: "waiting" | "connected" | "offline";
+  onRegeneratePairing: () => void;
+  onSendPrivateSignal: () => void;
+  onEnablePhoneFallback: () => void;
   onBack: () => void;
   onStartCall: (crewId: CrewId) => void;
 }
@@ -52,18 +49,21 @@ export function CommunicationStation({
   elapsedGameSeconds,
   tiles,
   gameTimeLabel,
+  pairingSession,
+  mobileSessionStatus,
+  onRegeneratePairing,
+  onSendPrivateSignal,
+  onEnablePhoneFallback,
   onBack,
   onStartCall,
 }: CommunicationStationProps) {
   const [contactsOpen, setContactsOpen] = useState(true);
   const [detailCrewId, setDetailCrewId] = useState<CrewId | null>(null);
   const [inventoryCrewId, setInventoryCrewId] = useState<CrewId | null>(null);
-  const [pairingSession, setPairingSession] = useState(() => createPhoneTerminalPairingSession());
   const [qrCodeUrl, setQrCodeUrl] = useState("");
-  const [phoneConnectionStatus, setPhoneConnectionStatus] = useState<PhoneConnectionStatus>("waiting");
   const [privateSignalStatus, setPrivateSignalStatus] = useState<PrivateSignalStatus>("idle");
-  const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
   const sequenceRef = useRef(1);
+  const phoneConnectionStatus: PhoneConnectionStatus = mobileSessionStatus === "connected" ? "connected" : mobileSessionStatus === "offline" ? "disconnected" : "waiting";
   const activeRuntimeCalls = Object.values(activeCalls)
     .filter((call) => isRuntimeCallActive(call, elapsedGameSeconds))
     .sort((left, right) => left.created_at - right.created_at || left.id.localeCompare(right.id));
@@ -125,91 +125,26 @@ export function CommunicationStation({
     };
   }, [pairingSession.mobileUrl]);
 
-  useEffect(() => {
-    if (!shouldStartYuanTerminal()) {
-      return;
-    }
-
-    setPhoneConnectionStatus("waiting");
-    const lease = acquireYuanDualDeviceTerminal({
-      hostUrl: pairingSession.hostUrl,
-      terminalId: pairingSession.pcTerminalId,
-      token: pairingSession.token,
-      tenantPublicKey: pairingSession.tenantPublicKey,
-      name: "Stellar Frontier PC Authority",
-      enableWebRTC: true,
-    });
-    const { terminal } = lease;
-    terminalRef.current = terminal;
-
-    const connectionSubscription = terminal.isConnected$.subscribe((connected) => {
-      setPhoneConnectionStatus((status) => (connected ? status : status === "connected" ? "disconnected" : "waiting"));
-    });
-    const service = provideDualDeviceService(terminal, DUAL_DEVICE_PC_EVENT_METHOD, (message) => {
-      handlePhoneEventMessage(message, setPrivateSignalStatus, setPhoneConnectionStatus);
-    });
-
-    return () => {
-      service.dispose();
-      connectionSubscription.unsubscribe();
-      if (terminalRef.current === terminal) {
-        terminalRef.current = null;
-      }
-      lease.dispose();
-    };
-  }, [pairingSession]);
-
   function regeneratePairingSession() {
-    setPairingSession(createPhoneTerminalPairingSession());
-    setPhoneConnectionStatus("waiting");
+    onRegeneratePairing();
     setPrivateSignalStatus("idle");
   }
 
-  async function sendPrivateSignal() {
-    const message = createDualDeviceMessage({
+  function sendPrivateSignal() {
+    void createDualDeviceMessage({
       type: "phone.call.incoming",
       roomId: pairingSession.roomId,
       clientId: pairingSession.pcTerminalId,
       sequence: sequenceRef.current,
-      payload: {
-        title: "手机终端测试来电",
-        body: "这是一条 PC 授权的手机端测试通讯。",
-        fallbackAfterMs: 10000,
-      },
+      payload: { title: "手机终端测试来电" },
     });
     sequenceRef.current += 1;
-
-    if (terminalRef.current && !pairingExpired) {
-      setPrivateSignalStatus("sent");
-      await requestDualDeviceMessage({
-        terminal: terminalRef.current,
-        targetTerminalId: pairingSession.phoneTerminalId,
-        method: DUAL_DEVICE_PHONE_DELIVERY_METHOD,
-        message,
-      }).catch(() => setPrivateSignalStatus("fallback"));
-      return;
-    }
-
-    setPrivateSignalStatus("fallback");
+    onSendPrivateSignal();
+    setPrivateSignalStatus(pairingExpired ? "fallback" : "sent");
   }
 
-  async function enablePhoneFallback() {
-    const message = createDualDeviceMessage({
-      type: "phone.fallback.enabled",
-      roomId: pairingSession.roomId,
-      clientId: pairingSession.pcTerminalId,
-      sequence: sequenceRef.current,
-      payload: { reason: "pc_manual_fallback" },
-    });
-    sequenceRef.current += 1;
-    if (terminalRef.current) {
-      await requestDualDeviceMessage({
-        terminal: terminalRef.current,
-        targetTerminalId: pairingSession.phoneTerminalId,
-        method: DUAL_DEVICE_PHONE_DELIVERY_METHOD,
-        message,
-      }).catch(() => undefined);
-    }
+  function enablePhoneFallback() {
+    onEnablePhoneFallback();
     setPrivateSignalStatus("fallback");
   }
 
@@ -603,50 +538,6 @@ function formatEventImportance(importance: EventLog["importance"]) {
   return "简报";
 }
 
-function createPhoneTerminalPairingSession() {
-  return createPairingSession({
-    hostUrl: getConfiguredYuanHostUrl(),
-    mobileBaseUrl: getConfiguredMobileTerminalUrl(),
-  });
-}
-
-function shouldStartYuanTerminal() {
-  return import.meta.env.MODE !== "test" && import.meta.env.VITE_DISABLE_YUAN_TERMINAL !== "true" && typeof WebSocket !== "undefined";
-}
-
-function getConfiguredYuanHostUrl() {
-  const configured = import.meta.env.VITE_YUAN_HOST_URL as string | undefined;
-  if (configured) {
-    return configured;
-  }
-
-  const url = new URL(window.location.href);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.port = "8888";
-  url.pathname = "/";
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
-function getConfiguredMobileTerminalUrl() {
-  const configured = import.meta.env.VITE_MOBILE_TERMINAL_URL as string | undefined;
-  if (configured) {
-    return configured;
-  }
-
-  const url = new URL(window.location.href);
-  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-    url.port = "5174";
-    url.pathname = "/";
-  } else {
-    url.pathname = `${url.pathname.replace(/\/$/, "")}/mobile/`;
-  }
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
 function formatPhoneConnectionStatus(status: PhoneConnectionStatus) {
   if (status === "connected") {
     return "已连接";
@@ -658,22 +549,6 @@ function formatPhoneConnectionStatus(status: PhoneConnectionStatus) {
     return "已断开";
   }
   return "等待配对";
-}
-
-function handlePhoneEventMessage(
-  message: DualDeviceMessage,
-  setPrivateSignalStatus: (status: PrivateSignalStatus) => void,
-  setPhoneConnectionStatus: (status: PhoneConnectionStatus) => void,
-) {
-  if (message.type === "phone.message.read") {
-    setPrivateSignalStatus("read");
-  }
-  if (message.type === "phone.call.answer") {
-    setPrivateSignalStatus("answered");
-  }
-  if (message.type === "link.heartbeat") {
-    setPhoneConnectionStatus("connected");
-  }
 }
 
 function getPhoneStatusTone(status: PhoneConnectionStatus) {

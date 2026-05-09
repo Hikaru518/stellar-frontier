@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import App, { mergeEventRuntimeState, toEventEngineState } from "./App";
+import App, { mergeEventRuntimeState, resolvePhoneRuntimeCallCrewId, toEventEngineState, validatePhoneMessageEnvelope } from "./App";
 import { crewDefinitions, defaultMapConfig, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
 import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
@@ -208,6 +208,56 @@ describe("App", () => {
     });
 
     expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
+  });
+
+  it("does not expose a DOM event bypass for phone basic action intents", () => {
+    render(<App />);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("stellar-phone-choice-select", {
+        detail: {
+          version: 1,
+          kind: "basic_action",
+          crewId: "amy",
+          actionId: "universal:standby",
+          clientRequestId: "test-phone-standby",
+        },
+      }));
+    });
+
+    const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
+    expect(Object.values(saved.crew_actions ?? {})).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ crew_id: "amy", type: "standby", source: "player_command" })]),
+    );
+  });
+
+  it("rejects forged or replayed phone-origin envelopes before PC authority handling", () => {
+    const pairing = { roomId: "room-1", phoneTerminalId: "phone-1" };
+    const baseMessage = {
+      type: "phone.choice.select" as const,
+      roomId: "room-1",
+      clientId: "phone-1",
+      sequence: 2,
+      sentAt: 1000,
+      payload: {
+        version: 1,
+        kind: "basic_action",
+        crewId: "amy",
+        actionId: "universal:standby",
+        clientRequestId: "req-1",
+      },
+    };
+
+    expect(validatePhoneMessageEnvelope(baseMessage, pairing, 1)).toEqual({ ok: true, nextSequence: 2 });
+    expect(validatePhoneMessageEnvelope({ ...baseMessage, clientId: "attacker" }, pairing, 1)).toEqual({ ok: false, reason: "client_mismatch" });
+    expect(validatePhoneMessageEnvelope({ ...baseMessage, roomId: "other-room" }, pairing, 1)).toEqual({ ok: false, reason: "room_mismatch" });
+    expect(validatePhoneMessageEnvelope({ ...baseMessage, sequence: 1 }, pairing, 1)).toEqual({ ok: false, reason: "replayed_sequence" });
+  });
+
+  it("derives runtime-call phone intent crew from the authoritative call", () => {
+    expect(resolvePhoneRuntimeCallCrewId("amy", "amy")).toEqual({ ok: true, crewId: "amy" });
+    expect(resolvePhoneRuntimeCallCrewId(null, "garry")).toEqual({ ok: true, crewId: "garry" });
+    expect(resolvePhoneRuntimeCallCrewId("mike", "amy")).toEqual({ ok: false, reason: "crew_mismatch" });
   });
 
   it("settles arrival event checks against runtime map state without crashing", () => {

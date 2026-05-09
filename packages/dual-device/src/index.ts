@@ -53,6 +53,32 @@ export interface DualDeviceMessage {
   payload: Record<string, unknown>;
 }
 
+export type PhoneChoiceSelectPayload =
+  | {
+      version: 1;
+      kind: "runtime_call_option";
+      callId: string;
+      crewId: string | null;
+      optionId: string;
+      clientRequestId: string;
+    }
+  | {
+      version: 1;
+      kind: "basic_action";
+      crewId: string;
+      actionId: PhoneBasicActionId;
+      clientRequestId: string;
+    }
+  | {
+      version: 1;
+      kind: "story_action";
+      crewId: string;
+      actionId: string;
+      clientRequestId: string;
+    };
+
+export type PhoneBasicActionId = "universal:survey" | "universal:standby" | "universal:stop";
+
 export interface YuanTerminalMessage {
   source_terminal_id: string;
   target_terminal_id: string;
@@ -520,6 +546,36 @@ export function validateDualDeviceMessage(value: unknown): value is DualDeviceMe
     Number.isFinite(sentAt) &&
     isRecord(value.payload)
   );
+}
+
+export function validatePhoneChoiceSelectPayload(value: unknown): value is PhoneChoiceSelectPayload {
+  if (!isRecord(value) || value.version !== 1 || typeof value.clientRequestId !== "string" || value.clientRequestId.length === 0) {
+    return false;
+  }
+
+  if (value.kind === "runtime_call_option") {
+    return (
+      typeof value.callId === "string" &&
+      value.callId.length > 0 &&
+      (typeof value.crewId === "string" || value.crewId === null) &&
+      typeof value.optionId === "string" &&
+      value.optionId.length > 0
+    );
+  }
+
+  if (value.kind === "basic_action") {
+    return typeof value.crewId === "string" && value.crewId.length > 0 && isPhoneBasicActionId(value.actionId);
+  }
+
+  if (value.kind === "story_action") {
+    return typeof value.crewId === "string" && value.crewId.length > 0 && typeof value.actionId === "string" && value.actionId.length > 0;
+  }
+
+  return false;
+}
+
+export function isPhoneBasicActionId(value: unknown): value is PhoneBasicActionId {
+  return value === "universal:survey" || value === "universal:standby" || value === "universal:stop";
 }
 
 const dualDeviceMessageSchema = {

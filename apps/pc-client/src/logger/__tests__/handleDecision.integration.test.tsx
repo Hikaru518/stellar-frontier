@@ -64,8 +64,8 @@ describe("TASK-009 — App.tsx handleDecision 源码接入断言", () => {
 
   it('handleDecision 事件选项分支写入 logger.log({type:"player.call.choice"...})', () => {
     expect(appSource).toMatch(/type:\s*"player\.call\.choice"/);
-    expect(appSource).toMatch(/choice_key:\s*actionId/);
-    expect(appSource).toMatch(/call_id:\s*currentCall\.runtimeCallId/);
+    expect(appSource).toMatch(/choice_key:\s*optionId/);
+    expect(appSource).toMatch(/call_id:\s*callId/);
   });
 
   it('universal:survey 分支写入 player.action.dispatch action_kind="survey"', () => {
@@ -86,13 +86,9 @@ describe("TASK-009 — App.tsx handleDecision 源码接入断言", () => {
 
   it("universal:move 分支不调用 logger.log（MVP 跳过）", () => {
     const moveStart = appSource.indexOf('if (actionId === "universal:move")');
-    const surveyStart = appSource.indexOf(
-      'if (actionId === "universal:survey")',
-      moveStart,
-    );
     expect(moveStart).toBeGreaterThan(-1);
-    expect(surveyStart).toBeGreaterThan(moveStart);
-    const moveBlock = appSource.slice(moveStart, surveyStart);
+    const moveBlock = appSource.slice(moveStart).match(/if \(actionId === "universal:move"\) \{[\s\S]*?return;\n    \}/)?.[0] ?? "";
+    expect(moveBlock).not.toBe("");
     expect(moveBlock).not.toMatch(/logger\.log\s*\(/);
   });
 

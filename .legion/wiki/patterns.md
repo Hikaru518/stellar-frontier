@@ -11,3 +11,7 @@ Keep `scripts/validate-content.mjs` as the stable root entrypoint. The actual va
 ## Playwright Browsers
 
 Local Playwright browser downloads should use `common/temp/playwright-browsers` so large generated browser assets stay inside ignored repo temp space.
+
+## Cross-Device Intent Validation
+
+Treat phone-origin typed events as untrusted until they pass the PC boundary. Runtime gameplay commands must be validated before heartbeat/fallback state changes or gameplay dispatch, and tests should cover spoofed client IDs, replayed sequences, and any non-transport bypass path.

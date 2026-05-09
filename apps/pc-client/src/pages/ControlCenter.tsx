@@ -3,6 +3,7 @@ import { ConsoleShell, FieldList, Modal, Panel, StatusTag, SystemLogPanel } from
 import { facilities, type CrewMember, type GameMapState, type InvestigationReport, type ResourceSummary, type SystemLog } from "../data/gameData";
 import { formatGameTime } from "../timeSystem";
 import type { EventLog, Objective } from "../events/types";
+import type { PcMobileStatusCard } from "../App";
 
 interface ControlCenterProps {
   crew: CrewMember[];
@@ -16,6 +17,7 @@ interface ControlCenterProps {
   onOpenMap: () => void;
   onOpenDebug: () => void;
   onAppendLog: (text: string, tone?: "neutral" | "muted" | "accent" | "danger" | "success") => void;
+  mobileStatus?: PcMobileStatusCard;
 }
 
 export function ControlCenter({
@@ -30,6 +32,7 @@ export function ControlCenter({
   onOpenMap,
   onOpenDebug,
   onAppendLog,
+  mobileStatus,
 }: ControlCenterProps) {
   const [modal, setModal] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
@@ -43,6 +46,7 @@ export function ControlCenter({
     .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
     .slice(0, 3);
   const objectiveList = Object.values(objectives).sort((left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
+  const mobileActive = mobileStatus?.mode === "active";
 
   const modalContent = useMemo(() => getFacilityModal(modal, resources), [modal, resources]);
 
@@ -89,7 +93,7 @@ export function ControlCenter({
         </Panel>
 
         <div className="facility-grid">
-          {facilities.map((facility) => (
+          {facilities.filter((facility) => !(mobileActive && facility.id === "station")).map((facility) => (
             <button
               type="button"
               key={facility.id}
@@ -103,6 +107,8 @@ export function ControlCenter({
             </button>
           ))}
         </div>
+
+        {mobileStatus ? <MobileCommunicationStatus status={mobileStatus} /> : null}
 
         <Panel title="当前建议" className="control-hint" tone={incomingCount ? "accent" : "neutral"}>
           <p>
@@ -151,6 +157,23 @@ export function ControlCenter({
         </Modal>
       ) : null}
     </ConsoleShell>
+  );
+}
+
+function MobileCommunicationStatus({ status }: { status: PcMobileStatusCard }) {
+  const active = status.mode === "active";
+  return (
+    <Panel title="移动通讯设备" className="control-hint" tone={active ? "accent" : status.mode === "fallback" ? "danger" : "neutral"}>
+      <FieldList
+        rows={[
+          ["模式", active ? "手机在线，PC 通讯台入口已收起" : status.mode === "fallback" ? "PC fallback 已接管" : "等待手机心跳"],
+          ["待处理", `${status.unreadCount} 条通讯 / ${status.emergencyCount} 条紧急`],
+          ["最近心跳", status.lastHeartbeatAt ? `${Math.max(0, Math.round((Date.now() - status.lastHeartbeatAt) / 1000))} 秒前` : "未收到"],
+          ["fallback", `${Math.round(status.fallbackAfterMs / 1000)} 秒无心跳后恢复 PC 通讯台`],
+        ]}
+      />
+      {active ? <p className="muted-text">请在手机端处理通讯选择；移动指令仍回到 PC 地图确认。</p> : null}
+    </Panel>
   );
 }
 
