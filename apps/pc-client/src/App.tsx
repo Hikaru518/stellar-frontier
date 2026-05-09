@@ -9,8 +9,8 @@ import { settleAction, type ActionSettlementPatch } from "./callActionSettlement
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
-import { buildCallView } from "./callActions";
-import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
+import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
+import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -234,6 +234,28 @@ function App() {
       setPage("ending");
     }
   }, [returnHomeCompleted]);
+
+  useEffect(() => {
+    if (!currentCall || currentCall.runtimeCallId) {
+      return;
+    }
+
+    const runtimeCall = findRuntimeCallForCrew(gameState, currentCall.crewId);
+    if (!runtimeCall) {
+      return;
+    }
+
+    setCurrentCall((call) =>
+      call && call.crewId === currentCall.crewId
+        ? {
+            ...call,
+            settled: false,
+            runtimeCallId: runtimeCall.id,
+            result: undefined,
+          }
+        : call,
+    );
+  }, [currentCall, gameState]);
 
   // beforeunload 路径下 handler 必须同步访问最新的 elapsedGameSeconds，但下面
   // 注册 listener 的 useEffect 依赖 `[]`，闭包会捕获 stale state。所以用 ref
@@ -523,11 +545,22 @@ function App() {
         },
         gameSeconds: authoritativeState.elapsedGameSeconds,
       });
-      const applied = triggerCurrentAreaSurvey(authoritativeState, crewId);
-      setGameState(applied.state);
+      setGameState((state) => createSurveyCrewAction(state, crewId, state.elapsedGameSeconds));
       if (updateCurrentCall) {
-        setCurrentCall((call) => (call ? { ...call, settled: true, result: applied.createdEvent ? "调查事件已进入通讯队列。" : CURRENT_AREA_SURVEY_EMPTY_RESULT } : call));
+        setCurrentCall((call) =>
+          call
+            ? {
+                ...call,
+                settled: true,
+                result: `调查指令已提交，预计 ${formatDuration(15)} 后回传结果。`,
+              }
+            : call,
+        );
       }
+      return;
+    }
+
+    if (currentCall?.settled) {
       return;
     }
 
@@ -552,12 +585,42 @@ function App() {
       return;
     }
 
+    const localTimedResult = dispatchTimedLocalAction(authoritativeState, crewId, actionId);
+    if (localTimedResult.matched) {
+      if (localTimedResult.accepted) {
+        logger.log({
+          type: "player.action.dispatch",
+          source: "player_command",
+          payload: {
+            crew_id: crewId,
+            action_id: actionId,
+            action_kind: "repair",
+          },
+          gameSeconds: authoritativeState.elapsedGameSeconds,
+        });
+      }
+      setGameState(localTimedResult.state);
+      if (updateCurrentCall) {
+        setCurrentCall((call) => (call ? { ...call, settled: localTimedResult.accepted, result: localTimedResult.reason } : call));
+      }
+      return;
+    }
+
     const selectedStoryAction = findVisibleLocationStoryAction(authoritativeState, crewId, actionId);
     if (selectedStoryAction) {
       const applied = triggerLocationStoryAction(authoritativeState, selectedStoryAction);
       setGameState(applied.state);
       if (updateCurrentCall) {
-        setCurrentCall((call) => (call ? { ...call, settled: true, result: applied.createdEvent ? "地点事件已进入通讯队列。" : "当前地点没有可触发的地点事件。" } : call));
+        setCurrentCall((call) =>
+          call
+            ? {
+                ...call,
+                settled: applied.createdEvent ? false : true,
+                runtimeCallId: applied.runtimeCallId ?? call.runtimeCallId,
+                result: applied.createdEvent ? undefined : "当前地点没有可触发的地点事件。",
+              }
+            : call,
+        );
       }
       return;
     }
@@ -783,7 +846,7 @@ function createInitialGameState(): GameState {
   const now = new Date().toISOString();
   const emptyEventState = createEmptyEventRuntimeState();
 
-  if (saved && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
+  if (saved && isSavedBaselineCompatible(saved) && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       const normalizedMember = normalizeCrewMember(member as CrewMember, initialMember as CrewMember);
@@ -838,6 +901,14 @@ function createInitialGameState(): GameState {
   };
 
   return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
+}
+
+function isSavedBaselineCompatible(saved: SavedGameState) {
+  if (!saved.map || typeof saved.map !== "object") {
+    return false;
+  }
+
+  return saved.map.configId === defaultMapConfig.id && saved.map.configVersion === defaultMapConfig.version;
 }
 
 function getMoveTargetSelectionLabel(_map: GameMapState, tileId: string) {
@@ -936,11 +1007,12 @@ function createStopCrewAction(state: GameState, crewId: CrewId, occurredAt: numb
 function createBasicCrewAction(args: {
   id: Id;
   crewId: Id;
-  type: "standby" | "stop";
+  type: "standby" | "stop" | "survey";
   source: CrewActionState["source"];
   tileId: Id;
   occurredAt: number;
   durationSeconds: number;
+  actionParams?: Record<string, unknown>;
 }): CrewActionState {
   return {
     id: args.id,
@@ -959,9 +1031,63 @@ function createBasicCrewAction(args: {
     ends_at: args.occurredAt + args.durationSeconds,
     progress_seconds: 0,
     duration_seconds: args.durationSeconds,
-    action_params: {},
+    action_params: args.actionParams ?? {},
     can_interrupt: true,
     interrupt_duration_seconds: 10,
+  };
+}
+
+function createSurveyCrewAction(state: GameState, crewId: CrewId, occurredAt: number): GameState {
+  const member = state.crew.find((item) => item.id === crewId);
+  if (!member) {
+    return state;
+  }
+
+  if (findActiveCrewActionForMember(state.crew_actions, member)) {
+    return {
+      ...state,
+      logs: appendLogEntry(state.logs, `${member.name} 正在执行行动，不能开始调查。`, "muted", occurredAt),
+    };
+  }
+
+  const actionId = `survey:${crewId}:${member.currentTile}:${occurredAt}`;
+  const action = createBasicCrewAction({
+    id: actionId,
+    crewId,
+    type: "survey",
+    source: "player_command",
+    tileId: member.currentTile,
+    occurredAt,
+    durationSeconds: 15,
+    actionParams: { surveyLevel: "standard" },
+  });
+
+  return {
+    ...state,
+    crew: state.crew.map((item) =>
+      item.id === crewId
+        ? {
+            ...item,
+            status: "正在调查当前区域。",
+            statusTone: "accent",
+            activeAction: {
+              id: action.id,
+              actionType: "survey",
+              status: "inProgress",
+              startTime: occurredAt,
+              durationSeconds: action.duration_seconds,
+              finishTime: action.ends_at ?? occurredAt + action.duration_seconds,
+              targetTile: member.currentTile,
+              params: action.action_params,
+            },
+          }
+        : item,
+    ),
+    logs: appendLogEntry(state.logs, `${member.name} 开始调查当前区域。`, "accent", occurredAt),
+    crew_actions: {
+      ...state.crew_actions,
+      [actionId]: action,
+    },
   };
 }
 
@@ -1104,7 +1230,13 @@ function settleGameTime(state: GameState): GameState {
   return processAppEventWakeups(nextState);
 }
 
-type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" };
+type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" | "repair" };
+export interface TimedLocalDispatchResult {
+  matched: boolean;
+  accepted: boolean;
+  reason: string;
+  state: GameState;
+}
 
 function collectDueCrewActions(crewActions: Record<Id, CrewActionState>, elapsedGameSeconds: number): Map<Id, CrewActionState> {
   const dueActions = Object.values(crewActions)
@@ -1260,7 +1392,7 @@ function settleStopCrewActionState(
 function canSettleWithRuntimeHandler(
   action: CrewActionState,
 ): action is RuntimeSettleableCrewAction {
-  return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract";
+  return action.type === "survey" || action.type === "gather" || action.type === "build" || action.type === "extract" || action.type === "repair";
 }
 
 function createCrewActionCompleteTrigger(action: CrewActionState, member: CrewMember, elapsedGameSeconds: number): TriggerContext {
@@ -1430,27 +1562,6 @@ function processAppEventWakeups(state: GameState): GameState {
   return merged;
 }
 
-function triggerCurrentAreaSurvey(state: GameState, crewId: CrewId): { state: GameState; createdEvent: boolean } {
-  const member = state.crew.find((item) => item.id === crewId);
-  if (!member) {
-    return { state, createdEvent: false };
-  }
-
-  const eventState = toEventEngineState(state);
-  for (const context of createCurrentAreaSurveyTriggerContexts(state, member)) {
-    const result = processTrigger({
-      state: eventState,
-      index: eventContentIndex,
-      context,
-    });
-    if ((result.candidate_report?.created_event_ids.length ?? 0) > 0) {
-      return { state: mergeEventRuntimeState(state, result.state), createdEvent: true };
-    }
-  }
-
-  return { state, createdEvent: false };
-}
-
 interface LocationStoryActionSelection {
   member: CrewMember;
   object: MapObjectDefinition;
@@ -1462,16 +1573,29 @@ function findVisibleLocationStoryAction(
   crewId: CrewId,
   actionId: string,
 ): LocationStoryActionSelection | undefined {
-  const member = state.crew.find((item) => item.id === crewId);
-  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
-  if (!member || !tile) {
+  const selection = findLocationStoryActionSelection(state, crewId, actionId);
+  if (!selection) {
     return undefined;
   }
 
-  const visibleEnabled = buildCallView({ member, tile, gameState: state }).groups.some((group) =>
+  const visibleEnabled = buildCallView({ member: selection.member, tile: selection.tile, gameState: state }).groups.some((group) =>
     group.actions.some((action) => action.id === actionId && !action.disabled),
   );
   if (!visibleEnabled) {
+    return undefined;
+  }
+
+  return selection;
+}
+
+function findLocationStoryActionSelection(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
+  const member = state.crew.find((item) => item.id === crewId);
+  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
+  if (!member || !tile) {
     return undefined;
   }
 
@@ -1480,16 +1604,130 @@ function findVisibleLocationStoryAction(
     if (!action) {
       continue;
     }
-    return { member, object, action };
+    return { member, tile, object, action };
   }
 
   return undefined;
 }
 
+export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actionId: string): TimedLocalDispatchResult {
+  const selection = findLocationStoryActionSelection(state, crewId, actionId);
+  if (!selection || selection.action.local_action?.kind !== "timed_repair") {
+    return {
+      matched: false,
+      accepted: false,
+      reason: "",
+      state,
+    };
+  }
+
+  if (isMapObjectRepaired(state, selection.object.id)) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: "该对象已经修复，不能重复维修。",
+      state,
+    };
+  }
+
+  const lockReason = getTimedRepairLockReason(state.crew_actions, crewId, selection.object.id);
+  if (lockReason) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: lockReason,
+      state,
+    };
+  }
+
+  const blockingAction = selectActiveCrewActionForCrew(state.crew_actions, crewId);
+  if (blockingAction) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: "该队员已有进行中的主要行动。",
+      state,
+    };
+  }
+
+  const action = createRepairCrewActionState(state, selection);
+  const nextMember = {
+    ...selection.member,
+    status: `正在维修${selection.object.name}。`,
+    statusTone: "accent" as Tone,
+    activeAction: {
+      id: action.id,
+      actionType: "repair" as const,
+      status: "inProgress" as const,
+      startTime: state.elapsedGameSeconds,
+      durationSeconds: action.duration_seconds,
+      finishTime: action.ends_at ?? state.elapsedGameSeconds + action.duration_seconds,
+      targetTile: selection.member.currentTile,
+      params: action.action_params,
+    },
+  };
+  const nextState = {
+    ...state,
+    crew: state.crew.map((member) => (member.id === nextMember.id ? nextMember : member)),
+    crew_actions: {
+      ...state.crew_actions,
+      [action.id]: action,
+    },
+    logs: appendLogEntry(
+      state.logs,
+      `${selection.member.name} 开始维修${selection.object.name}，预计 ${formatDuration(action.duration_seconds)}。`,
+      "accent",
+      state.elapsedGameSeconds,
+    ),
+  };
+
+  return {
+    matched: true,
+    accepted: true,
+    reason: "维修指令已提交。",
+    state: nextState,
+  };
+}
+
+
+function createRepairCrewActionState(
+  state: GameState,
+  selection: LocationStoryActionSelection,
+): CrewActionState {
+  const localAction = selection.action.local_action as TimedRepairLocalActionDef;
+  const actionId = `repair:${selection.member.id}:${selection.object.id}:${state.elapsedGameSeconds}`;
+  return {
+    id: actionId,
+    crew_id: selection.member.id,
+    type: "repair",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: selection.member.currentTile,
+    to_tile_id: null,
+    target_tile_id: selection.member.currentTile,
+    path_tile_ids: [],
+    started_at: state.elapsedGameSeconds,
+    ends_at: state.elapsedGameSeconds + localAction.duration_seconds,
+    progress_seconds: 0,
+    duration_seconds: localAction.duration_seconds,
+    action_params: {
+      object_id: selection.object.id,
+      success_check: localAction.success_check,
+      success_effects: localAction.success_effects,
+      failure_effects: localAction.failure_effects,
+    },
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+  };
+}
+
 function triggerLocationStoryAction(
   state: GameState,
   selection: LocationStoryActionSelection,
-): { state: GameState; createdEvent: boolean } {
+): { state: GameState; createdEvent: boolean; runtimeCallId?: string } {
   const context = createLocationStoryActionTriggerContext(state, selection);
   const result = processTrigger({
     state: toEventEngineState(state),
@@ -1497,9 +1735,13 @@ function triggerLocationStoryAction(
     context,
   });
 
+  const nextState = mergeEventRuntimeState(state, result.state);
+  const runtimeCallId = findRuntimeCallForCrew(nextState, selection.member.id)?.id;
+
   return {
-    state: mergeEventRuntimeState(state, result.state),
+    state: nextState,
     createdEvent: (result.candidate_report?.created_event_ids.length ?? 0) > 0,
+    runtimeCallId,
   };
 }
 
@@ -1522,46 +1764,6 @@ function createLocationStoryActionTriggerContext(
       tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object.tags ?? []),
     },
   };
-}
-
-function createCurrentAreaSurveyTriggerContexts(state: GameState, member: CrewMember): TriggerContext[] {
-  const tileId = member.currentTile;
-  const objects = getVisibleSurveyObjects(state, tileId);
-  const contexts = objects.map((object) => createCurrentAreaSurveyTriggerContext(state, member, object));
-  contexts.push(createCurrentAreaSurveyTriggerContext(state, member));
-  return contexts;
-}
-
-function createCurrentAreaSurveyTriggerContext(
-  state: GameState,
-  member: CrewMember,
-  object?: MapObjectDefinition,
-): TriggerContext {
-  return {
-    trigger_type: "action_complete",
-    occurred_at: state.elapsedGameSeconds,
-    source: "crew_action",
-    crew_id: member.id,
-    tile_id: member.currentTile,
-    action_id: `current-area-survey:${member.id}:${member.currentTile}:${state.elapsedGameSeconds}`,
-    payload: {
-      action_type: "survey",
-      object_id: object?.id ?? null,
-      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object?.tags ?? []),
-    },
-  };
-}
-
-function getVisibleSurveyObjects(state: GameState, tileId: string): MapObjectDefinition[] {
-  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
-  if (!configTile) {
-    return [];
-  }
-
-  return configTile.objectIds
-    .map((objectId) => mapObjectDefinitionById.get(objectId))
-    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)))
-    .filter((definition) => definition.actions.some((action) => action.id === `${definition.id}:survey`));
 }
 
 function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {

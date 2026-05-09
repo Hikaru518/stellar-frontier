@@ -154,7 +154,7 @@ export function MapPage({
                 ["区域", selectedCell.tile?.areaName ?? "未知区域"],
                 ["地形", selectedCell.tile?.terrain ?? selectedTile.terrain],
                 ["天气", selectedCell.tile?.weather ?? "未知天气"],
-                ["地块对象", objectSummary(tileObjects(selectedCell))],
+                ["地块对象", objectSummary(selectedCell, map)],
                 ["特殊状态", specialStateSummary(activeSpecialStates(selectedCell, map.tilesById[selectedCell.id]))],
                 ["手下状态", crewStatus(selectedTile, crewById, crewActionViews)],
                 ["计时状态", crewTiming(selectedTile, crewById, crewActionViews, elapsedGameSeconds)],
@@ -241,6 +241,19 @@ function tileObjects(cell: VisibleTileCell): MapObjectDefinition[] {
   return resolveTileObjects(cell.tile);
 }
 
+function objectSummary(cell: VisibleTileCell, map: GameMapState) {
+  const objects = tileObjects(cell);
+  if (objects.length === 0) {
+    return "未确认新的地块对象";
+  }
+
+  const revealedIds = new Set(map.tilesById[cell.id]?.revealedObjectIds ?? []);
+  const revealedLabels = objects.filter((object) => revealedIds.has(object.id)).map((object) => object.name);
+  const hasUnknownObject = objects.some((object) => !revealedIds.has(object.id));
+  const labels = hasUnknownObject ? [...revealedLabels, "未知对象"] : revealedLabels;
+  return labels.join(" / ");
+}
+
 function activeSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["tilesById"][string]): MapSpecialStateDefinition[] {
   if (!cell.tile) {
     return [];
@@ -252,10 +265,6 @@ function activeSpecialStates(cell: VisibleTileCell, runtimeTile: GameMapState["t
 
 function crewIdsForCell(runtimeTile: GameMapState["tilesById"][string], tile?: Pick<MapTile, "crew">) {
   return runtimeTile?.crew?.length ? runtimeTile.crew : (tile?.crew ?? []);
-}
-
-function objectSummary(objects: MapObjectDefinition[]) {
-  return objects.length ? objects.map((object) => object.name).join(" / ") : "未确认新的地块对象";
 }
 
 function specialStateSummary(states: MapSpecialStateDefinition[]) {

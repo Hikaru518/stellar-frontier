@@ -609,6 +609,7 @@ export type CrewActionType =
   | "gather"
   | "build"
   | "extract"
+  | "repair"
   | "return_to_base"
   | "event_waiting"
   | "guarding_event_site";

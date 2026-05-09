@@ -15,3 +15,7 @@ Local Playwright browser downloads should use `common/temp/playwright-browsers` 
 ## Cross-Device Intent Validation
 
 Treat phone-origin typed events as untrusted until they pass the PC boundary. Runtime gameplay commands must be validated before heartbeat/fallback state changes or gameplay dispatch, and tests should cover spoofed client IDs, replayed sequences, and any non-transport bypass path.
+
+## Event Manifest Tests
+
+Editor manifest tests should not hard-code legacy domain ordering or overwrite copied `content/` with a manifest that references files not present in the same fixture. Prefer either current manifest-driven assertions or fully self-contained manifest + asset fixtures.

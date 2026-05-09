@@ -3,7 +3,7 @@ import { mapObjectDefinitionById, universalActions, type ActionDef, type MapObje
 import { buildCallActionContext } from "./conditions/callActionContext";
 import { generateHint } from "./conditions/hintTemplates";
 import { evaluateCondition } from "./events/conditions";
-import type { Condition, RuntimeCall } from "./events/types";
+import type { Condition, CrewActionState, RuntimeCall } from "./events/types";
 import type { CrewMember, GameState, MapTile } from "./data/gameData";
 
 export interface CallActionGroup {
@@ -62,7 +62,7 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
   const candidates = collectCandidates(tile, gameState);
   const context = buildCallActionContext({ member, tile, gameState });
   const evaluated = candidates.flatMap((candidate) => {
-    const view = evaluateCandidate(candidate, context);
+    const view = evaluateCandidate(candidate, context, gameState, member);
     return view ? [{ candidate, view }] : [];
   });
 
@@ -88,10 +88,27 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
     if (!entry || entry.views.length === 0) {
       continue;
     }
-    groups.push({ title: entry.object.name, actions: entry.views });
+    groups.push({ title: formatObjectGroupTitle(entry.object, gameState), actions: entry.views });
   }
 
   return runtimeCall ? { groups, runtimeCall } : { groups };
+}
+
+function formatObjectGroupTitle(object: MapObjectDefinition, gameState: GameState): string {
+  const status = gameState.map.mapObjects?.[object.id]?.status_enum ?? object.initial_status;
+  const statusLabel = formatObjectStatus(status);
+  return statusLabel ? `${object.name}（${statusLabel}）` : object.name;
+}
+
+function formatObjectStatus(status: string | undefined): string {
+  switch (status) {
+    case "damaged":
+      return "已损坏";
+    case "repaired":
+      return "正常";
+    default:
+      return status ?? "";
+  }
 }
 
 function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate[] {
@@ -113,7 +130,12 @@ function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate
   return candidates;
 }
 
-function evaluateCandidate(candidate: ActionCandidate, context: ReturnType<typeof buildCallActionContext>): CallActionView | null {
+function evaluateCandidate(
+  candidate: ActionCandidate,
+  context: ReturnType<typeof buildCallActionContext>,
+  gameState: GameState,
+  member: CrewMember,
+): CallActionView | null {
   const { action, object } = candidate;
   const failed: Condition[] = [];
   let passed = true;
@@ -124,6 +146,17 @@ function evaluateCandidate(candidate: ActionCandidate, context: ReturnType<typeo
       passed = false;
       failed.push(condition);
     }
+  }
+
+  const repairLockReason =
+    action.local_action?.kind === "timed_repair" && object
+      ? getTimedRepairLockReason(gameState.crew_actions, member.id, object.id)
+      : undefined;
+  if (repairLockReason) {
+    return toView(action, object, {
+      disabled: true,
+      disabledReason: repairLockReason,
+    });
   }
 
   if (passed) {
@@ -225,4 +258,35 @@ function lookupStaticObjectIds(tileId: string): string[] {
 
 function findRuntimeCallForMember(member: CrewMember, gameState: GameState) {
   return Object.values(gameState.active_calls).find((call) => call.crew_id === member.id);
+}
+
+export function findActiveRepairActionForObject(
+  crewActions: Record<string, CrewActionState>,
+  objectId: string,
+): CrewActionState | undefined {
+  return Object.values(crewActions)
+    .filter(
+      (action) =>
+        action.type === "repair" &&
+        action.status === "active" &&
+        action.action_params.object_id === objectId,
+    )
+    .sort((left, right) => (right.started_at ?? 0) - (left.started_at ?? 0) || right.id.localeCompare(left.id))[0];
+}
+
+export function getTimedRepairLockReason(
+  crewActions: Record<string, CrewActionState>,
+  crewId: string,
+  objectId: string,
+): string | undefined {
+  const activeRepair = findActiveRepairActionForObject(crewActions, objectId);
+  if (!activeRepair) {
+    return undefined;
+  }
+
+  return activeRepair.crew_id === crewId ? "该队员已在维修该对象。" : "该对象正由其他队员维修。";
+}
+
+export function isMapObjectRepaired(gameState: Pick<GameState, "map">, objectId: string): boolean {
+  return gameState.map.mapObjects?.[objectId]?.status_enum === "repaired";
 }
