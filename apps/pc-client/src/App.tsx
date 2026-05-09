@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
+import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary, questDefinitions } from "./content/contentData";
+import { eventContentLibrary, questDefinitions, type QuestNavigationEntry } from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
 import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
@@ -50,7 +51,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
-import { createInitialQuestState, normalizeQuestState } from "./questSystem";
+import { buildQuestSidebarView, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
 import { logger } from "./logger";
 import {
   acquireYuanDualDeviceTerminal,
@@ -137,6 +138,10 @@ function App() {
   const [mapReturnTarget, setMapReturnTarget] = useState<MapReturnTarget>("control");
   const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [questSidebarCollapsed, setQuestSidebarCollapsed] = useState(true);
+  const [questStatusFilter, setQuestStatusFilter] = useState<QuestStatusFilter>("all");
+  const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
+  const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
   const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
   const [mobileSession, setMobileSession] = useState<MobileSessionState>({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
   const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
@@ -160,6 +165,34 @@ function App() {
     unreadCount: activeMobileCalls.length + crew.filter((member) => member.hasIncoming).length,
     emergencyCount: activeMobileCalls.filter(isUrgentRuntimeCallState).length,
   };
+  const questSidebarView = useMemo(
+    () =>
+      buildQuestSidebarView({
+        state: gameState.quest_state,
+        definitions: questDefinitions,
+        statusFilter: questStatusFilter,
+        categoryFilter: questCategoryFilter,
+        selectedQuestId,
+      }),
+    [gameState.quest_state, questCategoryFilter, questStatusFilter, selectedQuestId],
+  );
+  const questSidebar = (
+    <QuestSidebar
+      view={questSidebarView}
+      onNavigate={handleQuestSidebarNavigate}
+      collapsed={questSidebarCollapsed}
+      statusFilter={questStatusFilter}
+      categoryFilter={questCategoryFilter}
+      onCollapsedChange={setQuestSidebarCollapsed}
+      onStatusFilterChange={setQuestStatusFilter}
+      onCategoryFilterChange={setQuestCategoryFilter}
+      onSelectedQuestIdChange={setSelectedQuestId}
+    />
+  );
+
+  function handleQuestSidebarNavigate(_entry: QuestNavigationEntry) {
+    // T8 owns quest navigation behavior. T7 only renders the entry points.
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -751,28 +784,31 @@ function App() {
 
   if (page === "station") {
     return (
-      <CommunicationStation
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        objectives={gameState.objectives}
-        eventLogs={gameState.event_logs}
-        elapsedGameSeconds={elapsedGameSeconds}
-        tiles={tiles}
-        gameTimeLabel={gameTimeLabel}
-        pairingSession={mobilePairingSession}
-        mobileSessionStatus={mobileSession.status}
-        onRegeneratePairing={regenerateMobilePairingSession}
-        onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
-        onEnablePhoneFallback={enableMobileFallback}
-        onBack={() => setPage("control")}
-        onStartCall={startCall}
-      />
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
+        <CommunicationStation
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          objectives={gameState.objectives}
+          eventLogs={gameState.event_logs}
+          elapsedGameSeconds={elapsedGameSeconds}
+          tiles={tiles}
+          gameTimeLabel={gameTimeLabel}
+          pairingSession={mobilePairingSession}
+          mobileSessionStatus={mobileSession.status}
+          onRegeneratePairing={regenerateMobilePairingSession}
+          onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
+          onEnablePhoneFallback={enableMobileFallback}
+          onBack={() => setPage("control")}
+          onStartCall={startCall}
+        />
+      </QuestLayout>
     );
   }
 
   if (page === "call") {
     return (
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
         <CallPage
           call={currentCall}
           crew={crew}
@@ -788,12 +824,14 @@ function App() {
           onOpenMap={() => openMap("call")}
           onEndCall={endCall}
           onOpenStation={() => setPage("station")}
-      />
+        />
+      </QuestLayout>
     );
   }
 
   if (page === "map") {
     return (
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
         <MapPage
           tiles={tiles}
           map={map}
@@ -809,25 +847,28 @@ function App() {
           onSelectMoveTarget={selectMoveTarget}
           onReturn={returnFromMap}
         />
+      </QuestLayout>
     );
   }
 
   return (
     <>
-      <ControlCenter
-        crew={crew}
-        logs={logs}
-        eventLogs={gameState.event_logs}
-        objectives={gameState.objectives}
-        resources={resources}
-        gameTimeLabel={gameTimeLabel}
-        onOpenStation={openStation}
-        onOpenMap={() => openMap("control")}
-        onOpenDebug={() => setDebugOpen(true)}
-        onAppendLog={appendLog}
-        map={map}
-        mobileStatus={mobileStatusCard}
-      />
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
+        <ControlCenter
+          crew={crew}
+          logs={logs}
+          eventLogs={gameState.event_logs}
+          objectives={gameState.objectives}
+          resources={resources}
+          gameTimeLabel={gameTimeLabel}
+          onOpenStation={openStation}
+          onOpenMap={() => openMap("control")}
+          onOpenDebug={() => setDebugOpen(true)}
+          onAppendLog={appendLog}
+          map={map}
+          mobileStatus={mobileStatusCard}
+        />
+      </QuestLayout>
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
@@ -841,6 +882,15 @@ function App() {
 }
 
 export default App;
+
+function QuestLayout({ children, sidebar, collapsed }: { children: ReactNode; sidebar: ReactNode; collapsed: boolean }) {
+  return (
+    <div className={`quest-layout ${collapsed ? "quest-layout-collapsed" : ""}`}>
+      <main className="quest-layout-main">{children}</main>
+      {sidebar}
+    </div>
+  );
+}
 
 function createInitialGameState(): GameState {
   const saved = loadGameSave<SavedGameState>(isCompatibleGameSaveState);

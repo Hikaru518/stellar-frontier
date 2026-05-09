@@ -1,8 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { QuestNavigationEntry } from "../content/contentData";
-import type { QuestDetailView, QuestSidebarView } from "../questSystem";
+import type { QuestCategoryFilter, QuestDetailView, QuestSidebarView, QuestStatusFilter } from "../questSystem";
 import { QuestSidebar } from "./QuestSidebar";
 
 const stationNavigation: QuestNavigationEntry = { type: "page", label: "打开通讯台", page: "station" };
@@ -93,9 +94,49 @@ function makeView(sourceQuests: QuestDetailView[] = quests): QuestSidebarView {
   };
 }
 
+function makeControlledView(sourceQuests: QuestDetailView[], filteredQuests: QuestDetailView[], selectedQuestId?: string): QuestSidebarView {
+  return {
+    ...makeView(sourceQuests),
+    list: filteredQuests,
+    selectedQuest: filteredQuests.find((quest) => quest.id === selectedQuestId) ?? filteredQuests[0],
+  };
+}
+
+function TestQuestSidebar({
+  sourceQuests = quests,
+  initiallyCollapsed = false,
+  onNavigate = vi.fn(),
+}: {
+  sourceQuests?: QuestDetailView[];
+  initiallyCollapsed?: boolean;
+  onNavigate?: (entry: QuestNavigationEntry) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(initiallyCollapsed);
+  const [statusFilter, setStatusFilter] = useState<QuestStatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<QuestCategoryFilter>("all");
+  const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
+  const filteredQuests = sourceQuests.filter(
+    (quest) => (statusFilter === "all" || quest.status === statusFilter) && (categoryFilter === "all" || quest.category === categoryFilter),
+  );
+
+  return (
+    <QuestSidebar
+      view={makeControlledView(sourceQuests, filteredQuests, selectedQuestId)}
+      onNavigate={onNavigate}
+      collapsed={collapsed}
+      statusFilter={statusFilter}
+      categoryFilter={categoryFilter}
+      onCollapsedChange={setCollapsed}
+      onStatusFilterChange={setStatusFilter}
+      onCategoryFilterChange={setCategoryFilter}
+      onSelectedQuestIdChange={setSelectedQuestId}
+    />
+  );
+}
+
 describe("QuestSidebar", () => {
   it("renders collapsed counts, main count, and recent update summary", () => {
-    render(<QuestSidebar view={makeView()} quests={quests} initiallyCollapsed onNavigate={vi.fn()} />);
+    render(<TestQuestSidebar initiallyCollapsed />);
 
     expect(screen.getByText("未完成 1")).toBeInTheDocument();
     expect(screen.getByText("主要 1")).toBeInTheDocument();
@@ -104,7 +145,7 @@ describe("QuestSidebar", () => {
   });
 
   it("renders expanded filters, quest list, detail, three-level structure, and updated mark", () => {
-    render(<QuestSidebar view={makeView()} quests={quests} onNavigate={vi.fn()} />);
+    render(<TestQuestSidebar />);
 
     expect(screen.getByRole("group", { name: "完成状态" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "任务类型" })).toBeInTheDocument();
@@ -120,7 +161,7 @@ describe("QuestSidebar", () => {
   it("filters by main or side category without calling navigation", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<QuestSidebar view={makeView()} quests={quests} onNavigate={onNavigate} />);
+    render(<TestQuestSidebar onNavigate={onNavigate} />);
 
     await user.click(within(screen.getByRole("group", { name: "任务类型" })).getByRole("button", { name: "次要" }));
     expect(screen.queryByRole("button", { name: /重组幸存者/ })).not.toBeInTheDocument();
@@ -135,7 +176,7 @@ describe("QuestSidebar", () => {
   it("filters by incomplete or completed status without calling navigation", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<QuestSidebar view={makeView()} quests={quests} onNavigate={onNavigate} />);
+    render(<TestQuestSidebar onNavigate={onNavigate} />);
 
     await user.click(within(screen.getByRole("group", { name: "完成状态" })).getByRole("button", { name: "已完成" }));
     expect(screen.queryByRole("button", { name: /重组幸存者/ })).not.toBeInTheDocument();
@@ -148,7 +189,7 @@ describe("QuestSidebar", () => {
   });
 
   it("marks completed todos with completed styling", () => {
-    render(<QuestSidebar view={makeView()} quests={quests} onNavigate={vi.fn()} />);
+    render(<TestQuestSidebar />);
 
     expect(screen.getByText("呼叫 Mike").closest("li")).toHaveClass("quest-todo-completed");
     expect(screen.getByText("确认坠毁点").closest("li")).toHaveClass("quest-todo-incomplete");
@@ -157,7 +198,7 @@ describe("QuestSidebar", () => {
   it("calls onNavigate from navigation buttons only", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<QuestSidebar view={makeView()} quests={quests} onNavigate={onNavigate} />);
+    render(<TestQuestSidebar onNavigate={onNavigate} />);
 
     await user.click(screen.getAllByRole("button", { name: "联系 Mike" })[0]);
 
@@ -167,18 +208,18 @@ describe("QuestSidebar", () => {
 
   it("shows explicit empty text for no quests and filtered empty results", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<QuestSidebar view={makeView([])} quests={[]} onNavigate={vi.fn()} />);
+    const { rerender } = render(<TestQuestSidebar sourceQuests={[]} />);
 
     expect(screen.getByText("暂无已登记任务。")).toBeInTheDocument();
 
-    rerender(<QuestSidebar view={makeView([quests[0]])} quests={[quests[0]]} onNavigate={vi.fn()} />);
+    rerender(<TestQuestSidebar sourceQuests={[quests[0]]} />);
     await user.click(within(screen.getByRole("group", { name: "完成状态" })).getByRole("button", { name: "已完成" }));
     expect(screen.getByText("当前筛选下没有任务。")).toBeInTheDocument();
   });
 
   it("falls back when current node descriptions are missing", async () => {
     const user = userEvent.setup();
-    render(<QuestSidebar view={makeView()} quests={quests} onNavigate={vi.fn()} />);
+    render(<TestQuestSidebar />);
 
     await user.click(screen.getByRole("button", { name: /南侧通道测绘/ }));
 

@@ -1,33 +1,39 @@
-import { useState } from "react";
 import type { QuestNavigationEntry } from "../content/contentData";
 import type { QuestCategoryFilter, QuestDetailView, QuestEntryStatus, QuestSidebarView, QuestStatusFilter } from "../questSystem";
 import { Panel, StatusTag } from "./Layout";
 
 interface QuestSidebarProps {
   view: QuestSidebarView;
-  quests?: QuestDetailView[];
   onNavigate: (entry: QuestNavigationEntry) => void;
-  initiallyCollapsed?: boolean;
+  collapsed: boolean;
+  statusFilter: QuestStatusFilter;
+  categoryFilter: QuestCategoryFilter;
+  onCollapsedChange: (collapsed: boolean) => void;
+  onStatusFilterChange: (filter: QuestStatusFilter) => void;
+  onCategoryFilterChange: (filter: QuestCategoryFilter) => void;
+  onSelectedQuestIdChange: (questId: string) => void;
 }
 
 const missingIntelText = "当前任务情报缺失。";
 
-export function QuestSidebar({ view, quests, onNavigate, initiallyCollapsed = false }: QuestSidebarProps) {
-  const [collapsed, setCollapsed] = useState(initiallyCollapsed);
-  const [statusFilter, setStatusFilter] = useState<QuestStatusFilter>("all");
-  const [categoryFilter, setCategoryFilter] = useState<QuestCategoryFilter>("all");
-  const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>(view.selectedQuest?.id ?? quests?.[0]?.id);
-
-  const sourceQuests = quests ?? (view.selectedQuest ? [view.selectedQuest] : []);
-  const filteredQuests = sourceQuests.filter(
-    (quest) => (statusFilter === "all" || quest.status === statusFilter) && (categoryFilter === "all" || quest.category === categoryFilter),
-  );
-  const selectedQuest = filteredQuests.find((quest) => quest.id === selectedQuestId) ?? filteredQuests[0];
+export function QuestSidebar({
+  view,
+  onNavigate,
+  collapsed,
+  statusFilter,
+  categoryFilter,
+  onCollapsedChange,
+  onStatusFilterChange,
+  onCategoryFilterChange,
+  onSelectedQuestIdChange,
+}: QuestSidebarProps) {
+  const filteredQuests = view.list;
+  const selectedQuest = view.selectedQuest;
 
   if (collapsed) {
     return (
       <aside className="quest-sidebar quest-sidebar-collapsed" aria-label="任务侧边栏">
-        <button type="button" className="small-button quest-sidebar-toggle" onClick={() => setCollapsed(false)}>
+        <button type="button" className="small-button quest-sidebar-toggle" onClick={() => onCollapsedChange(false)}>
           展开任务
         </button>
         <div className="quest-collapsed-metrics" aria-label="任务摘要">
@@ -57,7 +63,7 @@ export function QuestSidebar({ view, quests, onNavigate, initiallyCollapsed = fa
           <p className="quest-sidebar-kicker">任务频道</p>
           <h2>任务追踪</h2>
         </div>
-        <button type="button" className="small-button" onClick={() => setCollapsed(true)}>
+        <button type="button" className="small-button" onClick={() => onCollapsedChange(true)}>
           折叠
         </button>
       </header>
@@ -70,7 +76,7 @@ export function QuestSidebar({ view, quests, onNavigate, initiallyCollapsed = fa
           ["completed", "已完成"],
         ]}
         value={statusFilter}
-        onChange={(value) => setStatusFilter(value as QuestStatusFilter)}
+        onChange={(value) => onStatusFilterChange(value as QuestStatusFilter)}
       />
       <QuestFilterGroup
         label="任务类型"
@@ -80,10 +86,10 @@ export function QuestSidebar({ view, quests, onNavigate, initiallyCollapsed = fa
           ["side", "次要"],
         ]}
         value={categoryFilter}
-        onChange={(value) => setCategoryFilter(value as QuestCategoryFilter)}
+        onChange={(value) => onCategoryFilterChange(value as QuestCategoryFilter)}
       />
 
-      {sourceQuests.length === 0 ? (
+      {view.emptyText === "No registered quests." ? (
         <Panel className="quest-empty-state">暂无已登记任务。</Panel>
       ) : filteredQuests.length === 0 ? (
         <Panel className="quest-empty-state">当前筛选下没有任务。</Panel>
@@ -95,7 +101,7 @@ export function QuestSidebar({ view, quests, onNavigate, initiallyCollapsed = fa
                 type="button"
                 key={quest.id}
                 className={`quest-list-item ${quest.id === selectedQuest?.id ? "quest-list-item-active" : ""}`}
-                onClick={() => setSelectedQuestId(quest.id)}
+                onClick={() => onSelectedQuestIdChange(quest.id)}
               >
                 <span className="quest-list-title-row">
                   <span>{quest.title}</span>
