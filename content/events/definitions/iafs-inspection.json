@@ -35,7 +35,8 @@
           "effects": [
             { "id": "reveal_generator", "type": "update_tile_state", "target": { "type": "event_tile" }, "params": { "object_id": "iafs_generator", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
             { "id": "reveal_life_support", "type": "update_tile_state", "target": { "type": "event_tile" }, "params": { "object_id": "iafs_life_support", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
-            { "id": "reveal_shuttle_core", "type": "update_tile_state", "target": { "type": "event_tile" }, "params": { "object_id": "iafs_shuttle_core", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+            { "id": "reveal_shuttle_core", "type": "update_tile_state", "target": { "type": "event_tile" }, "params": { "object_id": "iafs_shuttle_core", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+            { "id": "complete_survey_crash_site_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "regroup_after_crash", "subquest_id": "inspect_crash_modules", "todo_id": "survey_crash_site" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
           ]
         }
       ],

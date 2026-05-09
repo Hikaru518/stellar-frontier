@@ -98,6 +98,18 @@
           ],
           "todos": [
             {
+              "id": "survey_crash_site",
+              "title": "调查 IAFS 坠毁点",
+              "description": "在 4-4 完成一次区域调查，确认坠毁点周边是否还有可用模块。",
+              "navigation": [
+                {
+                  "type": "tile",
+                  "label": "查看 IAFS 坠毁点",
+                  "tile_id": "4-4"
+                }
+              ]
+            },
+            {
               "id": "inspect_generator",
               "title": "检查 IAFS 发电机",
               "description": "确认发电机是否仍能为临时营地供能。",

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { eventContentLibrary, questDefinitions } from "../content/contentData";
+import { createInitialQuestState } from "../questSystem";
 import { EventContentIndex } from "./contentIndex";
+import { buildEventContentIndex } from "./contentIndex";
 import { processEventWakeups, processTrigger, selectCallOption } from "./eventEngine";
 import { startRuntimeEvent, type GraphRunnerGameState } from "./graphRunner";
 import {
@@ -96,6 +99,44 @@ describe("event engine call option selection", () => {
 });
 
 describe("event engine trigger intake", () => {
+  it("completes the crash-site survey quest todo through the authored survey call chain", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredCrashSiteState(),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(240),
+        trigger_type: "action_complete",
+        source: "crew_action",
+        crew_id: "mike",
+        tile_id: "4-4",
+        action_id: "act_survey_crash_site",
+        payload: { action_type: "survey" },
+      },
+    });
+    const callId = started.event?.active_call_id ?? "";
+
+    expect(started.errors).toEqual([]);
+    expect(started.event?.event_definition_id).toBe("iafs_crash_site_survey_reveal");
+
+    const selected = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "ack",
+      occurred_at: 245,
+    });
+
+    const quest = selected.state.quest_state?.quests.regroup_after_crash;
+    const subquest = quest?.subquests.inspect_crash_modules;
+    expect(selected.errors).toEqual([]);
+    expect(subquest?.todos.survey_crash_site).toMatchObject({ status: "completed", completed_at: 245 });
+    expect(quest?.status).toBe("incomplete");
+    expect(subquest?.status).toBe("incomplete");
+    expect(selected.state.crew_actions).toEqual({});
+  });
+
   it("starts arrival candidates and advances call choice contexts", () => {
     const definition = eventDefinition([
       callNode("signal_call", { press_on: "success_end" }),
@@ -404,6 +445,40 @@ function createState(): GraphRunnerGameState {
       amy: crew("amy"),
     },
     tiles: {},
+  };
+}
+
+function createAuthoredCrashSiteState(): GraphRunnerGameState {
+  return {
+    ...createEmptyEventRuntimeState(),
+    elapsed_game_seconds: 240,
+    crew: {
+      mike: {
+        ...crew("mike"),
+        display_name: "Mike",
+        tile_id: "4-4",
+        inventory_id: "inv_mike",
+      },
+    },
+    tiles: {
+      "4-4": {
+        id: "4-4",
+        coordinates: { x: 4, y: 4 },
+        terrain_type: "crash_site",
+        tags: ["iafs", "crash_site"],
+        danger_tags: [],
+        discovery_state: "visited",
+        survey_state: "surveyed",
+        visibility: "visible",
+        current_crew_ids: ["mike"],
+        resource_nodes: [],
+        site_objects: [],
+        buildings: [],
+        event_marks: [],
+        history_keys: [],
+      },
+    },
+    quest_state: createInitialQuestState(questDefinitions, 0),
   };
 }
 
