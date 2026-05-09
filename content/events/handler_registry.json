@@ -21,6 +21,17 @@
       "uses_random": false,
       "failure_policy": "fail_event",
       "sample_fixtures": []
+    },
+    {
+      "handler_type": "quest_progress",
+      "kind": "effect",
+      "description": "Apply explicit quest progress updates to GameState.quest_state. The world_flags target is only a handler_effect placeholder; quest state is not stored in world_flags.",
+      "params_schema_ref": "#/$defs/quest_progress_params",
+      "allowed_target_types": ["world_flags"],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": []
     }
   ]
 }
