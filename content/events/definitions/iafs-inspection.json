@@ -1,0 +1,208 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_generator_inspect_damaged",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "调查发电机（损坏）",
+      "summary": "调查损坏发电机时，队员回报当前损坏情况。",
+      "tags": ["iafs", "inspection", "generator"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_generator:inspect" } },
+          { "type": "handler_condition", "handler_type": "object_status_equals", "params": { "object_id": "iafs_generator", "status": "damaged" } }
+        ]
+      },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          { "id": "report", "type": "call", "title": "发电机调查结果", "call_template_id": "iafs_generator_inspect_damaged.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "end", "type": "end", "title": "发电机调查完成", "resolution": "resolved", "result_key": "generator_inspected_damaged", "event_log_template_id": "iafs_generator_inspect_damaged_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [],
+      "log_templates": [{ "id": "iafs_generator_inspect_damaged_log", "summary": "发电机损坏调查完成", "importance": "minor", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_generator_inspect_damaged.call.report"] },
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_generator_inspect_repaired",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "调查发电机（已修复）",
+      "summary": "调查已修复发电机时，队员回报修复后的情况。",
+      "tags": ["iafs", "inspection", "generator"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_generator:inspect" } },
+          { "type": "handler_condition", "handler_type": "object_status_equals", "params": { "object_id": "iafs_generator", "status": "repaired" } }
+        ]
+      },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          { "id": "report", "type": "call", "title": "发电机调查结果", "call_template_id": "iafs_generator_inspect_repaired.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "end", "type": "end", "title": "发电机调查完成", "resolution": "resolved", "result_key": "generator_inspected_repaired", "event_log_template_id": "iafs_generator_inspect_repaired_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [],
+      "log_templates": [{ "id": "iafs_generator_inspect_repaired_log", "summary": "发电机修复状态已确认", "importance": "minor", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_generator_inspect_repaired.call.report"] },
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_life_support_inspect_damaged",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "调查维生装置（损坏）",
+      "summary": "调查损坏维生装置时，队员回报当前损坏情况。",
+      "tags": ["iafs", "inspection", "life_support"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_life_support:inspect" } },
+          { "type": "handler_condition", "handler_type": "object_status_equals", "params": { "object_id": "iafs_life_support", "status": "damaged" } }
+        ]
+      },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          { "id": "report", "type": "call", "title": "维生装置调查结果", "call_template_id": "iafs_life_support_inspect_damaged.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "end", "type": "end", "title": "维生装置调查完成", "resolution": "resolved", "result_key": "life_support_inspected_damaged", "event_log_template_id": "iafs_life_support_inspect_damaged_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [],
+      "log_templates": [{ "id": "iafs_life_support_inspect_damaged_log", "summary": "维生装置损坏调查完成", "importance": "minor", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_life_support_inspect_damaged.call.report"] },
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_life_support_inspect_repaired",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "调查维生装置（已修复）",
+      "summary": "调查已修复维生装置时，队员回报修复后的情况。",
+      "tags": ["iafs", "inspection", "life_support"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_life_support:inspect" } },
+          { "type": "handler_condition", "handler_type": "object_status_equals", "params": { "object_id": "iafs_life_support", "status": "repaired" } }
+        ]
+      },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          { "id": "report", "type": "call", "title": "维生装置调查结果", "call_template_id": "iafs_life_support_inspect_repaired.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "end", "type": "end", "title": "维生装置调查完成", "resolution": "resolved", "result_key": "life_support_inspected_repaired", "event_log_template_id": "iafs_life_support_inspect_repaired_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [],
+      "log_templates": [{ "id": "iafs_life_support_inspect_repaired_log", "summary": "维生装置修复状态已确认", "importance": "minor", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_life_support_inspect_repaired.call.report"] },
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_shuttle_core_inspect_damaged",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "调查穿梭机核心（损坏）",
+      "summary": "调查损坏穿梭机核心时，队员回报当前损坏情况。",
+      "tags": ["iafs", "inspection", "shuttle_core"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_shuttle_core:inspect" } },
+          { "type": "handler_condition", "handler_type": "object_status_equals", "params": { "object_id": "iafs_shuttle_core", "status": "damaged" } }
+        ]
+      },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          { "id": "report", "type": "call", "title": "穿梭机核心调查结果", "call_template_id": "iafs_shuttle_core_inspect_damaged.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "end", "type": "end", "title": "穿梭机核心调查完成", "resolution": "resolved", "result_key": "shuttle_core_inspected_damaged", "event_log_template_id": "iafs_shuttle_core_inspect_damaged_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [],
+      "log_templates": [{ "id": "iafs_shuttle_core_inspect_damaged_log", "summary": "穿梭机核心损坏调查完成", "importance": "minor", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_shuttle_core_inspect_damaged.call.report"] },
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_shuttle_core_inspect_repaired",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "调查穿梭机核心（已修复）",
+      "summary": "调查已修复穿梭机核心时，队员回报修复后的情况。",
+      "tags": ["iafs", "inspection", "shuttle_core"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_shuttle_core:inspect" } },
+          { "type": "handler_condition", "handler_type": "object_status_equals", "params": { "object_id": "iafs_shuttle_core", "status": "repaired" } }
+        ]
+      },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": null, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "report",
+        "nodes": [
+          { "id": "report", "type": "call", "title": "穿梭机核心调查结果", "call_template_id": "iafs_shuttle_core_inspect_repaired.call.report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": 180 },
+          { "id": "end", "type": "end", "title": "穿梭机核心调查完成", "resolution": "resolved", "result_key": "shuttle_core_inspected_repaired", "event_log_template_id": "iafs_shuttle_core_inspect_repaired_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [],
+      "log_templates": [{ "id": "iafs_shuttle_core_inspect_repaired_log", "summary": "穿梭机核心修复状态已确认", "importance": "minor", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_shuttle_core_inspect_repaired.call.report"] },
+      "sample_contexts": []
+    }
+  ]
+}

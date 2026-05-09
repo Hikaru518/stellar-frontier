@@ -1,4 +1,11 @@
 {
   "schema_version": "event-manifest.v1",
-  "domains": []
+  "domains": [
+    {
+      "id": "iafs-inspection",
+      "definitions": "definitions/iafs-inspection.json",
+      "call_templates": "call_templates/iafs-inspection.json",
+      "presets": null
+    }
+  ]
 }

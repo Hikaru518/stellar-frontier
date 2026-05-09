@@ -490,6 +490,46 @@ describe("App", () => {
     expect(saved?.active_calls).toEqual({});
   });
 
+  it("investigating a damaged crash-site object creates a runtime event call", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: "发电机" }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+
+    expect(screen.getByText(/外壳撕裂/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
+  });
+
+  it("investigating a repaired crash-site object creates a repaired-state runtime event call", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          map: {
+            ...(createSavedCrashSiteState().map as Record<string, unknown>),
+            mapObjects: {
+              iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
+              iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+            },
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: "发电机" }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+
+    expect(screen.getByText(/供电回路已恢复稳定/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
+  });
+
   it("allows retrying a repair after a failed attempt has cleared the lock", () => {
     const retryResult = dispatchTimedLocalAction(
       createSavedCrashSiteState({

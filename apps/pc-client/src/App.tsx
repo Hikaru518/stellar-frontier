@@ -10,7 +10,7 @@ import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCre
 import { appendDiaryEntry } from "./diarySystem";
 import { eventContentLibrary } from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
-import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
+import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -577,8 +577,18 @@ function App() {
     if (selectedStoryAction) {
       const applied = triggerLocationStoryAction(authoritativeState, selectedStoryAction);
       setGameState(applied.state);
+<<<<<<< HEAD
       if (updateCurrentCall) {
-        setCurrentCall((call) => (call ? { ...call, settled: true, result: applied.createdEvent ? "地点事件已进入通讯队列。" : "当前地点没有可触发的地点事件。" } : call));
+        setCurrentCall((call) =>
+          call
+            ? {
+                ...call,
+                settled: applied.createdEvent ? false : true,
+                runtimeCallId: applied.runtimeCallId ?? call.runtimeCallId,
+                result: applied.createdEvent ? undefined : "当前地点没有可触发的地点事件。",
+              }
+            : call,
+        );
       }
       return;
     }
@@ -1613,11 +1623,12 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
   };
 }
 
+
 function createRepairCrewActionState(
   state: GameState,
   selection: LocationStoryActionSelection,
 ): CrewActionState {
-  const localAction = selection.action.local_action!;
+  const localAction = selection.action.local_action as TimedRepairLocalActionDef;
   const actionId = `repair:${selection.member.id}:${selection.object.id}:${state.elapsedGameSeconds}`;
   return {
     id: actionId,
@@ -1650,7 +1661,7 @@ function createRepairCrewActionState(
 function triggerLocationStoryAction(
   state: GameState,
   selection: LocationStoryActionSelection,
-): { state: GameState; createdEvent: boolean } {
+): { state: GameState; createdEvent: boolean; runtimeCallId?: string } {
   const context = createLocationStoryActionTriggerContext(state, selection);
   const result = processTrigger({
     state: toEventEngineState(state),
@@ -1658,9 +1669,13 @@ function triggerLocationStoryAction(
     context,
   });
 
+  const nextState = mergeEventRuntimeState(state, result.state);
+  const runtimeCallId = findRuntimeCallForCrew(nextState, selection.member.id)?.id;
+
   return {
-    state: mergeEventRuntimeState(state, result.state),
+    state: nextState,
     createdEvent: (result.candidate_report?.created_event_ids.length ?? 0) > 0,
+    runtimeCallId,
   };
 }
 

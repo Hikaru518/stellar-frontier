@@ -12,6 +12,23 @@
       "initial_status": "damaged",
       "actions": [
         {
+          "id": "iafs_generator:inspect",
+          "category": "object",
+          "label": "调查",
+          "tone": "neutral",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            }
+          ],
+          "event_id": "iafs_generator_inspect_damaged"
+        },
+        {
           "id": "iafs_generator:repair",
           "category": "object",
           "label": "维修",
@@ -69,6 +86,23 @@
       "initial_status": "damaged",
       "actions": [
         {
+          "id": "iafs_life_support:inspect",
+          "category": "object",
+          "label": "调查",
+          "tone": "neutral",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            }
+          ],
+          "event_id": "iafs_life_support_inspect_damaged"
+        },
+        {
           "id": "iafs_life_support:repair",
           "category": "object",
           "label": "维修",
@@ -125,6 +159,23 @@
       "status_options": ["damaged", "repaired"],
       "initial_status": "damaged",
       "actions": [
+        {
+          "id": "iafs_shuttle_core:inspect",
+          "category": "object",
+          "label": "调查",
+          "tone": "neutral",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            }
+          ],
+          "event_id": "iafs_shuttle_core_inspect_damaged"
+        },
         {
           "id": "iafs_shuttle_core:repair",
           "category": "object",

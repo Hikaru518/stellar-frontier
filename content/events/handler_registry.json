@@ -1,3 +1,26 @@
 {
-  "handlers": []
+  "handlers": [
+    {
+      "handler_type": "trigger_context_value_equals",
+      "kind": "condition",
+      "description": "检查 trigger_context 字段是否保存了预期值。",
+      "params_schema_ref": "#/$defs/trigger_context_value_equals_params",
+      "allowed_target_types": [],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": []
+    },
+    {
+      "handler_type": "object_status_equals",
+      "kind": "condition",
+      "description": "检查运行时地图对象状态是否等于预期值。",
+      "params_schema_ref": "#/$defs/object_status_equals_params",
+      "allowed_target_types": [],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": []
+    }
+  ]
 }

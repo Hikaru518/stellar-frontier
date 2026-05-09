@@ -82,6 +82,20 @@ describe("mapObjects content", () => {
     }
   });
 
+  it("defines an inspect action routed through structured event content on each IAFS crash-site object", () => {
+    for (const objectId of crashSiteObjectIds) {
+      const definition = getMapObjectDefinition(objectId);
+      const inspectAction = definition?.actions.find((action) => action.id === `${objectId}:inspect`);
+
+      expect(inspectAction).toMatchObject({
+        category: "object",
+        label: "调查",
+        event_id: expect.stringContaining(objectId.replace("iafs_", "iafs_")),
+      });
+      expect(inspectAction?.event_id).toContain("inspect");
+    }
+  });
+
   it("places the three IAFS crash-site objects on tile 4-4 and encloses the larger start zone with mountains", () => {
     const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "4-4");
     const ringTileIds = ["2-3", "2-4", "2-5", "3-2", "3-6", "4-2", "4-7", "5-2", "5-7", "6-2", "6-6", "7-3", "7-4", "7-5"];

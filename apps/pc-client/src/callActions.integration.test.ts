@@ -227,9 +227,9 @@ describe("map-object-action pipeline integration", () => {
     const member = createCrashSiteMember();
     const view = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
-    const generatorAction = view.groups.find((group) => group.title === "发电机")?.actions[0];
-    const lifeSupportAction = view.groups.find((group) => group.title === "维生装置")?.actions[0];
-    const shuttleCoreAction = view.groups.find((group) => group.title === "穿梭机核心")?.actions[0];
+    const generatorAction = view.groups.find((group) => group.title === "发电机")?.actions.find((action) => action.id === "iafs_generator:repair");
+    const lifeSupportAction = view.groups.find((group) => group.title === "维生装置")?.actions.find((action) => action.id === "iafs_life_support:repair");
+    const shuttleCoreAction = view.groups.find((group) => group.title === "穿梭机核心")?.actions.find((action) => action.id === "iafs_shuttle_core:repair");
 
     expect(generatorAction).toMatchObject({ id: "iafs_generator:repair", label: "维修" });
     expect(generatorAction?.disabled).toBeUndefined();
@@ -237,6 +237,34 @@ describe("map-object-action pipeline integration", () => {
     expect(lifeSupportAction?.disabled).toBeUndefined();
     expect(shuttleCoreAction).toMatchObject({ id: "iafs_shuttle_core:repair", label: "维修" });
     expect(shuttleCoreAction?.disabled).toBeUndefined();
+  });
+
+  it("shows inspect actions for crash-site objects regardless of repair status", () => {
+    const member = createCrashSiteMember();
+    const damagedView = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
+
+    expect(damagedView.groups.find((group) => group.title === "发电机")?.actions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", label: "调查" })]),
+    );
+
+    const repairedView = buildCallView({
+      member,
+      tile: createCrashSiteTile(),
+      gameState: createCrashSiteState({
+        map: {
+          ...createCrashSiteState().map,
+          mapObjects: {
+            iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
+            iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
+            iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+          },
+        },
+      }),
+    });
+
+    expect(repairedView.groups.find((group) => group.title === "发电机")?.actions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", label: "调查" })]),
+    );
   });
 
   it("keeps repair visible but disables it when another crew member is already repairing the object", () => {
