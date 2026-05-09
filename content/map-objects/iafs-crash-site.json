@@ -7,7 +7,7 @@
       "name": "发电机",
       "description": "坠毁现场的应急发电机组，外壳撕裂，仍有零星火花。",
       "tags": ["iafs", "crash_site", "repair_target", "power_system"],
-      "visibility": "onDiscovered",
+      "visibility": "hidden",
       "status_options": ["damaged", "repaired"],
       "initial_status": "damaged",
       "actions": [
@@ -81,7 +81,7 @@
       "name": "维生装置",
       "description": "维生循环模组被坠毁冲击压歪，面板仍在断续报警。",
       "tags": ["iafs", "crash_site", "repair_target", "life_support"],
-      "visibility": "onDiscovered",
+      "visibility": "hidden",
       "status_options": ["damaged", "repaired"],
       "initial_status": "damaged",
       "actions": [
@@ -155,7 +155,7 @@
       "name": "穿梭机核心",
       "description": "穿梭机核心舱体半埋在碎石里，接口烧蚀严重。",
       "tags": ["iafs", "crash_site", "repair_target", "shuttle_core"],
-      "visibility": "onDiscovered",
+      "visibility": "hidden",
       "status_options": ["damaged", "repaired"],
       "initial_status": "damaged",
       "actions": [

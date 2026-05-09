@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App, { dispatchTimedLocalAction, mergeEventRuntimeState, resolvePhoneRuntimeCallCrewId, toEventEngineState, validatePhoneMessageEnvelope } from "./App";
-import { crewDefinitions, defaultMapConfig, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
+import { buildEventContentIndex } from "./events/contentIndex";
+import { crewDefinitions, defaultMapConfig, eventContentLibrary, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
 import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
 import { evaluateCondition } from "./events/conditions";
 import { executeEffects } from "./events/effects";
+import { processTrigger } from "./events/eventEngine";
 import { createEmptyEventRuntimeState, type CrewActionState, type Effect } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 
@@ -458,10 +460,6 @@ describe("App", () => {
         resources: initialResources,
       })),
     );
-=======
-  it("dispatches a repair selection into a timed repair crew action", () => {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
->>>>>>> 24e5d5a (feat(iafs): wire timed repair actions)
 
   it("dispatches a repair selection into a timed repair crew action", () => {
     window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
@@ -470,7 +468,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
-    fireEvent.click(within(screen.getByRole("heading", { name: "发电机" }).closest("section") as HTMLElement).getByRole("button", { name: "维修" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "维修" }));
 
     const saved = readSavedState();
     expect(saved).not.toBeNull();
@@ -497,7 +495,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
-    fireEvent.click(within(screen.getByRole("heading", { name: "发电机" }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
 
     expect(screen.getByText(/外壳撕裂/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
@@ -524,10 +522,90 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
-    fireEvent.click(within(screen.getByRole("heading", { name: "发电机" }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
 
     expect(screen.getByText(/供电回路已恢复稳定/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
+  });
+
+  it("reveals hidden crash-site objects only after surveying the crash site event", () => {
+    vi.useFakeTimers();
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          map: {
+            ...(createSavedCrashSiteState().map as Record<string, unknown>),
+            tilesById: {
+              "4-4": {
+                discovered: true,
+                investigated: true,
+                revealedObjectIds: [],
+              },
+            },
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    expect(screen.queryByRole("heading", { name: "发电机" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
+
+    act(() => {
+      vi.advanceTimersByTime(15000);
+    });
+
+    expect(screen.getByText(/这里还有几套能辨认出来的关键设施/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "标记这些可用设施。" }));
+
+    const saved = readSavedState();
+    expect(saved?.map).toMatchObject({
+      tilesById: {
+        "4-4": {
+          revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
+        },
+      },
+    });
+  });
+
+  it("routes crash-site inspect triggers into the inspection event definitions", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+
+    const result = processTrigger({
+      state: toEventEngineState(createSavedCrashSiteState() as never),
+      index: indexResult.index,
+      context: {
+        trigger_type: "action_complete",
+        occurred_at: 0,
+        source: "call",
+        crew_id: "mike",
+        tile_id: "4-4",
+        action_id: "iafs_generator:inspect",
+        event_id: null,
+        event_definition_id: "iafs_generator_inspect_damaged",
+        node_id: null,
+        call_id: null,
+        objective_id: null,
+        selected_option_id: null,
+        world_flag_key: null,
+        proximity: null,
+        payload: {
+          action_type: "inspect",
+          action_def_id: "iafs_generator:inspect",
+          object_id: "iafs_generator",
+          tags: ["iafs", "crash_site", "repair_target", "power_system"],
+        },
+      },
+    });
+
+    expect(result.candidate_report?.selected_event_definition_ids).toEqual(["iafs_generator_inspect_damaged"]);
+    expect(result.candidate_report?.created_event_ids.length).toBe(1);
   });
 
   it("allows retrying a repair after a failed attempt has cleared the lock", () => {

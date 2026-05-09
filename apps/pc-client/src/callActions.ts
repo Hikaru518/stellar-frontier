@@ -88,10 +88,27 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
     if (!entry || entry.views.length === 0) {
       continue;
     }
-    groups.push({ title: entry.object.name, actions: entry.views });
+    groups.push({ title: formatObjectGroupTitle(entry.object, gameState), actions: entry.views });
   }
 
   return runtimeCall ? { groups, runtimeCall } : { groups };
+}
+
+function formatObjectGroupTitle(object: MapObjectDefinition, gameState: GameState): string {
+  const status = gameState.map.mapObjects?.[object.id]?.status_enum ?? object.initial_status;
+  const statusLabel = formatObjectStatus(status);
+  return statusLabel ? `${object.name}（${statusLabel}）` : object.name;
+}
+
+function formatObjectStatus(status: string | undefined): string {
+  switch (status) {
+    case "damaged":
+      return "已损坏";
+    case "repaired":
+      return "正常";
+    default:
+      return status ?? "";
+  }
 }
 
 function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate[] {

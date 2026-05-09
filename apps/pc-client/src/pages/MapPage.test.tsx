@@ -69,7 +69,36 @@ describe("MapPage", () => {
 
     act(() => phaserMapCanvasState.latestProps?.onSelectTile("4-4"));
     expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
-    expect(screen.getByText("发电机 / 维生装置 / 穿梭机核心")).toBeInTheDocument();
+    expect(screen.getByText("未知对象")).toBeInTheDocument();
+  });
+
+  it("shows unknown objects on radar before crash-site objects are revealed", () => {
+    render(
+      <MapPage
+        tiles={initialTiles}
+        map={{
+          ...createInitialMapState(),
+          tilesById: {
+            ...createInitialMapState().tilesById,
+            "4-4": {
+              ...createInitialMapState().tilesById["4-4"],
+              revealedObjectIds: [],
+            },
+          },
+        }}
+        crew={initialCrew}
+        crewActions={{}}
+        activeCalls={{}}
+        eventLogs={[]}
+        elapsedGameSeconds={0}
+        gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+        returnTarget="control"
+        onReturn={vi.fn()}
+      />,
+    );
+
+    act(() => phaserMapCanvasState.latestProps?.onSelectTile("4-4"));
+    expect(screen.getByText("未知对象")).toBeInTheDocument();
   });
 
   it("passes no authored visual layers for the current map content", () => {

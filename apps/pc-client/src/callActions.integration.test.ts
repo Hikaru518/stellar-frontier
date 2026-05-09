@@ -227,9 +227,9 @@ describe("map-object-action pipeline integration", () => {
     const member = createCrashSiteMember();
     const view = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
-    const generatorAction = view.groups.find((group) => group.title === "发电机")?.actions.find((action) => action.id === "iafs_generator:repair");
-    const lifeSupportAction = view.groups.find((group) => group.title === "维生装置")?.actions.find((action) => action.id === "iafs_life_support:repair");
-    const shuttleCoreAction = view.groups.find((group) => group.title === "穿梭机核心")?.actions.find((action) => action.id === "iafs_shuttle_core:repair");
+    const generatorAction = findGroup(view, "发电机")?.actions.find((action) => action.id === "iafs_generator:repair");
+    const lifeSupportAction = findGroup(view, "维生装置")?.actions.find((action) => action.id === "iafs_life_support:repair");
+    const shuttleCoreAction = findGroup(view, "穿梭机核心")?.actions.find((action) => action.id === "iafs_shuttle_core:repair");
 
     expect(generatorAction).toMatchObject({ id: "iafs_generator:repair", label: "维修" });
     expect(generatorAction?.disabled).toBeUndefined();
@@ -243,7 +243,7 @@ describe("map-object-action pipeline integration", () => {
     const member = createCrashSiteMember();
     const damagedView = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
-    expect(damagedView.groups.find((group) => group.title === "发电机")?.actions).toEqual(
+    expect(findGroup(damagedView, "发电机")?.actions).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", label: "调查" })]),
     );
 
@@ -262,9 +262,31 @@ describe("map-object-action pipeline integration", () => {
       }),
     });
 
-    expect(repairedView.groups.find((group) => group.title === "发电机")?.actions).toEqual(
+    expect(findGroup(repairedView, "发电机")?.actions).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", label: "调查" })]),
     );
+  });
+
+  it("hides crash-site object groups before a survey event reveals them", () => {
+    const member = createCrashSiteMember();
+    const hiddenView = buildCallView({
+      member,
+      tile: createCrashSiteTile(),
+      gameState: createCrashSiteState({
+        map: {
+          ...createCrashSiteState().map,
+          tilesById: {
+            "4-4": {
+              discovered: true,
+              investigated: true,
+              revealedObjectIds: [],
+            },
+          },
+        },
+      }),
+    });
+
+    expect(hiddenView.groups.map((group) => group.title)).toEqual(["基础行动"]);
   });
 
   it("keeps repair visible but disables it when another crew member is already repairing the object", () => {
@@ -504,10 +526,14 @@ describe("map-object-action pipeline integration", () => {
     };
 
     const unlockedView = buildCallView({ member, tile, gameState: updatedState });
-    const unlockedGroup = unlockedView.groups.find((group) => group.title === "实验舱门");
+    const unlockedGroup = findGroup(unlockedView, "实验舱门");
     expect(unlockedGroup).toBeDefined();
     const enterAction = unlockedGroup!.actions.find((action) => action.id === `${STUB_OBJECT_ID}:enter`);
     expect(enterAction).toBeDefined();
     expect(enterAction!.disabled).toBeFalsy();
   });
 });
+
+function findGroup(view: ReturnType<typeof buildCallView>, objectName: string) {
+  return view.groups.find((group) => group.title === objectName || group.title.startsWith(`${objectName}（`));
+}
