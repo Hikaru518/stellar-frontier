@@ -56,6 +56,15 @@ const eventAssetFiles = [
   ["content/events/handler_registry.json", "content/schemas/events/handler-registry.schema.json"],
 ];
 
+const questProgressOperations = new Set([
+  "complete_quest",
+  "complete_subquest",
+  "complete_todo",
+  "set_quest_node",
+  "set_subquest_node",
+  "mark_updated",
+]);
+
 const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
 const schemaPaths = new Set([
   ...contentFilePairs.map(([, schemaPath]) => schemaPath),
@@ -125,6 +134,7 @@ if (!eventSchemaFailed) {
 
 failed = validateReferences(loaded, loadedMaps, tilesetRegistry) || failed;
 failed = validateQuestContentReferences(loadedQuests, loaded, loadedMaps) || failed;
+failed = validateQuestProgressEffectReferences(loadedQuests) || failed;
 
 if (failed) {
   process.exitCode = 1;
@@ -622,6 +632,131 @@ function addUnique(set, value) {
 
   set.add(value);
   return true;
+}
+
+function validateQuestProgressEffectReferences(questFiles) {
+  const questIndex = buildQuestIndex(questFiles);
+  let hasError = false;
+
+  for (const { directoryPath } of eventAssetGroups) {
+    for (const dataPath of listJsonFiles(directoryPath)) {
+      const file = readJson(dataPath);
+      for (const [definitionIndex, definition] of (file.event_definitions ?? []).entries()) {
+        for (const [groupIndex, group] of (definition.effect_groups ?? []).entries()) {
+          for (const [effectIndex, effect] of (group.effects ?? []).entries()) {
+            hasError = validateQuestProgressEffect(
+              effect,
+              `${dataPath}/event_definitions/${definitionIndex}/effect_groups/${groupIndex}/effects/${effectIndex}`,
+              questIndex,
+            ) || hasError;
+          }
+        }
+
+        for (const [nodeIndex, node] of (definition.event_graph?.nodes ?? []).entries()) {
+          for (const [effectIndex, effect] of (node.inline_effects ?? []).entries()) {
+            hasError = validateQuestProgressEffect(
+              effect,
+              `${dataPath}/event_definitions/${definitionIndex}/event_graph/nodes/${nodeIndex}/inline_effects/${effectIndex}`,
+              questIndex,
+            ) || hasError;
+          }
+        }
+      }
+    }
+  }
+
+  return hasError;
+}
+
+function buildQuestIndex(questFiles) {
+  const quests = new Map();
+
+  for (const questFile of Object.values(questFiles)) {
+    for (const quest of questFile.quests ?? []) {
+      const questEntry = {
+        quest,
+        nodes: new Set((quest.nodes ?? []).map((node) => node.id)),
+        subquests: new Map(),
+      };
+
+      for (const subquest of quest.subquests ?? []) {
+        questEntry.subquests.set(subquest.id, {
+          subquest,
+          nodes: new Set((subquest.nodes ?? []).map((node) => node.id)),
+          todos: new Set((subquest.todos ?? []).map((todo) => todo.id)),
+        });
+      }
+
+      quests.set(quest.id, questEntry);
+    }
+  }
+
+  return quests;
+}
+
+function validateQuestProgressEffect(effect, contextPath, questIndex) {
+  if (effect?.type !== "handler_effect" || effect.handler_type !== "quest_progress") {
+    return false;
+  }
+
+  let hasError = false;
+  const params = effect.params && typeof effect.params === "object" ? effect.params : {};
+  const operation = params.operation;
+  if (!questProgressOperations.has(operation)) {
+    return report(`Invalid quest_progress operation at ${contextPath}/params/operation: ${operation ?? "<missing>"}`);
+  }
+
+  for (const field of requiredQuestProgressFields(operation)) {
+    if (typeof params[field] !== "string" || params[field].length === 0) {
+      hasError = report(`Missing quest_progress ${operation} field at ${contextPath}/params/${field}`) || hasError;
+    }
+  }
+  if (hasError) {
+    return true;
+  }
+
+  const quest = questIndex.get(params.quest_id);
+  if (!quest) {
+    return report(`Unknown quest_progress quest_id at ${contextPath}/params/quest_id: ${params.quest_id}`);
+  }
+
+  if (operation === "set_quest_node" && !quest.nodes.has(params.node_id)) {
+    hasError = report(`Unknown quest_progress node_id in quest ${params.quest_id} at ${contextPath}/params/node_id: ${params.node_id}`) || hasError;
+  }
+
+  if (operation === "complete_subquest" || operation === "complete_todo" || operation === "set_subquest_node") {
+    const subquest = quest.subquests.get(params.subquest_id);
+    if (!subquest) {
+      return report(`Unknown quest_progress subquest_id in quest ${params.quest_id} at ${contextPath}/params/subquest_id: ${params.subquest_id}`);
+    }
+
+    if (operation === "complete_todo" && !subquest.todos.has(params.todo_id)) {
+      hasError = report(`Unknown quest_progress todo_id in subquest ${params.subquest_id} at ${contextPath}/params/todo_id: ${params.todo_id}`) || hasError;
+    }
+    if (operation === "set_subquest_node" && !subquest.nodes.has(params.node_id)) {
+      hasError = report(`Unknown quest_progress node_id in subquest ${params.subquest_id} at ${contextPath}/params/node_id: ${params.node_id}`) || hasError;
+    }
+  }
+
+  return hasError;
+}
+
+function requiredQuestProgressFields(operation) {
+  switch (operation) {
+    case "complete_quest":
+    case "mark_updated":
+      return ["quest_id"];
+    case "complete_subquest":
+      return ["quest_id", "subquest_id"];
+    case "complete_todo":
+      return ["quest_id", "subquest_id", "todo_id"];
+    case "set_quest_node":
+      return ["quest_id", "node_id"];
+    case "set_subquest_node":
+      return ["quest_id", "subquest_id", "node_id"];
+    default:
+      return [];
+  }
 }
 
 function report(message) {

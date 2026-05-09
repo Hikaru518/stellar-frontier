@@ -1861,6 +1861,7 @@ export function mergeEventRuntimeState(state: GameState, eventState: GraphRunner
     event_logs: eventState.event_logs,
     world_history: eventState.world_history,
     world_flags: worldFlags,
+    quest_state: eventState.quest_state ?? state.quest_state,
     crew_actions: eventState.crew_actions,
     inventories: eventState.inventories,
     rng_state: eventState.rng_state,

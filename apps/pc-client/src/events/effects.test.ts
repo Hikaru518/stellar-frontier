@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { questDefinitions } from "../content/contentData";
+import { createInitialQuestState } from "../questSystem";
 import { executeEffects, type EffectExecutionContext, type EffectGameState } from "./effects";
 import type { Effect, HandlerDefinition, TriggerContext } from "./types";
 
@@ -297,6 +299,93 @@ describe("structured effect executor", () => {
     ]);
   });
 
+  it("applies quest_progress handler effects only to quest state", () => {
+    const state = createState();
+    const before = structuredClone(state);
+    const result = executeEffects(
+      [
+        effect("quest-progress", "handler_effect", { type: "world_flags" }, {
+          operation: "complete_todo",
+          quest_id: "regroup_after_crash",
+          subquest_id: "establish_survivor_contact",
+          todo_id: "call_mike",
+        }, { handler_type: "quest_progress" }),
+      ],
+      createContext(state, {
+        handler_registry: [handlerDefinition({ handler_type: "quest_progress", kind: "effect", allowed_target_types: ["world_flags"] })],
+      }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.errors).toEqual([]);
+    expect(result.state.quest_state?.quests.regroup_after_crash.subquests.establish_survivor_contact.todos.call_mike).toMatchObject({
+      status: "completed",
+      completed_at: 120,
+      updated_at: 120,
+    });
+    expect(result.state.world_flags).toEqual(before.world_flags);
+    expect(result.state.crew_actions).toEqual(before.crew_actions);
+    expect(result.state.objectives).toEqual(before.objectives);
+    expect(result.state.event_logs).toEqual(before.event_logs);
+    expect(state).toEqual(before);
+  });
+
+  it("returns quest_progress effect errors for invalid payloads and fail_event stops later effects", () => {
+    const context = createContext(createState(), {
+      handler_registry: [handlerDefinition({ handler_type: "quest_progress", kind: "effect", allowed_target_types: ["world_flags"] })],
+    });
+
+    const invalidOperation = executeEffects(
+      [effect("bad-operation", "handler_effect", { type: "world_flags" }, { operation: "advance_quest", quest_id: "regroup_after_crash" }, { handler_type: "quest_progress" })],
+      context,
+    );
+    expect(invalidOperation.status).toBe("failed");
+    expect(invalidOperation.errors).toEqual([
+      expect.objectContaining({ code: "invalid_effect", effect_id: "bad-operation", path: "effects[0].params.operation" }),
+    ]);
+
+    const missingField = executeEffects(
+      [effect("missing-todo", "handler_effect", { type: "world_flags" }, {
+        operation: "complete_todo",
+        quest_id: "regroup_after_crash",
+        subquest_id: "establish_survivor_contact",
+      }, { handler_type: "quest_progress" })],
+      context,
+    );
+    expect(missingField.status).toBe("failed");
+    expect(missingField.errors).toEqual([
+      expect.objectContaining({ code: "missing_value", effect_id: "missing-todo", path: "effects[0].params.todo_id" }),
+    ]);
+
+    const invalidReference = executeEffects(
+      [effect("bad-reference", "handler_effect", { type: "world_flags" }, {
+        operation: "set_quest_node",
+        quest_id: "regroup_after_crash",
+        node_id: "missing_node",
+      }, { handler_type: "quest_progress" })],
+      context,
+    );
+    expect(invalidReference.status).toBe("failed");
+    expect(invalidReference.errors).toEqual([
+      expect.objectContaining({ code: "handler_error", effect_id: "bad-reference", path: "effects[0].params" }),
+    ]);
+
+    const stopped = executeEffects(
+      [
+        effect("bad-reference", "handler_effect", { type: "world_flags" }, {
+          operation: "set_quest_node",
+          quest_id: "regroup_after_crash",
+          node_id: "missing_node",
+        }, { handler_type: "quest_progress" }),
+        effect("after", "set_world_flag", { type: "world_flags" }, { key: "should_not_run", value: true }),
+      ],
+      context,
+    );
+    expect(stopped.status).toBe("failed");
+    expect(stopped.applied_effect_ids).toEqual([]);
+    expect(stopped.state.world_flags.should_not_run).toBeUndefined();
+  });
+
   it("returns a clear fail_event error when a target cannot be resolved", () => {
     const result = executeEffects(
       [effect("bad-target", "add_crew_condition", { type: "crew_id", id: "missing_crew" }, { condition: "lost" })],
@@ -405,6 +494,7 @@ function createState(): EffectGameState {
         resources: { energy: 42 },
       },
     },
+    quest_state: createInitialQuestState(questDefinitions, 0),
     crew_actions: {},
     active_events: {
       evt_beast: {
