@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConsoleShell, FieldList, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig, type MapSpecialStateDefinition } from "../content/contentData";
 import type { MapObjectDefinition } from "../content/mapObjects";
@@ -24,6 +24,7 @@ interface MapPageProps {
   returnTarget: MapReturnTarget;
   moveSelectionCrewId?: CrewId | null;
   selectedMoveTargetId?: string;
+  initialSelectedTileId?: string;
   onSelectMoveTarget?: (tileId: string) => void;
   onReturn: () => void;
 }
@@ -40,11 +41,12 @@ export function MapPage({
   returnTarget,
   moveSelectionCrewId,
   selectedMoveTargetId,
+  initialSelectedTileId,
   onSelectMoveTarget,
   onReturn,
 }: MapPageProps) {
   const visibleWindow = useMemo(() => getFullTileWindow(defaultMapConfig), []);
-  const [selectedId, setSelectedId] = useState<string | null>(selectedMoveTargetId ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedTileId ?? selectedMoveTargetId ?? null);
   const [mapZoomLevel, setMapZoomLevel] = useState(0);
   const selectedCell = selectedId ? visibleWindow.cells.find((cell) => cell.id === selectedId) : undefined;
   const selectedTile = selectedCell ? tiles.find((tile) => tile.id === selectedCell.id) : undefined;
@@ -78,6 +80,12 @@ export function MapPage({
     () => buildPhaserCrewMarkers(crew, crewActions, tileCenters, elapsedGameSeconds),
     [crew, crewActions, elapsedGameSeconds, tileCenters],
   );
+
+  useEffect(() => {
+    if (initialSelectedTileId) {
+      setSelectedId(initialSelectedTileId);
+    }
+  }, [initialSelectedTileId]);
 
   const crewById = useMemo(
     () => new Map(crew.map((member) => [member.id, member])),

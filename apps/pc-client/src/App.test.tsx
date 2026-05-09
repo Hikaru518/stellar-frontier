@@ -242,6 +242,44 @@ describe("App", () => {
     expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
   });
 
+  it("uses crew quest navigation to open the station without starting a call", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
+    fireEvent.click(screen.getByRole("button", { name: "联系 Mike" }));
+
+    expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
+    expect(screen.queryByText("普通通话已接通。", { exact: false })).not.toBeInTheDocument();
+    const mikeCard = screen.getByText("Mike，神秘幸存者").closest("article");
+    expect(mikeCard).toHaveClass("crew-card-quest-highlight");
+    const saved = readSavedState();
+    expect(saved?.crew_actions).toEqual({});
+    expect((saved?.logs as Array<{ text: string }>).some((log) => log.text.includes("普通通话已接通"))).toBe(false);
+  });
+
+  it("uses page quest navigation to switch pages without creating crew actions", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开通讯台" }));
+
+    expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
+    const saved = readSavedState();
+    expect(saved?.crew_actions).toEqual({});
+  });
+
+  it("uses tile quest navigation to open and select the map tile without creating crew actions", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "查看 IAFS 坠毁点" })[0]);
+
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+    expect(screen.getByText("坐标详情：(0,0)")).toBeInTheDocument();
+    const saved = readSavedState();
+    expect(saved?.crew_actions).toEqual({});
+  });
+
   it("advances game time while the app is running", () => {
     vi.useFakeTimers();
     render(<App />);

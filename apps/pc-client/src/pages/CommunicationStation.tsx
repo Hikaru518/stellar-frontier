@@ -38,6 +38,8 @@ interface CommunicationStationProps {
   onEnablePhoneFallback: () => void;
   onBack: () => void;
   onStartCall: (crewId: CrewId) => void;
+  highlightCrewId?: CrewId | null;
+  questNavigationMessage?: string;
 }
 
 export function CommunicationStation({
@@ -56,6 +58,8 @@ export function CommunicationStation({
   onEnablePhoneFallback,
   onBack,
   onStartCall,
+  highlightCrewId,
+  questNavigationMessage,
 }: CommunicationStationProps) {
   const [contactsOpen, setContactsOpen] = useState(true);
   const [detailCrewId, setDetailCrewId] = useState<CrewId | null>(null);
@@ -105,6 +109,12 @@ export function CommunicationStation({
   const realtimeLink = describeYuanRealtimeLink([...phoneTransportCandidates]);
   const hostTarget = getLatencyTarget(yuanBackedDualDevicePlan, "Yuan WSS Host RTT") ?? "同区域 20-80ms，跨区域 <150ms";
   const pairingExpired = isPairingSessionExpired(pairingSession);
+
+  useEffect(() => {
+    if (highlightCrewId) {
+      setContactsOpen(true);
+    }
+  }, [highlightCrewId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +177,7 @@ export function CommunicationStation({
       <div className="station-layout">
         <Panel title="通讯台主机" className="station-deck">
           <p>当前时间：{gameTimeLabel}</p>
+          {questNavigationMessage ? <p className="accent-text">{questNavigationMessage}</p> : null}
           <p className="accent-text">{latestRuntimeLine ? `事件通话内容：${latestRuntimeLine}` : "暂无待处理事件通话内容。"}</p>
           <div className="terminal-box">
             这里保留通讯台主区域。通讯录展开时悬浮在左侧，不完全遮挡当前上下文。
@@ -215,6 +226,7 @@ export function CommunicationStation({
                   member={member}
                   actionView={crewActionViews[member.id]}
                   hasRuntimeCall={activeCallCrewIds.has(member.id)}
+                  highlighted={member.id === highlightCrewId}
                   onOpenDetail={() => setDetailCrewId(member.id)}
                   onOpenInventory={() => setInventoryCrewId(member.id)}
                   onStartCall={() => onStartCall(member.id)}
@@ -376,6 +388,7 @@ function CrewCard({
   member,
   actionView,
   hasRuntimeCall,
+  highlighted,
   onOpenDetail,
   onOpenInventory,
   onStartCall,
@@ -383,6 +396,7 @@ function CrewCard({
   member: CrewMember;
   actionView: CrewActionViewModel;
   hasRuntimeCall: boolean;
+  highlighted: boolean;
   onOpenDetail: () => void;
   onOpenInventory: () => void;
   onStartCall: () => void;
@@ -390,7 +404,7 @@ function CrewCard({
   const hasCallEntry = member.hasIncoming || hasRuntimeCall || Boolean(actionView.activeCallId);
   const callDisabled = !actionView.canStartCall;
   return (
-    <article className={`crew-card ${hasCallEntry ? "crew-card-alert" : ""}`}>
+    <article className={`crew-card ${hasCallEntry ? "crew-card-alert" : ""} ${highlighted ? "crew-card-quest-highlight" : ""}`}>
       <div className="avatar-box">头像</div>
       <div className="crew-card-body">
         <div className="crew-card-heading">

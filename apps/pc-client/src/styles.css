@@ -399,6 +399,11 @@ p {
   background: #f4eadf;
 }
 
+.crew-card-quest-highlight {
+  border-color: #1e6f7a;
+  box-shadow: 0 0 0 2px rgba(30, 111, 122, 0.18);
+}
+
 .avatar-box {
   display: grid;
   width: 76px;

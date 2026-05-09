@@ -77,6 +77,11 @@ const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 const MOBILE_FALLBACK_AFTER_MS = 10000;
 
+type QuestNavigationHint =
+  | { type: "tile"; tileId: string; label: string }
+  | { type: "crew"; crewId: CrewId; label: string }
+  | { type: "unavailable"; label: string };
+
 type SavedCrewMember = Partial<CrewMember> & { id: CrewId };
 
 type SavedGameState = Partial<Omit<GameState, "crew">> & {
@@ -142,6 +147,7 @@ function App() {
   const [questStatusFilter, setQuestStatusFilter] = useState<QuestStatusFilter>("all");
   const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
   const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
+  const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
   const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
   const [mobileSession, setMobileSession] = useState<MobileSessionState>({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
   const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
@@ -177,10 +183,11 @@ function App() {
     [gameState.quest_state, questCategoryFilter, questStatusFilter, selectedQuestId],
   );
   const questSidebar = (
-    <QuestSidebar
-      view={questSidebarView}
-      onNavigate={handleQuestSidebarNavigate}
-      collapsed={questSidebarCollapsed}
+      <QuestSidebar
+        view={questSidebarView}
+        onNavigate={handleQuestSidebarNavigate}
+        navigationMessage={questNavigationHint?.type === "unavailable" ? `任务导航目标不可用：${questNavigationHint.label}` : undefined}
+        collapsed={questSidebarCollapsed}
       statusFilter={questStatusFilter}
       categoryFilter={questCategoryFilter}
       onCollapsedChange={setQuestSidebarCollapsed}
@@ -190,8 +197,32 @@ function App() {
     />
   );
 
-  function handleQuestSidebarNavigate(_entry: QuestNavigationEntry) {
-    // T8 owns quest navigation behavior. T7 only renders the entry points.
+  function handleQuestSidebarNavigate(entry: QuestNavigationEntry) {
+    if (entry.type === "page") {
+      setQuestNavigationHint(null);
+      setMapReturnTarget("control");
+      setPage(entry.page);
+      return;
+    }
+
+    if (entry.type === "tile") {
+      if (!tiles.some((tile) => tile.id === entry.tile_id)) {
+        setQuestNavigationHint({ type: "unavailable", label: entry.label });
+        return;
+      }
+      setQuestNavigationHint({ type: "tile", tileId: entry.tile_id, label: entry.label });
+      setMapReturnTarget("control");
+      setPage("map");
+      return;
+    }
+
+    const crewMember = crew.find((member) => member.id === entry.crew_id);
+    if (!crewMember) {
+      setQuestNavigationHint({ type: "unavailable", label: entry.label });
+      return;
+    }
+    setQuestNavigationHint({ type: "crew", crewId: crewMember.id, label: entry.label });
+    setPage("station");
   }
 
   useEffect(() => {
@@ -801,6 +832,8 @@ function App() {
           onEnablePhoneFallback={enableMobileFallback}
           onBack={() => setPage("control")}
           onStartCall={startCall}
+          highlightCrewId={questNavigationHint?.type === "crew" ? questNavigationHint.crewId : null}
+          questNavigationMessage={questNavigationHint?.type === "crew" ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。` : undefined}
         />
       </QuestLayout>
     );
@@ -844,6 +877,7 @@ function App() {
           returnTarget={mapReturnTarget}
           moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
           selectedMoveTargetId={currentCall?.selectedTargetTileId}
+          initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
           onSelectMoveTarget={selectMoveTarget}
           onReturn={returnFromMap}
         />

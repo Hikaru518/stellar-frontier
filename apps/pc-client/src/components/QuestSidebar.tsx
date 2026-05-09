@@ -5,6 +5,7 @@ import { Panel, StatusTag } from "./Layout";
 interface QuestSidebarProps {
   view: QuestSidebarView;
   onNavigate: (entry: QuestNavigationEntry) => void;
+  navigationMessage?: string;
   collapsed: boolean;
   statusFilter: QuestStatusFilter;
   categoryFilter: QuestCategoryFilter;
@@ -19,6 +20,7 @@ const missingIntelText = "当前任务情报缺失。";
 export function QuestSidebar({
   view,
   onNavigate,
+  navigationMessage,
   collapsed,
   statusFilter,
   categoryFilter,
@@ -67,6 +69,8 @@ export function QuestSidebar({
           折叠
         </button>
       </header>
+
+      {navigationMessage ? <Panel className="quest-empty-state" tone="accent">{navigationMessage}</Panel> : null}
 
       <QuestFilterGroup
         label="完成状态"
