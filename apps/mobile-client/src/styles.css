@@ -196,3 +196,88 @@ dd {
   font-family: "Cascadia Mono", Consolas, monospace;
   overflow-wrap: anywhere;
 }
+
+.mobile-chat-shell {
+  width: min(720px, calc(100vw - 24px));
+}
+
+.connection-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.connection-strip span,
+.thread-row em,
+.pending-line {
+  border: 1px solid rgba(159, 184, 209, 0.5);
+  padding: 4px 8px;
+  color: #9fb8d1;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.emergency-call-panel {
+  position: sticky;
+  top: 10px;
+  z-index: 2;
+}
+
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+}
+
+.thread-list,
+.chat-thread,
+.structured-options {
+  display: grid;
+  gap: 10px;
+}
+
+.thread-row {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(109, 139, 170, 0.64);
+  background: rgba(236, 231, 220, 0.04);
+  color: inherit;
+  padding: 10px;
+  text-align: left;
+}
+
+.thread-row-active {
+  border-color: #7ad39a;
+  background: rgba(122, 211, 154, 0.12);
+}
+
+.thread-row span,
+.chat-bubble span {
+  color: #9fb8d1;
+  font-size: 12px;
+}
+
+.chat-bubble {
+  border: 1px solid rgba(159, 184, 209, 0.36);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 10px;
+}
+
+.structured-options button {
+  min-height: 40px;
+  border: 1px solid #7ad39a;
+  background: rgba(122, 211, 154, 0.14);
+  color: #ece7dc;
+}
+
+.structured-options button:disabled {
+  border-style: dashed;
+  color: #9fb8d1;
+  opacity: 0.72;
+}
+
+@media (max-width: 640px) {
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+}

@@ -15,6 +15,7 @@ import {
   selectPreferredTransport,
   shouldEnablePcFallback,
   validateDualDeviceMessage,
+  validatePhoneChoiceSelectPayload,
   yuanBackedDualDevicePlan,
 } from "./index.js";
 
@@ -114,6 +115,46 @@ describe("Yuan-backed dual-device business layer", () => {
     expect(shouldEnablePcFallback({ transport: "yuan-wss", lastHeartbeatAt: 1000, fallbackAfterMs: 5000 }, 7000)).toBe(true);
     expect(shouldEnablePcFallback({ transport: "yuan-wss", lastHeartbeatAt: 1000, fallbackAfterMs: 5000 }, 3000)).toBe(false);
     expect(shouldEnablePcFallback({ transport: "offline", fallbackAfterMs: 5000 }, 3000)).toBe(true);
+  });
+
+  it("validates phone.choice.select payload v1 and rejects mobile movement", () => {
+    expect(
+      validatePhoneChoiceSelectPayload({
+        version: 1,
+        kind: "runtime_call_option",
+        callId: "call-1",
+        crewId: "mike",
+        optionId: "accept",
+        clientRequestId: "req-1",
+      }),
+    ).toBe(true);
+    expect(
+      validatePhoneChoiceSelectPayload({
+        version: 1,
+        kind: "basic_action",
+        crewId: "amy",
+        actionId: "universal:survey",
+        clientRequestId: "req-2",
+      }),
+    ).toBe(true);
+    expect(
+      validatePhoneChoiceSelectPayload({
+        version: 1,
+        kind: "basic_action",
+        crewId: "amy",
+        actionId: "universal:move",
+        clientRequestId: "req-3",
+      }),
+    ).toBe(false);
+    expect(
+      validatePhoneChoiceSelectPayload({
+        version: 1,
+        kind: "story_action",
+        crewId: "garry",
+        actionId: "mainline-docs:survey",
+        clientRequestId: "req-4",
+      }),
+    ).toBe(true);
   });
 
   it("documents Yuan Host as external infrastructure, not a Stellar server package", () => {
