@@ -7,7 +7,7 @@ import {
   deriveCrewActionViewModel,
   startCrewMove,
 } from "./crewSystem";
-import { initialCrew } from "./data/gameData";
+import { initialCrew, initialTiles } from "./data/gameData";
 import type { CrewMember, MapTile } from "./data/gameData";
 import type { CrewActionState, CrewState, RuntimeCall } from "./events/types";
 
@@ -134,6 +134,13 @@ describe("crewSystem", () => {
     };
     expect(member.activeAction.durationSeconds).toBe(180);
     expect(member.activeAction.finishTime).toBe(190);
+  });
+
+  it("blocks move previews into mountain tiles", () => {
+    const preview = createMovePreview(crewMember("4-4"), "2-4", initialTiles);
+
+    expect(preview.canMove).toBe(false);
+    expect(preview.reason).toBe("当前无法前往 山。");
   });
 });
 

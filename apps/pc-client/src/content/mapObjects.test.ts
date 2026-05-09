@@ -82,15 +82,15 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("places the three IAFS crash-site objects on tile 4-4 and blocks the surrounding mountain ring", () => {
+  it("places the three IAFS crash-site objects on tile 4-4 and encloses the larger start zone with mountains", () => {
     const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "4-4");
-    const ringTileIds = ["3-3", "3-4", "3-5", "4-3", "4-5", "5-3", "5-4", "5-5"];
+    const ringTileIds = ["2-3", "2-4", "2-5", "3-2", "3-6", "4-2", "4-7", "5-2", "5-7", "6-2", "6-6", "7-3", "7-4", "7-5"];
 
     expect(crashTile?.objectIds).toEqual(crashSiteObjectIds);
 
     for (const tileId of ringTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.terrain).toBe("山体 / 不可通行");
+      expect(tile?.terrain).toBe("山");
     }
   });
 

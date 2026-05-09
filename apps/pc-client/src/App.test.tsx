@@ -113,7 +113,12 @@ describe("App", () => {
 
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(saved.saveVersion).toBe(GAME_SAVE_VERSION);
-    expect(saved.map).toMatchObject({ rows: 8, cols: 8, originTileId: "4-4", discoveredTileIds: ["3-3", "3-4", "3-5", "4-3", "4-4", "4-5", "5-3", "5-4", "5-5"] });
+    expect(saved.map).toMatchObject({
+      rows: 8,
+      cols: 8,
+      originTileId: "4-4",
+      discoveredTileIds: ["3-3", "3-4", "3-5", "4-3", "4-4", "4-5", "4-6", "5-3", "5-4", "5-5", "5-6", "6-3", "6-4", "6-5"],
+    });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike"]);
     expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "4-4", location: "IAFS坠毁点 (0,0)" });
     expect(saved.map.mapObjects).toMatchObject({

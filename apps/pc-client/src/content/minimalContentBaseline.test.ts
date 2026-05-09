@@ -31,7 +31,22 @@ describe("minimal content baseline", () => {
 
     expect(defaultMapConfig.size).toEqual({ rows: 8, cols: 8 });
     expect(defaultMapConfig.originTileId).toBe("4-4");
-    expect(defaultMapConfig.initialDiscoveredTileIds).toEqual(["3-3", "3-4", "3-5", "4-3", "4-4", "4-5", "5-3", "5-4", "5-5"]);
+    expect(defaultMapConfig.initialDiscoveredTileIds).toEqual([
+      "3-3",
+      "3-4",
+      "3-5",
+      "4-3",
+      "4-4",
+      "4-5",
+      "4-6",
+      "5-3",
+      "5-4",
+      "5-5",
+      "5-6",
+      "6-3",
+      "6-4",
+      "6-5",
+    ]);
     expect(defaultMapConfig.tiles).toHaveLength(64);
     expect(defaultMapConfig.tiles.find((tile) => tile.id === "4-4")?.objectIds).toEqual([
       "iafs_generator",

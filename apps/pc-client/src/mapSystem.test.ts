@@ -38,7 +38,7 @@ describe("mapSystem", () => {
   it("uses the authored map area names and origin-relative location labels", () => {
     expect(getTileAreaName(defaultMapConfig, "1-1")).toBe("起点");
     expect(getTileLocationLabel(defaultMapConfig, "1-1")).toBe("起点 (-3,3)");
-    expect(getTileLocationLabel(defaultMapConfig, "3-3")).toBe("山体封锁带 (-1,1)");
+    expect(getTileLocationLabel(defaultMapConfig, "3-3")).toBe("坠毁西北坡 (-1,1)");
   });
 
   it("builds visible windows from discovered tiles and clamps boundaries", () => {
