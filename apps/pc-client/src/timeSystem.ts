@@ -81,6 +81,9 @@ export function isCompatibleGameSaveState(value: unknown) {
     isRecord(value.world_flags) &&
     isRecord(value.crew_actions) &&
     isRecord(value.inventories) &&
+    isRecord(value.quest_state) &&
+    isRecord(value.quest_state.quests) &&
+    Array.isArray(value.quest_state.updated_quest_ids) &&
     (value.rng_state === null || isRecord(value.rng_state))
   );
 }

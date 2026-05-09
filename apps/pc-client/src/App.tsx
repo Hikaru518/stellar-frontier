@@ -8,7 +8,7 @@ import { MapPage } from "./pages/MapPage";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary } from "./content/contentData";
+import { eventContentLibrary, questDefinitions } from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
 import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
@@ -50,6 +50,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
+import { createInitialQuestState, normalizeQuestState } from "./questSystem";
 import { logger } from "./logger";
 import {
   acquireYuanDualDeviceTerminal,
@@ -846,7 +847,7 @@ function createInitialGameState(): GameState {
   const now = new Date().toISOString();
   const emptyEventState = createEmptyEventRuntimeState();
 
-  if (saved && isSavedBaselineCompatible(saved) && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
+  if (saved && isSavedBaselineCompatible(saved) && typeof saved.elapsedGameSeconds === "number" && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       const normalizedMember = normalizeCrewMember(member as CrewMember, initialMember as CrewMember);
@@ -881,6 +882,7 @@ function createInitialGameState(): GameState {
       crew_actions: saved.crew_actions ?? emptyEventState.crew_actions,
       inventories: saved.inventories ?? emptyEventState.inventories,
       rng_state: saved.rng_state ?? emptyEventState.rng_state,
+      quest_state: normalizeQuestState(saved.quest_state, questDefinitions, saved.elapsedGameSeconds),
     } as GameState;
   }
 
@@ -897,6 +899,7 @@ function createInitialGameState(): GameState {
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
+    quest_state: createInitialQuestState(questDefinitions, 0),
     ...emptyEventState,
   };
 

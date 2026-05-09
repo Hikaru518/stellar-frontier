@@ -13,11 +13,12 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { buildCallView } from "./callActions";
-import { defaultMapConfig } from "./content/contentData";
+import { defaultMapConfig, questDefinitions } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
 import { executeEffects, type EffectExecutionContext, type EffectGameState } from "./events/effects";
 import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gameData";
 import type { Condition, CrewActionState, Effect } from "./events/types";
+import { createInitialQuestState } from "./questSystem";
 
 const STUB_TILE_ID = "2-3";
 const STUB_OBJECT_ID = "__integration_locked_door__";
@@ -137,6 +138,7 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
     world_history: {},
     world_flags: {},
     rng_state: null,
+    quest_state: createInitialQuestState(questDefinitions, 0),
     ...overrides,
   };
 }

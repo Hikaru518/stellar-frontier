@@ -10,6 +10,7 @@ import { mapObjectDefinitionById, type RuntimeMapObjectsState } from "../content
 import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 import { getDisplayCoord, getTileLocationLabel, parseTileId, type RuntimeMapState } from "../mapSystem";
+import type { QuestRuntimeState } from "../questSystem";
 
 export type PageId = "control" | "station" | "call" | "map" | "ending";
 
@@ -37,6 +38,7 @@ export interface GameState extends EventRuntimeState {
   logs: SystemLog[];
   resources: ResourceSummary;
   eventHistory: Record<string, number>;
+  quest_state: QuestRuntimeState;
 }
 
 export interface ActiveAction {
