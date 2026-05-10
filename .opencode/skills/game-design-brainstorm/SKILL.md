@@ -1,6 +1,6 @@
 ---
 name: game-design-brainstorm
-description: "针对 stellar-frontier 这类叙事 / 系统驱动游戏的设计访谈 skill。把粗略游戏想法转化为版本化中文策划案（含本轮范围 / MVP / Later / 风险等阶段化字段）；用于新机制 / 新系统 / 整体玩法的脑暴与澄清，在开始任何代码实现之前调用。产物是单次增量策划案，wiki 整理由 organize-wiki skill 处理。"
+description: "仅显式说明使用此skill时才会使用。"
 ---
 
 # game-design-brainstorm

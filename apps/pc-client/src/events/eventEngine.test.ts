@@ -205,7 +205,7 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
-  it("records repair quest progress immediately when authored repair actions complete", () => {
+  it("queues a success callback and records repair quest progress when authored repair actions complete", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const state = createAuthoredCrashSiteState();
@@ -245,11 +245,52 @@ describe("event engine trigger intake", () => {
     });
 
     const quest = result.state.quest_state?.quests.regroup_after_crash;
+    const callId = result.event?.active_call_id ?? "";
     expect(result.errors).toEqual([]);
     expect(result.event?.event_definition_id).toBe("iafs_generator_repair_complete");
-    expect(result.state.active_calls).toEqual({});
+    expect(result.event?.status).toBe("waiting_call");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("发电机这边修好了。");
     expect(quest?.todos.repair_generator).toMatchObject({ status: "completed", completed_at: 360 });
     expect(quest?.status).toBe("completed");
+
+    const selected = selectCallOption({
+      state: result.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "ack",
+      occurred_at: 361,
+    });
+    expect(selected.errors).toEqual([]);
+    expect(selected.event?.status).toBe("resolved");
+    expect(selected.event?.active_call_id).toBeNull();
+    expect(selected.state.active_calls[callId]?.status).toBe("ended");
+  });
+
+  it("queues a failure callback without completing the repair quest todo", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+
+    const result = processTrigger({
+      state: createAuthoredCrashSiteState(),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(360),
+        trigger_type: "action_complete",
+        source: "crew_action",
+        crew_id: "mike",
+        tile_id: "4-4",
+        action_id: "repair:mike:iafs_generator:0",
+        payload: { action_type: "repair", object_id: "iafs_generator", repair_result: "failure" },
+      },
+    });
+
+    const quest = result.state.quest_state?.quests.regroup_after_crash;
+    const callId = result.event?.active_call_id ?? "";
+    expect(result.errors).toEqual([]);
+    expect(result.event?.event_definition_id).toBe("iafs_generator_repair_failed");
+    expect(result.event?.status).toBe("waiting_call");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("发电机这边还没修起来。");
+    expect(quest?.todos.repair_generator?.status).not.toBe("completed");
   });
 
   it("starts arrival candidates and advances call choice contexts", () => {
