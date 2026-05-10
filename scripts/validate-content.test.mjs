@@ -158,6 +158,19 @@ describe("validate-content", () => {
     expect(result.output).toContain("content/events/definitions/forest.json");
   });
 
+  it("rejects quest completed_node_id references to non-completed nodes", () => {
+    const root = createContentRoot();
+    const quests = readJson(root, "content/quests/quests.json");
+    quests.quests[0].completed_node_id = "repair_targets_revealed";
+    writeJson(root, "content/quests/quests.json", quests);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("completed_node_id must reference a completed node");
+    expect(result.output).toContain("repair_targets_revealed");
+  });
+
   it("rejects map candidate actions missing from object call-actions", () => {
     const root = createContentRoot();
     writeJson(root, "content/call-actions/basic-actions.json", {
@@ -219,7 +232,19 @@ function createContentRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "stellar-content-"));
   tempRoots.push(root);
   fs.cpSync(path.join(projectRoot, "content"), path.join(root, "content"), { recursive: true });
+  createReferencedTilesetFiles(root);
   return root;
+}
+
+function createReferencedTilesetFiles(root) {
+  const registry = readJson(root, "content/maps/tilesets/registry.json");
+  for (const tileset of registry.tilesets ?? []) {
+    for (const relativePath of [tileset.assetPath, path.join("apps/pc-client/public", tileset.publicPath)]) {
+      const filePath = path.join(root, relativePath);
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, "");
+    }
+  }
 }
 
 function runValidator(root) {

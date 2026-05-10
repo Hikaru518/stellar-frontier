@@ -381,6 +381,7 @@ function validateQuestContentReferences(questFiles, data, maps) {
       }
 
       hasError = validateQuestNodes(quest.nodes, quest.initial_node_id, questPath) || hasError;
+      hasError = validateQuestCompletedNode(quest.nodes, quest.completed_node_id, questPath) || hasError;
       hasError = validateQuestNavigation(quest.navigation, questPath, crewIds, tileIds) || hasError;
       hasError = validateQuestTodos(quest.todos, questPath, new Set((quest.nodes ?? []).map((node) => node.id)), crewIds, tileIds) || hasError;
 
@@ -437,6 +438,23 @@ function validateQuestNodes(nodes, initialNodeId, contextPath) {
   }
 
   return hasError;
+}
+
+function validateQuestCompletedNode(nodes, completedNodeId, contextPath) {
+  if (!completedNodeId) {
+    return false;
+  }
+
+  const completedNode = (nodes ?? []).find((node) => node.id === completedNodeId);
+  if (!completedNode) {
+    return report(`Unknown completed_node_id at ${contextPath}: ${completedNodeId}`);
+  }
+
+  if (completedNode.type !== "completed") {
+    return report(`completed_node_id must reference a completed node at ${contextPath}: ${completedNodeId}`);
+  }
+
+  return false;
 }
 
 function validateQuestNavigation(entries, contextPath, crewIds, tileIds) {

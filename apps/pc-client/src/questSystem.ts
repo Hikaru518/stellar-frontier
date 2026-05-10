@@ -1,4 +1,4 @@
-import type { QuestCategory, QuestDefinition, QuestNavigationEntry, SubquestDefinition } from "./content/contentData";
+import type { QuestCategory, QuestCompletedNodeDefinition, QuestCompletionResultDefinition, QuestDefinition, QuestNavigationEntry, SubquestDefinition } from "./content/contentData";
 
 export type QuestEntryStatus = "incomplete" | "completed";
 
@@ -94,6 +94,7 @@ export interface QuestListItemView {
 
 export interface QuestDetailView extends QuestListItemView {
   description: string;
+  completionResult?: QuestCompletionResultDefinition;
   navigation: QuestNavigationEntry[];
   todos: TodoView[];
   subquests: SubquestView[];
@@ -452,10 +453,11 @@ function toQuestDetailView(definition: QuestDefinition, progress: QuestProgress,
     title: definition.title,
     summary: definition.summary,
     status: progress.status,
-    currentDescription: definition.nodes.find((node) => node.id === progress.current_node_id)?.description ?? missingCurrentDescription,
+    currentDescription: findProgressNodeDescription(definition.nodes, progress.current_node_id),
     updated: updatedQuestIds.has(definition.id),
     completedAt: progress.completed_at ?? null,
     description: definition.description,
+    completionResult: progress.status === "completed" ? toCompletionResult(definition) : undefined,
     navigation: definition.navigation ?? [],
     todos: toTodoViews(definition.todos ?? [], progress.todos, progress.current_node_id),
     subquests: (definition.subquests ?? []).map((subquestDefinition) => toSubquestView(subquestDefinition, progress.subquests[subquestDefinition.id])),
@@ -469,9 +471,29 @@ function toSubquestView(definition: SubquestDefinition, progress: SubquestProgre
     title: definition.title,
     summary: definition.summary,
     status: progress.status,
-    currentDescription: definition.nodes.find((node) => node.id === progress.current_node_id)?.description ?? missingCurrentDescription,
+    currentDescription: findProgressNodeDescription(definition.nodes, progress.current_node_id),
     navigation: definition.navigation ?? [],
     todos: toTodoViews(definition.todos, progress.todos, progress.current_node_id),
+  };
+}
+
+function findProgressNodeDescription(nodes: QuestDefinition["nodes"], nodeId: string): string {
+  const node = nodes.find((item) => item.id === nodeId);
+  return node && node.type !== "completed" ? node.description : missingCurrentDescription;
+}
+
+function toCompletionResult(definition: QuestDefinition): QuestCompletionResultDefinition | undefined {
+  const completedNode = definition.nodes.find(
+    (node): node is QuestCompletedNodeDefinition => node.id === definition.completed_node_id && node.type === "completed",
+  );
+  if (!completedNode) {
+    return undefined;
+  }
+
+  return {
+    title: completedNode.title,
+    summary: completedNode.summary,
+    outcomes: completedNode.outcomes,
   };
 }
 

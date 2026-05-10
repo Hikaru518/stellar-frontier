@@ -9,6 +9,7 @@
       "summary": "先调查 IAFS 坠毁区域，再修复暴露出的关键装置。",
       "description": "IAFS 在未知星球迫降后，坠毁区域仍有可回收设施。先完成区域调查，确认关键装置位置，再安排维修。",
       "initial_node_id": "crash_site_unsecured",
+      "completed_node_id": "crash_site_stabilized",
       "nodes": [
         {
           "id": "crash_site_unsecured",
@@ -17,6 +18,17 @@
         {
           "id": "repair_targets_revealed",
           "description": "坠毁区域调查完成，发电机、维生系统和穿梭机核心已经显露。下一步是逐项维修这些装置。"
+        },
+        {
+          "id": "crash_site_stabilized",
+          "type": "completed",
+          "title": "坠毁点已稳定",
+          "summary": "Mike 完成了 IAFS 坠毁点的初步调查与关键设备修复。",
+          "outcomes": [
+            "发电机恢复基础供能。",
+            "维生系统重新上线。",
+            "穿梭机核心进入可评估状态。"
+          ]
         }
       ],
       "todos": [

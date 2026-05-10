@@ -287,6 +287,37 @@ test("shows the quest sidebar on the control center and supports collapse, expan
   await expect(sidebar.getByRole("button", { name: "展开任务" })).toBeVisible();
 });
 
+test("shows completion result for completed crash-site quest from authored content", async ({ page }) => {
+  const questState = createInitialQuestStateForE2e();
+  questState.quests.regroup_after_crash.status = "completed";
+  questState.quests.regroup_after_crash.current_node_id = "repair_targets_revealed";
+  questState.quests.regroup_after_crash.completed_at = 120;
+  for (const todo of Object.values(questState.quests.regroup_after_crash.todos)) {
+    todo.status = "completed";
+    todo.completed_at = 120;
+  }
+
+  await installSave(page, {
+    elapsedGameSeconds: 120,
+    crew: [idleCrew("mike", "4-4", { status: "坠毁区域待命。" })],
+    map: { ...createInitialMapState(), configVersion: 2 },
+    logs: initialLogs,
+    resources: initialResources,
+    quest_state: questState,
+  });
+  await page.goto("/");
+
+  const sidebar = page.getByLabel("任务侧边栏");
+  await sidebar.getByRole("button", { name: "展开任务" }).click();
+
+  await expect(sidebar.getByRole("heading", { name: "坠毁点已稳定" })).toBeVisible();
+  await expect(sidebar.getByText("Mike 完成了 IAFS 坠毁点的初步调查与关键设备修复。")).toBeVisible();
+  await expect(sidebar.getByText("发电机恢复基础供能。")).toBeVisible();
+  await expect(sidebar.getByText("维生系统重新上线。")).toBeVisible();
+  await expect(sidebar.getByText("穿梭机核心进入可评估状态。")).toBeVisible();
+  await expect(sidebar.getByText("维修 IAFS 发电机")).toBeVisible();
+});
+
 test("completes a quest todo through the crash-site event and preserves it after reload", async ({ page }) => {
   await installSave(page, {
     elapsedGameSeconds: 0,

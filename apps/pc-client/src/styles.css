@@ -1245,6 +1245,7 @@ blockquote {
 
 .quest-sidebar-header h2,
 .quest-detail-header h3,
+.quest-completion-result h4,
 .quest-subquest h4 {
   margin-bottom: 6px;
 }
@@ -1376,6 +1377,23 @@ blockquote {
   border-left: 3px solid #24384f;
   background: #e8edf0;
   padding: 8px 10px;
+}
+
+.quest-completion-result {
+  border: 1px solid #7ca878;
+  background: #edf3ea;
+  padding: 12px;
+}
+
+.quest-completion-result p,
+.quest-completion-result ul {
+  margin: 0;
+}
+
+.quest-completion-result ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
 }
 
 .quest-subquest-stack {

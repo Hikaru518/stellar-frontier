@@ -60,6 +60,11 @@ const quests: QuestDetailView[] = [
     updated: false,
     completedAt: 90,
     description: "这是一个次要任务。",
+    completionResult: {
+      title: "通道测绘完成",
+      summary: "南侧通道已经记录到地图档案。",
+      outcomes: ["地图标注已更新。", "后续队员可以回看通道位置。"],
+    },
     navigation: [mapNavigation],
     todos: [],
     subquests: [
@@ -197,6 +202,38 @@ describe("QuestSidebar", () => {
     expect(screen.getByText("确认坠毁点").closest("li")).toHaveClass("quest-todo-incomplete");
   });
 
+  it("shows completion result for completed quests while keeping completed todos visible", async () => {
+    const user = userEvent.setup();
+    render(<TestQuestSidebar />);
+
+    expect(screen.queryByText("通道测绘完成")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /南侧通道测绘/ }));
+
+    expect(screen.getByRole("heading", { name: "通道测绘完成" })).toBeInTheDocument();
+    expect(screen.getByText("南侧通道已经记录到地图档案。")).toBeInTheDocument();
+    expect(screen.getByText("地图标注已更新。")).toBeInTheDocument();
+    expect(screen.getByText("后续队员可以回看通道位置。")).toBeInTheDocument();
+    expect(screen.getByText("提交测绘记录")).toBeInTheDocument();
+  });
+
+  it("hides the previous progress node when a quest is completed", () => {
+    render(
+      <TestQuestSidebar
+        sourceQuests={[
+          {
+            ...quests[1],
+            currentDescription: "上一阶段：继续逐项维修关键装置。",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "通道测绘完成" })).toBeInTheDocument();
+    expect(screen.getByText("南侧通道已经记录到地图档案。")).toBeInTheDocument();
+    expect(screen.queryByText("上一阶段：继续逐项维修关键装置。")).not.toBeInTheDocument();
+  });
+
   it("calls onNavigate from navigation buttons only", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
@@ -219,11 +256,8 @@ describe("QuestSidebar", () => {
     expect(screen.getByText("当前筛选下没有任务。")).toBeInTheDocument();
   });
 
-  it("falls back when current node descriptions are missing", async () => {
-    const user = userEvent.setup();
-    render(<TestQuestSidebar />);
-
-    await user.click(screen.getByRole("button", { name: /南侧通道测绘/ }));
+  it("falls back when incomplete current node descriptions are missing", () => {
+    render(<TestQuestSidebar sourceQuests={[{ ...quests[0], currentDescription: "" }]} />);
 
     expect(screen.getAllByText("当前任务情报缺失。").length).toBeGreaterThan(0);
   });

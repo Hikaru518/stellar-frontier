@@ -16,9 +16,17 @@ const questDefinitions: QuestDefinition[] = [
     summary: "Main summary",
     description: "Main description",
     initial_node_id: "start",
+    completed_node_id: "main_complete",
     nodes: [
       { id: "start", description: "Start description" },
       { id: "changed", description: "Changed description" },
+      {
+        id: "main_complete",
+        type: "completed",
+        title: "Main quest complete",
+        summary: "The main quest has been resolved.",
+        outcomes: ["The crash site is stable."],
+      },
     ],
     navigation: [{ type: "page", label: "Station", page: "station" }],
     todos: [
@@ -211,6 +219,28 @@ describe("questSystem", () => {
     expect(repairShown.quests.flat_quest.todos.survey_crash_site.status).toBe("completed");
     expect(repairView.selectedQuest?.todos.map((todo) => todo.id)).toEqual(["survey_crash_site", "repair_generator"]);
     expect(repairView.selectedQuest?.subquests).toEqual([]);
+  });
+
+  it("exposes completion result only after a quest is completed", () => {
+    const initial = createInitialQuestState(questDefinitions, 0);
+
+    const incompleteView = buildQuestSidebarView({ state: initial, definitions: questDefinitions });
+    const completed = applyQuestProgress({
+      state: initial,
+      definitions: questDefinitions,
+      operation: "complete_quest",
+      quest_id: "main_quest",
+      occurred_at: 50,
+    }).state;
+    const completedView = buildQuestSidebarView({ state: completed, definitions: questDefinitions, selectedQuestId: "main_quest" });
+
+    expect(incompleteView.selectedQuest?.completionResult).toBeUndefined();
+    expect(completedView.selectedQuest?.completionResult).toEqual({
+      title: "Main quest complete",
+      summary: "The main quest has been resolved.",
+      outcomes: ["The crash site is stable."],
+    });
+    expect(completed.quests.main_quest).not.toHaveProperty("completion_result");
   });
 
   it("applies explicit completion without automatically completing parent entries", () => {

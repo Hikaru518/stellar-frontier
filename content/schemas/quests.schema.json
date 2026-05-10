@@ -52,6 +52,9 @@
         "initial_node_id": {
           "$ref": "#/$defs/id"
         },
+        "completed_node_id": {
+          "$ref": "#/$defs/id"
+        },
         "nodes": {
           "type": "array",
           "minItems": 1,
@@ -134,6 +137,16 @@
       }
     },
     "node": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/progress_node"
+        },
+        {
+          "$ref": "#/$defs/completed_node"
+        }
+      ]
+    },
+    "progress_node": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "description"],
@@ -141,8 +154,37 @@
         "id": {
           "$ref": "#/$defs/id"
         },
+        "type": {
+          "const": "progress"
+        },
         "description": {
           "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "completed_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title", "summary"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "completed"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "outcomes": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/non_empty_string"
+          }
         }
       }
     },

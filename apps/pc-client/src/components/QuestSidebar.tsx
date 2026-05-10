@@ -115,7 +115,9 @@ export function QuestSidebar({
                   <QuestCategoryTag category={quest.category} />
                   <QuestStatusTag status={quest.status} />
                 </span>
-                <span className="quest-list-description">{formatCurrentDescription(quest.currentDescription)}</span>
+                {quest.status === "incomplete" ? (
+                  <span className="quest-list-description">{formatCurrentDescription(quest.currentDescription)}</span>
+                ) : null}
               </button>
             ))}
           </section>
@@ -171,8 +173,12 @@ function QuestDetail({ quest, onNavigate }: { quest: QuestDetailView; onNavigate
           <QuestStatusTag status={quest.status} />
         </div>
       </header>
-      <p className="quest-current-intel">{formatCurrentDescription(quest.currentDescription)}</p>
+      {quest.status === "incomplete" ? (
+        <p className="quest-current-intel">{formatCurrentDescription(quest.currentDescription)}</p>
+      ) : null}
       <NavigationButtons entries={quest.navigation} onNavigate={onNavigate} />
+
+      {quest.completionResult ? <CompletionResult result={quest.completionResult} /> : null}
 
       <TodoList todos={quest.todos} onNavigate={onNavigate} />
 
@@ -186,13 +192,31 @@ function QuestDetail({ quest, onNavigate }: { quest: QuestDetailView; onNavigate
               </div>
               <QuestStatusTag status={subquest.status} />
             </header>
-            <p className="quest-current-intel">{formatCurrentDescription(subquest.currentDescription)}</p>
+            {subquest.status === "incomplete" ? (
+              <p className="quest-current-intel">{formatCurrentDescription(subquest.currentDescription)}</p>
+            ) : null}
             <NavigationButtons entries={subquest.navigation} onNavigate={onNavigate} />
             <TodoList todos={subquest.todos} onNavigate={onNavigate} />
           </section>
         ))}
       </div>
     </Panel>
+  );
+}
+
+function CompletionResult({ result }: { result: NonNullable<QuestDetailView["completionResult"]> }) {
+  return (
+    <section className="quest-completion-result" aria-label="任务完成结果">
+      <h4>{result.title}</h4>
+      <p>{result.summary}</p>
+      {result.outcomes && result.outcomes.length > 0 ? (
+        <ul>
+          {result.outcomes.map((outcome) => (
+            <li key={outcome}>{outcome}</li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 

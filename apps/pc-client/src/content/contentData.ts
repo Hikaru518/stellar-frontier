@@ -228,10 +228,21 @@ export type QuestNavigationEntry =
   | { type: "tile"; label: string; tile_id: string }
   | { type: "crew"; label: string; crew_id: string };
 
-export interface QuestNodeDefinition {
+export interface QuestProgressNodeDefinition {
   id: string;
+  type?: "progress";
   description: string;
 }
+
+export interface QuestCompletedNodeDefinition {
+  id: string;
+  type: "completed";
+  title: string;
+  summary: string;
+  outcomes?: string[];
+}
+
+export type QuestNodeDefinition = QuestProgressNodeDefinition | QuestCompletedNodeDefinition;
 
 export interface QuestTodoDefinition {
   id: string;
@@ -239,6 +250,12 @@ export interface QuestTodoDefinition {
   description?: string;
   visible_after_node?: string;
   navigation?: QuestNavigationEntry[];
+}
+
+export interface QuestCompletionResultDefinition {
+  title: string;
+  summary: string;
+  outcomes?: string[];
 }
 
 export interface SubquestDefinition {
@@ -258,6 +275,7 @@ export interface QuestDefinition {
   summary: string;
   description: string;
   initial_node_id: string;
+  completed_node_id?: string;
   nodes: QuestNodeDefinition[];
   todos?: QuestTodoDefinition[];
   subquests?: SubquestDefinition[];
