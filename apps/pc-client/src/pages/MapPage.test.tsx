@@ -29,16 +29,16 @@ describe("MapPage", () => {
     expect(screen.getByRole("button", { name: "通话" })).toBeInTheDocument();
   });
 
-  it("returns crew status and inventory requests to the control center handlers", () => {
-    const onOpenCrewStatusInControl = vi.fn();
-    const onOpenCrewInventoryInControl = vi.fn();
-    renderMapPage({ onOpenCrewStatusInControl, onOpenCrewInventoryInControl });
+  it("routes crew status and inventory requests to the crew page handlers", () => {
+    const onShowCrewStatus = vi.fn();
+    const onShowCrewInventory = vi.fn();
+    renderMapPage({ onShowCrewStatus, onShowCrewInventory });
 
     fireEvent.click(screen.getByRole("button", { name: "查看状态" }));
     fireEvent.click(screen.getByRole("button", { name: "查看背包" }));
 
-    expect(onOpenCrewStatusInControl).toHaveBeenCalledWith(initialCrew[0].id);
-    expect(onOpenCrewInventoryInControl).toHaveBeenCalledWith(initialCrew[0].id);
+    expect(onShowCrewStatus).toHaveBeenCalledWith(initialCrew[0].id);
+    expect(onShowCrewInventory).toHaveBeenCalledWith(initialCrew[0].id);
   });
 
   it("records map interaction info in the right trace panel", () => {
@@ -79,8 +79,8 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       onOpenControl={vi.fn()}
       onOpenTask={vi.fn()}
       onStartCall={vi.fn()}
-      onOpenCrewStatusInControl={vi.fn()}
-      onOpenCrewInventoryInControl={vi.fn()}
+      onShowCrewStatus={vi.fn()}
+      onShowCrewInventory={vi.fn()}
       logs={initialLogs}
       {...overrides}
     />

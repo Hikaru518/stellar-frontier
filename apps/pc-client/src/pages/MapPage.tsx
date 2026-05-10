@@ -42,8 +42,8 @@ interface MapPageProps {
   onOpenControl: () => void;
   onOpenTask: () => void;
   onStartCall: (crewId: CrewId) => void;
-  onOpenCrewStatusInControl: (crewId: CrewId) => void;
-  onOpenCrewInventoryInControl: (crewId: CrewId) => void;
+  onShowCrewStatus: (crewId: CrewId) => void;
+  onShowCrewInventory: (crewId: CrewId) => void;
   logs: SystemLog[];
 }
 
@@ -60,8 +60,8 @@ export function MapPage({
   onOpenControl,
   onOpenTask,
   onStartCall,
-  onOpenCrewStatusInControl,
-  onOpenCrewInventoryInControl,
+  onShowCrewStatus,
+  onShowCrewInventory,
   logs,
 }: MapPageProps) {
   const latestLog = logs[logs.length - 1];
@@ -110,13 +110,13 @@ export function MapPage({
   }
 
   function handleOpenCrewStatus(member: CrewMember) {
-    pushTrace(`[CREW] ${member.name} / 状态回传已切回控制台`);
-    onOpenCrewStatusInControl(member.id);
+    pushTrace(`[CREW] ${member.name} / 打开角色状态页`);
+    onShowCrewStatus(member.id);
   }
 
   function handleOpenCrewInventory(member: CrewMember) {
-    pushTrace(`[PACK] ${member.name} / 背包回传已切回控制台`);
-    onOpenCrewInventoryInControl(member.id);
+    pushTrace(`[PACK] ${member.name} / 打开角色背包页`);
+    onShowCrewInventory(member.id);
   }
 
   function stagePointToWorld(clientX: number, clientY: number) {

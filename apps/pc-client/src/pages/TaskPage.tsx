@@ -25,8 +25,8 @@ interface TaskPageProps {
   onOpenControl: () => void;
   onOpenMap: () => void;
   onStartCall: (crewId: CrewId) => void;
-  onOpenCrewStatusInControl: (crewId: CrewId) => void;
-  onOpenCrewInventoryInControl: (crewId: CrewId) => void;
+  onShowCrewStatus: (crewId: CrewId) => void;
+  onShowCrewInventory: (crewId: CrewId) => void;
 }
 
 const missingIntelText = "当前任务情报缺失。";
@@ -50,8 +50,8 @@ export function TaskPage({
   onOpenControl,
   onOpenMap,
   onStartCall,
-  onOpenCrewStatusInControl,
-  onOpenCrewInventoryInControl,
+  onShowCrewStatus,
+  onShowCrewInventory,
 }: TaskPageProps) {
   const latestLog = logs[logs.length - 1];
   const [traceLines, setTraceLines] = useState<string[]>([]);
@@ -92,13 +92,13 @@ export function TaskPage({
   }
 
   function handleOpenCrewStatus(member: CrewMember) {
-    pushTrace(`[CREW] ${member.name} / 状态回传已切回控制台`);
-    onOpenCrewStatusInControl(member.id);
+    pushTrace(`[CREW] ${member.name} / 打开角色状态页`);
+    onShowCrewStatus(member.id);
   }
 
   function handleOpenCrewInventory(member: CrewMember) {
-    pushTrace(`[PACK] ${member.name} / 背包回传已切回控制台`);
-    onOpenCrewInventoryInControl(member.id);
+    pushTrace(`[PACK] ${member.name} / 打开角色背包页`);
+    onShowCrewInventory(member.id);
   }
 
   return (
@@ -154,7 +154,7 @@ export function TaskPage({
         </div>
       }
       rightPanel={
-        <section className="console-side-panel">
+        <section className="console-side-panel console-task-side-panel">
           <div className="console-column-header">
             <span>task controls</span>
           </div>

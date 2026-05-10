@@ -12,7 +12,7 @@ import type { InventoryEntry } from "../inventorySystem";
 import { getDisplayCoord, getTileLocationLabel, parseTileId, type RuntimeMapState } from "../mapSystem";
 import type { QuestRuntimeState } from "../questSystem";
 
-export type PageId = "control" | "station" | "call" | "map" | "ending";
+export type PageId = "control" | "station" | "call" | "map" | "crew" | "ending";
 
 export type CrewId = CrewDefinition["crewId"];
 

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CallPage } from "./pages/CallPage";
 import { ControlCenter } from "./pages/ControlCenter";
+import { CrewConsolePage, type CrewConsoleMode } from "./pages/CrewConsolePage";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
@@ -90,8 +91,6 @@ type SavedGameState = Partial<Omit<GameState, "crew">> & {
 
 type MobileMode = "waiting" | "active" | "fallback";
 type MobileSessionStatus = "waiting" | "connected" | "offline";
-type ControlConsoleViewMode = "overview" | "crewStatus" | "crewInventory";
-
 interface MobileSessionState {
   status: MobileSessionStatus;
   lastHeartbeatAt?: number;
@@ -149,8 +148,8 @@ function App() {
   const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
   const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
   const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
-  const [controlConsoleView, setControlConsoleView] = useState<{ mode: ControlConsoleViewMode; crewId: CrewId | null }>({
-    mode: "overview",
+  const [crewConsoleView, setCrewConsoleView] = useState<{ mode: CrewConsoleMode; crewId: CrewId | null }>({
+    mode: "status",
     crewId: null,
   });
   const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
@@ -371,18 +370,17 @@ function App() {
   }
 
   function openControlOverview() {
-    setControlConsoleView({ mode: "overview", crewId: null });
     setPage("control");
   }
 
-  function openCrewStatusInControl(crewId: CrewId) {
-    setControlConsoleView({ mode: "crewStatus", crewId });
-    setPage("control");
+  function openCrewStatusPage(crewId: CrewId) {
+    setCrewConsoleView({ mode: "status", crewId });
+    setPage("crew");
   }
 
-  function openCrewInventoryInControl(crewId: CrewId) {
-    setControlConsoleView({ mode: "crewInventory", crewId });
-    setPage("control");
+  function openCrewInventoryPage(crewId: CrewId) {
+    setCrewConsoleView({ mode: "inventory", crewId });
+    setPage("crew");
   }
 
   function openMap(returnTarget: MapReturnTarget) {
@@ -860,32 +858,34 @@ function App() {
         onOpenControl={openControlOverview}
         onOpenMap={() => openMap("control")}
         onStartCall={startCall}
-        onOpenCrewStatusInControl={openCrewStatusInControl}
-        onOpenCrewInventoryInControl={openCrewInventoryInControl}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
       />
     );
   }
 
   if (page === "call") {
     return (
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <CallPage
-          call={currentCall}
-          crew={crew}
-          tiles={tiles}
-          activeCalls={gameState.active_calls}
-          elapsedGameSeconds={elapsedGameSeconds}
-          gameTimeLabel={gameTimeLabel}
-          gameState={gameState}
-          onDecision={handleDecision}
-          onConfirmMove={confirmMove}
-          onClearMoveTarget={clearMoveTarget}
-          onSelectMoveTarget={selectMoveTarget}
-          onOpenMap={() => openMap("call")}
-          onEndCall={endCall}
-          onOpenStation={() => setPage("station")}
-        />
-      </QuestLayout>
+      <CallPage
+        call={currentCall}
+        crew={crew}
+        tiles={tiles}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        gameTimeLabel={gameTimeLabel}
+        gameState={gameState}
+        logs={logs}
+        onDecision={handleDecision}
+        onConfirmMove={confirmMove}
+        onClearMoveTarget={clearMoveTarget}
+        onSelectMoveTarget={selectMoveTarget}
+        onOpenMap={() => openMap("call")}
+        onOpenControl={openControlOverview}
+        onOpenTask={openStation}
+        onStartCall={startCall}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
+      />
     );
   }
 
@@ -904,9 +904,32 @@ function App() {
         onOpenControl={openControlOverview}
         onOpenTask={openStation}
         onStartCall={startCall}
-        onOpenCrewStatusInControl={openCrewStatusInControl}
-        onOpenCrewInventoryInControl={openCrewInventoryInControl}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
         logs={logs}
+      />
+    );
+  }
+
+  if (page === "crew") {
+    return (
+      <CrewConsolePage
+        crew={crew}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
+        eventLogs={gameState.event_logs}
+        logs={logs}
+        gameTimeLabel={gameTimeLabel}
+        selectedCrewId={crewConsoleView.crewId}
+        mode={crewConsoleView.mode}
+        onOpenControl={openControlOverview}
+        onOpenTask={openStation}
+        onOpenMap={() => openMap("control")}
+        onStartCall={startCall}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
       />
     );
   }
@@ -922,15 +945,11 @@ function App() {
         gameTimeLabel={gameTimeLabel}
         onOpenStation={openStation}
         onOpenMap={() => openMap("control")}
-        onOpenDebug={() => setDebugOpen(true)}
         onStartCall={startCall}
-        onAppendLog={appendLog}
         map={map}
         mobileStatus={mobileStatusCard}
-        consoleViewMode={controlConsoleView.mode}
-        consoleViewCrewId={controlConsoleView.crewId}
-        onShowCrewStatus={(crewId) => setControlConsoleView({ mode: "crewStatus", crewId })}
-        onShowCrewInventory={(crewId) => setControlConsoleView({ mode: "crewInventory", crewId })}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
       />
       {debugOpen ? (
         <DebugToolbox
@@ -945,15 +964,6 @@ function App() {
 }
 
 export default App;
-
-function QuestLayout({ children, sidebar, collapsed }: { children: ReactNode; sidebar: ReactNode; collapsed: boolean }) {
-  return (
-    <div className={`quest-layout ${collapsed ? "quest-layout-collapsed" : ""}`}>
-      <main className="quest-layout-main">{children}</main>
-      {sidebar}
-    </div>
-  );
-}
 
 function createInitialGameState(): GameState {
   const saved = loadGameSave<SavedGameState>(isCompatibleGameSaveState);
