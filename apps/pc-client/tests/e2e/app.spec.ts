@@ -57,7 +57,7 @@ test("PS-001 opens basic normal-call actions for Mike, Amy, and Garry", async ({
   }
 });
 
-test("IAFS bootstrap starts at the crash site and exposes the three repair actions", async ({ page }) => {
+test("IAFS bootstrap starts at the crash site and hides repair actions before survey", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeVisible();
@@ -65,10 +65,11 @@ test("IAFS bootstrap starts at the crash site and exposes the three repair actio
   await startNormalCrewCall(page, "Mike，特战干员");
 
   await expect(page.getByText(/地点：IAFS坠毁点 \(0,0\)/)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "发电机" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "维生装置" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "穿梭机核心" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "维修" })).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "发电机" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "维生装置" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "穿梭机核心" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "维修" })).toHaveCount(0);
 });
 
 test("PS-002 keeps removed object actions hidden after current-area survey", async ({ page }) => {
@@ -268,7 +269,7 @@ test("shows the quest sidebar on the control center and supports collapse, expan
 
   const sidebar = page.getByLabel("任务侧边栏");
   await expect(sidebar).toBeVisible();
-  await expect(sidebar.getByText("未完成 2")).toBeVisible();
+  await expect(sidebar.getByText("未完成 1")).toBeVisible();
   await expect(sidebar.getByText("主要 1")).toBeVisible();
 
   await sidebar.getByRole("button", { name: "展开任务" }).click();
@@ -280,8 +281,7 @@ test("shows the quest sidebar on the control center and supports collapse, expan
 
   await sidebar.getByRole("group", { name: "完成状态" }).getByRole("button", { name: "全部" }).click();
   await sidebar.getByRole("group", { name: "任务类型" }).getByRole("button", { name: "次要" }).click();
-  await expect(sidebar.getByRole("heading", { name: "记录南侧通道" })).toBeVisible();
-  await expect(sidebar.getByText("重整坠毁现场")).toHaveCount(0);
+  await expect(sidebar.getByText("当前筛选下没有任务。")).toBeVisible();
 
   await sidebar.getByRole("button", { name: "折叠" }).click();
   await expect(sidebar.getByRole("button", { name: "展开任务" })).toBeVisible();
@@ -299,6 +299,7 @@ test("completes a quest todo through the crash-site event and preserves it after
 
   await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
   await expect(page.getByText("调查 IAFS 坠毁点")).toBeVisible();
+  await expect(page.getByText("维修 IAFS 发电机")).toHaveCount(0);
 
   await page.getByRole("button", { name: "通讯台 查看通讯录" }).click();
   await startNormalCrewCall(page, "Mike，神秘幸存者");
@@ -311,14 +312,18 @@ test("completes a quest todo through the crash-site event and preserves it after
   await page.getByRole("button", { name: "标记这些可用设施。" }).click();
 
   const saved = await readSave(page);
-  expect(saved.quest_state.quests.regroup_after_crash.subquests.inspect_crash_modules.todos.survey_crash_site).toMatchObject({
+  expect(saved.quest_state.quests.regroup_after_crash.todos.survey_crash_site).toMatchObject({
     status: "completed",
   });
+  expect(saved.quest_state.quests.regroup_after_crash.current_node_id).toBe("repair_targets_revealed");
 
   await page.reload();
   await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
   const surveyTodo = page.locator(".quest-todo").filter({ hasText: "调查 IAFS 坠毁点" });
   await expect(surveyTodo.getByText("已完成")).toBeVisible();
+  await expect(page.getByText("维修 IAFS 发电机")).toBeVisible();
+  await expect(page.getByText("维修维生系统")).toBeVisible();
+  await expect(page.getByText("维修穿梭机核心")).toBeVisible();
 });
 
 test("quest navigation opens context without starting calls or movement", async ({ page }) => {
@@ -326,11 +331,6 @@ test("quest navigation opens context without starting calls or movement", async 
 
   const sidebar = page.getByLabel("任务侧边栏");
   await sidebar.getByRole("button", { name: "展开任务" }).click();
-
-  await sidebar.getByRole("button", { name: "联系 Mike" }).click();
-  await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /通话页面：/ })).toHaveCount(0);
-  expect((await readSave(page)).crew_actions).toEqual({});
 
   await sidebar.getByRole("button", { name: "查看 IAFS 坠毁点" }).first().click();
   await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
@@ -1181,49 +1181,13 @@ function createInitialQuestStateForE2e() {
         current_node_id: "crash_site_unsecured",
         updated_at: 0,
         completed_at: null,
-        subquests: {
-          establish_survivor_contact: {
-            id: "establish_survivor_contact",
-            status: "incomplete",
-            current_node_id: "contact_pending",
-            updated_at: 0,
-            completed_at: null,
-            todos: {
-              call_mike: { id: "call_mike", status: "incomplete", updated_at: 0, completed_at: null },
-            },
-          },
-          inspect_crash_modules: {
-            id: "inspect_crash_modules",
-            status: "incomplete",
-            current_node_id: "modules_unknown",
-            updated_at: 0,
-            completed_at: null,
-            todos: {
-              survey_crash_site: { id: "survey_crash_site", status: "incomplete", updated_at: 0, completed_at: null },
-              inspect_generator: { id: "inspect_generator", status: "incomplete", updated_at: 0, completed_at: null },
-              inspect_life_support: { id: "inspect_life_support", status: "incomplete", updated_at: 0, completed_at: null },
-            },
-          },
+        todos: {
+          survey_crash_site: { id: "survey_crash_site", status: "incomplete", updated_at: 0, completed_at: null },
+          repair_generator: { id: "repair_generator", status: "incomplete", updated_at: 0, completed_at: null },
+          repair_life_support: { id: "repair_life_support", status: "incomplete", updated_at: 0, completed_at: null },
+          repair_shuttle_core: { id: "repair_shuttle_core", status: "incomplete", updated_at: 0, completed_at: null },
         },
-      },
-      survey_south_passage: {
-        id: "survey_south_passage",
-        status: "incomplete",
-        current_node_id: "survey_not_started",
-        updated_at: 0,
-        completed_at: null,
-        subquests: {
-          mark_passage_tiles: {
-            id: "mark_passage_tiles",
-            status: "incomplete",
-            current_node_id: "passage_unmarked",
-            updated_at: 0,
-            completed_at: null,
-            todos: {
-              check_tile_5_4: { id: "check_tile_5_4", status: "incomplete", updated_at: 0, completed_at: null },
-            },
-          },
-        },
+        subquests: {},
       },
     },
     updated_quest_ids: [],

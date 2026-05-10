@@ -13,6 +13,7 @@ export interface QuestProgress {
   current_node_id: string;
   updated_at: number;
   completed_at?: number | null;
+  todos: Record<string, TodoProgress>;
   subquests: Record<string, SubquestProgress>;
 }
 
@@ -94,6 +95,7 @@ export interface QuestListItemView {
 export interface QuestDetailView extends QuestListItemView {
   description: string;
   navigation: QuestNavigationEntry[];
+  todos: TodoView[];
   subquests: SubquestView[];
 }
 
@@ -171,7 +173,26 @@ export function applyQuestProgress(input: ApplyQuestProgressInput): ApplyQuestPr
     return { state: updateQuest(input.state, quest, { current_node_id: input.node_id, updated_at: input.occurred_at }), warnings: [] };
   }
 
-  const subquestDefinition = definition.subquests.find((subquest) => subquest.id === input.subquest_id);
+  if (input.operation === "complete_todo" && !input.subquest_id) {
+    const todoDefinition = (definition.todos ?? []).find((todo) => todo.id === input.todo_id);
+    const todo = input.todo_id ? quest.todos[input.todo_id] : undefined;
+    if (!input.todo_id || !todoDefinition || !todo) {
+      return warn(input.state, `Todo ${input.todo_id ?? ""} does not exist in quest ${definition.id}.`);
+    }
+    if (todo.status === "completed") {
+      return { state: input.state, warnings: [] };
+    }
+    return {
+      state: updateQuestTodo(input.state, quest, todo, {
+        status: "completed",
+        updated_at: input.occurred_at,
+        completed_at: input.occurred_at,
+      }, definition, input.occurred_at),
+      warnings: [],
+    };
+  }
+
+  const subquestDefinition = (definition.subquests ?? []).find((subquest) => subquest.id === input.subquest_id);
   const subquest = input.subquest_id ? quest.subquests[input.subquest_id] : undefined;
   if (!input.subquest_id || !subquestDefinition || !subquest) {
     return warn(input.state, `Subquest ${input.subquest_id ?? ""} does not exist in quest ${definition.id}.`);
@@ -259,7 +280,8 @@ function createQuestProgress(definition: QuestDefinition, occurredAt: number): Q
     current_node_id: definition.initial_node_id,
     updated_at: occurredAt,
     completed_at: null,
-    subquests: Object.fromEntries(definition.subquests.map((subquest) => [subquest.id, createSubquestProgress(subquest, occurredAt)])),
+    todos: Object.fromEntries((definition.todos ?? []).map((todo) => [todo.id, createTodoProgress(todo.id, occurredAt)])),
+    subquests: Object.fromEntries((definition.subquests ?? []).map((subquest) => [subquest.id, createSubquestProgress(subquest, occurredAt)])),
   };
 }
 
@@ -271,16 +293,17 @@ function createSubquestProgress(definition: SubquestDefinition, occurredAt: numb
     updated_at: occurredAt,
     completed_at: null,
     todos: Object.fromEntries(
-      definition.todos.map((todo) => [
-        todo.id,
-        {
-          id: todo.id,
-          status: "incomplete" as const,
-          updated_at: occurredAt,
-          completed_at: null,
-        },
-      ]),
+      definition.todos.map((todo) => [todo.id, createTodoProgress(todo.id, occurredAt)]),
     ),
+  };
+}
+
+function createTodoProgress(id: string, occurredAt: number): TodoProgress {
+  return {
+    id,
+    status: "incomplete",
+    updated_at: occurredAt,
+    completed_at: null,
   };
 }
 
@@ -293,8 +316,9 @@ function normalizeQuestProgress(saved: QuestProgress | undefined, definition: Qu
     current_node_id: savedCurrentNodeId && definition.nodes.some((node) => node.id === savedCurrentNodeId) ? savedCurrentNodeId : definition.initial_node_id,
     updated_at: typeof saved?.updated_at === "number" ? saved.updated_at : occurredAt,
     completed_at: normalizeCompletedAt(saved, normalizeStatus(saved?.status)),
+    todos: Object.fromEntries((definition.todos ?? []).map((todo) => [todo.id, normalizeTodoProgress(saved?.todos?.[todo.id], todo.id, occurredAt)])),
     subquests: Object.fromEntries(
-      definition.subquests.map((subquest) => [subquest.id, normalizeSubquestProgress(saved?.subquests[subquest.id], subquest, occurredAt)]),
+      (definition.subquests ?? []).map((subquest) => [subquest.id, normalizeSubquestProgress(saved?.subquests?.[subquest.id], subquest, occurredAt)]),
     ),
   };
 }
@@ -378,6 +402,30 @@ function updateTodo(state: QuestRuntimeState, quest: QuestProgress, subquest: Su
   return updateQuestWithoutTimestamp(state, updatedQuest);
 }
 
+function updateQuestTodo(
+  state: QuestRuntimeState,
+  quest: QuestProgress,
+  todo: TodoProgress,
+  patch: Partial<TodoProgress>,
+  definition: QuestDefinition,
+  occurredAt: number,
+): QuestRuntimeState {
+  const updatedTodo = { ...todo, ...patch };
+  const updatedTodos = {
+    ...quest.todos,
+    [todo.id]: updatedTodo,
+  };
+  const allQuestTodosCompleted = (definition.todos ?? []).length > 0 && (definition.todos ?? []).every((item) => updatedTodos[item.id]?.status === "completed");
+  const updatedQuest = {
+    ...quest,
+    status: allQuestTodosCompleted ? "completed" as const : quest.status,
+    updated_at: allQuestTodosCompleted ? occurredAt : quest.updated_at,
+    completed_at: allQuestTodosCompleted ? occurredAt : quest.completed_at,
+    todos: updatedTodos,
+  };
+  return updateQuestWithoutTimestamp(state, updatedQuest);
+}
+
 function updateQuestWithoutTimestamp(state: QuestRuntimeState, quest: QuestProgress): QuestRuntimeState {
   return {
     ...state,
@@ -409,7 +457,8 @@ function toQuestDetailView(definition: QuestDefinition, progress: QuestProgress,
     completedAt: progress.completed_at ?? null,
     description: definition.description,
     navigation: definition.navigation ?? [],
-    subquests: definition.subquests.map((subquestDefinition) => toSubquestView(subquestDefinition, progress.subquests[subquestDefinition.id])),
+    todos: toTodoViews(definition.todos ?? [], progress.todos, progress.current_node_id),
+    subquests: (definition.subquests ?? []).map((subquestDefinition) => toSubquestView(subquestDefinition, progress.subquests[subquestDefinition.id])),
     contentIndex,
   };
 }
@@ -422,14 +471,20 @@ function toSubquestView(definition: SubquestDefinition, progress: SubquestProgre
     status: progress.status,
     currentDescription: definition.nodes.find((node) => node.id === progress.current_node_id)?.description ?? missingCurrentDescription,
     navigation: definition.navigation ?? [],
-    todos: definition.todos.map((todoDefinition) => ({
+    todos: toTodoViews(definition.todos, progress.todos, progress.current_node_id),
+  };
+}
+
+function toTodoViews(definitions: { id: string; title: string; description?: string; visible_after_node?: string; navigation?: QuestNavigationEntry[] }[], progress: Record<string, TodoProgress>, currentNodeId: string): TodoView[] {
+  return definitions
+    .filter((todoDefinition) => !todoDefinition.visible_after_node || todoDefinition.visible_after_node === currentNodeId)
+    .map((todoDefinition) => ({
       id: todoDefinition.id,
       title: todoDefinition.title,
       description: todoDefinition.description,
-      status: progress.todos[todoDefinition.id]?.status ?? "incomplete",
+      status: progress[todoDefinition.id]?.status ?? "incomplete",
       navigation: todoDefinition.navigation ?? [],
-    })),
-  };
+    }));
 }
 
 function toQuestListItemView(item: QuestDetailView): QuestListItemView {

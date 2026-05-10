@@ -307,8 +307,7 @@ describe("structured effect executor", () => {
         effect("quest-progress", "handler_effect", { type: "world_flags" }, {
           operation: "complete_todo",
           quest_id: "regroup_after_crash",
-          subquest_id: "establish_survivor_contact",
-          todo_id: "call_mike",
+          todo_id: "survey_crash_site",
         }, { handler_type: "quest_progress" }),
       ],
       createContext(state, {
@@ -318,7 +317,7 @@ describe("structured effect executor", () => {
 
     expect(result.status).toBe("success");
     expect(result.errors).toEqual([]);
-    expect(result.state.quest_state?.quests.regroup_after_crash.subquests.establish_survivor_contact.todos.call_mike).toMatchObject({
+    expect(result.state.quest_state?.quests.regroup_after_crash.todos.survey_crash_site).toMatchObject({
       status: "completed",
       completed_at: 120,
       updated_at: 120,
@@ -348,7 +347,6 @@ describe("structured effect executor", () => {
       [effect("missing-todo", "handler_effect", { type: "world_flags" }, {
         operation: "complete_todo",
         quest_id: "regroup_after_crash",
-        subquest_id: "establish_survivor_contact",
       }, { handler_type: "quest_progress" })],
       context,
     );

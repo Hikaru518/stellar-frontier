@@ -174,6 +174,8 @@ function QuestDetail({ quest, onNavigate }: { quest: QuestDetailView; onNavigate
       <p className="quest-current-intel">{formatCurrentDescription(quest.currentDescription)}</p>
       <NavigationButtons entries={quest.navigation} onNavigate={onNavigate} />
 
+      <TodoList todos={quest.todos} onNavigate={onNavigate} />
+
       <div className="quest-subquest-stack">
         {quest.subquests.map((subquest) => (
           <section key={subquest.id} className={`quest-subquest quest-subquest-${subquest.status}`}>
@@ -186,22 +188,32 @@ function QuestDetail({ quest, onNavigate }: { quest: QuestDetailView; onNavigate
             </header>
             <p className="quest-current-intel">{formatCurrentDescription(subquest.currentDescription)}</p>
             <NavigationButtons entries={subquest.navigation} onNavigate={onNavigate} />
-            <ul className="quest-todo-list">
-              {subquest.todos.map((todo) => (
-                <li key={todo.id} className={`quest-todo quest-todo-${todo.status}`}>
-                  <div>
-                    <span className="quest-todo-title">{todo.title}</span>
-                    {todo.description ? <p>{todo.description}</p> : null}
-                  </div>
-                  <QuestStatusTag status={todo.status} />
-                  <NavigationButtons entries={todo.navigation} onNavigate={onNavigate} />
-                </li>
-              ))}
-            </ul>
+            <TodoList todos={subquest.todos} onNavigate={onNavigate} />
           </section>
         ))}
       </div>
     </Panel>
+  );
+}
+
+function TodoList({ todos, onNavigate }: { todos: QuestDetailView["todos"]; onNavigate: (entry: QuestNavigationEntry) => void }) {
+  if (todos.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="quest-todo-list">
+      {todos.map((todo) => (
+        <li key={todo.id} className={`quest-todo quest-todo-${todo.status}`}>
+          <div>
+            <span className="quest-todo-title">{todo.title}</span>
+            {todo.description ? <p>{todo.description}</p> : null}
+          </div>
+          <QuestStatusTag status={todo.status} />
+          <NavigationButtons entries={todo.navigation} onNavigate={onNavigate} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

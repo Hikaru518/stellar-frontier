@@ -237,6 +237,7 @@ export interface QuestTodoDefinition {
   id: string;
   title: string;
   description?: string;
+  visible_after_node?: string;
   navigation?: QuestNavigationEntry[];
 }
 
@@ -258,7 +259,8 @@ export interface QuestDefinition {
   description: string;
   initial_node_id: string;
   nodes: QuestNodeDefinition[];
-  subquests: SubquestDefinition[];
+  todos?: QuestTodoDefinition[];
+  subquests?: SubquestDefinition[];
   navigation?: QuestNavigationEntry[];
 }
 

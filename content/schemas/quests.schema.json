@@ -31,7 +31,7 @@
     "quest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "category", "title", "summary", "description", "initial_node_id", "nodes", "subquests"],
+      "required": ["id", "category", "title", "summary", "description", "initial_node_id", "nodes"],
       "properties": {
         "id": {
           "$ref": "#/$defs/id"
@@ -63,6 +63,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/subquest"
+          }
+        },
+        "todos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/todo"
           }
         },
         "navigation": {
@@ -118,6 +124,9 @@
         },
         "description": {
           "$ref": "#/$defs/non_empty_string"
+        },
+        "visible_after_node": {
+          "$ref": "#/$defs/id"
         },
         "navigation": {
           "$ref": "#/$defs/navigation_entries"

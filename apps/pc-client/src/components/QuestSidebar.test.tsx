@@ -22,6 +22,7 @@ const quests: QuestDetailView[] = [
     completedAt: null,
     description: "建立最小通讯链路，确认队员与坠毁点状态。",
     navigation: [stationNavigation],
+    todos: [],
     subquests: [
       {
         id: "contact_mike",
@@ -60,6 +61,7 @@ const quests: QuestDetailView[] = [
     completedAt: 90,
     description: "这是一个次要任务。",
     navigation: [mapNavigation],
+    todos: [],
     subquests: [
       {
         id: "map_passage",

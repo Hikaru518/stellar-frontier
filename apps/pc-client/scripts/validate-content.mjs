@@ -382,6 +382,7 @@ function validateQuestContentReferences(questFiles, data, maps) {
 
       hasError = validateQuestNodes(quest.nodes, quest.initial_node_id, questPath) || hasError;
       hasError = validateQuestNavigation(quest.navigation, questPath, crewIds, tileIds) || hasError;
+      hasError = validateQuestTodos(quest.todos, questPath, new Set((quest.nodes ?? []).map((node) => node.id)), crewIds, tileIds) || hasError;
 
       const subquestIds = new Set();
       for (const subquest of quest.subquests ?? []) {
@@ -393,17 +394,29 @@ function validateQuestContentReferences(questFiles, data, maps) {
         hasError = validateQuestNodes(subquest.nodes, subquest.initial_node_id, subquestPath) || hasError;
         hasError = validateQuestNavigation(subquest.navigation, subquestPath, crewIds, tileIds) || hasError;
 
-        const todoIds = new Set();
-        for (const todo of subquest.todos ?? []) {
-          const todoPath = `${subquestPath}/todos/${todo.id ?? "<missing>"}`;
-          if (!addUnique(todoIds, todo.id)) {
-            hasError = report(`Duplicate todo id in quest ${quest.id}/${subquest.id}: ${todo.id}`) || hasError;
-          }
-
-          hasError = validateQuestNavigation(todo.navigation, todoPath, crewIds, tileIds) || hasError;
-        }
+        hasError = validateQuestTodos(subquest.todos, subquestPath, new Set((subquest.nodes ?? []).map((node) => node.id)), crewIds, tileIds) || hasError;
       }
     }
+  }
+
+  return hasError;
+}
+
+function validateQuestTodos(todos, contextPath, nodeIds, crewIds, tileIds) {
+  let hasError = false;
+  const todoIds = new Set();
+
+  for (const todo of todos ?? []) {
+    const todoPath = `${contextPath}/todos/${todo.id ?? "<missing>"}`;
+    if (!addUnique(todoIds, todo.id)) {
+      hasError = report(`Duplicate todo id at ${contextPath}: ${todo.id}`) || hasError;
+    }
+
+    if (todo.visible_after_node && !nodeIds.has(todo.visible_after_node)) {
+      hasError = report(`Unknown todo visible_after_node at ${todoPath}: ${todo.visible_after_node}`) || hasError;
+    }
+
+    hasError = validateQuestNavigation(todo.navigation, todoPath, crewIds, tileIds) || hasError;
   }
 
   return hasError;
@@ -676,6 +689,7 @@ function buildQuestIndex(questFiles) {
       const questEntry = {
         quest,
         nodes: new Set((quest.nodes ?? []).map((node) => node.id)),
+        todos: new Set((quest.todos ?? []).map((todo) => todo.id)),
         subquests: new Map(),
       };
 
@@ -724,7 +738,13 @@ function validateQuestProgressEffect(effect, contextPath, questIndex) {
     hasError = report(`Unknown quest_progress node_id in quest ${params.quest_id} at ${contextPath}/params/node_id: ${params.node_id}`) || hasError;
   }
 
-  if (operation === "complete_subquest" || operation === "complete_todo" || operation === "set_subquest_node") {
+  if (operation === "complete_todo" && !params.subquest_id) {
+    if (!quest.todos.has(params.todo_id)) {
+      hasError = report(`Unknown quest_progress todo_id in quest ${params.quest_id} at ${contextPath}/params/todo_id: ${params.todo_id}`) || hasError;
+    }
+  }
+
+  if (operation === "complete_subquest" || (operation === "complete_todo" && params.subquest_id) || operation === "set_subquest_node") {
     const subquest = quest.subquests.get(params.subquest_id);
     if (!subquest) {
       return report(`Unknown quest_progress subquest_id in quest ${params.quest_id} at ${contextPath}/params/subquest_id: ${params.subquest_id}`);
@@ -749,7 +769,7 @@ function requiredQuestProgressFields(operation) {
     case "complete_subquest":
       return ["quest_id", "subquest_id"];
     case "complete_todo":
-      return ["quest_id", "subquest_id", "todo_id"];
+      return ["quest_id", "todo_id"];
     case "set_quest_node":
       return ["quest_id", "node_id"];
     case "set_subquest_node":

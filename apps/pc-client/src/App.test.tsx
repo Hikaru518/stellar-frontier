@@ -139,8 +139,8 @@ describe("App", () => {
     savedQuestState.quests.regroup_after_crash.status = "completed";
     savedQuestState.quests.regroup_after_crash.completed_at = 42;
     savedQuestState.quests.regroup_after_crash.current_node_id = "deleted_node";
-    savedQuestState.quests.regroup_after_crash.subquests.establish_survivor_contact.todos.call_mike.status = "completed";
-    savedQuestState.quests.regroup_after_crash.subquests.establish_survivor_contact.todos.call_mike.completed_at = 43;
+    savedQuestState.quests.regroup_after_crash.todos.survey_crash_site.status = "completed";
+    savedQuestState.quests.regroup_after_crash.todos.survey_crash_site.completed_at = 43;
 
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -156,17 +156,12 @@ describe("App", () => {
           status: "completed",
           completed_at: 42,
           current_node_id: "crash_site_unsecured",
-          subquests: {
-            establish_survivor_contact: {
-              todos: {
-                call_mike: { status: "completed", completed_at: 43 },
-              },
+          todos: {
+            survey_crash_site: {
+              status: "completed",
+              completed_at: 43,
             },
           },
-        },
-        survey_south_passage: {
-          status: "incomplete",
-          current_node_id: "survey_not_started",
         },
       },
     });
@@ -240,32 +235,6 @@ describe("App", () => {
 
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
     expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
-  });
-
-  it("uses crew quest navigation to open the station without starting a call", () => {
-    render(<App />);
-
-    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
-    fireEvent.click(screen.getByRole("button", { name: "联系 Mike" }));
-
-    expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
-    expect(screen.queryByText("普通通话已接通。", { exact: false })).not.toBeInTheDocument();
-    const mikeCard = screen.getByText("Mike，神秘幸存者").closest("article");
-    expect(mikeCard).toHaveClass("crew-card-quest-highlight");
-    const saved = readSavedState();
-    expect(saved?.crew_actions).toEqual({});
-    expect((saved?.logs as Array<{ text: string }>).some((log) => log.text.includes("普通通话已接通"))).toBe(false);
-  });
-
-  it("uses page quest navigation to switch pages without creating crew actions", () => {
-    render(<App />);
-
-    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
-    fireEvent.click(screen.getByRole("button", { name: "打开通讯台" }));
-
-    expect(screen.getByRole("heading", { name: "通讯台" })).toBeInTheDocument();
-    const saved = readSavedState();
-    expect(saved?.crew_actions).toEqual({});
   });
 
   it("uses tile quest navigation to open and select the map tile without creating crew actions", () => {

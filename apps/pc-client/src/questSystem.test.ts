@@ -21,6 +21,10 @@ const questDefinitions: QuestDefinition[] = [
       { id: "changed", description: "Changed description" },
     ],
     navigation: [{ type: "page", label: "Station", page: "station" }],
+    todos: [
+      { id: "quest_todo", title: "Quest Todo" },
+      { id: "future_quest_todo", title: "Future Quest Todo", visible_after_node: "changed" },
+    ],
     subquests: [
       {
         id: "main_subquest",
@@ -42,6 +46,7 @@ const questDefinitions: QuestDefinition[] = [
           {
             id: "second_todo",
             title: "Second Todo",
+            visible_after_node: "sub_changed",
           },
         ],
       },
@@ -93,6 +98,12 @@ describe("questSystem", () => {
       updated_at: 10,
       completed_at: null,
     });
+    expect(state.quests.main_quest.todos.quest_todo).toEqual({
+      id: "quest_todo",
+      status: "incomplete",
+      updated_at: 10,
+      completed_at: null,
+    });
   });
 
   it("normalizes missing entries and invalid current nodes without changing existing completions", () => {
@@ -105,6 +116,9 @@ describe("questSystem", () => {
           current_node_id: "deleted_node",
           updated_at: 20,
           completed_at: 21,
+          todos: {
+            quest_todo: { id: "quest_todo", status: "completed", updated_at: 18, completed_at: 19 },
+          },
           subquests: {
             main_subquest: {
               id: "main_subquest",
@@ -143,7 +157,60 @@ describe("questSystem", () => {
       updated_at: 99,
       completed_at: null,
     });
+    expect(state.quests.main_quest.todos.future_quest_todo).toEqual({
+      id: "future_quest_todo",
+      status: "incomplete",
+      updated_at: 99,
+      completed_at: null,
+    });
     expect(state.quests.side_quest.status).toBe("incomplete");
+  });
+
+  it("supports quest-level todos without requiring subquests", () => {
+    const flatDefinitions: QuestDefinition[] = [
+      {
+        id: "flat_quest",
+        category: "main",
+        title: "Flat Quest",
+        summary: "Flat summary",
+        description: "Flat description",
+        initial_node_id: "survey",
+        nodes: [
+          { id: "survey", description: "Survey first" },
+          { id: "repair", description: "Repair now" },
+        ],
+        todos: [
+          { id: "survey_crash_site", title: "Survey crash site" },
+          { id: "repair_generator", title: "Repair generator", visible_after_node: "repair" },
+        ],
+      },
+    ];
+    const initial = createInitialQuestState(flatDefinitions, 0);
+
+    const surveyDone = applyQuestProgress({
+      state: initial,
+      definitions: flatDefinitions,
+      operation: "complete_todo",
+      quest_id: "flat_quest",
+      todo_id: "survey_crash_site",
+      occurred_at: 10,
+    }).state;
+    const repairShown = applyQuestProgress({
+      state: surveyDone,
+      definitions: flatDefinitions,
+      operation: "set_quest_node",
+      quest_id: "flat_quest",
+      node_id: "repair",
+      occurred_at: 11,
+    }).state;
+
+    const initialView = buildQuestSidebarView({ state: initial, definitions: flatDefinitions });
+    const repairView = buildQuestSidebarView({ state: repairShown, definitions: flatDefinitions });
+    expect(initial.quests.flat_quest.subquests).toEqual({});
+    expect(initialView.selectedQuest?.todos.map((todo) => todo.id)).toEqual(["survey_crash_site"]);
+    expect(repairShown.quests.flat_quest.todos.survey_crash_site.status).toBe("completed");
+    expect(repairView.selectedQuest?.todos.map((todo) => todo.id)).toEqual(["survey_crash_site", "repair_generator"]);
+    expect(repairView.selectedQuest?.subquests).toEqual([]);
   });
 
   it("applies explicit completion without automatically completing parent entries", () => {
@@ -281,6 +348,26 @@ describe("questSystem", () => {
     expect(invalidNodeResult.warnings).toEqual(["Quest node missing_node does not exist in quest main_quest."]);
     expect(invalidNodeResult.state).toBe(subquestNodeResult.state);
     expect(invalidQuestResult.warnings).toEqual(["Quest missing_quest does not exist."]);
+  });
+
+  it("hides future todos until the subquest reaches their visible node", () => {
+    const initial = createInitialQuestState(questDefinitions, 0);
+
+    const initialView = buildQuestSidebarView({ state: initial, definitions: questDefinitions });
+    expect(initialView.selectedQuest?.subquests[0].todos.map((todo) => todo.id)).toEqual(["main_todo"]);
+
+    const advanced = applyQuestProgress({
+      state: initial,
+      definitions: questDefinitions,
+      operation: "set_subquest_node",
+      quest_id: "main_quest",
+      subquest_id: "main_subquest",
+      node_id: "sub_changed",
+      occurred_at: 20,
+    }).state;
+
+    const advancedView = buildQuestSidebarView({ state: advanced, definitions: questDefinitions });
+    expect(advancedView.selectedQuest?.subquests[0].todos.map((todo) => todo.id)).toEqual(["main_todo", "second_todo"]);
   });
 
   it("builds filtered view models without changing runtime state", () => {

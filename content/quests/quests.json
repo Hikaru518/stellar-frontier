@@ -6,198 +6,49 @@
       "id": "regroup_after_crash",
       "category": "main",
       "title": "重整坠毁现场",
-      "summary": "确认 Mike 的位置，稳定 IAFS 坠毁点的基础生存条件。",
-      "description": "IAFS 在未知星球迫降后，通讯链路仍不稳定。先把幸存者、坠毁点与关键模块重新纳入可控范围。",
+      "summary": "先调查 IAFS 坠毁区域，再修复暴露出的关键装置。",
+      "description": "IAFS 在未知星球迫降后，坠毁区域仍有可回收设施。先完成区域调查，确认关键装置位置，再安排维修。",
       "initial_node_id": "crash_site_unsecured",
       "nodes": [
         {
           "id": "crash_site_unsecured",
-          "description": "坠毁点仍处于临时可用状态。需要先通过通讯确认 Mike 的状况，再围绕核心模块展开检查。"
+          "description": "坠毁区域尚未完成调查。先让队员在 4-4 执行调查，确认还有哪些关键装置可用。"
         },
         {
-          "id": "survivor_contact_established",
-          "description": "幸存者联系已建立。下一步应把注意力转向坠毁点周边的供电、维生与穿梭机核心。"
+          "id": "repair_targets_revealed",
+          "description": "坠毁区域调查完成，发电机、维生系统和穿梭机核心已经显露。下一步是逐项维修这些装置。"
         }
       ],
-      "navigation": [
+      "todos": [
         {
-          "type": "crew",
-          "label": "联系 Mike",
-          "crew_id": "mike"
-        },
-        {
-          "type": "tile",
-          "label": "查看 IAFS 坠毁点",
-          "tile_id": "4-4"
-        }
-      ],
-      "subquests": [
-        {
-          "id": "establish_survivor_contact",
-          "title": "建立幸存者联系",
-          "summary": "通过通讯台确认 Mike 是否还能执行指令。",
-          "initial_node_id": "contact_pending",
-          "nodes": [
-            {
-              "id": "contact_pending",
-              "description": "通讯台可以尝试接入 Mike。先确认他还能回应，再安排后续行动。"
-            },
-            {
-              "id": "contact_confirmed",
-              "description": "Mike 已能通过通讯台回应。任务面板后续只记录明确事件推进，不根据 UI 打开行为自动更新。"
-            }
-          ],
-          "navigation": [
-            {
-              "type": "page",
-              "label": "打开通讯台",
-              "page": "station"
-            },
-            {
-              "type": "crew",
-              "label": "定位 Mike",
-              "crew_id": "mike"
-            }
-          ],
-          "todos": [
-            {
-              "id": "call_mike",
-              "title": "接通 Mike 的通讯",
-              "description": "使用现有通讯台流程与 Mike 建立一次有效通话。",
-              "navigation": [
-                {
-                  "type": "crew",
-                  "label": "前往 Mike 通讯入口",
-                  "crew_id": "mike"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "inspect_crash_modules",
-          "title": "检查坠毁点模块",
-          "summary": "确认发电机、维生系统和穿梭机核心的基础状态。",
-          "initial_node_id": "modules_unknown",
-          "nodes": [
-            {
-              "id": "modules_unknown",
-              "description": "坠毁点核心模块尚未完成检查。优先从 4-4 的 IAFS 残骸开始。"
-            },
-            {
-              "id": "modules_triaged",
-              "description": "关键模块已有初步状态记录。后续事件可以显式推进具体修复或回收目标。"
-            }
-          ],
+          "id": "survey_crash_site",
+          "title": "调查 IAFS 坠毁点",
+          "description": "在 4-4 完成一次区域调查，确认坠毁点周边是否还有可用模块。",
           "navigation": [
             {
               "type": "tile",
-              "label": "定位坠毁点模块",
+              "label": "查看 IAFS 坠毁点",
               "tile_id": "4-4"
             }
-          ],
-          "todos": [
-            {
-              "id": "survey_crash_site",
-              "title": "调查 IAFS 坠毁点",
-              "description": "在 4-4 完成一次区域调查，确认坠毁点周边是否还有可用模块。",
-              "navigation": [
-                {
-                  "type": "tile",
-                  "label": "查看 IAFS 坠毁点",
-                  "tile_id": "4-4"
-                }
-              ]
-            },
-            {
-              "id": "inspect_generator",
-              "title": "检查 IAFS 发电机",
-              "description": "确认发电机是否仍能为临时营地供能。",
-              "navigation": [
-                {
-                  "type": "tile",
-                  "label": "查看发电机所在区域",
-                  "tile_id": "4-4"
-                }
-              ]
-            },
-            {
-              "id": "inspect_life_support",
-              "title": "检查维生系统",
-              "description": "确认维生系统是否还能支撑幸存者活动。",
-              "navigation": [
-                {
-                  "type": "tile",
-                  "label": "查看维生系统所在区域",
-                  "tile_id": "4-4"
-                }
-              ]
-            }
           ]
-        }
-      ]
-    },
-    {
-      "id": "survey_south_passage",
-      "category": "side",
-      "title": "记录南侧通道",
-      "summary": "把坠毁点南侧可通行区域登记为后续行动参考。",
-      "description": "坠毁点南侧仍有几块可通行地形。记录这些区域能帮助后续任务把导航入口指向明确位置。",
-      "initial_node_id": "survey_not_started",
-      "nodes": [
-        {
-          "id": "survey_not_started",
-          "description": "南侧通道尚未形成正式行动记录。"
         },
         {
-          "id": "survey_marked",
-          "description": "南侧通道已有初步登记，可作为后续移动或调查事件的导航提示。"
-        }
-      ],
-      "navigation": [
+          "id": "repair_generator",
+          "title": "维修 IAFS 发电机",
+          "description": "修复发电机，使坠毁点恢复稳定供能。",
+          "visible_after_node": "repair_targets_revealed"
+        },
         {
-          "type": "tile",
-          "label": "查看南侧通道",
-          "tile_id": "5-4"
-        }
-      ],
-      "subquests": [
+          "id": "repair_life_support",
+          "title": "维修维生系统",
+          "description": "修复维生系统，稳定坠毁点的基础生存条件。",
+          "visible_after_node": "repair_targets_revealed"
+        },
         {
-          "id": "mark_passage_tiles",
-          "title": "标记可通行地块",
-          "summary": "记录 5-4 与 5-5 附近的通行条件。",
-          "initial_node_id": "passage_unmarked",
-          "nodes": [
-            {
-              "id": "passage_unmarked",
-              "description": "通道还只是地图上的可见区域，尚未被任务系统记录为行动参考。"
-            },
-            {
-              "id": "passage_recorded",
-              "description": "南侧通道已被记录，后续事件可显式完成相关待办。"
-            }
-          ],
-          "navigation": [
-            {
-              "type": "tile",
-              "label": "定位 5-4",
-              "tile_id": "5-4"
-            }
-          ],
-          "todos": [
-            {
-              "id": "check_tile_5_4",
-              "title": "确认 5-4 通行状态",
-              "description": "检查坠毁点南侧第一段通道是否安全。",
-              "navigation": [
-                {
-                  "type": "tile",
-                  "label": "查看 5-4",
-                  "tile_id": "5-4"
-                }
-              ]
-            }
-          ]
+          "id": "repair_shuttle_core",
+          "title": "维修穿梭机核心",
+          "description": "修复穿梭机核心，为后续撤离或回收行动保留可能性。",
+          "visible_after_node": "repair_targets_revealed"
         }
       ]
     }

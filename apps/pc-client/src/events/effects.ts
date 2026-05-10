@@ -1225,7 +1225,7 @@ function requiredQuestProgressFields(operation: QuestProgressOperation): string[
     case "complete_subquest":
       return ["quest_id", "subquest_id"];
     case "complete_todo":
-      return ["quest_id", "subquest_id", "todo_id"];
+      return ["quest_id", "todo_id"];
     case "set_quest_node":
       return ["quest_id", "node_id"];
     case "set_subquest_node":
