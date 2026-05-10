@@ -99,6 +99,73 @@ describe("event engine call option selection", () => {
 });
 
 describe("event engine trigger intake", () => {
+  it("runs the authored opening Mike call chain into regrouping situation", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredCrashSiteState(),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(0),
+        trigger_type: "game_start",
+        source: "time_system",
+        crew_id: "mike",
+        tile_id: "4-4",
+        payload: { phase: "new_game" },
+      },
+    });
+    const crashReportCallId = started.event?.active_call_id ?? "";
+
+    expect(started.errors).toEqual([]);
+    expect(started.event?.event_definition_id).toBe("iafs_opening_mike_crash_call");
+    expect(started.state.active_calls[crashReportCallId]?.rendered_lines[0]?.text).toContain("这里是 Mike");
+
+    const facilities = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: crashReportCallId,
+      option_id: "promise_return_home",
+      occurred_at: 1,
+    });
+    const facilitiesCallId = facilities.event?.active_call_id ?? "";
+    const cargo = selectCallOption({
+      state: facilities.state,
+      index: indexResult.index,
+      call_id: facilitiesCallId,
+      option_id: "check_usable_facilities",
+      occurred_at: 2,
+    });
+    const cargoCallId = cargo.event?.active_call_id ?? "";
+    const route = selectCallOption({
+      state: cargo.state,
+      index: indexResult.index,
+      call_id: cargoCallId,
+      option_id: "search_scattered_cargo",
+      occurred_at: 3,
+    });
+    const routeCallId = route.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: route.state,
+      index: indexResult.index,
+      call_id: routeCallId,
+      option_id: "find_exit_route",
+      occurred_at: 4,
+    });
+    const quest = ended.state.quest_state?.quests.regroup_after_crash;
+
+    expect(facilities.errors).toEqual([]);
+    expect(cargo.errors).toEqual([]);
+    expect(route.errors).toEqual([]);
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(quest?.current_node_id).toBe("regrouping_situation");
+    expect(ended.state.event_logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ summary: "Mike 完成坠毁后首次回报，主线进入重整态势" }),
+      ]),
+    );
+  });
+
   it("completes the crash-site survey quest todo through the authored survey call chain", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);

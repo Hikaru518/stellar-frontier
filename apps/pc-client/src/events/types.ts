@@ -7,6 +7,7 @@ export type GameSeconds = number;
 export type JsonObject = Record<string, unknown>;
 
 export type TriggerType =
+  | "game_start"
   | "arrival"
   | "proximity"
   | "action_complete"

@@ -109,7 +109,7 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
-    expect(screen.getByText("未读通讯 0")).toBeInTheDocument();
+    expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
   });
 
   it("creates a blank-world save on first load", () => {
@@ -146,6 +146,16 @@ describe("App", () => {
       iafs_shuttle_core: { status_enum: "damaged" },
     });
     expect(Object.keys(saved.quest_state.quests)).toEqual(questDefinitions.map((quest) => quest.id));
+    expect(saved.active_events["iafs_opening_mike_crash_call:0"]).toMatchObject({
+      event_definition_id: "iafs_opening_mike_crash_call",
+      current_node_id: "crash_report",
+      status: "waiting_call",
+    });
+    expect(saved.active_calls["iafs_opening_mike_crash_call:0:crash_report:call"]).toMatchObject({
+      crew_id: "mike",
+      event_node_id: "crash_report",
+      status: "awaiting_choice",
+    });
     expect(saved.tiles).toBeUndefined();
   });
 

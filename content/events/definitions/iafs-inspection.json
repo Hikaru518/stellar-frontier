@@ -2,6 +2,51 @@
   "event_definitions": [
     {
       "schema_version": "event-program-model-v1",
+      "id": "iafs_opening_mike_crash_call",
+      "version": 1,
+      "domain": "iafs-inspection",
+      "title": "开局：Mike 坠毁后首次来电",
+      "summary": "新游戏开始时，Mike 主动接入通讯，报告坠毁见闻并请求我们带他回家。",
+      "tags": ["iafs", "opening", "crash_site", "mike"],
+      "status": "approved",
+      "trigger": {
+        "type": "game_start",
+        "required_context": ["crew_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "crew_id", "value": "mike" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.phase", "value": "new_game" } }
+        ]
+      },
+      "candidate_selection": { "priority": 1000, "weight": 1, "mutex_group": "iafs_opening", "max_instances_per_trigger": 1, "requires_blocking_slot": true },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:game_start", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "crash_report",
+        "nodes": [
+          { "id": "crash_report", "type": "call", "title": "坠毁后的首次接入", "call_template_id": "iafs_opening_mike_crash_call.call.crash_report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "urgent", "delivery": "incoming_call", "options": [{ "id": "promise_return_home", "is_default": true }, { "id": "keep_him_grounded" }], "option_node_mapping": { "promise_return_home": "facilities_prompt", "keep_him_grounded": "facilities_prompt" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+          { "id": "facilities_prompt", "type": "call", "title": "确认飞船可用设施", "call_template_id": "iafs_opening_mike_crash_call.call.facilities_prompt", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "incoming_call", "options": [{ "id": "check_usable_facilities", "is_default": true }, { "id": "inventory_ship_systems" }], "option_node_mapping": { "check_usable_facilities": "cargo_prompt", "inventory_ship_systems": "cargo_prompt" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+          { "id": "cargo_prompt", "type": "call", "title": "标记散落货物", "call_template_id": "iafs_opening_mike_crash_call.call.cargo_prompt", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "incoming_call", "options": [{ "id": "search_scattered_cargo", "is_default": true }, { "id": "mark_external_cargo" }], "option_node_mapping": { "search_scattered_cargo": "route_prompt", "mark_external_cargo": "route_prompt" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+          { "id": "route_prompt", "type": "call", "title": "寻找离开坠毁区的路", "call_template_id": "iafs_opening_mike_crash_call.call.route_prompt", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "incoming_call", "options": [{ "id": "find_exit_route", "is_default": true }, { "id": "seek_local_contact" }], "option_node_mapping": { "find_exit_route": "end", "seek_local_contact": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+          { "id": "end", "type": "end", "title": "进入重整态势", "resolution": "resolved", "result_key": "regrouping_situation_started", "final_effect_refs": ["enter_regrouping_situation"], "event_log_template_id": "iafs_opening_mike_crash_call_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [
+        {
+          "id": "enter_regrouping_situation",
+          "effects": [
+            { "id": "log_regrouping_situation", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "Mike 完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible", "result_key": "regrouping_situation_started" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+            { "id": "set_regrouping_situation_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "regroup_after_crash", "node_id": "regrouping_situation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+          ]
+        }
+      ],
+      "log_templates": [{ "id": "iafs_opening_mike_crash_call_log", "summary": "Mike 完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_opening_mike_crash_call.call.crash_report", "iafs_opening_mike_crash_call.call.facilities_prompt", "iafs_opening_mike_crash_call.call.cargo_prompt", "iafs_opening_mike_crash_call.call.route_prompt"], "crew_ids": ["mike"] },
+      "sample_contexts": [{ "trigger_type": "game_start", "occurred_at": 0, "source": "time_system", "crew_id": "mike", "tile_id": "4-4", "payload": { "phase": "new_game" } }]
+    },
+    {
+      "schema_version": "event-program-model-v1",
       "id": "iafs_crash_site_survey_reveal",
       "version": 1,
       "domain": "iafs-inspection",

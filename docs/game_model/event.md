@@ -76,7 +76,9 @@
 
 `trigger_definition` 决定事件何时进入候选池。
 
-固定 `trigger.type`：`arrival`、`proximity`、`action_complete`、`idle_time`、`call_choice`、`event_node_finished`、`objective_created`、`objective_completed`、`world_flag_changed`、`time_wakeup`。
+固定 `trigger.type`：`game_start`、`arrival`、`proximity`、`action_complete`、`idle_time`、`call_choice`、`event_node_finished`、`objective_created`、`objective_completed`、`world_flag_changed`、`time_wakeup`。
+
+`game_start` 只在新游戏初始化时由 App 主动派发；读取兼容存档时不重放。当前 IAFS 开局用它创建 Mike 的首次坠毁来电，并在强选通话链结束后把主线任务推进到“重整态势”。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |

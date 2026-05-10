@@ -363,6 +363,7 @@
     "trigger_type": {
       "type": "string",
       "enum": [
+        "game_start",
         "arrival",
         "proximity",
         "action_complete",
