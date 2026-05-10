@@ -121,7 +121,7 @@ export async function completeOpeningMikeCall(page: Page) {
 }
 
 export function mikeCard(page: Page) {
-  return page.locator("article.console-crew-card").filter({ hasText: "Mike" }).first();
+  return page.locator("article.console-crew-card").filter({ hasText: "麦克" }).first();
 }
 
 export function objectSection(page: Page, name: string) {

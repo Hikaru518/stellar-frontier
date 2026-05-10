@@ -4,7 +4,7 @@
   "crew": [
     {
       "crewId": "mike",
-      "name": "Mike",
+      "name": "麦克",
       "role": "神秘幸存者",
       "currentTile": "129-129",
       "status": "idle",
@@ -26,6 +26,64 @@
       },
       "voiceTone": "简短、克制、信息很少。",
       "personalityTags": ["神秘", "寡言", "谨慎"],
+      "expertise": [],
+      "diaryEntries": [],
+      "canCommunicate": true,
+      "lastContactTime": 0
+    },
+    {
+      "crewId": "simon",
+      "name": "西蒙",
+      "role": "待设定成员",
+      "currentTile": "129-129",
+      "status": "idle",
+      "statusTone": "neutral",
+      "attributes": {
+        "physical": 4,
+        "agility": 5,
+        "intellect": 3,
+        "perception": 2,
+        "luck": 3
+      },
+      "skills": [],
+      "inventory": [],
+      "profile": {
+        "originWorld": "未知",
+        "originProfession": "待设定",
+        "experience": "档案尚未补全。",
+        "selfIntro": "我在，等你的指令。"
+      },
+      "voiceTone": "待设定。",
+      "personalityTags": ["待设定", "行动派", "通讯可用"],
+      "expertise": [],
+      "diaryEntries": [],
+      "canCommunicate": true,
+      "lastContactTime": 0
+    },
+    {
+      "crewId": "alice",
+      "name": "爱丽丝",
+      "role": "待设定成员",
+      "currentTile": "129-129",
+      "status": "idle",
+      "statusTone": "neutral",
+      "attributes": {
+        "physical": 2,
+        "agility": 4,
+        "intellect": 3,
+        "perception": 4,
+        "luck": 5
+      },
+      "skills": [],
+      "inventory": [],
+      "profile": {
+        "originWorld": "未知",
+        "originProfession": "待设定",
+        "experience": "档案尚未补全。",
+        "selfIntro": "通讯已接入。"
+      },
+      "voiceTone": "待设定。",
+      "personalityTags": ["待设定", "观察者", "通讯可用"],
       "expertise": [],
       "diaryEntries": [],
       "canCommunicate": true,

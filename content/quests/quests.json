@@ -17,7 +17,7 @@
         },
         {
           "id": "regrouping_situation",
-          "description": "Mike 已经完成坠毁后的首次回报。现在需要重整态势：确认飞船还能使用的设施，留意散落货物，并开始寻找离开坠毁区或接触当地居民的线索。"
+          "description": "麦克已经完成坠毁后的首次回报。现在需要重整态势：确认飞船还能使用的设施，留意散落货物，并开始寻找离开坠毁区或接触当地居民的线索。"
         },
         {
           "id": "repair_targets_revealed",
@@ -27,7 +27,7 @@
           "id": "crash_site_stabilized",
           "type": "completed",
           "title": "坠毁点已稳定",
-          "summary": "Mike 完成了 IAFS 坠毁点的初步调查与关键设备修复。",
+          "summary": "麦克完成了 IAFS 坠毁点的初步调查与关键设备修复。",
           "outcomes": [
             "发电机恢复基础供能。",
             "维生系统重新上线。",

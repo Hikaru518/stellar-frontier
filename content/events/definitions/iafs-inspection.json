@@ -5,8 +5,8 @@
       "id": "iafs_opening_mike_crash_call",
       "version": 1,
       "domain": "iafs-inspection",
-      "title": "开局：Mike 坠毁后首次来电",
-      "summary": "新游戏开始时，Mike 主动接入通讯，报告坠毁见闻并请求我们带他回家。",
+      "title": "开局：麦克坠毁后首次来电",
+      "summary": "新游戏开始时，麦克主动接入通讯，报告坠毁见闻并请求我们带他回家。",
       "tags": ["iafs", "opening", "crash_site", "mike"],
       "status": "approved",
       "trigger": {
@@ -36,14 +36,14 @@
         {
           "id": "enter_regrouping_situation",
           "effects": [
-            { "id": "log_regrouping_situation", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "Mike 完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible", "result_key": "regrouping_situation_started" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+            { "id": "log_regrouping_situation", "type": "add_event_log", "target": { "type": "event_log" }, "params": { "summary": "麦克完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible", "result_key": "regrouping_situation_started" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
             { "id": "set_regrouping_situation_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "regroup_after_crash", "node_id": "regrouping_situation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
           ]
         }
       ],
-      "log_templates": [{ "id": "iafs_opening_mike_crash_call_log", "summary": "Mike 完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible" }],
+      "log_templates": [{ "id": "iafs_opening_mike_crash_call_log", "summary": "麦克完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["iafs_opening_mike_crash_call.call.crash_report", "iafs_opening_mike_crash_call.call.facilities_prompt", "iafs_opening_mike_crash_call.call.cargo_prompt", "iafs_opening_mike_crash_call.call.route_prompt"], "crew_ids": ["mike"] },
-      "sample_contexts": [{ "trigger_type": "game_start", "occurred_at": 0, "source": "time_system", "crew_id": "mike", "tile_id": "4-4", "payload": { "phase": "new_game" } }]
+      "sample_contexts": [{ "trigger_type": "game_start", "occurred_at": 0, "source": "time_system", "crew_id": "mike", "tile_id": "129-129", "payload": { "phase": "new_game" } }]
     },
     {
       "schema_version": "event-program-model-v1",

@@ -180,7 +180,7 @@ function crewAction(overrides: Partial<CrewActionState>): CrewActionState {
 function crewRuntime(overrides: Partial<CrewState>): CrewState {
   return {
     id: "mike",
-    display_name: "Mike",
+    display_name: "麦克",
     tile_id: "1-1",
     status: "idle",
     attributes: { strength: 3, agility: 3, intelligence: 3, perception: 3, luck: 3 },

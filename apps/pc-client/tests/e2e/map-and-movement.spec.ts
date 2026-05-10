@@ -90,10 +90,10 @@ test("shows authored crash-site radar metadata on the occupied origin tile", asy
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
   await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
-  await expect(page.getByText(/Mike/)).toBeVisible();
+  await expect(page.getByText(/麦克/)).toBeVisible();
 });
 
-test("moves Mike after selecting a target tile from the console radar and confirming in call", async ({ page }) => {
+test("moves 麦克 after selecting a target tile from the console radar and confirming in call", async ({ page }) => {
   await page.goto("/");
 
   await startNormalMikeCall(page);
@@ -102,8 +102,8 @@ test("moves Mike after selecting a target tile from the console radar and confir
   await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
   await selectMapTile(page, "129-130");
   await page.getByRole("button", { name: "标记当前坐标" }).click();
-  await expect(page.getByRole("heading", { name: "Mike 通话界面" })).toBeVisible();
-  const confirmMoveButton = page.getByRole("button", { name: /确认请求 Mike 前往 坠毁东侧 \(1,0\)/ });
+  await expect(page.getByRole("heading", { name: "麦克 通话界面" })).toBeVisible();
+  const confirmMoveButton = page.getByRole("button", { name: /确认请求 麦克 前往 坠毁东侧 \(1,0\)/ });
   await expect(confirmMoveButton).toBeVisible();
   await confirmMoveButton.click();
   await expect(page.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeVisible();

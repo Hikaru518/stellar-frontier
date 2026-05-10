@@ -43,7 +43,7 @@ const questDefinitions: QuestDefinition[] = [
           { id: "sub_start", description: "Sub start description" },
           { id: "sub_changed", description: "Sub changed description" },
         ],
-        navigation: [{ type: "crew", label: "Mike", crew_id: "mike" }],
+        navigation: [{ type: "crew", label: "麦克", crew_id: "mike" }],
         todos: [
           {
             id: "main_todo",

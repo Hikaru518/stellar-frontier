@@ -8,7 +8,7 @@ import { QuestSidebar } from "./QuestSidebar";
 
 const stationNavigation: QuestNavigationEntry = { type: "page", label: "打开通讯台", page: "station" };
 const mapNavigation: QuestNavigationEntry = { type: "tile", label: "定位坠毁点", tile_id: "129-129" };
-const crewNavigation: QuestNavigationEntry = { type: "crew", label: "联系 Mike", crew_id: "mike" };
+const crewNavigation: QuestNavigationEntry = { type: "crew", label: "联系 麦克", crew_id: "mike" };
 
 const quests: QuestDetailView[] = [
   {
@@ -17,7 +17,7 @@ const quests: QuestDetailView[] = [
     title: "重组幸存者",
     summary: "确认坠毁后的生还者状态。",
     status: "incomplete",
-    currentDescription: "Mike 已回到通讯范围。",
+    currentDescription: "麦克已回到通讯范围。",
     updated: true,
     completedAt: null,
     description: "建立最小通讯链路，确认队员与坠毁点状态。",
@@ -27,14 +27,14 @@ const quests: QuestDetailView[] = [
       {
         id: "contact_mike",
         title: "建立联络",
-        summary: "先让 Mike 报告周边情况。",
+        summary: "先让麦克报告周边情况。",
         status: "incomplete",
         currentDescription: "需要一次通话确认。",
         navigation: [crewNavigation],
         todos: [
           {
             id: "call_mike",
-            title: "呼叫 Mike",
+            title: "呼叫 麦克",
             description: "在通讯台发起通话。",
             status: "completed",
             navigation: [crewNavigation],
@@ -161,7 +161,7 @@ describe("QuestSidebar", () => {
     expect(screen.getByText("updated")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "重组幸存者" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "建立联络" })).toBeInTheDocument();
-    expect(screen.getByText("呼叫 Mike")).toBeInTheDocument();
+    expect(screen.getByText("呼叫 麦克")).toBeInTheDocument();
     expect(screen.queryByText("main_quest")).not.toBeInTheDocument();
   });
 
@@ -198,7 +198,7 @@ describe("QuestSidebar", () => {
   it("marks completed todos with completed styling", () => {
     render(<TestQuestSidebar />);
 
-    expect(screen.getByText("呼叫 Mike").closest("li")).toHaveClass("quest-todo-completed");
+    expect(screen.getByText("呼叫 麦克").closest("li")).toHaveClass("quest-todo-completed");
     expect(screen.getByText("确认坠毁点").closest("li")).toHaveClass("quest-todo-incomplete");
   });
 
@@ -239,7 +239,7 @@ describe("QuestSidebar", () => {
     const user = userEvent.setup();
     render(<TestQuestSidebar onNavigate={onNavigate} />);
 
-    await user.click(screen.getAllByRole("button", { name: "联系 Mike" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "联系 麦克" })[0]);
 
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith(crewNavigation);

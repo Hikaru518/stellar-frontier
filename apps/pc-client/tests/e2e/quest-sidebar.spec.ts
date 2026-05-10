@@ -37,7 +37,7 @@ test("shows completion result for completed crash-site quest from authored conte
   await page.getByRole("button", { name: /任务/ }).click();
 
   await expect(page.getByText("坠毁点已稳定").first()).toBeVisible();
-  await expect(page.getByText("Mike 完成了 IAFS 坠毁点的初步调查与关键设备修复。").first()).toBeVisible();
+  await expect(page.getByText("麦克完成了 IAFS 坠毁点的初步调查与关键设备修复。").first()).toBeVisible();
   await expect(page.getByText("发电机恢复基础供能。").first()).toBeVisible();
   await expect(page.getByText("维生系统重新上线。").first()).toBeVisible();
   await expect(page.getByText("穿梭机核心进入可评估状态。").first()).toBeVisible();
@@ -93,7 +93,7 @@ test("task page layout leaves core controls reachable on task, call, and map pag
   await expectConsoleLayoutHasRoom(page);
 
   await startNormalMikeCall(page);
-  await expect(page.getByRole("heading", { name: "Mike 通话界面" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "麦克 通话界面" })).toBeVisible();
   await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
   await expectConsoleLayoutHasRoom(page);
 

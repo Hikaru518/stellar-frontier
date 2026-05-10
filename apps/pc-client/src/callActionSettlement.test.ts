@@ -10,7 +10,7 @@ type TileWithContent = MapTile & { tags?: string[] };
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {
     id: "mike",
-    name: "Mike",
+    name: "麦克",
     role: "神秘幸存者",
     currentTile: "1-1",
     location: "起点",
@@ -202,7 +202,7 @@ describe("settleAction", () => {
     expect(patch.member).toMatchObject({ status: "维修完成，待命中。", statusTone: "success", activeAction: undefined });
     expect(patch.logs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ text: "Mike 完成维修，目标已恢复。", tone: "success" }),
+        expect.objectContaining({ text: "麦克 完成维修，目标已恢复。", tone: "success" }),
       ]),
     );
     expect(patch.triggerContexts).toEqual([
@@ -259,7 +259,7 @@ describe("settleAction", () => {
     expect(patch.baseInventory).toEqual([]);
     expect(patch.logs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ text: "Mike 完成维修尝试，但未能修复目标。", tone: "muted" }),
+        expect.objectContaining({ text: "麦克 完成维修尝试，但未能修复目标。", tone: "muted" }),
       ]),
     );
     expect(patch.triggerContexts).toEqual([

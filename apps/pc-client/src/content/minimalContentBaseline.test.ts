@@ -6,19 +6,30 @@ import { mapObjectDefinitions, universalActions } from "./mapObjects";
 describe("minimal content baseline", () => {
   it("exposes the crash-site bootstrap runtime dataset", () => {
     expect(eventContentLibrary.domains).toEqual(["iafs-inspection"]);
-    expect(eventContentLibrary.event_definitions).toHaveLength(12);
-    expect(eventContentLibrary.call_templates).toHaveLength(12);
+    expect(eventContentLibrary.event_definitions).toHaveLength(15);
+    expect(eventContentLibrary.call_templates).toHaveLength(18);
     expect(mapObjectDefinitions.map((definition) => definition.id)).toEqual([
       "iafs_generator",
       "iafs_life_support",
       "iafs_shuttle_core",
     ]);
 
-    expect(crewDefinitions).toHaveLength(1);
+    expect(crewDefinitions).toHaveLength(3);
     expect(crewDefinitions[0]).toMatchObject({
       crewId: "mike",
+      name: "麦克",
       currentTile: "129-129",
       canCommunicate: true,
+    });
+    expect(crewDefinitions[1]).toMatchObject({
+      crewId: "simon",
+      name: "西蒙",
+      attributes: { physical: 4, agility: 5, intellect: 3, perception: 2, luck: 3 },
+    });
+    expect(crewDefinitions[2]).toMatchObject({
+      crewId: "alice",
+      name: "爱丽丝",
+      attributes: { physical: 2, agility: 4, intellect: 3, perception: 4, luck: 5 },
     });
 
     expect(itemDefinitions).toEqual([]);

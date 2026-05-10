@@ -177,8 +177,8 @@ describe("crew content exports", () => {
   it("keeps runtime crew exports aligned with the authored baseline", async () => {
     const { initialCrew } = await import("../data/gameData");
 
-    expect(contentData.crewDefinitions.map((member) => member.crewId)).toEqual(["mike"]);
-    expect(initialCrew.map((member) => member.id)).toEqual(["mike"]);
+    expect(contentData.crewDefinitions.map((member) => member.crewId)).toEqual(["mike", "simon", "alice"]);
+    expect(initialCrew.map((member) => member.id)).toEqual(["mike", "simon", "alice"]);
   });
 
   it("does not expose unsupported crew summary copy", async () => {

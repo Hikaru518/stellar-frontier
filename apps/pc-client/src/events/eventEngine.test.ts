@@ -99,7 +99,7 @@ describe("event engine call option selection", () => {
 });
 
 describe("event engine trigger intake", () => {
-  it("runs the authored opening Mike call chain into regrouping situation", () => {
+  it("runs the authored opening 麦克 call chain into regrouping situation", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -110,7 +110,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "game_start",
         source: "time_system",
         crew_id: "mike",
-        tile_id: "4-4",
+        tile_id: "129-129",
         payload: { phase: "new_game" },
       },
     });
@@ -118,7 +118,7 @@ describe("event engine trigger intake", () => {
 
     expect(started.errors).toEqual([]);
     expect(started.event?.event_definition_id).toBe("iafs_opening_mike_crash_call");
-    expect(started.state.active_calls[crashReportCallId]?.rendered_lines[0]?.text).toContain("这里是 Mike");
+    expect(started.state.active_calls[crashReportCallId]?.rendered_lines[0]?.text).toContain("这里是麦克");
 
     const facilities = selectCallOption({
       state: started.state,
@@ -161,7 +161,7 @@ describe("event engine trigger intake", () => {
     expect(quest?.current_node_id).toBe("regrouping_situation");
     expect(ended.state.event_logs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ summary: "Mike 完成坠毁后首次回报，主线进入重整态势" }),
+        expect.objectContaining({ summary: "麦克完成坠毁后首次回报，主线进入重整态势" }),
       ]),
     );
   });
@@ -570,7 +570,7 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
     crew: {
       mike: {
         ...crew("mike"),
-        display_name: "Mike",
+        display_name: "麦克",
         tile_id: "129-129",
         inventory_id: "inv_mike",
       },

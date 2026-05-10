@@ -10,7 +10,7 @@ import { createInitialQuestState } from "./questSystem";
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {
     id: "mike",
-    name: "Mike",
+    name: "麦克",
     role: "神秘幸存者",
     currentTile: "1-1",
     location: "起点",

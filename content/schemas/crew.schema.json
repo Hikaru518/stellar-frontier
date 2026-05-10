@@ -191,7 +191,7 @@
       "properties": {
         "crewId": {
           "type": "string",
-          "enum": ["mike", "amy", "garry"]
+          "enum": ["mike", "amy", "garry", "simon", "alice"]
         },
         "name": {
           "$ref": "#/$defs/localizedText"
