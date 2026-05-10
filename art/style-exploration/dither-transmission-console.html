@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dither Transmission Console</title>
+  <style>
+    :root {
+      --paper: #d7cfac;
+      --paper-dark: #9d9579;
+      --ink: #151713;
+      --ink-2: #2c3328;
+      --olive: #5f704a;
+      --cyan: #5f9ea2;
+      --amber: #b57942;
+      --red: #a85243;
+      --cream: #eee4c5;
+      --muted: #746d58;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(238, 228, 197, 0.46), transparent 34%),
+        linear-gradient(135deg, #b9ae8f, #7f765e);
+      color: var(--ink);
+      font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Courier New", monospace;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 30;
+      background:
+        radial-gradient(circle, rgba(21, 23, 19, 0.14) 1px, transparent 1px),
+        repeating-linear-gradient(0deg, rgba(21, 23, 19, 0.035) 0 1px, transparent 1px 4px);
+      background-size: 5px 5px, auto;
+      mix-blend-mode: multiply;
+      opacity: 0.7;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .console {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      width: 100vw;
+      height: 100svh;
+      padding: 14px;
+      background-image:
+        radial-gradient(circle, rgba(21, 23, 19, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(21, 23, 19, 0.04) 1px, transparent 1px),
+        linear-gradient(rgba(21, 23, 19, 0.04) 1px, transparent 1px);
+      background-size: 9px 9px, 36px 36px, 36px 36px;
+    }
+
+    .top,
+    .bottom,
+    .panel,
+    .screen {
+      border: 2px solid var(--ink);
+      background:
+        radial-gradient(circle, rgba(21, 23, 19, 0.08) 1px, transparent 1px),
+        var(--paper);
+      background-size: 7px 7px;
+      box-shadow: 6px 6px 0 rgba(21, 23, 19, 0.22);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 74px;
+      padding: 12px 14px;
+    }
+
+    .kicker,
+    .label,
+    .small {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      margin-top: 4px;
+      color: var(--ink);
+      font-size: clamp(21px, 3vw, 34px);
+      letter-spacing: 0;
+    }
+
+    .readouts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(78px, 1fr));
+      gap: 8px;
+      min-width: 420px;
+    }
+
+    .readout {
+      border: 2px solid var(--ink);
+      background: var(--cream);
+      padding: 8px;
+    }
+
+    .readout strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(250px, 0.8fr) minmax(520px, 1.8fr) minmax(260px, 0.9fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    .panel h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .panel h2::after {
+      content: "";
+      flex: 1;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 10px);
+    }
+
+    .button-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .choice,
+    .tool {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      min-height: 40px;
+      border: 2px solid var(--ink);
+      background: var(--cream);
+      color: var(--ink);
+      padding: 8px;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 rgba(21, 23, 19, 0.25);
+    }
+
+    .choice:hover,
+    .choice[aria-pressed="true"],
+    .tool:hover,
+    .tool[aria-pressed="true"] {
+      background:
+        radial-gradient(circle, rgba(21, 23, 19, 0.2) 1px, transparent 1px),
+        #e4d9b6;
+      background-size: 5px 5px;
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 rgba(21, 23, 19, 0.25);
+    }
+
+    .choice small,
+    .tool small {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .screen {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--ink);
+      color: var(--cream);
+    }
+
+    .screen-head,
+    .screen-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 44px;
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--cream);
+      background:
+        radial-gradient(circle, rgba(238, 228, 197, 0.16) 1px, transparent 1px),
+        var(--ink-2);
+      background-size: 6px 6px;
+      z-index: 2;
+    }
+
+    .screen-foot {
+      border-top: 2px solid var(--cream);
+      border-bottom: 0;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background: #0f120f;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      cursor: crosshair;
+    }
+
+    .canvas-wrap::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle, rgba(238, 228, 197, 0.16) 1px, transparent 1px),
+        radial-gradient(circle at center, transparent 62%, rgba(0, 0, 0, 0.35));
+      background-size: 5px 5px, auto;
+      mix-blend-mode: screen;
+      opacity: 0.62;
+    }
+
+    .scope-panel {
+      display: grid;
+      grid-template-rows: auto 118px auto;
+      gap: 8px;
+    }
+
+    .scope-window {
+      position: relative;
+      overflow: hidden;
+      border: 2px solid var(--ink);
+      background: #10130f;
+    }
+
+    .scope-window::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle, rgba(238, 228, 197, 0.2) 1px, transparent 1px),
+        repeating-linear-gradient(0deg, rgba(238, 228, 197, 0.09) 0 1px, transparent 1px 5px);
+      background-size: 5px 5px, auto;
+      mix-blend-mode: screen;
+      opacity: 0.58;
+    }
+
+    #scopeScreen {
+      cursor: default;
+    }
+
+    #lissajousScreen {
+      cursor: default;
+    }
+
+    .scope-readout {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .note-list {
+      display: grid;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .note {
+      border: 2px solid var(--ink);
+      background: var(--cream);
+      padding: 8px;
+      line-height: 1.42;
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--red);
+    }
+
+    .meter {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 9px;
+    }
+
+    .bar {
+      height: 12px;
+      border: 2px solid var(--ink);
+      background: var(--cream);
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      background:
+        radial-gradient(circle, rgba(21, 23, 19, 0.25) 1px, transparent 1px),
+        var(--olive);
+      background-size: 5px 5px;
+    }
+
+    .bottom {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      min-height: 58px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .command {
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .tools {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .tools .tool {
+      width: auto;
+      min-width: 120px;
+    }
+
+    @media (max-width: 1000px) {
+      body {
+        overflow: auto;
+      }
+
+      .console {
+        height: auto;
+        min-height: 100svh;
+      }
+
+      .top,
+      .main,
+      .bottom {
+        grid-template-columns: 1fr;
+      }
+
+      .readouts {
+        min-width: 0;
+      }
+
+      .screen {
+        min-height: 560px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="console">
+    <header class="top">
+      <section>
+        <p class="kicker">STELLAR FRONTIER / LOW BANDWIDTH VISUAL LINK</p>
+        <h1>DITHER TRANSMISSION CONSOLE</h1>
+      </section>
+      <section class="readouts">
+        <div class="readout"><span class="label">CASE</span><strong id="caseReadout">IAFS-1A</strong></div>
+        <div class="readout"><span class="label">VIEW</span><strong id="viewReadout">MAP</strong></div>
+        <div class="readout"><span class="label">MODE</span><strong id="modeReadout">BAYER</strong></div>
+        <div class="readout"><span class="label">FRAME</span><strong id="frameReadout">0000</strong></div>
+      </section>
+    </header>
+
+    <section class="main">
+      <aside class="stack">
+        <section class="panel">
+          <h2>Transmission Mode</h2>
+          <div class="button-list">
+            <button class="choice" type="button" data-mode="BAYER" aria-pressed="true"><span>Bayer 半调</span><small>4x4</small></button>
+            <button class="choice" type="button" data-mode="FAX" aria-pressed="false"><span>传真回传</span><small>FAX</small></button>
+            <button class="choice" type="button" data-mode="THERMAL" aria-pressed="false"><span>双色热图</span><small>HEAT</small></button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Content</h2>
+          <div class="button-list">
+            <button class="choice" id="mapButton" type="button" aria-pressed="true"><span>地图回传</span><small>MAP</small></button>
+            <button class="choice" id="eventButton" type="button" aria-pressed="false"><span>事件画面</span><small>EVENT</small></button>
+          </div>
+        </section>
+        <section class="panel scope-panel">
+          <h2>Signal Capture</h2>
+          <div class="scope-window">
+            <canvas id="scopeScreen" aria-label="oscilloscope signal capture"></canvas>
+          </div>
+          <div class="scope-readout">
+            <span id="scopeFreq">freq 07.2khz</span>
+            <span id="scopeLock">lock weak</span>
+          </div>
+        </section>
+      </aside>
+
+      <section class="screen">
+        <div class="screen-head">
+          <p><span class="label">Dither Display</span> <strong id="screenTitle">地图回传 / Bayer 半调</strong></p>
+          <p class="small" id="screenMeta">low bandwidth map reconstruction</p>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="screen"></canvas>
+        </div>
+        <div class="screen-foot">
+          <p class="command" id="statusLine">&gt; drag / wheel / click marker</p>
+          <p class="small" id="coordLine">center 0.00,0.00 / zoom 1.20</p>
+        </div>
+      </section>
+
+      <aside class="stack">
+        <section class="panel">
+          <h2>Case Files</h2>
+          <div class="button-list" id="caseList"></div>
+        </section>
+        <section class="panel">
+          <h2>Signal Notes</h2>
+          <div class="note-list" id="notes"></div>
+        </section>
+        <section class="panel scope-panel">
+          <h2>Lissajous Sync</h2>
+          <div class="scope-window">
+            <canvas id="lissajousScreen" aria-label="lissajous phase monitor"></canvas>
+          </div>
+          <div class="scope-readout">
+            <span id="lissRatio">ratio 3:2</span>
+            <span id="lissPhase">phase 090</span>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Quality</h2>
+          <div class="meter"><span>NOISE</span><div class="bar"><span id="noiseBar" style="width: 64%"></span></div></div>
+          <div class="meter"><span>DETAIL</span><div class="bar"><span id="detailBar" style="width: 48%"></span></div></div>
+          <div class="meter"><span>TRUST</span><div class="bar"><span id="trustBar" style="width: 38%"></span></div></div>
+        </section>
+      </aside>
+    </section>
+
+    <footer class="bottom">
+      <p>
+        <span class="command" id="footerCommand">&gt; awaiting transmission command</span>
+        <br />
+        Dither console: low-bandwidth photographs, map reconstruction, event snapshots, and half-tone operation UI.
+      </p>
+      <div class="tools">
+        <button class="tool" id="randomizeButton" type="button">扰动信号</button>
+        <button class="tool" id="resetButton" type="button">回中心</button>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const cases = [
+      { id: "IAFS-1A", label: "坠毁倒计时", meta: "核心失压 / 备用电源临界 / 生命支持倒计时", tone: "crash", bars: [72, 46, 36] },
+      { id: "IAFS-3A", label: "门域首次接触", meta: "潜入窗口 / 协议信道 / 强攻回路并列推演", tone: "gate", bars: [86, 52, 41] },
+      { id: "IAFS-S08", label: "盲区测绘", meta: "外围警戒环 / 快扫与慢扫 / 低暴露潜入", tone: "blind", bars: [58, 62, 55] },
+      { id: "IAFS-S09", label: "七拍语法", meta: "采样 / 对照 / 共振发声器 / 实测误译风险", tone: "beat", bars: [79, 43, 44] }
+    ];
+
+    const canvas = document.getElementById("screen");
+    const ctx = canvas.getContext("2d");
+    const scopeCanvas = document.getElementById("scopeScreen");
+    const scopeCtx = scopeCanvas.getContext("2d");
+    const lissajousCanvas = document.getElementById("lissajousScreen");
+    const lissajousCtx = lissajousCanvas.getContext("2d");
+    const caseList = document.getElementById("caseList");
+    const notes = document.getElementById("notes");
+    const caseReadout = document.getElementById("caseReadout");
+    const viewReadout = document.getElementById("viewReadout");
+    const modeReadout = document.getElementById("modeReadout");
+    const frameReadout = document.getElementById("frameReadout");
+    const screenTitle = document.getElementById("screenTitle");
+    const screenMeta = document.getElementById("screenMeta");
+    const statusLine = document.getElementById("statusLine");
+    const coordLine = document.getElementById("coordLine");
+    const footerCommand = document.getElementById("footerCommand");
+    const noiseBar = document.getElementById("noiseBar");
+    const detailBar = document.getElementById("detailBar");
+    const trustBar = document.getElementById("trustBar");
+    const mapButton = document.getElementById("mapButton");
+    const eventButton = document.getElementById("eventButton");
+    const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
+    const randomizeButton = document.getElementById("randomizeButton");
+    const resetButton = document.getElementById("resetButton");
+    const scopeFreq = document.getElementById("scopeFreq");
+    const scopeLock = document.getElementById("scopeLock");
+    const lissRatio = document.getElementById("lissRatio");
+    const lissPhase = document.getElementById("lissPhase");
+
+    let selectedCase = 0;
+    let viewMode = "map";
+    let transmitMode = "BAYER";
+    let frame = 0;
+    let seed = 2.4;
+    let dpr = 1;
+    let scopeDpr = 1;
+    let lissajousDpr = 1;
+    let dragging = null;
+    const map = { x: 0, y: 0, zoom: 1.2, marker: { x: 2.0, y: -1.1 } };
+    const bayer = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5]
+    ];
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+
+      const scopeRect = scopeCanvas.getBoundingClientRect();
+      scopeDpr = Math.max(1, window.devicePixelRatio || 1);
+      scopeCanvas.width = Math.max(1, Math.floor(scopeRect.width * scopeDpr));
+      scopeCanvas.height = Math.max(1, Math.floor(scopeRect.height * scopeDpr));
+      scopeCtx.setTransform(scopeDpr, 0, 0, scopeDpr, 0, 0);
+      scopeCtx.imageSmoothingEnabled = false;
+
+      const lissRect = lissajousCanvas.getBoundingClientRect();
+      lissajousDpr = Math.max(1, window.devicePixelRatio || 1);
+      lissajousCanvas.width = Math.max(1, Math.floor(lissRect.width * lissajousDpr));
+      lissajousCanvas.height = Math.max(1, Math.floor(lissRect.height * lissajousDpr));
+      lissajousCtx.setTransform(lissajousDpr, 0, 0, lissajousDpr, 0, 0);
+      lissajousCtx.imageSmoothingEnabled = false;
+    }
+
+    function clear() {
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      ctx.fillStyle = "#0f120f";
+      ctx.fillRect(0, 0, w, h);
+      return { w, h };
+    }
+
+    function noise(x, y) {
+      return Math.sin(x * 1.13 + seed) * 0.42 + Math.sin(y * 1.58 + x * 0.33) * 0.3 + Math.cos((x + y) * 0.72 + seed * 0.4) * 0.22;
+    }
+
+    function worldAt(px, py, w, h) {
+      return {
+        x: map.x + (px - w / 2) / (58 * map.zoom),
+        y: map.y + (py - h / 2) / (42 * map.zoom)
+      };
+    }
+
+    function screenFromWorld(wx, wy, w, h) {
+      return {
+        x: (wx - map.x) * 58 * map.zoom + w / 2,
+        y: (wy - map.y) * 42 * map.zoom + h / 2
+      };
+    }
+
+    function ditherColor(value, x, y, palette) {
+      const threshold = (bayer[Math.floor(y) % 4][Math.floor(x) % 4] + 0.5) / 16 - 0.5;
+      const v = value + threshold * 0.46;
+      if (v < -0.36) return palette[0];
+      if (v < -0.08) return palette[1];
+      if (v < 0.22) return palette[2];
+      if (v < 0.48) return palette[3];
+      return palette[4];
+    }
+
+    function pixelDot(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x / size) * size, Math.round(y / size) * size, size, size);
+    }
+
+    function pixelLine(x1, y1, x2, y2, size, color) {
+      const steps = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / size));
+      for (let i = 0; i <= steps; i += 1) {
+        const t = i / steps;
+        pixelDot(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, size, color);
+      }
+    }
+
+    function pointInPolygon(x, y, points) {
+      let inside = false;
+      for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+        const xi = points[i][0];
+        const yi = points[i][1];
+        const xj = points[j][0];
+        const yj = points[j][1];
+        const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1) + xi;
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function pixelPolygon(points, size, fillA, fillB, stroke) {
+      const minX = Math.min(...points.map((point) => point[0]));
+      const maxX = Math.max(...points.map((point) => point[0]));
+      const minY = Math.min(...points.map((point) => point[1]));
+      const maxY = Math.max(...points.map((point) => point[1]));
+      for (let y = minY; y <= maxY; y += size) {
+        for (let x = minX; x <= maxX; x += size) {
+          if (pointInPolygon(x + size / 2, y + size / 2, points)) {
+            const threshold = bayer[Math.abs(Math.floor(y / size)) % 4][Math.abs(Math.floor(x / size)) % 4];
+            pixelDot(x, y, size, threshold > 7 ? fillA : fillB);
+          }
+        }
+      }
+      for (let i = 0; i < points.length; i += 1) {
+        const current = points[i];
+        const next = points[(i + 1) % points.length];
+        pixelLine(current[0], current[1], next[0], next[1], size, stroke);
+      }
+    }
+
+    function pixelEllipse(cx, cy, rx, ry, rotation, size, color) {
+      const steps = Math.max(36, Math.floor((rx + ry) / size) * 4);
+      for (let i = 0; i < steps; i += 1) {
+        const t = (i / steps) * Math.PI * 2;
+        const x = Math.cos(t) * rx;
+        const y = Math.sin(t) * ry;
+        const px = cx + x * Math.cos(rotation) - y * Math.sin(rotation);
+        const py = cy + x * Math.sin(rotation) + y * Math.cos(rotation);
+        pixelDot(px, py, size, color);
+      }
+    }
+
+    function drawMap(w, h) {
+      const cell = transmitMode === "FAX" ? 4 : 3;
+      const palette = transmitMode === "THERMAL"
+        ? ["#161813", "#4b3b2a", "#90623e", "#c58a4b", "#eee4c5"]
+        : ["#111411", "#29332a", "#637151", "#a8a071", "#eee4c5"];
+      const coldPalette = ["#111819", "#17333a", "#245c68", "#5f9ea2", "#d7cfac"];
+      const hotPalette = ["#191511", "#3a211d", "#74382f", "#a85243", "#eee4c5"];
+      const heatTime = frame * 0.012;
+      for (let y = 0; y < h; y += cell) {
+        for (let x = 0; x < w; x += cell) {
+          const p = worldAt(x, y, w, h);
+          const heightValue = noise(p.x, p.y);
+          const driftX = p.x + Math.sin(p.y * 0.34 + heatTime * 1.8) * 0.9 + heatTime * 1.65;
+          const driftY = p.y + Math.cos(p.x * 0.28 - heatTime * 1.2) * 0.8 - heatTime * 0.95;
+          const heatFlow =
+            Math.sin(driftX * 0.72 + seed) * 0.58 +
+            Math.cos(driftY * 0.86 - seed * 0.55) * 0.5 +
+            noise(driftX * 0.42, driftY * 0.42) * 0.62;
+          const heatBand = Math.sin((driftX - driftY) * 1.25 + frame * 0.032);
+          const tempSplit = Math.tanh(heatFlow + heatBand * 0.24);
+          const coast = heightValue + Math.sin(p.x * 0.24 - p.y * 0.15) * 0.22;
+          const route = Math.abs(p.y - Math.sin(p.x * 0.85 + seed) * 0.72);
+          const ridge = Math.abs(heightValue * 5 - Math.round(heightValue * 5));
+          let color = ditherColor(heightValue, x / cell, y / cell, palette);
+          if (coast < -0.42) color = ditherColor(heightValue - 0.36, x / cell, y / cell, ["#0d100d", "#111713", "#243632", "#445348", "#7f8f6e"]);
+          if (tempSplit < -0.18 && coast > -0.42) color = ditherColor(heightValue + Math.abs(tempSplit) * 0.18, x / cell + frame * 0.015, y / cell, coldPalette);
+          if (tempSplit > 0.2 && coast > -0.42) color = ditherColor(heightValue + tempSplit * 0.16, x / cell, y / cell + frame * 0.012, hotPalette);
+          if (Math.abs(tempSplit) < 0.08 && coast > -0.42) color = ditherColor(heightValue + heatBand * 0.12, x / cell, y / cell, ["#161813", "#263025", "#5f704a", "#8b846d", "#d7cfac"]);
+          if (ridge < 0.035 && coast > -0.5) color = "#151713";
+          if (route < 0.045 && coast > -0.38) {
+            const routePulse = Math.floor((p.x + frame * 0.045) * 7) % 11 === 0;
+            color = routePulse ? "#eee4c5" : "#a85243";
+          }
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, cell, cell);
+        }
+      }
+    }
+
+    function drawMapAnimations(w, h) {
+      const size = transmitMode === "FAX" ? 5 : 4;
+      const routePoints = [];
+      for (let wx = -8; wx <= 8; wx += 0.18) {
+        const wy = Math.sin(wx * 0.85 + seed) * 0.72;
+        routePoints.push(screenFromWorld(wx, wy, w, h));
+      }
+
+      for (let i = 0; i < routePoints.length - 1; i += 1) {
+        const a = routePoints[i];
+        const b = routePoints[i + 1];
+        if ((i + Math.floor(frame * 0.38)) % 12 === 0) {
+          pixelLine(a.x, a.y, b.x, b.y, size, "#eee4c5");
+        }
+      }
+
+      for (let i = 0; i < 4; i += 1) {
+        const t = ((frame * 0.018 + i * 0.25) % 1) * (routePoints.length - 1);
+        const point = routePoints[Math.floor(t)];
+        if (point) {
+          pixelDot(point.x, point.y, size * 1.5, i % 2 === 0 ? "#5f9ea2" : "#b57942");
+        }
+      }
+
+      if (map.marker) {
+        const marker = screenFromWorld(map.marker.x, map.marker.y, w, h);
+        const radius = 16 + (frame % 42) * 1.5;
+        ctx.strokeStyle = `rgba(238,228,197,${0.46 - (frame % 42) / 110})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(marker.x - radius, marker.y - radius * 0.7, radius * 2, radius * 1.4);
+        ctx.stroke();
+
+        const scanX = marker.x + Math.sin(frame * 0.045) * 92;
+        ctx.fillStyle = "rgba(95,158,162,0.18)";
+        ctx.fillRect(scanX, marker.y - 84, 5, 168);
+      }
+
+      ctx.fillStyle = "rgba(238,228,197,0.1)";
+      const sweepY = (frame * 1.7) % h;
+      ctx.fillRect(0, sweepY, w, 3);
+      ctx.fillStyle = "rgba(168,82,67,0.16)";
+      ctx.fillRect(0, (sweepY + h * 0.5) % h, w, 2);
+
+      const flowCell = 18;
+      for (let y = 0; y < h; y += flowCell) {
+        for (let x = 0; x < w; x += flowCell) {
+          const p = worldAt(x, y, w, h);
+          const flow =
+            Math.sin(p.x * 0.8 + frame * 0.028 + seed) +
+            Math.cos(p.y * 0.9 - frame * 0.021);
+          if (Math.abs(flow) > 1.35) {
+            ctx.fillStyle = flow > 0 ? "rgba(168,82,67,0.2)" : "rgba(95,158,162,0.2)";
+            ctx.fillRect(x + ((frame + y) % flowCell) * 0.18, y, flowCell * 0.7, 3);
+          }
+        }
+      }
+    }
+
+    function drawEvent(w, h) {
+      const current = cases[selectedCase];
+      const cell = 3;
+      for (let y = 0; y < h; y += cell) {
+        for (let x = 0; x < w; x += cell) {
+          const dx = (x - w / 2) / w;
+          const dy = (y - h / 2) / h;
+          let value = Math.sin(dx * 14 + seed) * 0.2 + Math.cos(dy * 18 - seed) * 0.18;
+          if (current.tone === "crash") {
+            value += dy > 0.12 ? 0.28 : -0.06;
+            value += Math.exp(-Math.hypot(dx - 0.16, dy - 0.05) * 18) * 1.2;
+          } else if (current.tone === "gate") {
+            const ring = Math.abs(Math.hypot(dx * 1.25, dy) - 0.22);
+            value += 0.42 - ring * 4;
+          } else if (current.tone === "blind") {
+            value += (Math.sin((x + frame) * 0.035) > 0.2 && Math.sin(y * 0.05) > -0.15) ? 0.34 : -0.08;
+          } else {
+            value += Math.sin(Math.hypot(dx, dy) * 70 - frame * 0.09) * 0.42;
+          }
+          ctx.fillStyle = ditherColor(value, x / cell, y / cell, ["#10130f", "#263025", "#5f704a", "#b57942", "#eee4c5"]);
+          ctx.fillRect(x, y, cell, cell);
+        }
+      }
+
+      const px = 5;
+
+      if (current.tone === "crash") {
+        const cx = w / 2;
+        const cy = h / 2 + 20;
+        const angle = -0.08;
+        const rotate = (points) => points.map(([x, y]) => [
+          cx + x * Math.cos(angle) - y * Math.sin(angle),
+          cy + x * Math.sin(angle) + y * Math.cos(angle)
+        ]);
+
+        pixelPolygon(
+          rotate([[-210, 52], [-142, 28], [86, 30], [194, 56], [126, 76], [-158, 78]]),
+          px,
+          "#151713",
+          "#263025",
+          "#151713",
+        );
+        pixelPolygon(
+          rotate([[-196, 0], [-150, -34], [-72, -54], [86, -52], [178, -20], [210, 6], [162, 34], [44, 46], [-118, 38], [-184, 22]]),
+          px,
+          "#9bc2c8",
+          "#3e6f78",
+          "#151713",
+        );
+        pixelPolygon(
+          rotate([[-54, -48], [14, -116], [94, -68], [50, -36], [-16, -30]]),
+          px,
+          "#6fa1aa",
+          "#294f58",
+          "#151713",
+        );
+        pixelPolygon(
+          rotate([[-76, 40], [-16, 88], [78, 76], [42, 40]]),
+          px,
+          "#5f9ea2",
+          "#24444b",
+          "#151713",
+        );
+        pixelPolygon(
+          rotate([[92, -44], [164, -88], [140, -30], [188, -18], [136, -8]]),
+          px,
+          "#49747b",
+          "#25383b",
+          "#151713",
+        );
+        pixelPolygon(
+          rotate([[-178, 4], [-132, -18], [-70, -22], [-106, 18]]),
+          px,
+          "#5f9ea2",
+          "#304b4a",
+          "#151713",
+        );
+        pixelEllipse(cx - 8, cy - 28, 54, 13, angle - 0.02, px, "#151713");
+        pixelEllipse(cx - 8, cy - 28, 44, 8, angle - 0.02, px, "#5f9ea2");
+        pixelLine(cx - 172, cy + 2, cx + 166, cy - 18, px, "#151713");
+        pixelLine(cx - 120, cy + 28, cx + 88, cy + 14, px, "#151713");
+        pixelLine(cx + 108, cy - 36, cx + 174, cy - 14, px, "#151713");
+        pixelLine(cx + 136, cy + 26, cx + 184, cy + 10, px, "#151713");
+        pixelLine(cx + 28, cy - 50, cx + 54, cy + 40, px, "#151713");
+
+        for (let i = 0; i < 7; i += 1) {
+          const dx = -166 + i * 54;
+          const top = cy - 32 + Math.sin(i * 0.9) * 10;
+          pixelLine(cx + dx, top, cx + dx + 28, top - 8, px, i % 2 === 0 ? "#151713" : "#a85243");
+        }
+
+        for (let i = 0; i < 11; i += 1) {
+          const debrisX = cx - 230 + i * 42;
+          const debrisY = cy + 88 + Math.sin(frame * 0.04 + i) * 8;
+          pixelDot(debrisX, debrisY, i % 3 === 0 ? 7 : 5, i % 2 === 0 ? "#3e6f78" : "#151713");
+        }
+
+        for (let i = 0; i < 4; i += 1) {
+          const baseX = cx + 160 + i * 10;
+          const baseY = cy + 18 + i * 4;
+          pixelLine(baseX, baseY, cx + 206 + i * 12, cy + 58 + Math.sin(frame * 0.1 + i) * 12, px, i % 2 === 0 ? "#a85243" : "#b57942");
+          pixelLine(baseX - 14, baseY + 8, cx + 188 + i * 8, cy + 70 + Math.cos(frame * 0.08 + i) * 10, px, "#9bc2c8");
+        }
+      } else if (current.tone === "gate") {
+        const cx = w / 2;
+        const cy = h / 2;
+        pixelPolygon(
+          [[cx - 194, cy + 116], [cx - 132, cy + 24], [cx - 78, cy + 12], [cx - 86, cy + 128]],
+          px,
+          "#6c8278",
+          "#304b4a",
+          "#151713",
+        );
+        pixelPolygon(
+          [[cx + 194, cy + 116], [cx + 132, cy + 24], [cx + 78, cy + 12], [cx + 86, cy + 128]],
+          px,
+          "#6c8278",
+          "#304b4a",
+          "#151713",
+        );
+        pixelPolygon(
+          [[cx - 120, cy - 102], [cx - 78, cy - 134], [cx + 78, cy - 134], [cx + 120, cy - 102], [cx + 92, cy - 72], [cx - 92, cy - 72]],
+          px,
+          "#8b846d",
+          "#4b4638",
+          "#151713",
+        );
+        for (let r = 42; r < Math.min(w, h) * 0.35; r += 28) {
+          const ringColor = r % 56 === 0 ? "#eee4c5" : "#5f9ea2";
+          pixelEllipse(cx, cy - 8, r * 1.18, r, frame * 0.006 + r * 0.002, px, ringColor);
+        }
+        pixelEllipse(cx, cy - 8, 48 + Math.sin(frame * 0.05) * 5, 82, -0.08, px, "#a85243");
+        pixelEllipse(cx, cy - 8, 30, 58, -0.08, px, "#eee4c5");
+        for (let i = 0; i < 8; i += 1) {
+          const a = (i / 8) * Math.PI * 2 + frame * 0.012;
+          pixelLine(cx + Math.cos(a) * 42, cy - 8 + Math.sin(a) * 58, cx + Math.cos(a) * 154, cy - 8 + Math.sin(a) * 112, px, i % 2 === 0 ? "#5f9ea2" : "#b57942");
+        }
+        pixelLine(cx - 232, cy + 130, cx + 232, cy + 130, px, "#151713");
+        pixelLine(cx - 150, cy + 66, cx + 150, cy + 66, px, "#151713");
+        pixelLine(cx - 112, cy - 78, cx + 112, cy - 78, px, "#151713");
+      } else if (current.tone === "blind") {
+        const cx = w / 2;
+        const cy = h / 2;
+        for (let x = -240; x <= 240; x += 48) {
+          pixelLine(cx + x, cy - 152, cx + x + Math.sin(frame * 0.02 + x) * 9, cy + 150, px, "#151713");
+        }
+        for (let y = -132; y <= 132; y += 38) {
+          pixelLine(cx - 246, cy + y, cx + 246, cy + y + Math.cos(frame * 0.02 + y) * 8, px, "#151713");
+        }
+        const towers = [[-174, -96], [-34, -122], [118, -72], [184, 72], [-110, 88]];
+        towers.forEach(([tx, ty], index) => {
+          pixelPolygon(
+            [[cx + tx - 18, cy + ty + 26], [cx + tx - 8, cy + ty - 18], [cx + tx + 8, cy + ty - 18], [cx + tx + 18, cy + ty + 26]],
+            px,
+            "#8b846d",
+            "#4b4638",
+            "#151713",
+          );
+          pixelEllipse(cx + tx, cy + ty - 24, 25, 12, frame * 0.01 + index, px, "#5f9ea2");
+          const sweep = frame * 0.035 + index * 1.2;
+          pixelLine(cx + tx, cy + ty - 24, cx + tx + Math.cos(sweep) * 84, cy + ty - 24 + Math.sin(sweep) * 52, px, "#eee4c5");
+        });
+        const buildings = [[-218, 120, 72, 28], [34, 104, 94, 34], [124, 20, 70, 24]];
+        buildings.forEach(([bx, by, bw, bh], index) => {
+          pixelPolygon(
+            [[cx + bx, cy + by], [cx + bx + bw, cy + by - 10], [cx + bx + bw, cy + by + bh], [cx + bx, cy + by + bh + 8]],
+            px,
+            index === 1 ? "#6c8278" : "#625d4a",
+            "#263025",
+            "#151713",
+          );
+        });
+        for (let i = 0; i < 7; i += 1) {
+          const sx = cx - 210 + i * 70;
+          const sy = cy - 40 + Math.sin(frame * 0.03 + i) * 22;
+          pixelLine(sx - 14, sy, sx + 18, sy + 6, px, "#b57942");
+          pixelDot(sx + 22, sy + 7, 5, "#a85243");
+        }
+        const route = [[-210, 116], [-150, 48], [-84, 34], [-20, 72], [48, 10], [92, -32], [138, -76], [220, -122]];
+        for (let i = 0; i < route.length - 1; i += 1) {
+          pixelLine(cx + route[i][0], cy + route[i][1], cx + route[i + 1][0], cy + route[i + 1][1], px, i % 2 === 0 ? "#a85243" : "#eee4c5");
+        }
+      } else {
+        const cx = w / 2;
+        const cy = h / 2;
+        pixelPolygon(
+          [[cx - 226, cy + 102], [cx + 226, cy + 102], [cx + 184, cy + 136], [cx - 184, cy + 136]],
+          px,
+          "#625d4a",
+          "#263025",
+          "#151713",
+        );
+        pixelPolygon(
+          [[cx - 88, cy - 128], [cx + 88, cy - 128], [cx + 112, cy - 92], [cx - 112, cy - 92]],
+          px,
+          "#6c8278",
+          "#304b4a",
+          "#151713",
+        );
+        for (let i = 0; i < 4; i += 1) {
+          const x = cx - 72 + i * 48;
+          pixelLine(x, cy - 92, x, cy - 44, px, "#151713");
+          pixelEllipse(x, cy - 38, 18, 10, 0, px, i % 2 === 0 ? "#5f9ea2" : "#b57942");
+        }
+        for (let i = 0; i < 7; i += 1) {
+          const x = -180 + i * 60;
+          const amp = 42 + Math.sin(frame * 0.08 + i) * 24;
+          pixelLine(cx + x, cy + 94, cx + x, cy - amp, px, "#151713");
+          pixelLine(cx + x - 14, cy - amp + 10, cx + x + 14, cy - amp - 10, px, "#eee4c5");
+          pixelLine(cx + x + 14, cy - amp + 10, cx + x - 14, cy - amp - 10, px, "#5f9ea2");
+          pixelPolygon(
+            [[cx + x - 10, cy + amp + 16], [cx + x + 10, cy + amp + 16], [cx + x + 10, cy + amp + 36], [cx + x - 10, cy + amp + 36]],
+            px,
+            i === 6 ? "#a85243" : "#b57942",
+            "#746d58",
+            "#151713",
+          );
+          pixelEllipse(cx + x, cy - amp, 26 + i * 2, 10, frame * 0.01 + i, px, i === 6 ? "#a85243" : "#eee4c5");
+        }
+        for (let i = 0; i < 6; i += 1) {
+          const waveY = cy - 8 + Math.sin(frame * 0.08 + i) * 26;
+          pixelLine(cx - 214 + i * 74, waveY, cx - 174 + i * 74, waveY + Math.cos(frame * 0.06 + i) * 18, px, "#5f9ea2");
+        }
+      }
+
+      ctx.fillStyle = "rgba(21,23,19,0.82)";
+      ctx.fillRect(22, 20, Math.min(430, w - 44), 76);
+      ctx.strokeStyle = "#eee4c5";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(22, 20, Math.min(430, w - 44), 76);
+      ctx.fillStyle = "#eee4c5";
+      ctx.font = "13px 'Courier New', monospace";
+      ctx.fillText(`${current.id} ${current.label}`, 38, 46);
+      ctx.fillStyle = "#b57942";
+      ctx.fillText(current.meta.slice(0, 52), 38, 70);
+    }
+
+    function overlay(w, h) {
+      ctx.strokeStyle = "rgba(238,228,197,0.28)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 60) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 60) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      const pulse = (frame * 1.6) % Math.min(w, h);
+      ctx.strokeStyle = "rgba(95,158,162,0.58)";
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      if (viewMode === "map" && map.marker) {
+        const mx = (map.marker.x - map.x) * 58 * map.zoom + w / 2;
+        const my = (map.marker.y - map.y) * 42 * map.zoom + h / 2;
+        ctx.strokeStyle = "#a85243";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(mx - 16, my);
+        ctx.lineTo(mx + 16, my);
+        ctx.moveTo(mx, my - 16);
+        ctx.lineTo(mx, my + 16);
+        ctx.stroke();
+      }
+      if (transmitMode === "FAX") {
+        ctx.fillStyle = "rgba(238,228,197,0.12)";
+        for (let y = (frame % 18) - 18; y < h; y += 18) ctx.fillRect(0, y, w, 2);
+      }
+    }
+
+    function applyGlitch(w, h) {
+      const burst = frame % 116 < 8 || Math.sin(frame * 0.073 + seed) > 0.965;
+      if (!burst) {
+        if (frame % 41 === 0) {
+          ctx.fillStyle = "rgba(238,228,197,0.12)";
+          ctx.fillRect(0, Math.floor(Math.random() * h), w, 2);
+        }
+        return;
+      }
+
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const strips = 5 + (frame % 4);
+      for (let i = 0; i < strips; i += 1) {
+        const sy = Math.floor(((i * 73 + frame * 19 + seed * 31) % h) * dpr);
+        const sh = Math.max(2, Math.floor((3 + ((frame + i) % 8)) * dpr));
+        const shift = Math.floor((Math.sin(frame * 0.9 + i * 2.1) * 18 + (i % 2 ? -9 : 9)) * dpr);
+        ctx.drawImage(canvas, 0, sy, canvas.width, sh, shift, sy, canvas.width, sh);
+      }
+      ctx.restore();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      for (let i = 0; i < 12; i += 1) {
+        const x = (i * 97 + frame * 11) % w;
+        const y = (i * 43 + frame * 17) % h;
+        ctx.fillStyle = i % 3 === 0 ? "rgba(168,82,67,0.42)" : i % 3 === 1 ? "rgba(95,158,162,0.34)" : "rgba(238,228,197,0.24)";
+        ctx.fillRect(x, y, 14 + (i % 4) * 8, 3 + (i % 3) * 3);
+      }
+
+      ctx.fillStyle = "rgba(21,23,19,0.34)";
+      for (let y = (frame * 7) % 24; y < h; y += 24) {
+        ctx.fillRect(0, y, w, 2);
+      }
+    }
+
+    function drawScope() {
+      const w = scopeCanvas.width / scopeDpr;
+      const h = scopeCanvas.height / scopeDpr;
+      const current = cases[selectedCase];
+      const amp = 0.22 + current.bars[1] / 180;
+      const jitter = transmitMode === "FAX" ? 0.2 : transmitMode === "THERMAL" ? 0.34 : 0.26;
+      const freq = 1.8 + selectedCase * 0.45 + (transmitMode === "FAX" ? 0.7 : 0);
+      const triggerX = (frame * 1.9) % w;
+
+      scopeCtx.fillStyle = "#10130f";
+      scopeCtx.fillRect(0, 0, w, h);
+
+      scopeCtx.strokeStyle = "rgba(238,228,197,0.18)";
+      scopeCtx.lineWidth = 1;
+      for (let x = 0; x < w; x += 24) {
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(x, 0);
+        scopeCtx.lineTo(x, h);
+        scopeCtx.stroke();
+      }
+      for (let y = 0; y < h; y += 18) {
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(0, y);
+        scopeCtx.lineTo(w, y);
+        scopeCtx.stroke();
+      }
+
+      scopeCtx.fillStyle = "rgba(95,158,162,0.16)";
+      scopeCtx.fillRect(triggerX, 0, 4, h);
+
+      const cell = 3;
+      for (let x = 0; x < w; x += cell) {
+        const t = x / w;
+        const carrier = Math.sin(t * Math.PI * 2 * freq + frame * 0.075 + seed);
+        const beat = Math.sin(t * Math.PI * 9 + frame * 0.032 + selectedCase);
+        const noiseValue = Math.sin((x + frame * 2.7) * 0.21 + seed) * jitter;
+        const y = h / 2 + (carrier * amp + beat * 0.12 + noiseValue * 0.18) * h * 0.72;
+        const strength = Math.abs(carrier) + Math.abs(noiseValue);
+        const color = strength > 0.92 ? "#eee4c5" : strength > 0.56 ? "#b57942" : "#5f9ea2";
+        pixelScopeDot(x, y, cell, color);
+      }
+
+      for (let i = 0; i < 5; i += 1) {
+        const x = (triggerX + i * 31) % w;
+        const y = h / 2 + Math.sin(frame * 0.08 + i) * h * 0.28;
+        pixelScopeDot(x, y, 6, i % 2 === 0 ? "#a85243" : "#eee4c5");
+      }
+
+      scopeCtx.fillStyle = "rgba(21,23,19,0.68)";
+      scopeCtx.fillRect(8, 8, 124, 22);
+      scopeCtx.fillStyle = "#eee4c5";
+      scopeCtx.font = "10px 'Courier New', monospace";
+      scopeCtx.fillText(`CAPTURE ${current.id}`, 14, 23);
+
+      scopeFreq.textContent = `freq ${(freq * 3.2 + amp * 4).toFixed(1)}khz`;
+      scopeLock.textContent = current.bars[2] > 50 ? "lock stable" : current.bars[2] > 40 ? "lock weak" : "lock noisy";
+    }
+
+    function pixelScopeDot(x, y, size, color) {
+      scopeCtx.fillStyle = color;
+      scopeCtx.fillRect(Math.round(x / size) * size, Math.round(y / size) * size, size, size);
+    }
+
+    function drawLissajous() {
+      const w = lissajousCanvas.width / lissajousDpr;
+      const h = lissajousCanvas.height / lissajousDpr;
+      const current = cases[selectedCase];
+      const ratios = [[3, 2], [4, 3], [5, 4], [7, 5]];
+      const ratio = ratios[selectedCase % ratios.length];
+      const phase = frame * 0.018 + selectedCase * Math.PI * 0.23 + seed * 0.08;
+      const radiusX = w * 0.36;
+      const radiusY = h * 0.36;
+      const cx = w / 2;
+      const cy = h / 2;
+
+      lissajousCtx.fillStyle = "#10130f";
+      lissajousCtx.fillRect(0, 0, w, h);
+
+      lissajousCtx.strokeStyle = "rgba(238,228,197,0.16)";
+      lissajousCtx.lineWidth = 1;
+      lissajousCtx.beginPath();
+      lissajousCtx.moveTo(cx, 8);
+      lissajousCtx.lineTo(cx, h - 8);
+      lissajousCtx.moveTo(8, cy);
+      lissajousCtx.lineTo(w - 8, cy);
+      lissajousCtx.stroke();
+
+      for (let r = 22; r < Math.min(w, h) * 0.44; r += 22) {
+        lissajousCtx.strokeStyle = r % 44 === 0 ? "rgba(95,158,162,0.18)" : "rgba(238,228,197,0.1)";
+        lissajousCtx.beginPath();
+        lissajousCtx.rect(cx - r, cy - r * 0.72, r * 2, r * 1.44);
+        lissajousCtx.stroke();
+      }
+
+      const step = 0.018;
+      for (let t = 0; t < Math.PI * 2; t += step) {
+        const x = cx + Math.sin(ratio[0] * t + phase) * radiusX;
+        const y = cy + Math.sin(ratio[1] * t) * radiusY;
+        const shimmer = Math.sin(t * 9 + frame * 0.07);
+        const color = shimmer > 0.72 ? "#eee4c5" : shimmer > -0.1 ? "#5f9ea2" : "#b57942";
+        pixelLissajousDot(x, y, 3, color);
+      }
+
+      for (let i = 0; i < 6; i += 1) {
+        const t = (frame * 0.012 + i / 6) * Math.PI * 2;
+        const x = cx + Math.sin(ratio[0] * t + phase) * radiusX;
+        const y = cy + Math.sin(ratio[1] * t) * radiusY;
+        pixelLissajousDot(x, y, 6, i % 2 === 0 ? "#a85243" : "#eee4c5");
+      }
+
+      if (frame % 90 < 10) {
+        lissajousCtx.fillStyle = "rgba(168,82,67,0.18)";
+        lissajousCtx.fillRect(0, (frame * 5) % h, w, 5);
+      }
+
+      lissajousCtx.fillStyle = "rgba(21,23,19,0.68)";
+      lissajousCtx.fillRect(8, 8, 118, 22);
+      lissajousCtx.fillStyle = "#eee4c5";
+      lissajousCtx.font = "10px 'Courier New', monospace";
+      lissajousCtx.fillText(`PHASE ${current.id}`, 14, 23);
+
+      lissRatio.textContent = `ratio ${ratio[0]}:${ratio[1]}`;
+      lissPhase.textContent = `phase ${Math.round(((phase % (Math.PI * 2)) / (Math.PI * 2)) * 360).toString().padStart(3, "0")}`;
+    }
+
+    function pixelLissajousDot(x, y, size, color) {
+      lissajousCtx.fillStyle = color;
+      lissajousCtx.fillRect(Math.round(x / size) * size, Math.round(y / size) * size, size, size);
+    }
+
+    function draw() {
+      frame += 1;
+      frameReadout.textContent = String(frame).padStart(4, "0");
+      const { w, h } = clear();
+      if (viewMode === "map") {
+        drawMap(w, h);
+        drawMapAnimations(w, h);
+      } else {
+        drawEvent(w, h);
+      }
+      overlay(w, h);
+      applyGlitch(w, h);
+      drawScope();
+      drawLissajous();
+      requestAnimationFrame(draw);
+    }
+
+    function renderCases() {
+      caseList.innerHTML = "";
+      cases.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(index === selectedCase));
+        button.innerHTML = `<span>${item.id} ${item.label}</span><small>${item.tone}</small>`;
+        button.addEventListener("click", () => {
+          selectedCase = index;
+          updateUi();
+        });
+        caseList.appendChild(button);
+      });
+    }
+
+    function updateUi() {
+      const current = cases[selectedCase];
+      caseReadout.textContent = current.id;
+      viewReadout.textContent = viewMode.toUpperCase();
+      modeReadout.textContent = transmitMode;
+      screenTitle.textContent = `${viewMode === "map" ? "地图回传" : "事件画面"} / ${transmitMode}`;
+      screenMeta.textContent = current.meta;
+      coordLine.textContent = `center ${map.x.toFixed(2)},${map.y.toFixed(2)} / zoom ${map.zoom.toFixed(2)}`;
+      noiseBar.style.width = `${current.bars[0]}%`;
+      detailBar.style.width = `${current.bars[1]}%`;
+      trustBar.style.width = `${current.bars[2]}%`;
+      mapButton.setAttribute("aria-pressed", String(viewMode === "map"));
+      eventButton.setAttribute("aria-pressed", String(viewMode === "event"));
+      modeButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === transmitMode)));
+      renderCases();
+      notes.innerHTML = "";
+      [
+        ["Half-tone", "操作台和显示屏都用少色半调/网点质感，避免现代高清玻璃感。"],
+        ["Map", "地图由噪声地形、冷热分区、路线、等高线和 Bayer 抖动重建。"],
+        ["Event", "事件画面像低带宽照片：只保留轮廓、热区和关键形状。"]
+      ].forEach(([title, body]) => {
+        const note = document.createElement("article");
+        note.className = "note";
+        note.innerHTML = `<strong>${title}</strong>${body}`;
+        notes.appendChild(note);
+      });
+    }
+
+    function pointerToWorld(event) {
+      const rect = canvas.getBoundingClientRect();
+      return worldAt(event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (viewMode !== "map") return;
+      const p = pointerToWorld(event);
+      map.marker = p;
+      dragging = { x: event.clientX, y: event.clientY };
+      canvas.setPointerCapture(event.pointerId);
+      statusLine.textContent = `> marker ${p.x.toFixed(2)}, ${p.y.toFixed(2)}`;
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (viewMode !== "map" || !dragging) return;
+      const dx = event.clientX - dragging.x;
+      const dy = event.clientY - dragging.y;
+      dragging = { x: event.clientX, y: event.clientY };
+      map.x -= dx / (58 * map.zoom);
+      map.y -= dy / (42 * map.zoom);
+      updateUi();
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      dragging = null;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("wheel", (event) => {
+      if (viewMode !== "map") return;
+      event.preventDefault();
+      map.zoom = Math.max(0.55, Math.min(5, map.zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      statusLine.textContent = `> zoom ${map.zoom.toFixed(2)}`;
+      updateUi();
+    }, { passive: false });
+
+    modeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        transmitMode = button.dataset.mode;
+        footerCommand.textContent = `> transmission mode ${transmitMode}`;
+        updateUi();
+      });
+    });
+
+    mapButton.addEventListener("click", () => {
+      viewMode = "map";
+      statusLine.textContent = "> map transmission selected";
+      updateUi();
+    });
+
+    eventButton.addEventListener("click", () => {
+      viewMode = "event";
+      statusLine.textContent = "> event snapshot selected";
+      updateUi();
+    });
+
+    randomizeButton.addEventListener("click", () => {
+      seed += 1.41;
+      footerCommand.textContent = `> signal perturbation ${seed.toFixed(2)}`;
+    });
+
+    resetButton.addEventListener("click", () => {
+      map.x = 0;
+      map.y = 0;
+      map.zoom = 1.2;
+      footerCommand.textContent = "> map center restored";
+      updateUi();
+    });
+
+    window.addEventListener("resize", resize);
+    resize();
+    updateUi();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

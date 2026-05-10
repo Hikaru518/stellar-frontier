@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASCII Asset Viewer</title>
+  <style>
+    :root {
+      --bg: #1c1611;
+      --panel: #2b2119;
+      --panel-2: #34281f;
+      --line: #9b6a3b;
+      --ink: #ecd4a3;
+      --muted: #a78a67;
+      --amber: #f0a64d;
+      --green: #7cff9c;
+      --cyan: #72d7ff;
+      --blue: #6c8fff;
+      --rose: #ff79b0;
+      --cream: #f6f0c3;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 50% 14%, rgba(240, 166, 77, 0.12), transparent 34%),
+        linear-gradient(135deg, #261b14, #17130f 60%, #10140f);
+      color: var(--ink);
+      font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Courier New", monospace;
+    }
+
+    body {
+      padding: 16px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 14px;
+      min-height: calc(100svh - 32px);
+    }
+
+    .panel {
+      border: 2px solid var(--line);
+      background:
+        radial-gradient(circle, rgba(240, 166, 77, 0.06) 1px, transparent 1px),
+        var(--panel);
+      background-size: 8px 8px;
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.42) inset,
+        0 14px 30px rgba(0, 0, 0, 0.26);
+      padding: 14px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p,
+    pre {
+      margin: 0;
+    }
+
+    h1 {
+      color: var(--amber);
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      color: var(--amber);
+      font-size: 13px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h3 {
+      color: var(--cream);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .button-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .button,
+    .file-label,
+    .mini-button {
+      display: grid;
+      align-items: center;
+      min-height: 38px;
+      border: 1px solid rgba(155, 106, 59, 0.56);
+      background: #19130f;
+      color: var(--ink);
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    .button:hover,
+    .file-label:hover,
+    .mini-button:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: #241a13;
+    }
+
+    .file-label input {
+      display: none;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 92px;
+      gap: 8px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .meta-card {
+      border: 1px solid rgba(155, 106, 59, 0.34);
+      background: #19130f;
+      padding: 8px;
+    }
+
+    .meta-card strong {
+      display: block;
+      color: var(--cream);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .mini-button {
+      min-height: 34px;
+      min-width: 82px;
+      justify-content: center;
+    }
+
+    .viewer {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .screen-wrap {
+      position: relative;
+      min-height: 0;
+      border: 2px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(124, 255, 156, 0.06), transparent),
+        #0a130d;
+      padding: 14px;
+      overflow: auto;
+    }
+
+    .screen-wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(0deg, rgba(246, 240, 195, 0.05) 0 1px, transparent 1px 4px),
+        radial-gradient(circle at center, transparent 70%, rgba(0, 0, 0, 0.34));
+    }
+
+    .ascii-screen {
+      position: relative;
+      z-index: 1;
+      display: inline-block;
+      min-width: 100%;
+      color: var(--green);
+      white-space: pre;
+      line-height: 1;
+      font-size: 14px;
+      text-shadow: 0 0 7px rgba(124, 255, 156, 0.36);
+    }
+
+    .ascii-screen.is-portrait {
+      font-size: 18px;
+    }
+
+    .ascii-line {
+      min-height: 1em;
+    }
+
+    .phosphor { color: var(--green); text-shadow: 0 0 7px rgba(124, 255, 156, 0.36); }
+    .dim { color: #4fa35d; text-shadow: 0 0 5px rgba(79, 163, 93, 0.22); }
+    .amber { color: var(--amber); text-shadow: 0 0 7px rgba(240, 166, 77, 0.32); }
+    .cyan { color: var(--cyan); text-shadow: 0 0 7px rgba(114, 215, 255, 0.32); }
+    .blue { color: var(--blue); text-shadow: 0 0 7px rgba(108, 143, 255, 0.32); }
+    .rose { color: var(--rose); text-shadow: 0 0 7px rgba(255, 121, 176, 0.32); }
+    .cream { color: var(--cream); text-shadow: 0 0 7px rgba(246, 240, 195, 0.26); }
+
+    .json-box {
+      max-height: 240px;
+      overflow: auto;
+      border: 1px solid rgba(155, 106, 59, 0.34);
+      background: #15110d;
+      padding: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="panel stack">
+      <section>
+        <h1>ASCII Viewer</h1>
+        <p class="muted">用来预览 `art/ascii-lab/` 里的地图、事件画面和人物头像 JSON。支持示例载入、文件导入、动画播放和状态切换。</p>
+      </section>
+
+      <section>
+        <h2>Examples</h2>
+        <div class="button-list">
+          <button class="button" id="loadMap" type="button">加载地图模板</button>
+          <button class="button" id="loadEvent" type="button">加载事件模板</button>
+          <button class="button" id="loadPortrait" type="button">加载头像模板</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Import</h2>
+        <label class="file-label">
+          <input id="fileInput" type="file" accept=".json,application/json" />
+          打开本地 JSON 文件
+        </label>
+      </section>
+
+      <section>
+        <h2>Asset</h2>
+        <div class="meta-grid">
+          <article class="meta-card"><span class="muted">ID</span><strong id="metaId">-</strong></article>
+          <article class="meta-card"><span class="muted">Type</span><strong id="metaType">-</strong></article>
+          <article class="meta-card"><span class="muted">Size</span><strong id="metaSize">-</strong></article>
+          <article class="meta-card"><span class="muted">Palette</span><strong id="metaPalette">-</strong></article>
+          <article class="meta-card"><span class="muted">Frames</span><strong id="metaFrames">-</strong></article>
+          <article class="meta-card"><span class="muted">FPS</span><strong id="metaFps">-</strong></article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Info</h2>
+        <p class="muted" id="metaInfo">载入一个 ASCII JSON 后，这里会显示说明。</p>
+      </section>
+    </aside>
+
+    <section class="panel viewer">
+      <section>
+        <h2>Preview</h2>
+        <div class="toolbar">
+          <button class="mini-button" id="playButton" type="button">播放</button>
+          <button class="mini-button" id="prevFrameButton" type="button">上一帧</button>
+          <button class="mini-button" id="nextFrameButton" type="button">下一帧</button>
+          <select class="mini-button" id="stateSelect" aria-label="portrait state"></select>
+        </div>
+      </section>
+
+      <section class="meta-grid">
+        <article class="meta-card"><span class="muted">Current Frame</span><strong id="frameReadout">0 / 0</strong></article>
+        <article class="meta-card"><span class="muted">Playback</span><strong id="playReadout">PAUSED</strong></article>
+      </section>
+
+      <section class="screen-wrap">
+        <div class="ascii-screen" id="asciiScreen"></div>
+      </section>
+
+      <section>
+        <h2>JSON</h2>
+        <pre class="json-box" id="jsonBox">{}</pre>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const examples = {
+      map: {
+        id: "iafs_reference_map",
+        type: "map",
+        width: 48,
+        height: 20,
+        palette: "phosphor",
+        fps: 4,
+        frames: [[
+          "................................................",
+          "..............::::::----+++++####...............",
+          "..........::::::----+++++++######...............",
+          ".......:::::----+++++++##########...............",
+          ".....::::----+++++#########@@@####..............",
+          "...::::----++++##########@@@@@@####.............",
+          "..:::----++++##########@@@@@@@@####.............",
+          "..::---++++##########@@@@@@@@@@####.............",
+          "..::---++++#########@@@@@@@@@@@####.............",
+          "...:::---++++######@@@@@@@@@@@####..............",
+          "....::::---++++####@@@@@@@@@#####...............",
+          "......::::---++++###@@@@@@#####................",
+          "........::::---++++##@@@#####..................",
+          "..........::::---++++#####.....................",
+          ".............::::---++##.......................",
+          "................::::---........................",
+          "................................................",
+          "................................................",
+          "................................................",
+          "................................................"
+        ]],
+        regions: [
+          { id: "ashfrost_belt", tone: "cream" },
+          { id: "frostbay", tone: "blue" },
+          { id: "cinderforge", tone: "amber" },
+          { id: "gate_realm", tone: "rose" }
+        ],
+        landmarks: [{ id: "crash_site", icon: "@", tone: "rose" }],
+        notes: "底层建议只用单色字符密度表现地形，彩色留给区域和建筑叠层。"
+      },
+      event: {
+        id: "iafs_event_crash_reference",
+        type: "event_scene",
+        width: 56,
+        height: 20,
+        palette: "apple2",
+        fps: 6,
+        title: "主线 1A / 坠毁倒计时",
+        meta: "核心失压 / 备用电源临界 / 生命支持倒计时",
+        caption: "点名、分工、首轮回收：先活下来，再谈探索。",
+        frames: [[
+          "                                                        ",
+          "              ^^^^^^^^                                  ",
+          "            ^^^^^^^^^^^                                 ",
+          "          ^^^^|^^^^^^^|                                 ",
+          "        ^^^^^^|^^^^^^^|^^^^            ##########        ",
+          "      ^^^^^^^^|^^^^^^^|^^^^^^          ##########        ",
+          "    ^^^^^^^^^^|^^^^^^^|^^^^^^^^        ##########        ",
+          "  :::::::::::::::::::::::::::::::   ~~                 **",
+          "::::::::::::::::::::::::::::::::::     \\__|__/      **  ",
+          "::::::::::::::::::::::::::::::::::      /_X_\\\\____***   ",
+          "::::::::::::::::::::::::::::::::::    _/__/ \\__\\\\       ",
+          "::::::::::::::::::::::::::::::::::      /____\\\\         ",
+          "::::::::::::::::::::::::::::::::::        oo            ",
+          "::::::::::::::::::::::::::::::::::                      ",
+          "                                                        ",
+          "                                                        ",
+          "                                                        ",
+          "                                                        ",
+          "                                                        ",
+          "                                                        "
+        ]]
+      },
+      portrait: {
+        id: "mike_portrait_reference",
+        type: "portrait",
+        width: 18,
+        height: 18,
+        palette: "apple2",
+        fps: 8,
+        frames: [
+          [
+            "      ######      ",
+            "    ##########    ",
+            "   ###......###   ",
+            "  ##..o....o..##  ",
+            " ##............## ",
+            " ##....----....## ",
+            " ##...______...## ",
+            " ##..../##\\....## ",
+            " ##.../####\\...## ",
+            "  ##..######..##  ",
+            "   ###.####.###   ",
+            "    ##########    ",
+            "      ##..##      ",
+            "     ###..###     ",
+            "    ####..####    ",
+            "    ##......##    ",
+            "    ##......##    ",
+            "                  "
+          ],
+          [
+            "      ######      ",
+            "    ##########    ",
+            "   ###......###   ",
+            "  ##..-....-..##  ",
+            " ##............## ",
+            " ##....----....## ",
+            " ##...______...## ",
+            " ##..../##\\....## ",
+            " ##.../####\\...## ",
+            "  ##..######..##  ",
+            "   ###.####.###   ",
+            "    ##########    ",
+            "      ##..##      ",
+            "     ###..###     ",
+            "    ####..####    ",
+            "    ##......##    ",
+            "    ##......##    ",
+            "                  "
+          ]
+        ],
+        states: {
+          idle: [0],
+          blink: [0, 1, 0],
+          talk: [0, 1, 0]
+        }
+      }
+    };
+
+    const asciiScreen = document.getElementById("asciiScreen");
+    const jsonBox = document.getElementById("jsonBox");
+    const frameReadout = document.getElementById("frameReadout");
+    const playReadout = document.getElementById("playReadout");
+    const metaId = document.getElementById("metaId");
+    const metaType = document.getElementById("metaType");
+    const metaSize = document.getElementById("metaSize");
+    const metaPalette = document.getElementById("metaPalette");
+    const metaFrames = document.getElementById("metaFrames");
+    const metaFps = document.getElementById("metaFps");
+    const metaInfo = document.getElementById("metaInfo");
+    const stateSelect = document.getElementById("stateSelect");
+    const playButton = document.getElementById("playButton");
+
+    let currentAsset = null;
+    let frameIndex = 0;
+    let isPlaying = false;
+    let timer = null;
+    let activeState = "";
+
+    function charTone(char) {
+      if ("@#".includes(char)) return "phosphor";
+      if ("+-=:".includes(char)) return "amber";
+      if ("~|/\\[]".includes(char)) return "cyan";
+      if ("*".includes(char)) return "rose";
+      if ("oO".includes(char)) return "cream";
+      if (".".includes(char)) return "dim";
+      return "phosphor";
+    }
+
+    function stopPlayback() {
+      isPlaying = false;
+      clearInterval(timer);
+      timer = null;
+      playButton.textContent = "播放";
+      playReadout.textContent = "PAUSED";
+    }
+
+    function stateFrames(asset) {
+      if (!asset.states || !activeState || !asset.states[activeState]) {
+        return asset.frames.map((_, index) => index);
+      }
+      return asset.states[activeState];
+    }
+
+    function renderFrame() {
+      if (!currentAsset) return;
+      const frameIds = stateFrames(currentAsset);
+      const realFrameIndex = frameIds[frameIndex] ?? 0;
+      const frame = currentAsset.frames[realFrameIndex] || [];
+
+      asciiScreen.className = `ascii-screen${currentAsset.type === "portrait" ? " is-portrait" : ""}`;
+      asciiScreen.innerHTML = "";
+
+      frame.forEach((line) => {
+        const row = document.createElement("div");
+        row.className = "ascii-line";
+        Array.from(line).forEach((char) => {
+          const span = document.createElement("span");
+          span.className = charTone(char);
+          span.textContent = char;
+          row.appendChild(span);
+        });
+        asciiScreen.appendChild(row);
+      });
+
+      frameReadout.textContent = `${frameIndex + 1} / ${frameIds.length}`;
+    }
+
+    function startPlayback() {
+      if (!currentAsset) return;
+      stopPlayback();
+      isPlaying = true;
+      playButton.textContent = "暂停";
+      playReadout.textContent = `PLAY ${currentAsset.fps || 1} FPS`;
+      timer = window.setInterval(() => {
+        const frameIds = stateFrames(currentAsset);
+        frameIndex = (frameIndex + 1) % Math.max(1, frameIds.length);
+        renderFrame();
+      }, 1000 / Math.max(1, currentAsset.fps || 1));
+    }
+
+    function setAsset(asset) {
+      currentAsset = asset;
+      frameIndex = 0;
+      activeState = "";
+      stopPlayback();
+
+      metaId.textContent = asset.id || "-";
+      metaType.textContent = asset.type || "-";
+      metaSize.textContent = `${asset.width || "?"} x ${asset.height || "?"}`;
+      metaPalette.textContent = asset.palette || "-";
+      metaFrames.textContent = String(asset.frames?.length || 0);
+      metaFps.textContent = String(asset.fps || 0);
+      metaInfo.textContent = asset.notes || asset.caption || asset.meta || "无额外说明。";
+      jsonBox.textContent = JSON.stringify(asset, null, 2);
+
+      stateSelect.innerHTML = "";
+      const baseOption = document.createElement("option");
+      baseOption.value = "";
+      baseOption.textContent = "默认序列";
+      stateSelect.appendChild(baseOption);
+      Object.keys(asset.states || {}).forEach((key) => {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = key;
+        stateSelect.appendChild(option);
+      });
+
+      renderFrame();
+    }
+
+    document.getElementById("loadMap").addEventListener("click", () => setAsset(structuredClone(examples.map)));
+    document.getElementById("loadEvent").addEventListener("click", () => setAsset(structuredClone(examples.event)));
+    document.getElementById("loadPortrait").addEventListener("click", () => setAsset(structuredClone(examples.portrait)));
+
+    document.getElementById("fileInput").addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const asset = JSON.parse(text);
+      setAsset(asset);
+    });
+
+    document.getElementById("prevFrameButton").addEventListener("click", () => {
+      if (!currentAsset) return;
+      const frameIds = stateFrames(currentAsset);
+      frameIndex = (frameIndex - 1 + frameIds.length) % frameIds.length;
+      renderFrame();
+    });
+
+    document.getElementById("nextFrameButton").addEventListener("click", () => {
+      if (!currentAsset) return;
+      const frameIds = stateFrames(currentAsset);
+      frameIndex = (frameIndex + 1) % frameIds.length;
+      renderFrame();
+    });
+
+    playButton.addEventListener("click", () => {
+      if (!currentAsset) return;
+      if (isPlaying) stopPlayback();
+      else startPlayback();
+    });
+
+    stateSelect.addEventListener("change", (event) => {
+      activeState = event.target.value;
+      frameIndex = 0;
+      renderFrame();
+    });
+
+    setAsset(structuredClone(examples.map));
+  </script>
+</body>
+</html>

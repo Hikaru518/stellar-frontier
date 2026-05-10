@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retro Lowfi Console</title>
+  <style>
+    :root {
+      --bg: #17130f;
+      --panel: #241d16;
+      --panel-2: #30261c;
+      --line: #9b6a3b;
+      --line-soft: rgba(197, 138, 76, 0.42);
+      --amber: #f0a64d;
+      --amber-soft: #d58b42;
+      --green: #9bbf74;
+      --blue: #74a6a6;
+      --red: #d36a4f;
+      --cream: #e7d0a4;
+      --muted: #8f7a5d;
+      --shadow: rgba(0, 0, 0, 0.48);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% 25%, rgba(240, 166, 77, 0.13), transparent 34%),
+        linear-gradient(135deg, #201610 0%, #17130f 48%, #0e1110 100%);
+      color: var(--cream);
+      font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace;
+      overflow: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    body::before {
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(231, 208, 164, 0.055) 0,
+          rgba(231, 208, 164, 0.055) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+      mix-blend-mode: screen;
+      opacity: 0.8;
+    }
+
+    body::after {
+      background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.24)),
+        radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.32) 100%);
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .console {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+      width: 100vw;
+      height: 100svh;
+      padding: 14px;
+      background-image:
+        linear-gradient(rgba(240, 166, 77, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(240, 166, 77, 0.04) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .topbar,
+    .footer,
+    .panel,
+    .viewport {
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 204, 126, 0.045), transparent 34%),
+        var(--panel);
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.38) inset,
+        0 18px 38px var(--shadow);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto minmax(240px, 0.8fr);
+      align-items: center;
+      gap: 16px;
+      min-height: 72px;
+      padding: 10px 14px;
+    }
+
+    .brand-kicker,
+    .label,
+    .tiny {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      margin-top: 4px;
+      color: var(--amber);
+      font-size: clamp(20px, 3vw, 34px);
+      font-weight: 700;
+      letter-spacing: 0;
+      text-shadow: 0 0 12px rgba(240, 166, 77, 0.32);
+    }
+
+    .system-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(58px, 1fr));
+      gap: 8px;
+      min-width: 360px;
+    }
+
+    .readout {
+      border: 1px solid var(--line-soft);
+      background: #15120e;
+      padding: 8px;
+      min-height: 48px;
+    }
+
+    .readout strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--cream);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .signal {
+      justify-self: end;
+      width: min(100%, 330px);
+    }
+
+    .signal-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(155, 106, 59, 0.28);
+      color: var(--blue);
+      font-size: 12px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(210px, 0.72fr) minmax(420px, 1.8fr) minmax(240px, 0.9fr);
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .panel {
+      min-height: 0;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .panel h2 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: var(--amber);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .panel h2::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--line-soft), transparent);
+    }
+
+    .control-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .toggle {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      border: 1px solid rgba(155, 106, 59, 0.5);
+      background: #18130f;
+      color: var(--cream);
+      padding: 6px 8px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .toggle:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .toggle .lamp {
+      width: 10px;
+      height: 10px;
+      border: 1px solid var(--line);
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(155, 191, 116, 0.62);
+    }
+
+    .toggle.off .lamp {
+      background: #42342a;
+      box-shadow: none;
+    }
+
+    .toggle[aria-pressed="true"] {
+      border-color: var(--amber);
+      color: var(--amber);
+      box-shadow: 0 0 12px rgba(240, 166, 77, 0.16) inset;
+    }
+
+    .toggle small {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .crew-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(155, 106, 59, 0.3);
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      background: #16120e;
+      color: var(--green);
+    }
+
+    .crew-card strong {
+      display: block;
+      color: var(--cream);
+      font-size: 13px;
+    }
+
+    .crew-card span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .viewport {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(116, 166, 166, 0.14), transparent 44%),
+        #11120f;
+    }
+
+    .viewport-head,
+    .viewport-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 42px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(36, 29, 22, 0.86);
+      z-index: 3;
+    }
+
+    .viewport-foot {
+      border-top: 1px solid var(--line-soft);
+      border-bottom: 0;
+    }
+
+    .map-stage {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+      cursor: crosshair;
+    }
+
+    #asciiScreen {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      image-rendering: pixelated;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(116, 166, 166, 0.11), transparent 42%),
+        #10110d;
+    }
+
+    .terrain {
+      position: absolute;
+      inset: 18px;
+      background:
+        radial-gradient(ellipse at 18% 22%, rgba(211, 106, 79, 0.38), transparent 18%),
+        radial-gradient(ellipse at 77% 30%, rgba(116, 166, 166, 0.32), transparent 20%),
+        radial-gradient(ellipse at 52% 70%, rgba(155, 191, 116, 0.26), transparent 28%),
+        linear-gradient(35deg, rgba(155, 106, 59, 0.18), transparent 36%),
+        #14150f;
+      border: 1px solid rgba(155, 106, 59, 0.35);
+      clip-path: polygon(8% 4%, 91% 2%, 98% 32%, 93% 91%, 63% 98%, 15% 88%, 3% 58%);
+    }
+
+    .terrain::before,
+    .terrain::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(231, 208, 164, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(231, 208, 164, 0.06) 1px, transparent 1px);
+      background-size: 38px 38px;
+      mask-image: radial-gradient(circle at center, black 42%, transparent 76%);
+    }
+
+    .terrain::after {
+      background:
+        repeating-radial-gradient(circle at 44% 52%, transparent 0 20px, rgba(240, 166, 77, 0.2) 21px 22px),
+        repeating-radial-gradient(circle at 72% 30%, transparent 0 26px, rgba(116, 166, 166, 0.18) 27px 28px);
+      mix-blend-mode: screen;
+      animation: pulse 2.7s linear infinite;
+    }
+
+    .route {
+      position: absolute;
+      left: 18%;
+      top: 52%;
+      width: 54%;
+      height: 22%;
+      border-top: 2px dashed var(--amber);
+      border-right: 2px dashed var(--amber);
+      transform: rotate(-8deg);
+      opacity: 0.9;
+    }
+
+    .marker {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--red);
+      transform: rotate(45deg);
+      box-shadow: 0 0 16px rgba(211, 106, 79, 0.72);
+    }
+
+    .marker.one {
+      left: 32%;
+      top: 48%;
+    }
+
+    .marker.two {
+      left: 70%;
+      top: 33%;
+      border-color: var(--blue);
+      box-shadow: 0 0 16px rgba(116, 166, 166, 0.72);
+    }
+
+    .radar {
+      position: absolute;
+      right: 28px;
+      bottom: 26px;
+      width: 128px;
+      aspect-ratio: 1;
+      border: 1px solid var(--blue);
+      border-radius: 50%;
+      background:
+        linear-gradient(90deg, transparent 49%, rgba(116, 166, 166, 0.38) 50%, transparent 51%),
+        linear-gradient(transparent 49%, rgba(116, 166, 166, 0.38) 50%, transparent 51%);
+      opacity: 0.86;
+    }
+
+    .radar::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 1px solid rgba(116, 166, 166, 0.38);
+      border-radius: 50%;
+    }
+
+    .radar::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 50%;
+      height: 2px;
+      background: var(--green);
+      transform-origin: left center;
+      animation: sweep 3s linear infinite;
+      box-shadow: 0 0 12px rgba(155, 191, 116, 0.8);
+    }
+
+    .event-scene {
+      position: absolute;
+      inset: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(155, 106, 59, 0.48);
+      background:
+        linear-gradient(180deg, rgba(116, 166, 166, 0.18) 0%, transparent 36%),
+        radial-gradient(ellipse at 18% 70%, rgba(211, 106, 79, 0.42), transparent 22%),
+        radial-gradient(ellipse at 74% 78%, rgba(116, 166, 166, 0.36), transparent 25%),
+        linear-gradient(180deg, #151711 0%, #201812 58%, #11100d 100%);
+    }
+
+    .event-scene::before {
+      content: "";
+      position: absolute;
+      left: -12%;
+      right: -12%;
+      bottom: -16%;
+      height: 48%;
+      background:
+        linear-gradient(165deg, transparent 0 18%, rgba(155, 106, 59, 0.64) 19% 20%, transparent 21%),
+        linear-gradient(10deg, #312316, #14120f);
+      transform: skewY(-3deg);
+    }
+
+    .event-scene::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(115deg, transparent 0 24px, rgba(231, 208, 164, 0.075) 25px 26px),
+        radial-gradient(circle at 52% 46%, transparent 0 19%, rgba(0, 0, 0, 0.22) 20% 100%);
+      mix-blend-mode: screen;
+      opacity: 0.78;
+    }
+
+    .event-sun {
+      position: absolute;
+      left: 12%;
+      top: 12%;
+      width: 96px;
+      height: 96px;
+      border: 1px solid rgba(240, 166, 77, 0.55);
+      border-radius: 50%;
+      background:
+        repeating-linear-gradient(0deg, rgba(240, 166, 77, 0.18) 0 6px, transparent 7px 12px),
+        radial-gradient(circle, rgba(240, 166, 77, 0.36), transparent 64%);
+      box-shadow: 0 0 36px rgba(240, 166, 77, 0.28);
+    }
+
+    .ship {
+      position: absolute;
+      left: 35%;
+      top: 47%;
+      width: 250px;
+      height: 64px;
+      transform: rotate(-10deg);
+      z-index: 2;
+    }
+
+    .ship-body {
+      position: absolute;
+      left: 22px;
+      top: 20px;
+      width: 184px;
+      height: 35px;
+      border: 2px solid var(--blue);
+      background:
+        linear-gradient(90deg, rgba(116, 166, 166, 0.15), rgba(231, 208, 164, 0.1)),
+        #191813;
+      clip-path: polygon(0 55%, 16% 14%, 72% 0, 100% 52%, 74% 100%, 13% 88%);
+      box-shadow: 0 0 18px rgba(116, 166, 166, 0.26);
+    }
+
+    .ship-wing {
+      position: absolute;
+      left: 66px;
+      top: 0;
+      width: 112px;
+      height: 38px;
+      border: 2px solid var(--line);
+      background: #241d16;
+      clip-path: polygon(0 100%, 44% 0, 100% 70%, 84% 100%);
+    }
+
+    .ship-tail {
+      position: absolute;
+      right: 16px;
+      top: 9px;
+      width: 48px;
+      height: 44px;
+      border: 2px solid var(--line);
+      background: #18130f;
+      clip-path: polygon(0 100%, 52% 0, 100% 100%);
+    }
+
+    .fire {
+      position: absolute;
+      left: 62%;
+      top: 55%;
+      width: 72px;
+      height: 96px;
+      z-index: 3;
+      filter: drop-shadow(0 0 18px rgba(211, 106, 79, 0.52));
+    }
+
+    .fire span {
+      position: absolute;
+      bottom: 0;
+      width: 38px;
+      height: 72px;
+      border-radius: 50% 50% 48% 48%;
+      background: var(--red);
+      clip-path: polygon(50% 0, 76% 34%, 100% 63%, 68% 100%, 28% 100%, 0 62%, 24% 34%);
+      animation: flame 0.8s steps(2) infinite;
+    }
+
+    .fire span:nth-child(2) {
+      left: 24px;
+      height: 58px;
+      background: var(--amber);
+      animation-delay: 0.18s;
+    }
+
+    .fire span:nth-child(3) {
+      left: 12px;
+      bottom: 8px;
+      width: 28px;
+      height: 44px;
+      background: #f3d28b;
+      animation-delay: 0.32s;
+    }
+
+    .smoke {
+      position: absolute;
+      left: 60%;
+      top: 22%;
+      width: 180px;
+      height: 160px;
+      z-index: 1;
+      opacity: 0.75;
+    }
+
+    .smoke span {
+      position: absolute;
+      width: 58px;
+      height: 36px;
+      border: 1px solid rgba(143, 122, 93, 0.52);
+      border-radius: 50%;
+      background: rgba(80, 69, 54, 0.44);
+      animation: drift 3.4s ease-in-out infinite;
+    }
+
+    .smoke span:nth-child(2) {
+      left: 48px;
+      top: 34px;
+      animation-delay: 0.4s;
+    }
+
+    .smoke span:nth-child(3) {
+      left: 96px;
+      top: 10px;
+      animation-delay: 0.8s;
+    }
+
+    .crew-signal {
+      position: absolute;
+      left: 22%;
+      bottom: 18%;
+      z-index: 4;
+      display: grid;
+      grid-template-columns: repeat(3, 20px);
+      gap: 12px;
+    }
+
+    .crew-dot {
+      width: 18px;
+      height: 34px;
+      border: 1px solid var(--cream);
+      border-radius: 9px 9px 4px 4px;
+      background: #18130f;
+      box-shadow: 0 0 10px rgba(231, 208, 164, 0.22);
+    }
+
+    .event-caption {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: 22px;
+      z-index: 5;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 14px;
+      border: 1px solid var(--line);
+      background: rgba(18, 16, 13, 0.86);
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .event-caption strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--red);
+      font-size: 13px;
+    }
+
+    .callout {
+      position: absolute;
+      min-width: 164px;
+      border: 1px solid var(--line);
+      background: rgba(23, 19, 15, 0.92);
+      padding: 8px;
+      color: var(--cream);
+      font-size: 11px;
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.44);
+    }
+
+    .callout.alpha {
+      left: 7%;
+      top: 11%;
+    }
+
+    .callout.beta {
+      right: 7%;
+      top: 14%;
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--amber);
+      font-size: 12px;
+    }
+
+    .meter {
+      height: 8px;
+      border: 1px solid rgba(155, 106, 59, 0.55);
+      background: #12100d;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .meter > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), var(--amber));
+    }
+
+    .log {
+      display: grid;
+      gap: 8px;
+      color: var(--cream);
+      font-size: 12px;
+    }
+
+    .log p {
+      border-left: 2px solid var(--line);
+      padding-left: 8px;
+      line-height: 1.45;
+    }
+
+    .log .danger {
+      border-color: var(--red);
+      color: #f1b098;
+    }
+
+    .objective {
+      display: grid;
+      gap: 10px;
+    }
+
+    .objective-row {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .bar {
+      height: 10px;
+      border: 1px solid rgba(155, 106, 59, 0.55);
+      background: #15120e;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      background: var(--amber);
+    }
+
+    .footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      min-height: 58px;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .command {
+      color: var(--green);
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .action {
+      border: 1px solid var(--line);
+      background: #15120e;
+      color: var(--cream);
+      padding: 8px 12px;
+      min-width: 108px;
+      cursor: pointer;
+    }
+
+    .action:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .action[aria-pressed="true"] {
+      border-color: var(--amber);
+      color: var(--amber);
+      box-shadow: 0 0 14px rgba(240, 166, 77, 0.2) inset;
+    }
+
+    @keyframes sweep {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: 0.52;
+      }
+    }
+
+    @keyframes flame {
+      50% {
+        transform: translateY(-6px) scaleX(0.82);
+      }
+    }
+
+    @keyframes drift {
+      50% {
+        transform: translate(12px, -8px) scale(1.12);
+      }
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+
+      .console {
+        height: auto;
+        min-height: 100svh;
+      }
+
+      .topbar,
+      .main,
+      .footer {
+        grid-template-columns: 1fr;
+      }
+
+      .system-strip {
+        min-width: 0;
+      }
+
+      .viewport {
+        min-height: 560px;
+      }
+
+      .signal {
+        justify-self: stretch;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="console" id="console">
+    <header class="topbar">
+      <section>
+        <p class="brand-kicker">STELLAR FRONTIER / PC AUTHORITY</p>
+        <h1>LOWFI TACTICAL CONSOLE</h1>
+      </section>
+
+      <section class="system-strip" aria-label="System readouts">
+        <div class="readout">
+          <span class="label">SOL</span>
+          <strong>037</strong>
+        </div>
+        <div class="readout">
+          <span class="label">POWER</span>
+          <strong>62%</strong>
+        </div>
+        <div class="readout">
+          <span class="label">LINK</span>
+          <strong>WSS</strong>
+        </div>
+        <div class="readout">
+          <span class="label">RISK</span>
+          <strong>II-B</strong>
+        </div>
+      </section>
+
+      <section class="signal">
+        <div class="signal-line"><span>Yuan baseline</span><strong>stable</strong></div>
+        <div class="signal-line"><span>local channel</span><strong>probing</strong></div>
+        <div class="signal-line"><span>world clock</span><strong>01:42:18</strong></div>
+      </section>
+    </header>
+
+    <section class="main">
+      <aside class="stack">
+        <section class="panel">
+          <h2>Map Layers</h2>
+          <div class="control-list">
+            <button class="toggle" id="leftEventButton" type="button" aria-pressed="false"><span class="lamp"></span><span>[E] 事件</span><small>EVENT</small></button>
+            <button class="toggle" id="leftMapButton" type="button" aria-pressed="true"><span class="lamp"></span><span>[M] 地图</span><small>MAP</small></button>
+            <button class="toggle" id="gridButton" type="button" aria-pressed="true"><span class="lamp"></span><span>[G] 网格</span><small>ON</small></button>
+            <button class="toggle" id="contourButton" type="button" aria-pressed="true"><span class="lamp"></span><span>[C] 等高线</span><small>ON</small></button>
+            <button class="toggle" id="signalButton" type="button" aria-pressed="true"><span class="lamp"></span><span>[S] 信号层</span><small>ON</small></button>
+            <button class="toggle" id="glitchUpButton" type="button" aria-pressed="false"><span class="lamp"></span><span>[H] 故障增强</span><small>LV+</small></button>
+            <button class="toggle" id="glitchDownButton" type="button" aria-pressed="false"><span class="lamp"></span><span>[L] 故障减弱</span><small>LV-</small></button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Event Menu</h2>
+          <div class="control-list">
+            <button class="toggle event-option" type="button" data-event-index="0" aria-pressed="true"><span class="lamp"></span><span>1A 坠毁倒计时</span><small>MAIN</small></button>
+            <button class="toggle event-option off" type="button" data-event-index="1" aria-pressed="false"><span class="lamp"></span><span>3A 门域接触</span><small>MAIN</small></button>
+            <button class="toggle event-option off" type="button" data-event-index="2" aria-pressed="false"><span class="lamp"></span><span>S01 失温婚约</span><small>SIDE</small></button>
+            <button class="toggle event-option off" type="button" data-event-index="3" aria-pressed="false"><span class="lamp"></span><span>S02 火井税单</span><small>SIDE</small></button>
+            <button class="toggle event-option off" type="button" data-event-index="4" aria-pressed="false"><span class="lamp"></span><span>S08 盲区测绘</span><small>SIDE</small></button>
+            <button class="toggle event-option off" type="button" data-event-index="5" aria-pressed="false"><span class="lamp"></span><span>S09 七拍语法</span><small>SIDE</small></button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Crew</h2>
+          <article class="crew-card">
+            <div class="avatar">M</div>
+            <div><strong>Mike</strong><span>moving / ETA 03:12</span></div>
+          </article>
+          <article class="crew-card">
+            <div class="avatar">A</div>
+            <div><strong>Amy</strong><span>surveying crash site</span></div>
+          </article>
+          <article class="crew-card">
+            <div class="avatar">G</div>
+            <div><strong>Garry</strong><span>signal weak</span></div>
+          </article>
+        </section>
+      </aside>
+
+      <section class="viewport">
+        <div class="viewport-head">
+          <p><span class="label">Satellite Radar</span> <strong>Default Map / 8 x 8</strong></p>
+          <p class="tiny">read only / command requires call confirm</p>
+        </div>
+
+        <div class="map-stage">
+          <canvas id="asciiScreen" aria-label="Interactive ASCII console viewport"></canvas>
+        </div>
+
+        <div class="viewport-foot">
+          <p class="command" id="statusLine">&gt; cursor locked to map pane / selected tile C-06</p>
+          <p class="tiny" id="viewMeta">zoom 1.50 / contour 0.72 / noise 0.18</p>
+        </div>
+      </section>
+
+      <aside class="stack">
+        <section class="panel">
+          <h2>Objectives</h2>
+          <div class="objective">
+            <div class="objective-row"><span>RETURN</span><div class="bar"><span style="width: 34%"></span></div></div>
+            <div class="objective-row"><span>REPAIR</span><div class="bar"><span style="width: 62%"></span></div></div>
+            <div class="objective-row"><span>MED</span><div class="bar"><span style="width: 48%"></span></div></div>
+            <div class="objective-row"><span>WATER</span><div class="bar"><span style="width: 27%"></span></div></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Signal Log</h2>
+          <div class="log">
+            <p>通讯台已接入 Amy 的调查回传，等待通话确认。</p>
+            <p class="danger">C-06 出现高频脉冲，建议先标记为候选目标。</p>
+            <p>Mike 的移动路线稳定，预计三分钟后抵达矿脊边缘。</p>
+            <p>手机私人终端维持公网兜底，局域网升级仍在探测。</p>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <footer class="footer">
+      <p>
+        <span class="command" id="commandLine">&gt; awaiting player command</span>
+        <br />
+        Retro palette test: amber phosphor, oxidized green, muted cyan, warning red, warm dark chassis.
+      </p>
+      <div class="action-row">
+        <button class="action" id="eventButton" type="button" aria-pressed="false">[E] 事件</button>
+        <button class="action" id="mapButton" type="button" aria-pressed="true">[M] 地图</button>
+        <button class="action" id="gridFooterButton" type="button" aria-pressed="true">[G] 网格</button>
+        <button class="action" id="zoomInButton" type="button">[+] 放大</button>
+        <button class="action" id="zoomOutButton" type="button">[-] 缩小</button>
+        <button class="action" id="recenterButton" type="button">[R] 回中心</button>
+      </div>
+    </footer>
+  </main>
+  <script>
+    const consoleRoot = document.getElementById("console");
+    const eventButton = document.getElementById("eventButton");
+    const mapButton = document.getElementById("mapButton");
+    const leftEventButton = document.getElementById("leftEventButton");
+    const leftMapButton = document.getElementById("leftMapButton");
+    const gridButton = document.getElementById("gridButton");
+    const gridFooterButton = document.getElementById("gridFooterButton");
+    const contourButton = document.getElementById("contourButton");
+    const signalButton = document.getElementById("signalButton");
+    const zoomInButton = document.getElementById("zoomInButton");
+    const zoomOutButton = document.getElementById("zoomOutButton");
+    const recenterButton = document.getElementById("recenterButton");
+    const glitchUpButton = document.getElementById("glitchUpButton");
+    const glitchDownButton = document.getElementById("glitchDownButton");
+    const eventOptionButtons = Array.from(document.querySelectorAll(".event-option"));
+    const statusLine = document.getElementById("statusLine");
+    const commandLine = document.getElementById("commandLine");
+    const viewMeta = document.getElementById("viewMeta");
+    const asciiScreen = document.getElementById("asciiScreen");
+    const asciiCtx = asciiScreen.getContext("2d");
+    const asciiPalette = {
+      g: "#9bbf74",
+      d: "#8f7a5d",
+      c: "#74a6a6",
+      a: "#f0a64d",
+      r: "#d36a4f",
+      w: "#e7d0a4"
+    };
+    const ramp = " .,:;irsXA253hMHGS#9B&@";
+    const state = {
+      mode: "map",
+      x: 0,
+      y: 0,
+      zoom: 1.45,
+      marker: { x: 2.3, y: -1.1 },
+      glitch: 2,
+      showGrid: true,
+      showContour: true,
+      showSignal: true,
+      selectedEvent: 0,
+      dragging: null
+    };
+    const eventScenes = [
+      {
+        id: "crash",
+        title: "主线 1A / 坠毁倒计时",
+        meta: "核心失压 / 备用电源临界 / 生命支持倒计时",
+        caption: "点名、分工、首轮回收：先活下来，再谈探索。",
+        color: "r",
+        art: [
+          "        __|__        ",
+          "  _____/ /_\\ \\____   ",
+          "--====/ /___\\ \\===---",
+          "     /_/ XX \\_\\      ",
+          "    /__/____\\__\\     "
+        ]
+      },
+      {
+        id: "gate",
+        title: "主线 3A / 门域首次接触",
+        meta: "潜入窗口 / 协议信道 / 强攻回路并列推演",
+        caption: "不是怎么过去，而是以怎样的身份过去。",
+        color: "c",
+        art: [
+          "      .-----------.      ",
+          "   .-'  .-===-.    '-.   ",
+          "  /   .'  7|7  '.     \\  ",
+          " |   /  -- | --   \\    | ",
+          " |   \\   __|__    /    | ",
+          "  \\   '._     _.'     /  ",
+          "   '-.   '---'    .-'    ",
+          "      '-----------'      "
+        ]
+      },
+      {
+        id: "vow",
+        title: "支线 01 / 失温婚约",
+        meta: "霜湾信物 / 烬炉誓物 / 封锁令取证",
+        caption: "把春天送到另一半冬天里。",
+        color: "w",
+        art: [
+          "   * frost relay *       ",
+          "      .----.      .----. ",
+          "     / ICE  \\____/ FIRE \\",
+          "     \\______/    \\______/",
+          "        \\   vow token  / ",
+          "         '---><---'      "
+        ]
+      },
+      {
+        id: "tax",
+        title: "支线 02 / 火井税单",
+        meta: "事故簿 / 配额流向 / 公开质询",
+        caption: "一张行政文书，读起来像生存判决。",
+        color: "a",
+        art: [
+          "   HEAT FORGE LEDGER     ",
+          "  +------------------+   ",
+          "  | TAX: ######      |   ",
+          "  | RISK COST: HIGH  |   ",
+          "  | PERMIT?  Y / N   |   ",
+          "  +------------------+   ",
+          "      /\\ mine shaft /\\   "
+        ]
+      },
+      {
+        id: "blind",
+        title: "支线 08 / 盲区测绘",
+        meta: "外围警戒环 / 快扫与慢扫 / 低暴露潜入",
+        caption: "盲区不是没人巡逻，而是那几分钟对方以为不用巡逻。",
+        color: "g",
+        art: [
+          " patrol mesh density      ",
+          "  +--+--+--+--+--+--+    ",
+          "  |##|  |##|  |##|  |    ",
+          "  +--+--+--+--+--+--+    ",
+          "       route: ....>      ",
+          "  blind slot [00:37]     "
+        ]
+      },
+      {
+        id: "beat",
+        title: "支线 09 / 七拍语法",
+        meta: "采样 / 对照 / 共振发声器 / 实测误译风险",
+        caption: "最危险的不是听不懂，而是确信自己听懂了。",
+        color: "w",
+        art: [
+          "  beat: 1 2 3 4 5 6 7    ",
+          "        | | | | | | *    ",
+          "   .-----------------.   ",
+          "   | resonance rig   |   ",
+          "   |  ))  ))  ))     |   ",
+          "   '-----------------'   "
+        ]
+      }
+    ];
+    let cols = 1;
+    let rows = 1;
+    let cellW = 9;
+    let cellH = 15;
+    let dpr = 1;
+    let frame = 0;
+    let glitches = [];
+    let nextGlitch = 0;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function resizeAscii() {
+      const rect = asciiScreen.getBoundingClientRect();
+      dpr = Math.max(1, window.devicePixelRatio || 1);
+      cellW = window.innerWidth < 980 ? 8 : 9;
+      cellH = window.innerWidth < 980 ? 13 : 15;
+      asciiScreen.width = Math.max(1, Math.floor(rect.width * dpr));
+      asciiScreen.height = Math.max(1, Math.floor(rect.height * dpr));
+      cols = Math.max(24, Math.floor(rect.width / cellW));
+      rows = Math.max(18, Math.floor(rect.height / cellH));
+      asciiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      asciiCtx.imageSmoothingEnabled = false;
+      asciiCtx.font = `${window.innerWidth < 980 ? 11 : 12}px "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace`;
+      asciiCtx.textBaseline = "top";
+    }
+
+    function makeBuffer(fill = " ") {
+      return Array.from({ length: rows }, () => Array(cols).fill(fill));
+    }
+
+    function makeColorBuffer(fill = "d") {
+      return Array.from({ length: rows }, () => Array(cols).fill(fill));
+    }
+
+    function put(buf, colors, x, y, ch, color = "g") {
+      if (x < 0 || y < 0 || x >= cols || y >= rows) return;
+      buf[y][x] = ch;
+      colors[y][x] = color;
+    }
+
+    function text(buf, colors, x, y, value, color = "g") {
+      if (y < 0 || y >= rows) return;
+      for (let i = 0; i < value.length && x + i < cols; i += 1) {
+        if (x + i >= 0) {
+          put(buf, colors, x + i, y, value[i], color);
+        }
+      }
+    }
+
+    function box(buf, colors, x, y, w, h, title) {
+      if (w < 3 || h < 3) return;
+      for (let i = 0; i < w; i += 1) {
+        put(buf, colors, x + i, y, "-", "d");
+        put(buf, colors, x + i, y + h - 1, "-", "d");
+      }
+      for (let j = 0; j < h; j += 1) {
+        put(buf, colors, x, y + j, "|", "d");
+        put(buf, colors, x + w - 1, y + j, "|", "d");
+      }
+      put(buf, colors, x, y, "+", "c");
+      put(buf, colors, x + w - 1, y, "+", "c");
+      put(buf, colors, x, y + h - 1, "+", "c");
+      put(buf, colors, x + w - 1, y + h - 1, "+", "c");
+      if (title) text(buf, colors, x + 2, y, `[${title}]`, "a");
+    }
+
+    function worldFromCell(cx, cy) {
+      return {
+        x: state.x + (cx - cols / 2) / (10 * state.zoom),
+        y: state.y + (cy - rows / 2) / (6 * state.zoom)
+      };
+    }
+
+    function sample(wx, wy) {
+      return Math.sin(wx * 1.2) * 0.44 + Math.sin(wy * 1.6 + wx * 0.35) * 0.28 + Math.cos((wx + wy) * 0.7) * 0.22 + Math.sin(wx * 2.7 - wy * 2.1) * 0.09;
+    }
+
+    function drawAsciiMap(buf, colors, time) {
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const p = worldFromCell(x, y);
+          const e = sample(p.x, p.y);
+          const level = clamp((e + 1.15) / 2.3, 0, 1);
+          let ch = ramp[Math.floor(level * (ramp.length - 1))];
+          let color = level < 0.28 ? "c" : level < 0.62 ? "g" : "a";
+          const contour = Math.abs(e * 5 - Math.round(e * 5));
+          if (state.showContour && contour < 0.032) {
+            ch = "=";
+            color = "a";
+          }
+          if (state.showGrid && (x % 9 === 0 || y % 5 === 0)) {
+            ch = "+";
+            color = "d";
+          }
+          const pulse = (time * 0.032) % Math.min(cols, rows);
+          const dist = Math.hypot(x - cols / 2, y - rows / 2);
+          if (state.showSignal && Math.abs(dist - pulse) < 0.5) {
+            ch = "o";
+            color = "c";
+          }
+          put(buf, colors, x, y, ch, color);
+        }
+      }
+
+      if (state.marker) {
+        const mx = Math.floor((state.marker.x - state.x) * 10 * state.zoom + cols / 2);
+        const my = Math.floor((state.marker.y - state.y) * 6 * state.zoom + rows / 2);
+        text(buf, colors, mx - 3, my - 2, "\\ | /", "r");
+        text(buf, colors, mx - 3, my - 1, "- X -", "r");
+        text(buf, colors, mx - 3, my, "/ | \\", "r");
+      }
+
+      box(buf, colors, 2, 2, Math.min(30, cols - 4), 6, "MAP CTRL");
+      text(buf, colors, 4, 4, `CENTER ${state.x.toFixed(2)}, ${state.y.toFixed(2)}`, "c");
+      text(buf, colors, 4, 5, `ZOOM   ${state.zoom.toFixed(2)}  GLITCH ${state.glitch}`, "g");
+      text(buf, colors, 4, 6, `GRID ${state.showGrid ? "ON" : "OFF"} CONTOUR ${state.showContour ? "ON" : "OFF"} SIGNAL ${state.showSignal ? "ON" : "OFF"}`, "a");
+
+      const mmW = Math.min(24, Math.floor(cols * 0.28));
+      const mmH = Math.min(10, Math.floor(rows * 0.25));
+      const mmX = cols - mmW - 3;
+      const mmY = 2;
+      box(buf, colors, mmX, mmY, mmW, mmH, "MINI");
+      for (let y = 1; y < mmH - 1; y += 1) {
+        for (let x = 1; x < mmW - 1; x += 1) {
+          const wx = state.x - 8 + (x / Math.max(1, mmW - 2)) * 16;
+          const wy = state.y - 6 + (y / Math.max(1, mmH - 2)) * 12;
+          const l = clamp((sample(wx, wy) + 1.15) / 2.3, 0, 1);
+          put(buf, colors, mmX + x, mmY + y, l > 0.66 ? "#" : l > 0.38 ? "+" : ".", l > 0.6 ? "a" : "d");
+        }
+      }
+      put(buf, colors, mmX + Math.floor(mmW / 2), mmY + Math.floor(mmH / 2), "[]", "c");
+    }
+
+    function drawAsciiEvent(buf, colors, time) {
+      const horizon = Math.floor(rows * 0.58);
+      const event = eventScenes[state.selectedEvent] ?? eventScenes[0];
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          if (y < horizon) {
+            put(buf, colors, x, y, (x + y + frame) % 17 === 0 ? "." : " ", "c");
+          } else {
+            put(buf, colors, x, y, (x + y) % 4 === 0 ? ":" : ".", event.color === "r" || event.color === "a" ? "a" : "g");
+          }
+        }
+      }
+
+      for (let x = 0; x < cols * 0.36; x += 1) {
+        const peak = cols * 0.16;
+        const yTop = Math.floor(horizon - 11 + Math.abs(x - peak) * 0.45);
+        for (let y = yTop; y < rows; y += 1) put(buf, colors, x, y, y < horizon ? "^" : "#", y < horizon ? "a" : "d");
+      }
+
+      const shipX = Math.floor(cols * 0.5);
+      const shipY = Math.floor(rows * 0.56);
+      event.art.forEach((line, dy) => {
+        text(buf, colors, shipX - Math.floor(line.length / 2), shipY + dy - Math.floor(event.art.length / 2), line, event.color);
+      });
+
+      const flame = frame % 12 < 6 ? ["  *  * ", " ******", "  **** "] : ["   *   ", "  ***  ", "*******"];
+      if (event.id === "crash" || event.id === "tax") {
+        flame.forEach((line, dy) => text(buf, colors, shipX + 10, shipY + dy + 1, line, dy === 1 ? "r" : "a"));
+      }
+
+      const smoke = ["  ~~     ~~  ", " ~~~~  ~~~~ ", "  ~~  ~~~~~ "];
+      smoke.forEach((line, dy) => text(buf, colors, shipX + 7 + Math.floor(Math.sin(time * 0.002 + dy) * 2), shipY - 7 + dy, line, "d"));
+
+      const crewX = Math.floor(cols * 0.2);
+      const crewY = Math.floor(rows * 0.7);
+      [" o   o   o ", "/|\\ /|\\ /|\\", "/ \\ / \\ / \\", event.id === "beat" ? " LISTEN / VERIFY" : event.id === "blind" ? " SCAN / HOLD" : " SOS / HEAT RISING"].forEach((line, dy) => {
+        text(buf, colors, crewX, crewY + dy, line, dy === 3 ? "r" : "w");
+      });
+
+      box(buf, colors, 2, 2, Math.min(48, cols - 4), 8, "IAFS EVENT");
+      text(buf, colors, 4, 4, event.title, event.color);
+      text(buf, colors, 4, 5, event.meta, "a");
+      text(buf, colors, 4, 6, event.caption, "w");
+      text(buf, colors, 4, 7, "event menu: left panel / click to switch", "d");
+    }
+
+    function spawnGlitch(time) {
+      glitches.push({
+        x: Math.floor(Math.random() * cols),
+        y: Math.floor(Math.random() * rows),
+        r: 5 + Math.random() * 14,
+        start: time,
+        dur: 160 + Math.random() * 260,
+        kick: (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 8))
+      });
+      if (glitches.length > 18) glitches.shift();
+    }
+
+    function applyGlitch(buf, colors, time) {
+      if (time > nextGlitch) {
+        spawnGlitch(time);
+        if (Math.random() > 0.66) spawnGlitch(time);
+        nextGlitch = time + (560 - state.glitch * 105) + Math.random() * 360;
+      }
+
+      for (let i = glitches.length - 1; i >= 0; i -= 1) {
+        const g = glitches[i];
+        const age = time - g.start;
+        if (age > g.dur) {
+          glitches.splice(i, 1);
+          continue;
+        }
+        const strength = 1 - age / g.dur;
+        const y0 = clamp(Math.floor(g.y - g.r), 0, rows - 1);
+        const y1 = clamp(Math.floor(g.y + g.r), 0, rows - 1);
+        for (let y = y0; y <= y1; y += 1) {
+          if (Math.random() < 0.42) {
+            const row = buf[y].slice();
+            const crow = colors[y].slice();
+            const shift = Math.floor(g.kick * strength + (Math.random() - 0.5) * g.r * 0.5);
+            for (let x = 0; x < cols; x += 1) {
+              const sx = x - shift;
+              if (sx >= 0 && sx < cols) {
+                buf[y][x] = row[sx];
+                colors[y][x] = crow[sx];
+              }
+            }
+          }
+        }
+        for (let b = 0; b < 5; b += 1) {
+          const bx = clamp(Math.floor(g.x + (Math.random() - 0.5) * g.r), 0, cols - 8);
+          const by = clamp(Math.floor(g.y + (Math.random() - 0.5) * g.r), 0, rows - 2);
+          const bw = 3 + Math.floor(Math.random() * 9);
+          for (let x = 0; x < bw; x += 1) put(buf, colors, bx + x, by, "#", Math.random() > 0.5 ? "r" : "a");
+        }
+      }
+    }
+
+    function renderAscii(time) {
+      frame += 1;
+      const buf = makeBuffer();
+      const colors = makeColorBuffer();
+      if (state.mode === "event") drawAsciiEvent(buf, colors, time);
+      else drawAsciiMap(buf, colors, time);
+      applyGlitch(buf, colors, time);
+
+      asciiCtx.setTransform(1, 0, 0, 1, 0, 0);
+      asciiCtx.clearRect(0, 0, asciiScreen.width, asciiScreen.height);
+      asciiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      asciiCtx.fillStyle = "#10110d";
+      asciiCtx.fillRect(0, 0, asciiScreen.width / dpr, asciiScreen.height / dpr);
+      asciiCtx.font = `${window.innerWidth < 980 ? 11 : 12}px "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace`;
+      for (let y = 0; y < rows; y += 1) {
+        for (let x = 0; x < cols; x += 1) {
+          const ch = buf[y][x];
+          if (ch === " ") continue;
+          asciiCtx.fillStyle = asciiPalette[colors[y][x]] || asciiPalette.g;
+          asciiCtx.fillText(ch, x * cellW + 2, y * cellH + 1);
+        }
+      }
+      requestAnimationFrame(renderAscii);
+    }
+
+    function cellFromEvent(event) {
+      const rect = asciiScreen.getBoundingClientRect();
+      return {
+        x: clamp(Math.floor((event.clientX - rect.left) / cellW), 0, cols - 1),
+        y: clamp(Math.floor((event.clientY - rect.top) / cellH), 0, rows - 1)
+      };
+    }
+
+    function setMode(mode) {
+      const eventMode = mode === "event";
+      const activeEvent = eventScenes[state.selectedEvent] ?? eventScenes[0];
+      state.mode = mode;
+      eventButton.setAttribute("aria-pressed", String(eventMode));
+      mapButton.setAttribute("aria-pressed", String(!eventMode));
+      leftEventButton.setAttribute("aria-pressed", String(eventMode));
+      leftMapButton.setAttribute("aria-pressed", String(!eventMode));
+      statusLine.textContent = eventMode
+        ? `> live event feed / ${activeEvent.title}`
+        : "> cursor locked to map pane / selected tile C-06";
+      commandLine.textContent = eventMode
+        ? `> incoming event: ${activeEvent.caption}`
+        : "> awaiting player command";
+      viewMeta.textContent = eventMode
+        ? activeEvent.meta
+        : "zoom 1.50 / contour 0.72 / noise 0.18";
+    }
+
+    function selectEvent(index) {
+      state.selectedEvent = clamp(index, 0, eventScenes.length - 1);
+      eventOptionButtons.forEach((button, buttonIndex) => {
+        const active = buttonIndex === state.selectedEvent;
+        button.classList.toggle("off", !active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+      setMode("event");
+    }
+
+    function syncToggle(button, enabled) {
+      button.classList.toggle("off", !enabled);
+      button.setAttribute("aria-pressed", String(enabled));
+      const small = button.querySelector("small");
+      if (small) small.textContent = enabled ? "ON" : "OFF";
+    }
+
+    function setZoom(nextZoom) {
+      state.mode = "map";
+      state.zoom = clamp(nextZoom, 0.6, 5);
+      setMode("map");
+      statusLine.textContent = `> zoom adjusted ${state.zoom.toFixed(2)}`;
+      viewMeta.textContent = `zoom ${state.zoom.toFixed(2)} / contour ${state.showContour ? "ON" : "OFF"} / signal ${state.showSignal ? "ON" : "OFF"}`;
+    }
+
+    function recenterMap() {
+      state.x = 0;
+      state.y = 0;
+      setMode("map");
+      statusLine.textContent = "> map center restored / origin tile locked";
+      commandLine.textContent = "> recenter command accepted";
+    }
+
+    function bumpGlitch(delta) {
+      state.glitch = clamp(state.glitch + delta, 0, 4);
+      statusLine.textContent = `> glitch level ${state.glitch}`;
+      commandLine.textContent = delta > 0 ? "> interference amplifier online" : "> interference dampener online";
+    }
+
+    eventButton.addEventListener("click", () => setMode("event"));
+    mapButton.addEventListener("click", () => setMode("map"));
+    leftEventButton.addEventListener("click", () => setMode("event"));
+    leftMapButton.addEventListener("click", () => setMode("map"));
+    eventOptionButtons.forEach((button) => {
+      button.addEventListener("click", () => selectEvent(Number(button.dataset.eventIndex || 0)));
+    });
+    gridButton.addEventListener("click", () => {
+      state.showGrid = !state.showGrid;
+      syncToggle(gridButton, state.showGrid);
+      syncToggle(gridFooterButton, state.showGrid);
+      statusLine.textContent = `> grid layer ${state.showGrid ? "enabled" : "disabled"}`;
+    });
+    gridFooterButton.addEventListener("click", () => gridButton.click());
+    contourButton.addEventListener("click", () => {
+      state.showContour = !state.showContour;
+      syncToggle(contourButton, state.showContour);
+      statusLine.textContent = `> contour layer ${state.showContour ? "enabled" : "disabled"}`;
+    });
+    signalButton.addEventListener("click", () => {
+      state.showSignal = !state.showSignal;
+      syncToggle(signalButton, state.showSignal);
+      statusLine.textContent = `> signal layer ${state.showSignal ? "enabled" : "disabled"}`;
+    });
+    zoomInButton.addEventListener("click", () => setZoom(state.zoom * 1.15));
+    zoomOutButton.addEventListener("click", () => setZoom(state.zoom / 1.15));
+    recenterButton.addEventListener("click", recenterMap);
+    glitchUpButton.addEventListener("click", () => bumpGlitch(1));
+    glitchDownButton.addEventListener("click", () => bumpGlitch(-1));
+
+    asciiScreen.addEventListener("pointerdown", (event) => {
+      if (state.mode !== "map") return;
+      const cell = cellFromEvent(event);
+      const world = worldFromCell(cell.x, cell.y);
+      state.marker = world;
+      state.dragging = { x: event.clientX, y: event.clientY };
+      asciiScreen.setPointerCapture(event.pointerId);
+      statusLine.textContent = `> marker set ${world.x.toFixed(2)}, ${world.y.toFixed(2)} / drag to pan`;
+      commandLine.textContent = "> map interaction active";
+    });
+
+    asciiScreen.addEventListener("pointermove", (event) => {
+      if (state.mode !== "map" || !state.dragging) return;
+      const dx = event.clientX - state.dragging.x;
+      const dy = event.clientY - state.dragging.y;
+      state.dragging = { x: event.clientX, y: event.clientY };
+      state.x -= dx / (82 * state.zoom);
+      state.y -= dy / (54 * state.zoom);
+      viewMeta.textContent = `zoom ${state.zoom.toFixed(2)} / center ${state.x.toFixed(2)}, ${state.y.toFixed(2)}`;
+    });
+
+    asciiScreen.addEventListener("pointerup", (event) => {
+      state.dragging = null;
+      if (asciiScreen.hasPointerCapture(event.pointerId)) asciiScreen.releasePointerCapture(event.pointerId);
+    });
+
+    asciiScreen.addEventListener("wheel", (event) => {
+      if (state.mode !== "map") return;
+      event.preventDefault();
+      state.zoom = clamp(state.zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12), 0.6, 5);
+      statusLine.textContent = `> zoom adjusted ${state.zoom.toFixed(2)} / wheel input accepted`;
+      viewMeta.textContent = `zoom ${state.zoom.toFixed(2)} / contour 0.72 / noise 0.18`;
+    }, { passive: false });
+
+    window.addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+      if (key === "e") setMode("event");
+      else if (key === "m") setMode("map");
+      else if (key === "g") gridButton.click();
+      else if (key === "c") contourButton.click();
+      else if (key === "s") signalButton.click();
+      else if (key === "r") recenterMap();
+      else if (key === "h") bumpGlitch(1);
+      else if (key === "l") bumpGlitch(-1);
+      else if (event.key === "+" || event.key === "=") setZoom(state.zoom * 1.15);
+      else if (event.key === "-" || event.key === "_") setZoom(state.zoom / 1.15);
+    });
+
+    window.addEventListener("resize", resizeAscii);
+    resizeAscii();
+    requestAnimationFrame(renderAscii);
+  </script>
+</body>
+</html>

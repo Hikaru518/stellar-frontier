@@ -1,0 +1,1048 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASCII Console</title>
+  <style>
+    :root {
+      --bg: #020503;
+      --ink: #8fffbe;
+      --ink-dim: #5ea07a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(120% 90% at 50% 35%, #0a1711 0%, var(--bg) 55%, #010302 100%);
+      color: var(--ink);
+      font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Courier New", monospace;
+    }
+
+    #screen {
+      display: block;
+      width: 100vw;
+      height: 100svh;
+      user-select: none;
+      cursor: crosshair;
+      animation: crt 0.16s steps(2) infinite;
+      image-rendering: pixelated;
+    }
+
+    .cg { color: #8fffbe; }
+    .cd { color: #5ea07a; }
+    .cc { color: #7fe8ff; }
+    .ca { color: #ffc879; }
+    .cr { color: #ff8479; }
+    .cw { color: #e9fff4; }
+    .cm { color: #b9ffdc; }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(to bottom, rgba(150, 255, 200, 0.07), rgba(150, 255, 200, 0.07) 1px, transparent 1px, transparent 3px),
+        radial-gradient(120% 100% at 50% 45%, transparent 45%, rgba(0, 0, 0, 0.62) 100%);
+      mix-blend-mode: screen;
+      opacity: 0.75;
+    }
+
+    @keyframes crt {
+      0%,
+      100% {
+        opacity: 0.98;
+      }
+
+      50% {
+        opacity: 0.9;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="screen"></canvas>
+  <div class="overlay" aria-hidden="true"></div>
+
+  <script>
+    (function () {
+      const screen = document.getElementById("screen");
+      const ctx = screen.getContext("2d", { alpha: true });
+      const ramp = " .,:;irsXA253hMHGS#9B&@";
+      const FONT_STACK = '"Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Courier New", monospace';
+      const SCREEN_PADDING = 8;
+      const WIDE_FILL = "";
+      const palette = {
+        g: "#8fffbe",
+        d: "#5ea07a",
+        c: "#7fe8ff",
+        a: "#ffc879",
+        r: "#ff8479",
+        w: "#e9fff4",
+        m: "#b9ffdc"
+      };
+
+      let cols = 0;
+      let rows = 0;
+      let frame = 0;
+      let glitches = [];
+      let nextGlitch = 0;
+      let buttonRects = [];
+      let hoverButton = null;
+      let drag = null;
+      const buttonPressUntil = {};
+
+      const state = {
+        mode: "map",
+        mapX: 0,
+        mapY: 0,
+        zoom: 1.5,
+        marker: null,
+        showGrid: true,
+        showContour: true,
+        showSignal: true,
+        glitchLevel: 1,
+        selectedEvent: 0,
+        status: "系统就绪"
+      };
+
+      const eventScenes = [
+        {
+          id: "crash",
+          short: "1A 坠毁",
+          title: "主线 1A / 坠毁倒计时",
+          meta: "核心失压 / 备用电源临界 / 生命支持倒计时",
+          caption: "点名、分工、首轮回收：先活下来，再谈探索。",
+          palette: "r",
+          art: [
+            "        __|__        ",
+            "  _____/ /_\\ \\____   ",
+            "--====/ /___\\ \\===---",
+            "     /_/ XX \\_\\      ",
+            "    /__/____\\__\\     "
+          ]
+        },
+        {
+          id: "gate",
+          short: "3A 门域",
+          title: "主线 3A / 门域首次接触",
+          meta: "潜入窗口 / 协议信道 / 强攻回路并列推演",
+          caption: "不是怎么过去，而是以怎样的身份过去。",
+          palette: "c",
+          art: [
+            "      .-----------.      ",
+            "   .-'  .-===-.    '-.   ",
+            "  /   .'  7|7  '.     \\  ",
+            " |   /  -- | --   \\    | ",
+            " |   \\   __|__    /    | ",
+            "  \\   '._     _.'     /  ",
+            "   '-.   '---'    .-'    ",
+            "      '-----------'      "
+          ]
+        },
+        {
+          id: "vow",
+          short: "S01 婚约",
+          title: "支线 01 / 失温婚约",
+          meta: "霜湾信物 / 烬炉誓物 / 封锁令取证",
+          caption: "把春天送到另一半冬天里。",
+          palette: "m",
+          art: [
+            "   * frost relay *       ",
+            "      .----.      .----. ",
+            "     / ICE  \\____/ FIRE \\",
+            "     \\______/    \\______/",
+            "        \\   vow token  / ",
+            "         '---><---'      "
+          ]
+        },
+        {
+          id: "tax",
+          short: "S02 税单",
+          title: "支线 02 / 火井税单",
+          meta: "事故簿 / 配额流向 / 公开质询",
+          caption: "一张行政文书，读起来像生存判决。",
+          palette: "a",
+          art: [
+            "   HEAT FORGE LEDGER     ",
+            "  +------------------+   ",
+            "  | TAX: ######      |   ",
+            "  | RISK COST: HIGH  |   ",
+            "  | PERMIT?  Y / N   |   ",
+            "  +------------------+   ",
+            "      /\\ mine shaft /\\   "
+          ]
+        },
+        {
+          id: "blind",
+          short: "S08 盲区",
+          title: "支线 08 / 盲区测绘",
+          meta: "外围警戒环 / 快扫与慢扫 / 低暴露潜入",
+          caption: "盲区不是没人巡逻，而是那几分钟对方以为不用巡逻。",
+          palette: "g",
+          art: [
+            " patrol mesh density      ",
+            "  +--+--+--+--+--+--+    ",
+            "  |##|  |##|  |##|  |    ",
+            "  +--+--+--+--+--+--+    ",
+            "       route: ....>      ",
+            "  blind slot [00:37]     "
+          ]
+        },
+        {
+          id: "beat",
+          short: "S09 七拍",
+          title: "支线 09 / 七拍语法",
+          meta: "采样 / 对照 / 共振发声器 / 实测误译风险",
+          caption: "最危险的不是听不懂，而是确信自己听懂了。",
+          palette: "w",
+          art: [
+            "  beat: 1 2 3 4 5 6 7    ",
+            "        | | | | | | *    ",
+            "   .-----------------.   ",
+            "   | resonance rig   |   ",
+            "   |  ))  ))  ))     |   ",
+            "   '-----------------'   "
+          ]
+        }
+      ];
+
+      let cellWidth = 9;
+      let cellHeight = 16;
+      let fontSize = 13;
+      let dpr = 1;
+      const glyphCache = new Map();
+      let gridOffsetX = SCREEN_PADDING;
+      let gridOffsetY = SCREEN_PADDING;
+
+      function clamp(v, min, max) {
+        return Math.max(min, Math.min(max, v));
+      }
+
+      function makeBuffer(w, h) {
+        return Array.from({ length: h }, () => Array(w).fill(" "));
+      }
+
+      function makeColorBuffer(w, h, c) {
+        return Array.from({ length: h }, () => Array(w).fill(c));
+      }
+
+      function drawText(buf, cbuf, x, y, txt, color) {
+        if (y < 0 || y >= buf.length) return;
+        let xi = x;
+        for (const ch of txt) {
+          const cw = charDisplayWidth(ch);
+          if (cw <= 0) continue;
+          if (xi < 0) {
+            xi += cw;
+            continue;
+          }
+          if ((cw === 2 && xi >= buf[0].length - 1) || (cw === 1 && xi >= buf[0].length)) break;
+          buf[y][xi] = ch;
+          cbuf[y][xi] = color || "g";
+          if (cw === 2) {
+            buf[y][xi + 1] = WIDE_FILL;
+            cbuf[y][xi + 1] = color || "g";
+          }
+          xi += cw;
+        }
+      }
+
+      function charDisplayWidth(ch) {
+        if (!ch) return 0;
+        const cp = ch.codePointAt(0);
+        if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) return 0;
+        if (
+          (cp >= 0x1100 && cp <= 0x115f) ||
+          (cp >= 0x2e80 && cp <= 0xa4cf) ||
+          (cp >= 0xac00 && cp <= 0xd7a3) ||
+          (cp >= 0xf900 && cp <= 0xfaff) ||
+          (cp >= 0xfe10 && cp <= 0xfe19) ||
+          (cp >= 0xfe30 && cp <= 0xfe6f) ||
+          (cp >= 0xff00 && cp <= 0xff60) ||
+          (cp >= 0xffe0 && cp <= 0xffe6)
+        ) return 2;
+        return 1;
+      }
+
+      function stringDisplayWidth(str) {
+        let w = 0;
+        for (const ch of str) w += charDisplayWidth(ch);
+        return w;
+      }
+
+      function sliceByDisplayWidth(str, maxWidth) {
+        if (maxWidth <= 0) return "";
+        let w = 0;
+        let out = "";
+        for (const ch of str) {
+          const cw = charDisplayWidth(ch);
+          if (w + cw > maxWidth) break;
+          out += ch;
+          w += cw;
+        }
+        return out;
+      }
+
+      function fitTextByDisplayWidth(str, width) {
+        const clipped = sliceByDisplayWidth(str, width);
+        const pad = Math.max(0, width - stringDisplayWidth(clipped));
+        return clipped + " ".repeat(pad);
+      }
+
+      function resetGlyphCache() {
+        glyphCache.clear();
+      }
+
+      function updateCanvasMetrics() {
+        const compact = window.innerWidth < 900;
+        fontSize = compact ? 11 : 13;
+        cellWidth = compact ? 8 : 9;
+        cellHeight = compact ? 14 : 16;
+        dpr = Math.max(1, window.devicePixelRatio || 1);
+        resetGlyphCache();
+      }
+
+      function getGlyphCanvas(ch, color, span) {
+        const key = `${fontSize}:${cellWidth}:${cellHeight}:${dpr}:${span}:${color}:${ch}`;
+        const cached = glyphCache.get(key);
+        if (cached) return cached;
+
+        const boxW = span * cellWidth;
+        const boxH = cellHeight;
+        const glyph = document.createElement("canvas");
+        glyph.width = Math.max(1, Math.ceil(boxW * dpr));
+        glyph.height = Math.max(1, Math.ceil(boxH * dpr));
+
+        const gctx = glyph.getContext("2d");
+        gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        gctx.imageSmoothingEnabled = false;
+
+        let drawSize = fontSize;
+        gctx.font = `${drawSize}px ${FONT_STACK}`;
+        let metrics = gctx.measureText(ch);
+        let textW = Math.max(metrics.width, (metrics.actualBoundingBoxLeft || 0) + (metrics.actualBoundingBoxRight || 0));
+        let textH = Math.max(drawSize, (metrics.actualBoundingBoxAscent || drawSize) + (metrics.actualBoundingBoxDescent || 0));
+        const scale = Math.min(1, (boxW - 1) / Math.max(1, textW), (boxH - 1) / Math.max(1, textH));
+
+        if (scale < 1) {
+          drawSize = Math.max(7, Math.floor(drawSize * scale));
+          gctx.font = `${drawSize}px ${FONT_STACK}`;
+          metrics = gctx.measureText(ch);
+          textW = Math.max(metrics.width, (metrics.actualBoundingBoxLeft || 0) + (metrics.actualBoundingBoxRight || 0));
+          textH = Math.max(drawSize, (metrics.actualBoundingBoxAscent || drawSize) + (metrics.actualBoundingBoxDescent || 0));
+        }
+
+        const ascent = metrics.actualBoundingBoxAscent || drawSize;
+        const descent = metrics.actualBoundingBoxDescent || 0;
+        const drawX = Math.floor((boxW - textW) / 2 - (metrics.actualBoundingBoxLeft || 0));
+        const drawY = Math.floor((boxH - (ascent + descent)) / 2 + ascent);
+
+        gctx.clearRect(0, 0, boxW, boxH);
+        gctx.font = `${drawSize}px ${FONT_STACK}`;
+        gctx.textBaseline = "alphabetic";
+        gctx.fillStyle = palette[color] || palette.g;
+        gctx.fillText(ch, drawX, drawY);
+
+        glyphCache.set(key, glyph);
+        return glyph;
+      }
+
+      function drawTextWide(buf, cbuf, x, y, txt, color) {
+        drawText(buf, cbuf, x, y, txt, color);
+      }
+
+      function drawTextClipped(buf, cbuf, x, y, txt, maxWidth, color) {
+        drawTextWide(buf, cbuf, x, y, sliceByDisplayWidth(txt, maxWidth), color);
+      }
+
+      function drawTextRightAligned(buf, cbuf, rightX, y, txt, maxWidth, color) {
+        const clipped = sliceByDisplayWidth(txt, maxWidth);
+        const w = stringDisplayWidth(clipped);
+        drawTextWide(buf, cbuf, rightX - w + 1, y, clipped, color);
+      }
+
+      function drawBox(buf, cbuf, x, y, w, h, title) {
+        if (w < 2 || h < 2) return;
+        for (let i = 0; i < w; i += 1) {
+          if (x + i >= 0 && x + i < buf[0].length) {
+            if (y >= 0 && y < buf.length) {
+              buf[y][x + i] = "-";
+              cbuf[y][x + i] = "d";
+            }
+            if (y + h - 1 >= 0 && y + h - 1 < buf.length) {
+              buf[y + h - 1][x + i] = "-";
+              cbuf[y + h - 1][x + i] = "d";
+            }
+          }
+        }
+        for (let j = 0; j < h; j += 1) {
+          if (y + j >= 0 && y + j < buf.length) {
+            if (x >= 0 && x < buf[0].length) {
+              buf[y + j][x] = "|";
+              cbuf[y + j][x] = "d";
+            }
+            if (x + w - 1 >= 0 && x + w - 1 < buf[0].length) {
+              buf[y + j][x + w - 1] = "|";
+              cbuf[y + j][x + w - 1] = "d";
+            }
+          }
+        }
+        if (y >= 0 && y < buf.length) {
+          if (x >= 0 && x < buf[0].length) {
+            buf[y][x] = "+";
+            cbuf[y][x] = "c";
+          }
+          if (x + w - 1 >= 0 && x + w - 1 < buf[0].length) {
+            buf[y][x + w - 1] = "+";
+            cbuf[y][x + w - 1] = "c";
+          }
+        }
+        if (y + h - 1 >= 0 && y + h - 1 < buf.length) {
+          if (x >= 0 && x < buf[0].length) {
+            buf[y + h - 1][x] = "+";
+            cbuf[y + h - 1][x] = "c";
+          }
+          if (x + w - 1 >= 0 && x + w - 1 < buf[0].length) {
+            buf[y + h - 1][x + w - 1] = "+";
+            cbuf[y + h - 1][x + w - 1] = "c";
+          }
+        }
+        if (title) drawTextClipped(buf, cbuf, x + 2, y, `[${title}]`, Math.max(0, w - 4), "c");
+      }
+
+      function drawButton(buf, cbuf, x, y, w, h, label, id, active) {
+        drawBox(buf, cbuf, x, y, w, h, "");
+        const now = performance.now();
+        const isHover = hoverButton === id;
+        const isPressed = (buttonPressUntil[id] || 0) > now;
+
+        if (isHover) {
+          for (let i = x + 1; i < x + w - 1; i += 1) {
+            buf[y][i] = "=";
+            cbuf[y][i] = "c";
+            buf[y + h - 1][i] = "=";
+            cbuf[y + h - 1][i] = "c";
+          }
+        }
+
+        const txt = fitTextByDisplayWidth(label, Math.max(0, w - 2));
+        drawText(buf, cbuf, x + 1, y + 1, txt, isPressed ? "w" : (isHover ? "c" : (active ? "a" : "g")));
+
+        if (isPressed) {
+          const fxChar = frame % 2 === 0 ? "*" : "+";
+          buf[y + 1][x + w - 2] = fxChar;
+          cbuf[y + 1][x + w - 2] = "w";
+        }
+
+        buttonRects.push({ id, x, y, w, h });
+      }
+
+      function meter(v, len) {
+        const n = clamp(Math.floor(v * len), 0, len);
+        return "[" + "#".repeat(n) + ".".repeat(len - n) + "]";
+      }
+
+      function layout() {
+        const topH = Math.min(4, Math.max(2, Math.floor(rows * 0.12)));
+        let bottomH = Math.min(9, Math.max(4, Math.floor(rows * 0.22)));
+        let sideW = Math.max(8, Math.floor(cols * 0.22));
+
+        let mainW = cols - sideW * 2;
+        if (mainW < 10) {
+          sideW = Math.max(2, Math.floor((cols - 10) / 2));
+          mainW = cols - sideW * 2;
+        }
+
+        let mainH = rows - topH - bottomH;
+        if (mainH < 8) {
+          bottomH = Math.max(2, rows - topH - 8);
+          mainH = rows - topH - bottomH;
+        }
+
+        const mainX = sideW;
+        const mainY = topH;
+
+        const viewX = mainX + 2;
+        const viewY = mainY + 3;
+        const viewW = Math.max(4, mainW - 4);
+        const viewH = Math.max(4, mainH - 5);
+
+        return { topH, bottomH, sideW, mainX, mainY, mainW, mainH, viewX, viewY, viewW, viewH };
+      }
+
+      function toWorld(view, sx, sy) {
+        return {
+          x: state.mapX + (sx - view.viewW / 2) / (10 * state.zoom),
+          y: state.mapY + (sy - view.viewH / 2) / (6 * state.zoom)
+        };
+      }
+
+      function sampleTerrain(wx, wy) {
+        const n1 = Math.sin(wx * 1.1) * 0.45;
+        const n2 = Math.sin(wy * 1.4 + wx * 0.35) * 0.28;
+        const n3 = Math.cos((wx + wy) * 0.8) * 0.22;
+        const n4 = Math.sin(wx * 2.6 - wy * 1.9) * 0.08;
+        return n1 + n2 + n3 + n4;
+      }
+
+      function sceneChar(l) {
+        const idx = clamp(Math.floor(l * (ramp.length - 1)), 0, ramp.length - 1);
+        return ramp[idx];
+      }
+
+      function drawMap(buf, cbuf, view, t) {
+        for (let y = 0; y < view.viewH; y += 1) {
+          for (let x = 0; x < view.viewW; x += 1) {
+            const world = toWorld(view, x, y);
+            const e = sampleTerrain(world.x, world.y);
+
+            let l = (e + 1.1) / 2.2;
+            let ch = sceneChar(l);
+            let col = l < 0.28 ? "c" : (l < 0.55 ? "g" : "m");
+
+            if (state.showContour) {
+              const contour = Math.abs((e * 5) - Math.round(e * 5));
+              if (contour < 0.035) {
+                ch = "=";
+                col = "a";
+              }
+            }
+
+            if (state.showGrid && (x % 8 === 0 || y % 4 === 0)) {
+              ch = "+";
+              col = "d";
+            }
+
+            if (state.showSignal) {
+              const cx = view.viewW * 0.5;
+              const cy = view.viewH * 0.5;
+              const d = Math.hypot(x - cx, y - cy);
+              const pulseR = (t * 0.035) % Math.min(view.viewW, view.viewH);
+              if (Math.abs(d - pulseR) < 0.55) {
+                ch = "o";
+                col = "m";
+              }
+            }
+
+            if (state.marker) {
+              const mx = Math.floor((state.marker.x - state.mapX) * 10 * state.zoom + view.viewW / 2);
+              const my = Math.floor((state.marker.y - state.mapY) * 6 * state.zoom + view.viewH / 2);
+              if (x === mx && y === my) {
+                ch = "X";
+                col = "r";
+              }
+            }
+
+            buf[view.viewY + y][view.viewX + x] = ch;
+            cbuf[view.viewY + y][view.viewX + x] = col;
+          }
+        }
+      }
+
+      function drawEventScene(buf, cbuf, view, t) {
+        const w = view.viewW;
+        const h = view.viewH;
+        const horizon = Math.floor(h * 0.62);
+        const event = eventScenes[state.selectedEvent] ?? eventScenes[0];
+
+        for (let y = 0; y < h; y += 1) {
+          for (let x = 0; x < w; x += 1) {
+            let ch = " ";
+            let col = "d";
+
+            if (y < horizon) {
+              ch = y % 2 === 0 ? "." : " ";
+              col = "c";
+            } else {
+              ch = (x + y) % 3 === 0 ? ":" : ".";
+              col = event.palette === "r" || event.palette === "a" ? "a" : "g";
+            }
+
+            buf[view.viewY + y][view.viewX + x] = ch;
+            cbuf[view.viewY + y][view.viewX + x] = col;
+          }
+        }
+
+        for (let x = 1; x < Math.floor(w * 0.45); x += 1) {
+          const peakX = Math.floor(w * 0.18);
+          const slope = Math.abs(x - peakX) * 0.95;
+          const yTop = Math.floor(horizon - 12 + slope);
+          for (let y = yTop; y < h; y += 1) {
+            if (y >= 0 && y < h) {
+              buf[view.viewY + y][view.viewX + x] = y < horizon ? "^" : "#";
+              cbuf[view.viewY + y][view.viewX + x] = y < horizon ? "a" : "d";
+            }
+          }
+        }
+
+        const lavaPulse = frame % 20 < 10;
+        const lavaX = Math.floor(w * 0.18);
+        for (let y = Math.floor(horizon - 10); y < Math.floor(horizon + 3); y += 1) {
+          if (y > 1 && y < h - 1) {
+            buf[view.viewY + y][view.viewX + lavaX] = "|";
+            cbuf[view.viewY + y][view.viewX + lavaX] = "r";
+            if (lavaPulse && y % 2 === 0 && lavaX + 1 < w) {
+              buf[view.viewY + y][view.viewX + lavaX + 1] = "*";
+              cbuf[view.viewY + y][view.viewX + lavaX + 1] = "a";
+            }
+          }
+        }
+
+        for (let x = Math.floor(w * 0.58); x < w - 2; x += 1) {
+          const wave = Math.sin(x * 0.35 + t * 0.002) * 1.6;
+          const yTop = Math.floor(horizon + 1 + wave);
+          for (let y = yTop; y < h; y += 1) {
+            buf[view.viewY + y][view.viewX + x] = (y + x) % 2 === 0 ? "*" : "+";
+            cbuf[view.viewY + y][view.viewX + x] = "w";
+          }
+        }
+
+        const px = Math.floor(w * 0.5);
+        const py = Math.floor(horizon + 2);
+        for (let i = 0; i < event.art.length; i += 1) {
+          const line = event.art[i];
+          for (let j = 0; j < line.length; j += 1) {
+            const ch = line[j];
+            if (ch !== " ") {
+              const tx = px + j - Math.floor(line.length / 2);
+              const ty = py + i - Math.floor(event.art.length / 2);
+              if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+                buf[view.viewY + ty][view.viewX + tx] = ch;
+                cbuf[view.viewY + ty][view.viewX + tx] = ch === "X" || ch === "*" ? "r" : event.palette;
+              }
+            }
+          }
+        }
+
+        const flame = frame % 12 < 6 ? [" * * ", "*****", " *** "] : ["  *  ", " *** ", "*****"];
+        for (let i = 0; i < flame.length; i += 1) {
+          const line = flame[i];
+          for (let j = 0; j < line.length; j += 1) {
+            if (line[j] !== " ") {
+              const tx = px + j + 5;
+              const ty = py + i - 2;
+              if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+                buf[view.viewY + ty][view.viewX + tx] = line[j];
+                cbuf[view.viewY + ty][view.viewX + tx] = j % 2 === 0 ? "a" : "r";
+              }
+            }
+          }
+        }
+
+        const smokeY = py - 7 - Math.floor(Math.sin(t * 0.004) * 1.2);
+        const smoke = [" ~~ ", "~~~~", " ~~ "];
+        for (let i = 0; i < smoke.length; i += 1) {
+          for (let j = 0; j < smoke[i].length; j += 1) {
+            if (smoke[i][j] !== " ") {
+              const tx = px + 6 + j;
+              const ty = smokeY + i;
+              if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+                buf[view.viewY + ty][view.viewX + tx] = "~";
+                cbuf[view.viewY + ty][view.viewX + tx] = "d";
+              }
+            }
+          }
+        }
+
+        const crewX = px - 10;
+        const crewY = py + 3;
+        const crew = [
+          " o   o ",
+          "/|\\ /|\\",
+          "/ \\ / \\",
+          event.id === "beat" ? "LISTEN" : event.id === "blind" ? "SCAN!" : "SOS! SOS!"
+        ];
+        for (let i = 0; i < crew.length; i += 1) {
+          for (let j = 0; j < crew[i].length; j += 1) {
+            const ch = crew[i][j];
+            if (ch !== " ") {
+              const tx = crewX + j;
+              const ty = crewY + i;
+              if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+                buf[view.viewY + ty][view.viewX + tx] = ch;
+                cbuf[view.viewY + ty][view.viewX + tx] = i < 3 ? "w" : "r";
+              }
+            }
+          }
+        }
+
+        drawBox(buf, cbuf, view.viewX + 2, view.viewY + 1, Math.min(w - 4, 42), 7, "IAFS EVENT");
+        drawTextClipped(buf, cbuf, view.viewX + 4, view.viewY + 3, event.title, Math.min(w - 8, 38), event.palette);
+        drawTextClipped(buf, cbuf, view.viewX + 4, view.viewY + 4, event.meta, Math.min(w - 8, 38), "d");
+        drawTextClipped(buf, cbuf, view.viewX + 4, view.viewY + 5, event.caption, Math.min(w - 8, 38), "w");
+      }
+
+      function drawMiniMap(buf, cbuf, view) {
+        const mmW = Math.min(26, Math.max(18, Math.floor(view.viewW * 0.3)));
+        const mmH = Math.min(12, Math.max(8, Math.floor(view.viewH * 0.26)));
+        const mmX = view.viewX + view.viewW - mmW - 2;
+        const mmY = view.viewY + 1;
+
+        drawBox(buf, cbuf, mmX, mmY, mmW, mmH, "MINI");
+
+        const wxMin = state.mapX - 8;
+        const wxMax = state.mapX + 8;
+        const wyMin = state.mapY - 6;
+        const wyMax = state.mapY + 6;
+
+        for (let y = 1; y < mmH - 1; y += 1) {
+          for (let x = 1; x < mmW - 1; x += 1) {
+            const wx = wxMin + ((x - 1) / Math.max(1, mmW - 3)) * (wxMax - wxMin);
+            const wy = wyMin + ((y - 1) / Math.max(1, mmH - 3)) * (wyMax - wyMin);
+            const e = sampleTerrain(wx, wy);
+            const l = clamp((e + 1.1) / 2.2, 0, 1);
+            buf[mmY + y][mmX + x] = l > 0.72 ? "#" : (l > 0.45 ? "+" : ".");
+            cbuf[mmY + y][mmX + x] = l > 0.6 ? "m" : "d";
+          }
+        }
+
+        const vw = clamp(Math.floor((view.viewW / (10 * state.zoom)) * ((mmW - 2) / (wxMax - wxMin))), 3, mmW - 3);
+        const vh = clamp(Math.floor((view.viewH / (6 * state.zoom)) * ((mmH - 2) / (wyMax - wyMin))), 2, mmH - 3);
+        const vx = mmX + Math.floor((mmW - 2 - vw) / 2) + 1;
+        const vy = mmY + Math.floor((mmH - 2 - vh) / 2) + 1;
+
+        for (let x = 0; x < vw; x += 1) {
+          buf[vy][vx + x] = "-";
+          cbuf[vy][vx + x] = "c";
+          buf[vy + vh - 1][vx + x] = "-";
+          cbuf[vy + vh - 1][vx + x] = "c";
+        }
+        for (let y = 0; y < vh; y += 1) {
+          buf[vy + y][vx] = "|";
+          cbuf[vy + y][vx] = "c";
+          buf[vy + y][vx + vw - 1] = "|";
+          cbuf[vy + y][vx + vw - 1] = "c";
+        }
+
+        if (state.marker) {
+          const mx = mmX + 1 + Math.floor(((state.marker.x - wxMin) / (wxMax - wxMin)) * (mmW - 3));
+          const my = mmY + 1 + Math.floor(((state.marker.y - wyMin) / (wyMax - wyMin)) * (mmH - 3));
+          if (mx > mmX && mx < mmX + mmW - 1 && my > mmY && my < mmY + mmH - 1) {
+            buf[my][mx] = "X";
+            cbuf[my][mx] = "r";
+          }
+        }
+      }
+
+      function spawnGlitch(t, view) {
+        glitches.push({
+          x: Math.floor(Math.random() * view.viewW) + view.viewX,
+          y: Math.floor(Math.random() * view.viewH) + view.viewY,
+          r: 8 + Math.random() * 18,
+          start: t,
+          dur: 180 + Math.random() * 260,
+          kick: (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 10))
+        });
+        if (glitches.length > 22) glitches.shift();
+      }
+
+      function applyGlitch(buf, cbuf, t, view) {
+        if (state.glitchLevel > 0 && t > nextGlitch) {
+          spawnGlitch(t, view);
+          if (Math.random() > 0.62) spawnGlitch(t, view);
+          nextGlitch = t + (520 - state.glitchLevel * 140) + Math.random() * 460;
+        }
+
+        const x0 = view.viewX;
+        const x1 = view.viewX + view.viewW - 1;
+        const y0Limit = view.viewY;
+        const y1Limit = view.viewY + view.viewH - 1;
+
+        for (let i = glitches.length - 1; i >= 0; i -= 1) {
+          const g = glitches[i];
+          const age = t - g.start;
+          if (age > g.dur) {
+            glitches.splice(i, 1);
+            continue;
+          }
+          const s = 1 - age / g.dur;
+          const y0 = Math.max(y0Limit, Math.floor(g.y - g.r));
+          const y1 = Math.min(y1Limit, Math.floor(g.y + g.r));
+          for (let y = y0; y <= y1; y += 1) {
+            if (Math.random() > 0.5) {
+              const shift = Math.floor((Math.random() - 0.5) * g.r * 0.7 * s + g.kick * s);
+              if (shift !== 0) {
+                const row = buf[y].slice();
+                const crow = cbuf[y].slice();
+                for (let x = x0; x <= x1; x += 1) {
+                  const sx = x - shift;
+                  if (sx >= x0 && sx <= x1) {
+                    buf[y][x] = row[sx];
+                    cbuf[y][x] = crow[sx];
+                  }
+                }
+              }
+            }
+          }
+          const blocks = 2 + Math.floor(Math.random() * 7);
+          for (let b = 0; b < blocks; b += 1) {
+            const bw = 4 + Math.floor(Math.random() * 12);
+            const bh = 1 + Math.floor(Math.random() * 3);
+            const bx = clamp(g.x + Math.floor((Math.random() - 0.5) * g.r), x0, x1 - bw + 1);
+            const by = clamp(g.y + Math.floor((Math.random() - 0.5) * g.r), y0Limit, y1Limit - bh + 1);
+            for (let yy = 0; yy < bh; yy += 1) {
+              for (let xx = 0; xx < bw; xx += 1) {
+                buf[by + yy][bx + xx] = "#";
+                cbuf[by + yy][bx + xx] = Math.random() > 0.5 ? "a" : "r";
+              }
+            }
+          }
+        }
+      }
+
+      function drawPanels(buf, cbuf, t, view) {
+        buttonRects = [];
+        const L = view;
+        const leftInner = Math.max(0, L.sideW - 4);
+        const rightInner = Math.max(0, L.sideW - 4);
+        const mainInner = Math.max(0, L.mainW - 4);
+        const bottomInner = Math.max(0, cols - 4);
+
+        drawBox(buf, cbuf, 0, 0, cols, L.topH, "R.A.C.O.T / ASCII MAP OPERATION CONSOLE");
+        const topLeft = `模式:在线  链路:97.8%  干扰:II-B  帧:${String(frame).padStart(6, "0")}`;
+        const topRight = `中心:${state.mapX.toFixed(2)},${state.mapY.toFixed(2)} 缩放:${state.zoom.toFixed(2)}`;
+        const topRightMax = Math.min(36, cols - 6);
+        const topRightW = stringDisplayWidth(sliceByDisplayWidth(topRight, topRightMax));
+        const topRightStart = Math.max(2, cols - 2 - topRightW);
+        const topLeftMax = Math.max(0, topRightStart - 5);
+        drawTextClipped(buf, cbuf, 2, 2, topLeft, topLeftMax, "m");
+        drawTextRightAligned(buf, cbuf, cols - 3, 2, topRight, topRightMax, "c");
+
+        drawBox(buf, cbuf, 0, L.topH, L.sideW, rows - L.topH - L.bottomH, "LEFT PANEL");
+        drawTextClipped(buf, cbuf, 2, L.topH + 2, "地图控制", leftInner, "a");
+        drawTextClipped(buf, cbuf, 2, L.topH + 3, `GRID   ${state.showGrid ? "ON" : "OFF"}`, leftInner, state.showGrid ? "g" : "d");
+        drawTextClipped(buf, cbuf, 2, L.topH + 4, `CONTOUR ${state.showContour ? "ON" : "OFF"}`, leftInner, state.showContour ? "g" : "d");
+        drawTextClipped(buf, cbuf, 2, L.topH + 5, `SIGNAL ${state.showSignal ? "ON" : "OFF"}`, leftInner, state.showSignal ? "g" : "d");
+        drawTextClipped(buf, cbuf, 2, L.topH + 6, `GLITCH LV ${state.glitchLevel}`, leftInner, "r");
+        drawTextClipped(buf, cbuf, 2, L.topH + 7, `MODE   ${state.mode === "map" ? "MAP" : "EVENT"}`, leftInner, "c");
+
+        let by = L.topH + 8;
+        const bh = 2;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[E] 事件", "event", state.mode === "event"); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[M] 地图", "map", state.mode === "map"); by += bh;
+        if (state.mode === "event") {
+          drawTextClipped(buf, cbuf, 2, by, "事件选择", leftInner, "a"); by += 1;
+          for (let i = 0; i < eventScenes.length && by < rows - L.bottomH - 2; i += 1) {
+            drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, eventScenes[i].short, `eventScene:${i}`, state.selectedEvent === i); by += bh;
+          }
+        }
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[G] 网格", "grid", state.showGrid); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[C] 等高线", "contour", state.showContour); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[S] 信号层", "signal", state.showSignal); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[+] 放大", "zoomIn", false); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[-] 缩小", "zoomOut", false); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[R] 回中心", "recenter", false); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[H] 故障增强", "glitchUp", false); by += bh;
+        drawButton(buf, cbuf, 2, by, L.sideW - 4, bh, "[L] 故障减弱", "glitchDown", false);
+
+        drawBox(buf, cbuf, cols - L.sideW, L.topH, L.sideW, rows - L.topH - L.bottomH, "RIGHT PANEL");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 2, "状态监视", rightInner, "a");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 4, `地形幅值 ${meter(0.7 + Math.sin(t * 0.001) * 0.2, 14)}`, rightInner, "g");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 5, `信号噪声 ${meter(0.52 + Math.sin(t * 0.0014) * 0.24, 14)}`, rightInner, "c");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 6, `异常强度 ${meter(0.3 + state.glitchLevel * 0.2, 14)}`, rightInner, "r");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 8, "交互说明", rightInner, "m");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 9, state.mode === "map" ? "拖拽: 平移地图" : eventScenes[state.selectedEvent].title, rightInner, "d");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 10, state.mode === "map" ? "滚轮: 缩放" : eventScenes[state.selectedEvent].meta, rightInner, "d");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 11, state.mode === "map" ? "点击主屏: 下标记" : eventScenes[state.selectedEvent].caption, rightInner, "d");
+        drawTextClipped(buf, cbuf, cols - L.sideW + 2, L.topH + 13, `MARKER: ${state.marker ? `${state.marker.x.toFixed(2)},${state.marker.y.toFixed(2)}` : "NONE"}`, rightInner, "c");
+
+        drawBox(buf, cbuf, L.mainX, L.mainY, L.mainW, L.mainH, state.mode === "map" ? "MAIN MAP VIEW" : "EVENT VIEW");
+        drawTextClipped(buf, cbuf, L.mainX + 2, L.mainY + 1, state.mode === "map" ? "ASCII 交互地图 / 故障特效仅主视窗" : eventScenes[state.selectedEvent].title, mainInner, "m");
+
+        if (state.mode === "map") {
+          drawMap(buf, cbuf, view, t);
+          drawMiniMap(buf, cbuf, view);
+        } else {
+          drawEventScene(buf, cbuf, view, t);
+        }
+
+        drawBox(buf, cbuf, 0, rows - L.bottomH, cols, L.bottomH, "BOTTOM CONTROL");
+        drawTextClipped(buf, cbuf, 2, rows - L.bottomH + 2, "操控台按钮可点击: 网格/等高线/信号/缩放/故障强度", bottomInner, "g");
+        drawTextClipped(buf, cbuf, 2, rows - L.bottomH + 3, `状态: ${state.status}`, bottomInner, "a");
+      }
+
+      function renderCanvas(buf, cbuf) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, screen.width, screen.height);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+
+        for (let y = 0; y < rows; y += 1) {
+          for (let x = 0; x < cols; x += 1) {
+            const ch = buf[y][x];
+            if (!ch || ch === " ") continue;
+            const span = charDisplayWidth(ch) === 2 ? 2 : 1;
+            const glyph = getGlyphCanvas(ch, cbuf[y][x] || "g", span);
+            ctx.drawImage(glyph, gridOffsetX + x * cellWidth, gridOffsetY + y * cellHeight, span * cellWidth, cellHeight);
+          }
+        }
+      }
+
+      function toCell(e) {
+        const rect = screen.getBoundingClientRect();
+        const px = e.clientX - rect.left - gridOffsetX;
+        const py = e.clientY - rect.top - gridOffsetY;
+        const x = Math.floor(px / Math.max(1, cellWidth));
+        const y = Math.floor(py / Math.max(1, cellHeight));
+        return {
+          x: clamp(x, 0, cols - 1),
+          y: clamp(y, 0, rows - 1),
+          inside: px >= 0 && py >= 0 && x >= 0 && y >= 0 && x < cols && y < rows
+        };
+      }
+
+      function findButton(cell) {
+        return buttonRects.find((b) => cell.x >= b.x && cell.x < b.x + b.w && cell.y >= b.y && cell.y < b.y + b.h);
+      }
+
+      function runAction(id) {
+        if (id === "grid") {
+          state.showGrid = !state.showGrid;
+          state.status = `网格 ${state.showGrid ? "开启" : "关闭"}`;
+        } else if (id === "contour") {
+          state.showContour = !state.showContour;
+          state.status = `等高线 ${state.showContour ? "开启" : "关闭"}`;
+        } else if (id === "signal") {
+          state.showSignal = !state.showSignal;
+          state.status = `信号层 ${state.showSignal ? "开启" : "关闭"}`;
+        } else if (id === "event") {
+          state.mode = "event";
+          state.status = `事件场景：${eventScenes[state.selectedEvent].short}`;
+        } else if (id === "map") {
+          state.mode = "map";
+          state.status = "切换到地图场景";
+        } else if (id.startsWith("eventScene:")) {
+          state.selectedEvent = Number(id.split(":")[1]) || 0;
+          state.mode = "event";
+          state.status = `事件场景：${eventScenes[state.selectedEvent].title}`;
+        } else if (id === "zoomIn") {
+          state.zoom = clamp(state.zoom * 1.15, 0.6, 5);
+          state.status = `缩放 ${state.zoom.toFixed(2)}`;
+        } else if (id === "zoomOut") {
+          state.zoom = clamp(state.zoom / 1.15, 0.6, 5);
+          state.status = `缩放 ${state.zoom.toFixed(2)}`;
+        } else if (id === "recenter") {
+          state.mapX = 0;
+          state.mapY = 0;
+          state.status = "已回到中心";
+        } else if (id === "glitchUp") {
+          state.glitchLevel = clamp(state.glitchLevel + 1, 0, 4);
+          state.status = `故障强度 ${state.glitchLevel}`;
+        } else if (id === "glitchDown") {
+          state.glitchLevel = clamp(state.glitchLevel - 1, 0, 4);
+          state.status = `故障强度 ${state.glitchLevel}`;
+        }
+      }
+
+      function resize() {
+        updateCanvasMetrics();
+
+        const rect = screen.getBoundingClientRect();
+        screen.width = Math.max(1, Math.floor(rect.width * dpr));
+        screen.height = Math.max(1, Math.floor(rect.height * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+
+        gridOffsetX = SCREEN_PADDING;
+        gridOffsetY = SCREEN_PADDING;
+
+        const availW = Math.max(1, rect.width - SCREEN_PADDING * 2);
+        const availH = Math.max(1, rect.height - SCREEN_PADDING * 2);
+
+        cols = Math.max(2, Math.floor(availW / Math.max(1, cellWidth)));
+        rows = Math.max(2, Math.floor(availH / Math.max(1, cellHeight)));
+      }
+
+      function render(t) {
+        frame += 1;
+        const L = layout();
+        const buf = makeBuffer(cols, rows);
+        const cbuf = makeColorBuffer(cols, rows, "d");
+        drawPanels(buf, cbuf, t, L);
+        applyGlitch(buf, cbuf, t, L);
+        renderCanvas(buf, cbuf);
+        requestAnimationFrame(render);
+      }
+
+      window.addEventListener("pointerdown", (e) => {
+        const cell = toCell(e);
+        if (!cell.inside) return;
+        const btn = findButton(cell);
+        if (btn) {
+          buttonPressUntil[btn.id] = performance.now() + 180;
+          runAction(btn.id);
+          return;
+        }
+
+        const L = layout();
+        if (state.mode === "map" && cell.x >= L.viewX && cell.x < L.viewX + L.viewW && cell.y >= L.viewY && cell.y < L.viewY + L.viewH) {
+          drag = { x: e.clientX, y: e.clientY };
+          const wx = state.mapX + (cell.x - L.viewX - L.viewW / 2) / (10 * state.zoom);
+          const wy = state.mapY + (cell.y - L.viewY - L.viewH / 2) / (6 * state.zoom);
+          state.marker = { x: wx, y: wy };
+          state.status = `标记 ${wx.toFixed(2)}, ${wy.toFixed(2)}`;
+        }
+      });
+
+      window.addEventListener("pointermove", (e) => {
+        const cell = toCell(e);
+        const btn = cell.inside ? findButton(cell) : null;
+        hoverButton = btn ? btn.id : null;
+        screen.style.cursor = btn ? "pointer" : (drag ? "grabbing" : "crosshair");
+
+        if (!drag || state.mode !== "map") return;
+        const dx = e.clientX - drag.x;
+        const dy = e.clientY - drag.y;
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        state.mapX -= dx / (82 * state.zoom);
+        state.mapY -= dy / (54 * state.zoom);
+        state.status = `平移中 ${state.mapX.toFixed(2)}, ${state.mapY.toFixed(2)}`;
+      });
+
+      window.addEventListener("pointerup", () => {
+        drag = null;
+        screen.style.cursor = hoverButton ? "pointer" : "crosshair";
+      });
+
+      window.addEventListener("pointerleave", () => {
+        hoverButton = null;
+        drag = null;
+        screen.style.cursor = "crosshair";
+      });
+
+      window.addEventListener("wheel", (e) => {
+        const cell = toCell(e);
+        if (!cell.inside) return;
+        const L = layout();
+        if (state.mode === "map" && cell.x >= L.viewX && cell.x < L.viewX + L.viewW && cell.y >= L.viewY && cell.y < L.viewY + L.viewH) {
+          e.preventDefault();
+          const f = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+          state.zoom = clamp(state.zoom * f, 0.6, 5);
+          state.status = `缩放 ${state.zoom.toFixed(2)}`;
+        }
+      }, { passive: false });
+
+      window.addEventListener("resize", resize);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+          resize();
+          requestAnimationFrame(render);
+        });
+      } else {
+        resize();
+        requestAnimationFrame(render);
+      }
+    })();
+  </script>
+</body>
+</html>
