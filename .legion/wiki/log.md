@@ -8,3 +8,10 @@
 - 将 Yuan protocol relay assessment 改为中文调研页，并明确结论：不维护 Stellar 专属 server，推荐在 Yuan Host/Protocol 之上构建 PC/mobile 共享业务层。
 - 根据用户澄清更新 Yuan 结论：PC/mobile 都作为 Yuan Terminal，room 可优先映射到 Yuan host/tenant，`DualDeviceMessage` 构建在 `ITerminalMessage` 上。
 - 将 task wiki 改为当前架构：`packages/dual-device` + 外部 Yuan Host，而不是 repo 内 server app。
+
+## 2026-05-09
+
+- Added task summary for `mobile-communication-device-gameplay`.
+- Added current decision that mobile active mode replaces the PC Communication Station UI while PC remains authoritative.
+- Added trust-boundary decision / pattern for phone-origin gameplay intents: paired client identity, monotonic sequence, payload validation, and authoritative PC lookup before dispatch.
+- Added task summary for `fix-iafs-editor-manifest-tests` and recorded an event manifest testing pattern: manifest fixtures must stay self-consistent and avoid legacy domain ordering assumptions.

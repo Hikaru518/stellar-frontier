@@ -1,0 +1,227 @@
+{
+  "$schema": "../schemas/map-objects.schema.json",
+  "map_objects": [
+    {
+      "id": "iafs_generator",
+      "kind": "facility",
+      "name": "发电机",
+      "description": "坠毁现场的应急发电机组，外壳撕裂，仍有零星火花。",
+      "tags": ["iafs", "crash_site", "repair_target", "power_system"],
+      "visibility": "hidden",
+      "status_options": ["damaged", "repaired"],
+      "initial_status": "damaged",
+      "actions": [
+        {
+          "id": "iafs_generator:inspect",
+          "category": "object",
+          "label": "调查",
+          "tone": "neutral",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            }
+          ],
+          "event_id": "iafs_generator_inspect_damaged"
+        },
+        {
+          "id": "iafs_generator:repair",
+          "category": "object",
+          "label": "维修",
+          "tone": "accent",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            },
+            {
+              "type": "handler_condition",
+              "handler_type": "object_status_equals",
+              "params": {
+                "object_id": "iafs_generator",
+                "status": "damaged"
+              }
+            }
+          ],
+          "local_action": {
+            "kind": "timed_repair",
+            "duration_seconds": 180,
+            "success_check": {
+              "attribute": "agility",
+              "base": 0,
+              "ratio": 0.2,
+              "bias": 0,
+              "difficulty": 0,
+              "min": 0,
+              "max": 1
+            },
+            "success_effects": [
+              {
+                "type": "set_object_status",
+                "object_id": "iafs_generator",
+                "status": "repaired"
+              }
+            ],
+            "failure_effects": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "iafs_life_support",
+      "kind": "facility",
+      "name": "维生装置",
+      "description": "维生循环模组被坠毁冲击压歪，面板仍在断续报警。",
+      "tags": ["iafs", "crash_site", "repair_target", "life_support"],
+      "visibility": "hidden",
+      "status_options": ["damaged", "repaired"],
+      "initial_status": "damaged",
+      "actions": [
+        {
+          "id": "iafs_life_support:inspect",
+          "category": "object",
+          "label": "调查",
+          "tone": "neutral",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            }
+          ],
+          "event_id": "iafs_life_support_inspect_damaged"
+        },
+        {
+          "id": "iafs_life_support:repair",
+          "category": "object",
+          "label": "维修",
+          "tone": "accent",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            },
+            {
+              "type": "handler_condition",
+              "handler_type": "object_status_equals",
+              "params": {
+                "object_id": "iafs_life_support",
+                "status": "damaged"
+              }
+            }
+          ],
+          "local_action": {
+            "kind": "timed_repair",
+            "duration_seconds": 180,
+            "success_check": {
+              "attribute": "agility",
+              "base": 0,
+              "ratio": 0.2,
+              "bias": 0,
+              "difficulty": 0,
+              "min": 0,
+              "max": 1
+            },
+            "success_effects": [
+              {
+                "type": "set_object_status",
+                "object_id": "iafs_life_support",
+                "status": "repaired"
+              }
+            ],
+            "failure_effects": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "iafs_shuttle_core",
+      "kind": "facility",
+      "name": "穿梭机核心",
+      "description": "穿梭机核心舱体半埋在碎石里，接口烧蚀严重。",
+      "tags": ["iafs", "crash_site", "repair_target", "shuttle_core"],
+      "visibility": "hidden",
+      "status_options": ["damaged", "repaired"],
+      "initial_status": "damaged",
+      "actions": [
+        {
+          "id": "iafs_shuttle_core:inspect",
+          "category": "object",
+          "label": "调查",
+          "tone": "neutral",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            }
+          ],
+          "event_id": "iafs_shuttle_core_inspect_damaged"
+        },
+        {
+          "id": "iafs_shuttle_core:repair",
+          "category": "object",
+          "label": "维修",
+          "tone": "accent",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            },
+            {
+              "type": "handler_condition",
+              "handler_type": "object_status_equals",
+              "params": {
+                "object_id": "iafs_shuttle_core",
+                "status": "damaged"
+              }
+            }
+          ],
+          "local_action": {
+            "kind": "timed_repair",
+            "duration_seconds": 180,
+            "success_check": {
+              "attribute": "agility",
+              "base": 0,
+              "ratio": 0.2,
+              "bias": 0,
+              "difficulty": 0,
+              "min": 0,
+              "max": 1
+            },
+            "success_effects": [
+              {
+                "type": "set_object_status",
+                "object_id": "iafs_shuttle_core",
+                "status": "repaired"
+              }
+            ],
+            "failure_effects": []
+          }
+        }
+      ]
+    }
+  ]
+}

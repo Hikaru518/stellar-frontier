@@ -733,7 +733,7 @@ function readNumberArray(value: unknown): number[] {
 }
 
 function isTilePassable(tile: MapTile) {
-  return !tile.terrain.includes("不可通行");
+  return !tile.terrain.includes("不可通行") && !tile.terrain.includes("山");
 }
 
 function isAdjacentTile(fromTileId: string, targetTileId: string, tiles: MapTile[]) {
