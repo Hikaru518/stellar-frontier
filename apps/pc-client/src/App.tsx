@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallPage } from "./pages/CallPage";
-import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
+import { TaskPage } from "./pages/TaskPage";
 import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
@@ -90,6 +90,7 @@ type SavedGameState = Partial<Omit<GameState, "crew">> & {
 
 type MobileMode = "waiting" | "active" | "fallback";
 type MobileSessionStatus = "waiting" | "connected" | "offline";
+type ControlConsoleViewMode = "overview" | "crewStatus" | "crewInventory";
 
 interface MobileSessionState {
   status: MobileSessionStatus;
@@ -148,6 +149,10 @@ function App() {
   const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
   const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
   const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
+  const [controlConsoleView, setControlConsoleView] = useState<{ mode: ControlConsoleViewMode; crewId: CrewId | null }>({
+    mode: "overview",
+    crewId: null,
+  });
   const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
   const [mobileSession, setMobileSession] = useState<MobileSessionState>({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
   const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
@@ -363,6 +368,21 @@ function App() {
 
   function openStation() {
     setPage("station");
+  }
+
+  function openControlOverview() {
+    setControlConsoleView({ mode: "overview", crewId: null });
+    setPage("control");
+  }
+
+  function openCrewStatusInControl(crewId: CrewId) {
+    setControlConsoleView({ mode: "crewStatus", crewId });
+    setPage("control");
+  }
+
+  function openCrewInventoryInControl(crewId: CrewId) {
+    setControlConsoleView({ mode: "crewInventory", crewId });
+    setPage("control");
   }
 
   function openMap(returnTarget: MapReturnTarget) {
@@ -815,27 +835,34 @@ function App() {
 
   if (page === "station") {
     return (
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <CommunicationStation
-          crew={crew}
-          crewActions={gameState.crew_actions}
-          activeCalls={gameState.active_calls}
-          objectives={gameState.objectives}
-          eventLogs={gameState.event_logs}
-          elapsedGameSeconds={elapsedGameSeconds}
-          tiles={tiles}
-          gameTimeLabel={gameTimeLabel}
-          pairingSession={mobilePairingSession}
-          mobileSessionStatus={mobileSession.status}
-          onRegeneratePairing={regenerateMobilePairingSession}
-          onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
-          onEnablePhoneFallback={enableMobileFallback}
-          onBack={() => setPage("control")}
-          onStartCall={startCall}
-          highlightCrewId={questNavigationHint?.type === "crew" ? questNavigationHint.crewId : null}
-          questNavigationMessage={questNavigationHint?.type === "crew" ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。` : undefined}
-        />
-      </QuestLayout>
+      <TaskPage
+        view={questSidebarView}
+        statusFilter={questStatusFilter}
+        categoryFilter={questCategoryFilter}
+        navigationMessage={
+          questNavigationHint?.type === "crew"
+            ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。`
+            : questNavigationHint?.type === "unavailable"
+              ? `任务导航目标不可用：${questNavigationHint.label}`
+              : undefined
+        }
+        crew={crew}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
+        gameTimeLabel={gameTimeLabel}
+        logs={logs}
+        onStatusFilterChange={setQuestStatusFilter}
+        onCategoryFilterChange={setQuestCategoryFilter}
+        onSelectedQuestIdChange={setSelectedQuestId}
+        onNavigate={handleQuestSidebarNavigate}
+        onOpenControl={openControlOverview}
+        onOpenMap={() => openMap("control")}
+        onStartCall={startCall}
+        onOpenCrewStatusInControl={openCrewStatusInControl}
+        onOpenCrewInventoryInControl={openCrewInventoryInControl}
+      />
     );
   }
 
@@ -864,45 +891,47 @@ function App() {
 
   if (page === "map") {
     return (
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <MapPage
-          tiles={tiles}
-          map={map}
-          crew={crew}
-          crewActions={gameState.crew_actions}
-          activeCalls={gameState.active_calls}
-          eventLogs={gameState.event_logs}
-          elapsedGameSeconds={elapsedGameSeconds}
-          gameTimeLabel={gameTimeLabel}
-          returnTarget={mapReturnTarget}
-          moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
-          selectedMoveTargetId={currentCall?.selectedTargetTileId}
-          initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
-          onSelectMoveTarget={selectMoveTarget}
-          onReturn={returnFromMap}
-        />
-      </QuestLayout>
+      <MapPage
+        tiles={tiles}
+        crew={crew}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        gameTimeLabel={gameTimeLabel}
+        returnTarget={mapReturnTarget}
+        moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
+        initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+        onOpenControl={openControlOverview}
+        onOpenTask={openStation}
+        onStartCall={startCall}
+        onOpenCrewStatusInControl={openCrewStatusInControl}
+        onOpenCrewInventoryInControl={openCrewInventoryInControl}
+        logs={logs}
+      />
     );
   }
 
   return (
     <>
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <ControlCenter
-          crew={crew}
-          logs={logs}
-          eventLogs={gameState.event_logs}
-          objectives={gameState.objectives}
-          resources={resources}
-          gameTimeLabel={gameTimeLabel}
-          onOpenStation={openStation}
-          onOpenMap={() => openMap("control")}
-          onOpenDebug={() => setDebugOpen(true)}
-          onAppendLog={appendLog}
-          map={map}
-          mobileStatus={mobileStatusCard}
-        />
-      </QuestLayout>
+      <ControlCenter
+        crew={crew}
+        logs={logs}
+        eventLogs={gameState.event_logs}
+        objectives={gameState.objectives}
+        resources={resources}
+        gameTimeLabel={gameTimeLabel}
+        onOpenStation={openStation}
+        onOpenMap={() => openMap("control")}
+        onOpenDebug={() => setDebugOpen(true)}
+        onStartCall={startCall}
+        onAppendLog={appendLog}
+        map={map}
+        mobileStatus={mobileStatusCard}
+        consoleViewMode={controlConsoleView.mode}
+        consoleViewCrewId={controlConsoleView.crewId}
+        onShowCrewStatus={(crewId) => setControlConsoleView({ mode: "crewStatus", crewId })}
+        onShowCrewInventory={(crewId) => setControlConsoleView({ mode: "crewInventory", crewId })}
+      />
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}

@@ -226,25 +226,26 @@ describe("App", () => {
     expect((saved.crew as Array<{ currentTile: string }>)[0]?.currentTile).toBe("4-4");
   });
 
-  it("shows one crew card in the communication station and an empty inventory modal", () => {
+  it("shows task tracking with crew controls and opens an empty inventory return", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
-    const mikeCard = screen.getByText("Mike，神秘幸存者").closest("article");
+    fireEvent.click(screen.getByRole("button", { name: /任务/ }));
+    expect(screen.getByRole("heading", { name: "任务追踪" })).toBeInTheDocument();
+    expect(screen.getAllByText("重整坠毁现场").length).toBeGreaterThan(0);
+
+    const mikeCard = screen.getByText("Mike").closest("article");
     expect(mikeCard).not.toBeNull();
 
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
-    expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
+    expect(screen.getByText("NO CARRIED ITEMS.")).toBeInTheDocument();
   });
 
-  it("uses tile quest navigation to open and select the map tile without creating crew actions", () => {
+  it("uses the console map entry to open the map without creating crew actions", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "查看 IAFS 坠毁点" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
 
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
-    expect(screen.getByText("坐标详情：(0,0)")).toBeInTheDocument();
     const saved = readSavedState();
     expect(saved?.crew_actions).toEqual({});
   });
@@ -357,7 +358,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "维修" }));
 
@@ -384,7 +385,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
 
@@ -411,7 +412,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
 
@@ -441,7 +442,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+    fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(screen.getByRole("button", { name: "通话" }));
     expect(screen.queryByRole("heading", { name: "发电机" })).toBeNull();
 
@@ -668,7 +669,7 @@ function startAmyBeastEmergencyFromSurvey() {
   );
 
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: /通讯台/ }));
+  fireEvent.click(screen.getByRole("button", { name: /任务/ }));
   const amyCard = screen.getByText("Amy，千金大小姐").closest("article");
   expect(amyCard).not.toBeNull();
   fireEvent.click(within(amyCard as HTMLElement).getByRole("button", { name: "通话" }));

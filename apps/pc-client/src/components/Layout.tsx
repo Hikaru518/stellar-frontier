@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { SystemLog, Tone } from "../data/gameData";
 
 interface ConsoleShellProps {
@@ -22,6 +22,31 @@ interface ModalProps {
   onClose: () => void;
 }
 
+interface GameConsoleStatusItem {
+  label: string;
+  value: ReactNode;
+}
+
+interface GameConsoleNavItem {
+  id: string;
+  label: string;
+  meta?: string;
+  active?: boolean;
+  onClick?: () => void;
+}
+
+interface GameConsoleLayoutProps {
+  title: string;
+  subtitle: string;
+  gameTimeLabel?: string;
+  statusItems?: GameConsoleStatusItem[];
+  navItems: GameConsoleNavItem[];
+  crewPanel: ReactNode;
+  rightPanel: ReactNode;
+  bottomBar: ReactNode;
+  children: ReactNode;
+}
+
 export function ConsoleShell({ title, subtitle, children, gameTimeLabel, actions }: ConsoleShellProps) {
   return (
     <main className="console-shell">
@@ -35,6 +60,233 @@ export function ConsoleShell({ title, subtitle, children, gameTimeLabel, actions
       </header>
       {children}
     </main>
+  );
+}
+
+export function GameConsoleLayout({
+  title,
+  subtitle,
+  gameTimeLabel,
+  statusItems = [],
+  navItems,
+  crewPanel,
+  rightPanel,
+  bottomBar,
+  children,
+}: GameConsoleLayoutProps) {
+  const screenRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) {
+      return;
+    }
+
+    const prefersReducedMotion =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : { matches: false };
+    let frame = 0;
+    let rafId: number | null = null;
+
+    const tick = () => {
+      if (prefersReducedMotion.matches) {
+        screen.dataset.glitch = "off";
+        screen.style.setProperty("--glitch-shift", "0px");
+        screen.style.setProperty("--glitch-band", "46%");
+        screen.style.setProperty("--glitch-opacity", "0");
+        return;
+      }
+
+      const burst = frame % 118 < 7 || Math.sin(frame * 0.071) > 0.992;
+      screen.dataset.glitch = burst ? "on" : "off";
+      screen.style.setProperty("--glitch-shift", burst ? `${Math.round(Math.sin(frame * 1.7) * 3)}px` : "0px");
+      screen.style.setProperty("--glitch-band", `${32 + (frame * 7) % 36}%`);
+      screen.style.setProperty("--glitch-opacity", burst ? "1" : "0");
+      frame += 1;
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, []);
+
+  return (
+    <main className="game-console-shell">
+      <header className="game-console-topbar">
+        <div className="game-console-titleblock">
+          <p className="game-console-kicker">stellar frontier / game console direction</p>
+          <h1>{title}</h1>
+        </div>
+        <div className="game-console-status-cluster">
+          <div className="game-console-status-copy">
+            <div className="game-console-status-strip">
+              {gameTimeLabel ? (
+                <div className="console-status-card console-status-card-wide">
+                  <span>time</span>
+                  <strong>{gameTimeLabel}</strong>
+                </div>
+              ) : null}
+              {statusItems.map((item) => (
+                <div key={item.label} className="console-status-card">
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+            {subtitle ? <p className="console-status-summary">{subtitle}</p> : null}
+          </div>
+          <ConsoleScope />
+        </div>
+      </header>
+
+      <section className="game-console-main">
+        <aside className="game-console-left">
+          <section className="console-column-panel">
+            <div className="console-column-header">
+              <span>interface view</span>
+            </div>
+            <div className="console-nav-list">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`console-nav-button ${item.active ? "console-nav-button-active" : ""}`}
+                  onClick={item.onClick}
+                >
+                  <span className="console-nav-label">{item.label}</span>
+                  {item.meta ? <span className="console-nav-meta">{item.meta}</span> : null}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="console-column-panel">
+            <div className="console-column-header">
+              <span>crew list</span>
+            </div>
+            {crewPanel}
+          </section>
+        </aside>
+
+        <section className="game-console-center">
+          <div className="console-display-case">
+            <div className="console-display-bezel">
+              <div ref={screenRef} className="console-display-screen" data-glitch="off">
+                {children}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside className="game-console-right">{rightPanel}</aside>
+      </section>
+
+      <footer className="game-console-bottom">{bottomBar}</footer>
+    </main>
+  );
+}
+
+function ConsoleScope() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    let frame = 0;
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const draw = () => {
+      const width = canvas.width / Math.max(1, window.devicePixelRatio || 1);
+      const height = canvas.height / Math.max(1, window.devicePixelRatio || 1);
+
+      context.fillStyle = "#15120e";
+      context.fillRect(0, 0, width, height);
+
+      context.strokeStyle = "rgba(116,166,166,0.16)";
+      context.lineWidth = 1;
+      for (let x = 0; x < width; x += 16) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, height);
+        context.stroke();
+      }
+      for (let y = 0; y < height; y += 10) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(width, y);
+        context.stroke();
+      }
+
+      const bandX = (frame * 1.7) % width;
+      context.fillStyle = "rgba(240,166,77,0.12)";
+      context.fillRect(bandX, 0, 4, height);
+
+      const tone = "#ffb85a";
+      const fillTone = "rgba(255,184,90,0.22)";
+      const freq = 2.2;
+
+      for (let x = 0; x < width; x += 3) {
+        const t = x / Math.max(1, width);
+        const wave = Math.sin(t * Math.PI * 2 * freq + frame * 0.08);
+        const beat = Math.sin(t * Math.PI * 6.8 - frame * 0.04);
+        const y = height / 2 + (wave * 0.28 + beat * 0.12) * height;
+        const pixelY = Math.round(y / 3) * 3;
+        context.fillStyle = fillTone;
+        context.fillRect(x, pixelY, 3, 3);
+        if ((x / 3 + Math.floor(frame * 0.6)) % 6 === 0) {
+          context.fillStyle = tone;
+          context.fillRect(x, pixelY, 3, 3);
+        }
+      }
+
+      frame += 1;
+      frameRef.current = window.requestAnimationFrame(draw);
+    };
+
+    resize();
+    draw();
+    window.addEventListener("resize", resize);
+    return () => {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  return (
+    <div className="console-scope-box" aria-hidden="true">
+      <canvas ref={canvasRef} className="console-scope-canvas" />
+      <div className="console-scope-readout">
+        <span>echo</span>
+        <span>65%</span>
+      </div>
+    </div>
   );
 }
 

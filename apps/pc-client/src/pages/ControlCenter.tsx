@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { ConsoleShell, FieldList, Modal, Panel, StatusTag, SystemLogPanel } from "../components/Layout";
-import { facilities, type CrewMember, type GameMapState, type InvestigationReport, type ResourceSummary, type SystemLog } from "../data/gameData";
+import { FieldList, GameConsoleLayout, Modal, Panel } from "../components/Layout";
+import { type CrewId, type CrewMember, type GameMapState, type InvestigationReport, type ResourceSummary, type SystemLog } from "../data/gameData";
 import { formatGameTime } from "../timeSystem";
 import type { EventLog, Objective } from "../events/types";
 import type { PcMobileStatusCard } from "../App";
+import { getInventoryView, type InventoryItemView } from "../inventorySystem";
 
 interface ControlCenterProps {
   crew: CrewMember[];
@@ -16,8 +17,13 @@ interface ControlCenterProps {
   onOpenStation: () => void;
   onOpenMap: () => void;
   onOpenDebug: () => void;
+  onStartCall: (crewId: CrewMember["id"]) => void;
   onAppendLog: (text: string, tone?: "neutral" | "muted" | "accent" | "danger" | "success") => void;
   mobileStatus?: PcMobileStatusCard;
+  consoleViewMode: "overview" | "crewStatus" | "crewInventory";
+  consoleViewCrewId: CrewId | null;
+  onShowCrewStatus: (crewId: CrewId) => void;
+  onShowCrewInventory: (crewId: CrewId) => void;
 }
 
 export function ControlCenter({
@@ -31,8 +37,13 @@ export function ControlCenter({
   onOpenStation,
   onOpenMap,
   onOpenDebug,
+  onStartCall,
   onAppendLog,
   mobileStatus,
+  consoleViewMode,
+  consoleViewCrewId,
+  onShowCrewStatus,
+  onShowCrewInventory,
 }: ControlCenterProps) {
   const [modal, setModal] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
@@ -47,6 +58,15 @@ export function ControlCenter({
     .slice(0, 3);
   const objectiveList = Object.values(objectives).sort((left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
   const mobileActive = mobileStatus?.mode === "active";
+  const latestLog = logs[logs.length - 1];
+  const detailCrew = consoleViewMode === "crewStatus" && consoleViewCrewId ? crew.find((member) => member.id === consoleViewCrewId) ?? null : null;
+  const inventoryCrew = consoleViewMode === "crewInventory" && consoleViewCrewId ? crew.find((member) => member.id === consoleViewCrewId) ?? null : null;
+  const selectedConsoleCrew = detailCrew ?? inventoryCrew;
+  const navItems = [
+    { id: "control", label: "控制台", meta: "main", active: true },
+    { id: "task", label: "任务", meta: "task", onClick: onOpenStation },
+    { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
+  ];
 
   const modalContent = useMemo(() => getFacilityModal(modal, resources), [modal, resources]);
 
@@ -67,83 +87,129 @@ export function ControlCenter({
   }
 
   return (
-    <ConsoleShell
-      title="前沿基地控制中心"
-      subtitle={`SOL ${String(resources.sol).padStart(3, "0")} / 本地供电 ${resources.power}% / 通讯窗口：${resources.commWindow}`}
-      gameTimeLabel={gameTimeLabel}
-      actions={
-        <>
-          <StatusTag tone={incomingCount > 0 ? "danger" : "muted"}>未读通讯 {incomingCount}</StatusTag>
-          <button type="button" className="debug-button" onClick={onOpenDebug}>
-            [DEBUG]
-          </button>
-        </>
-      }
-    >
-      <div className="control-layout">
-        <Panel title="中控台摘要" className="resource-summary">
-          <FieldList
-            rows={[
-              ["能源", resources.energy],
-              ["铁矿", resources.iron],
-              ["基地完整度", `${resources.baseIntegrity}%`],
-              ["通讯提示", incomingCount ? `${incomingNames || "未知队员"} 正在请求接入` : "暂无新的通讯请求。"],
-            ]}
+    <>
+      <GameConsoleLayout
+        title="前沿基地控制中心"
+        subtitle=""
+        gameTimeLabel={gameTimeLabel}
+        statusItems={[
+          { label: "signal", value: `未读通讯 ${incomingCount}` },
+          { label: "objectives", value: objectiveList.length ? `${objectiveList.length} 条` : "0 条" },
+          { label: "mobile", value: mobileStatusLabel(mobileStatus) },
+          { label: "sync", value: mobileStatus?.mode === "active" ? "68%" : "41%" },
+        ]}
+        navItems={navItems}
+        crewPanel={
+          <CrewLinkPanel
+            crew={crew}
+            incomingCrewIds={new Set(incomingCrew.map((member) => member.id))}
+            onStartCall={onStartCall}
+            onOpenDetail={onShowCrewStatus}
+            onOpenInventory={onShowCrewInventory}
           />
-        </Panel>
+        }
+        rightPanel={<section className="console-side-panel console-right-empty" aria-hidden="true" />}
+        bottomBar={
+          <div className="console-bottom-strip">
+            <strong>] LOG:</strong>
+            <span>{latestLog ? latestLog.text : "控制中心在线。"}</span>
+          </div>
+        }
+      >
+        <div className="console-screen-content">
+          <div className="console-screen-header">
+            <span>crt situation board</span>
+            <strong>
+              {detailCrew
+                ? `${detailCrew.name} / Crew Status`
+                : inventoryCrew
+                  ? `${inventoryCrew.name} / Inventory`
+                  : "前沿基地控制中心 / Frontline Base Control"}
+            </strong>
+            <span>
+              {detailCrew
+                ? "status / profile / field condition"
+                : inventoryCrew
+                  ? "inventory / carried items / response tools"
+                  : "status / overview / system log"}
+            </span>
+          </div>
 
-        <div className="facility-grid">
-          {facilities.filter((facility) => !(mobileActive && facility.id === "station")).map((facility) => (
-            <button
-              type="button"
-              key={facility.id}
-              className={`facility-card ${facility.variant ? `facility-${facility.variant}` : ""}`}
-              onClick={() => handleFacility(facility.id)}
-            >
-              <span className="facility-label">{facility.label}</span>
-              <span className={facility.id === "station" && incomingCount ? "facility-alert" : "facility-sub"}>
-                {facility.id === "station" && incomingCount ? `${incomingCount} 条来电 · ${incomingNames || "未知队员"}` : facility.subLabel}
-              </span>
-            </button>
-          ))}
+          <div className="console-screen-body">
+            {detailCrew ? (
+              <CrewStatusScreen member={detailCrew} eventLogs={eventLogs} />
+            ) : inventoryCrew ? (
+              <CrewInventoryScreen member={inventoryCrew} />
+            ) : (
+              <>
+                <div className="console-screen-block">
+                  <p className="console-screen-command">] RUN CONTROL-CENTER.BAS</p>
+                  <p className="console-screen-line console-screen-line-cyan">BASE STATUS: FRONTIER OUTPOST / PRIMARY LOOP STABLE</p>
+                </div>
+
+                <div className="console-screen-block">
+                  <p className="console-screen-section">[ FACILITIES ]</p>
+                  <p>1) COMMUNICATION STATION ......... {incomingCount ? "INCOMING" : "READY"}</p>
+                  <p>2) SATELLITE RADAR MAP .......... ONLINE</p>
+                  <p>3) MISSION BOARD ................ {objectiveList.length ? "TRACKING" : "IDLE"}</p>
+                  <p>4) FIELD SUPPORT ................ {resources.baseIntegrity >= 70 ? "STABLE" : "RISK"}</p>
+                </div>
+
+                <div className="console-screen-block">
+                  <p className="console-screen-section">[ EVENT SITUATION ]</p>
+                  <p className="console-screen-line console-screen-line-amber">
+                    ACTIVE CASE: {visibleEventLogs[0]?.summary ?? "暂无需要立即处理的事件。"}
+                  </p>
+                  <p className="console-screen-line console-screen-line-rose">
+                    PRIORITY: {incomingCount ? "CALLBACK REQUIRED" : objectiveList.length ? "OBJECTIVE WATCH" : "LOW"}
+                  </p>
+                </div>
+
+                <div className="console-screen-block">
+                  <p className="console-screen-section">[ CREW LINK ]</p>
+                  {crew.map((member, index) => (
+                    <p key={member.id}>
+                      {index + 1}) {member.name.toUpperCase()} {member.location.toUpperCase()} / {member.status.toUpperCase()}
+                    </p>
+                  ))}
+                </div>
+
+                <div className="console-screen-block">
+                  <p className="console-screen-section">[ LOG FEED ]</p>
+                  {(latestLog ? logs.slice(-4) : []).map((log) => (
+                    <p
+                      key={log.id}
+                      className={
+                        log.tone === "danger"
+                          ? "console-screen-line console-screen-line-rose"
+                          : log.tone === "accent"
+                            ? "console-screen-line console-screen-line-cyan"
+                            : undefined
+                      }
+                    >
+                      [{log.time}] {log.text}
+                    </p>
+                  ))}
+                </div>
+
+                <div className="console-screen-block">
+                  <p className="console-screen-command">] SHORTCUT [T] TASK [R] RADAR [C] CALL</p>
+                  <p className="console-screen-line">{incomingCount ? "READY FOR INCOMING CHANNEL." : "READY."}</p>
+                </div>
+              </>
+            )}
+
+            {selectedConsoleCrew ? (
+              <div className="console-screen-block">
+                <p className="console-screen-command">] RETURN TO OVERVIEW</p>
+                <p className="console-screen-line console-screen-line-cyan">
+                  点击左侧其他探员，或再次切换到任务 / 地图继续操作。
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
-
-        {mobileStatus ? <MobileCommunicationStatus status={mobileStatus} /> : null}
-
-        <Panel title="当前建议" className="control-hint" tone={incomingCount ? "accent" : "neutral"}>
-          <p>
-            {incomingCount
-              ? "先处理通讯台来电。"
-              : "暂无紧急请求。可查看通讯台、地图或调试工具。"}
-          </p>
-        </Panel>
-
-        <Panel title="事件态势" className="control-hint" tone={visibleEventLogs.length || objectiveList.length ? "accent" : "neutral"}>
-          <FieldList
-            rows={[
-              ["近期事件", visibleEventLogs.length ? `${visibleEventLogs.length} 条可见记录` : "暂无事件记录。"],
-              ["目标状态", objectiveList.length ? `${objectiveList.length} 条事件目标` : "暂无事件目标。"],
-            ]}
-          />
-          {visibleEventLogs.length ? (
-            <ol className="diary-list">
-              {visibleEventLogs.map((log) => (
-                <li key={log.id}>
-                  <div className="diary-meta">
-                    <span>{formatEventTime(log.occurred_at)}</span>
-                    <StatusTag tone={log.importance === "major" || log.importance === "critical" ? "accent" : "muted"}>
-                      {formatEventImportance(log.importance)}
-                    </StatusTag>
-                  </div>
-                  <p>{log.summary}</p>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-        </Panel>
-
-        <SystemLogPanel logs={logs} onOpenReport={setReportId} />
-      </div>
+      </GameConsoleLayout>
 
       {modal && modalContent ? (
         <Modal title={modalContent.title} onClose={() => setModal(null)}>
@@ -156,7 +222,167 @@ export function ControlCenter({
           <InvestigationReportView report={report} crew={crew} />
         </Modal>
       ) : null}
-    </ConsoleShell>
+
+    </>
+  );
+}
+
+function CrewLinkPanel({
+  crew,
+  incomingCrewIds,
+  onStartCall,
+  onOpenDetail,
+  onOpenInventory,
+}: {
+  crew: CrewMember[];
+  incomingCrewIds: Set<CrewMember["id"]>;
+  onStartCall: (crewId: CrewMember["id"]) => void;
+  onOpenDetail: (crewId: CrewMember["id"]) => void;
+  onOpenInventory: (crewId: CrewMember["id"]) => void;
+}) {
+  return (
+    <div className="console-crew-stack">
+      {crew.map((member) => {
+        const inventorySummary = member.inventory.length
+          ? member.inventory.map((entry) => `${entry.itemId} x${entry.quantity}`).join(" / ")
+          : "未记录携带物。";
+        return (
+          <article key={member.id} className={`console-crew-card ${incomingCrewIds.has(member.id) ? "console-crew-card-alert" : ""}`}>
+            <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
+            <div className="console-crew-copy">
+              <div className="console-crew-heading">
+                <strong>{member.name}</strong>
+                <span>{member.role}</span>
+                <span className={`console-crew-state-inline ${member.canCommunicate ? "console-crew-state-success" : "console-crew-state-danger"}`}>
+                  {member.canCommunicate ? "在线" : "失联"}
+                </span>
+              </div>
+              <p>{member.status}</p>
+              <p>位置：{member.location}</p>
+              <p>背包：{inventorySummary}</p>
+            </div>
+            <div className="console-crew-actions">
+              <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => onOpenDetail(member.id)}>
+                查看状态
+              </button>
+              <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => onOpenInventory(member.id)}>
+                查看背包
+              </button>
+              <button
+                type="button"
+                className="console-crew-button"
+                onClick={() => onStartCall(member.id)}
+                disabled={!member.canCommunicate && !incomingCrewIds.has(member.id)}
+              >
+                {incomingCrewIds.has(member.id) ? "接通" : "通话"}
+              </button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function CrewInventoryList({ member }: { member: CrewMember }) {
+  const inventoryView = getInventoryView(member.inventory);
+
+  if (!inventoryView.length) {
+    return <p>未记录携带物。</p>;
+  }
+
+  return (
+    <div className="expertise-list">
+      {inventoryView.map((item) => (
+        <article key={item.itemId} className="expertise-item">
+          <div className="expertise-heading">
+            <strong>{item.name}</strong>
+            <span>{item.categoryLabel}</span>
+          </div>
+          <FieldList
+            rows={[
+              ["数量", `x${item.quantity}`],
+              ["分类", item.categoryLabel],
+              ["标签", formatInventoryTags(item)],
+              ["描述", item.description],
+            ]}
+          />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CrewStatusScreen({ member, eventLogs }: { member: CrewMember; eventLogs: EventLog[] }) {
+  const recentLogs = eventLogs
+    .filter((log) => log.visibility === "player_visible" && log.crew_ids.includes(member.id))
+    .slice()
+    .sort((left, right) => right.occurred_at - left.occurred_at || right.id.localeCompare(left.id))
+    .slice(0, 3);
+
+  return (
+    <>
+      <div className="console-screen-block">
+        <p className="console-screen-command">] RUN CREW-STATUS.BAS</p>
+        <p className="console-screen-line console-screen-line-cyan">
+          CREW: {member.name.toUpperCase()} / ROLE: {member.role.toUpperCase()}
+        </p>
+      </div>
+
+      <div className="console-screen-block">
+        <p className="console-screen-section">[ FIELD CONDITION ]</p>
+        <p>STATUS ........ {member.status.toUpperCase()}</p>
+        <p>LOCATION ...... {member.location.toUpperCase()}</p>
+        <p>LINK .......... {member.canCommunicate ? "ONLINE" : "OFFLINE"}</p>
+        <p>VOICE ......... {member.voiceTone.toUpperCase()}</p>
+      </div>
+
+      <div className="console-screen-block">
+        <p className="console-screen-section">[ PROFILE ]</p>
+        <p>ORIGIN ........ {member.profile.originWorld.toUpperCase()}</p>
+        <p>PROFESSION .... {member.profile.originProfession.toUpperCase()}</p>
+        <p>EXPERIENCE .... {member.profile.experience.toUpperCase()}</p>
+      </div>
+
+      <div className="console-screen-block">
+        <p className="console-screen-section">[ ATTRIBUTES ]</p>
+        <p>PHY {member.attributes.physical} / AGI {member.attributes.agility} / INT {member.attributes.intellect}</p>
+        <p>PER {member.attributes.perception} / LUCK {member.attributes.luck}</p>
+      </div>
+
+      <div className="console-screen-block">
+        <p className="console-screen-section">[ RECENT TRACE ]</p>
+        {recentLogs.length ? recentLogs.map((log) => <p key={log.id}>[{log.occurred_at}] {log.summary.toUpperCase()}</p>) : <p>NO PLAYER-VISIBLE EVENT TRACE.</p>}
+      </div>
+    </>
+  );
+}
+
+function CrewInventoryScreen({ member }: { member: CrewMember }) {
+  const inventoryView = getInventoryView(member.inventory);
+
+  return (
+    <>
+      <div className="console-screen-block">
+        <p className="console-screen-command">] RUN INVENTORY.BAS</p>
+        <p className="console-screen-line console-screen-line-cyan">
+          CREW: {member.name.toUpperCase()} / CARRIED ITEMS {inventoryView.length}
+        </p>
+      </div>
+
+      <div className="console-screen-block">
+        <p className="console-screen-section">[ INVENTORY ]</p>
+        {inventoryView.length ? (
+          inventoryView.map((item) => (
+            <p key={item.itemId}>
+              {item.name.toUpperCase()} X{item.quantity} / {item.categoryLabel.toUpperCase()} / {(item.tagLabels.join(" / ") || "NONE").toUpperCase()}
+            </p>
+          ))
+        ) : (
+          <p>NO CARRIED ITEMS.</p>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -175,6 +401,19 @@ function MobileCommunicationStatus({ status }: { status: PcMobileStatusCard }) {
       {active ? <p className="muted-text">请在手机端处理通讯选择；移动指令仍回到 PC 地图确认。</p> : null}
     </Panel>
   );
+}
+
+function mobileStatusLabel(status?: PcMobileStatusCard) {
+  if (!status) {
+    return "N/A";
+  }
+  if (status.mode === "active") {
+    return "ACTIVE";
+  }
+  if (status.mode === "fallback") {
+    return "FALLBACK";
+  }
+  return "WAIT";
 }
 
 function InvestigationReportView({ report, crew }: { report: InvestigationReport; crew: CrewMember[] }) {
@@ -240,6 +479,10 @@ function formatEventImportance(importance: EventLog["importance"]) {
     return "记录";
   }
   return "简报";
+}
+
+function formatInventoryTags(item: InventoryItemView) {
+  return item.tagLabels.length ? item.tagLabels.join(" / ") : "无";
 }
 
 function getFacilityModal(id: string | null, resources: ResourceSummary): { title: string; body: ReactNode } | null {
