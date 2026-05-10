@@ -30,6 +30,11 @@ interface PresetsContent {
   presets: PresetDefinition[];
 }
 
+interface QuestsContent {
+  schema_version: "quests.v1";
+  quests: QuestDefinition[];
+}
+
 const eventDefinitionModules = import.meta.glob("../../../../content/events/definitions/*.json", {
   eager: true,
   import: "default",
@@ -44,6 +49,11 @@ const presetModules = import.meta.glob("../../../../content/events/presets/*.jso
   eager: true,
   import: "default",
 }) as Record<string, PresetsContent>;
+
+const questModules = import.meta.glob("../../../../content/quests/*.json", {
+  eager: true,
+  import: "default",
+}) as Record<string, QuestsContent>;
 
 const eventManifestContent = eventManifest as EventManifestContent;
 const eventManifestDomains = eventManifestContent.domains;
@@ -211,6 +221,67 @@ export interface MapConfigDefinition {
   visual?: MapVisualDefinition;
 }
 
+export type QuestCategory = "main" | "side";
+
+export type QuestNavigationEntry =
+  | { type: "page"; label: string; page: "control" | "station" | "map" }
+  | { type: "tile"; label: string; tile_id: string }
+  | { type: "crew"; label: string; crew_id: string };
+
+export interface QuestProgressNodeDefinition {
+  id: string;
+  type?: "progress";
+  description: string;
+}
+
+export interface QuestCompletedNodeDefinition {
+  id: string;
+  type: "completed";
+  title: string;
+  summary: string;
+  outcomes?: string[];
+}
+
+export type QuestNodeDefinition = QuestProgressNodeDefinition | QuestCompletedNodeDefinition;
+
+export interface QuestTodoDefinition {
+  id: string;
+  title: string;
+  description?: string;
+  visible_after_node?: string;
+  navigation?: QuestNavigationEntry[];
+}
+
+export interface QuestCompletionResultDefinition {
+  title: string;
+  summary: string;
+  outcomes?: string[];
+}
+
+export interface SubquestDefinition {
+  id: string;
+  title: string;
+  summary: string;
+  initial_node_id: string;
+  nodes: QuestNodeDefinition[];
+  todos: QuestTodoDefinition[];
+  navigation?: QuestNavigationEntry[];
+}
+
+export interface QuestDefinition {
+  id: string;
+  category: QuestCategory;
+  title: string;
+  summary: string;
+  description: string;
+  initial_node_id: string;
+  completed_node_id?: string;
+  nodes: QuestNodeDefinition[];
+  todos?: QuestTodoDefinition[];
+  subquests?: SubquestDefinition[];
+  navigation?: QuestNavigationEntry[];
+}
+
 export const eventProgramDefinitions = eventManifestDomains.flatMap(
   (domain) => readManifestContentFile(eventDefinitionModules, domain.definitions).event_definitions,
 );
@@ -224,6 +295,10 @@ export const handlerDefinitions = handlerRegistryContent.handlers as unknown as 
 export const presetDefinitions = eventManifestDomains.flatMap((domain) =>
   domain.presets ? readManifestContentFile(presetModules, domain.presets).presets : [],
 );
+
+export const questDefinitions = Object.keys(questModules)
+  .sort()
+  .flatMap((modulePath) => questModules[modulePath].quests);
 
 export const eventContentLibrary: EventContentLibrary = {
   domains: eventManifestDomains.map((domain) => domain.id),

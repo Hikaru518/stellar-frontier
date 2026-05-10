@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallPage } from "./pages/CallPage";
 import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
+import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary } from "./content/contentData";
+import { eventContentLibrary, questDefinitions, type QuestNavigationEntry } from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
 import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
@@ -50,6 +51,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
+import { buildQuestSidebarView, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
 import { logger } from "./logger";
 import {
   acquireYuanDualDeviceTerminal,
@@ -74,6 +76,11 @@ if (eventContentIndexResult.errors.length > 0) {
 const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 const MOBILE_FALLBACK_AFTER_MS = 10000;
+
+type QuestNavigationHint =
+  | { type: "tile"; tileId: string; label: string }
+  | { type: "crew"; crewId: CrewId; label: string }
+  | { type: "unavailable"; label: string };
 
 type SavedCrewMember = Partial<CrewMember> & { id: CrewId };
 
@@ -136,6 +143,11 @@ function App() {
   const [mapReturnTarget, setMapReturnTarget] = useState<MapReturnTarget>("control");
   const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [questSidebarCollapsed, setQuestSidebarCollapsed] = useState(true);
+  const [questStatusFilter, setQuestStatusFilter] = useState<QuestStatusFilter>("all");
+  const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
+  const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
+  const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
   const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
   const [mobileSession, setMobileSession] = useState<MobileSessionState>({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
   const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
@@ -159,6 +171,59 @@ function App() {
     unreadCount: activeMobileCalls.length + crew.filter((member) => member.hasIncoming).length,
     emergencyCount: activeMobileCalls.filter(isUrgentRuntimeCallState).length,
   };
+  const questSidebarView = useMemo(
+    () =>
+      buildQuestSidebarView({
+        state: gameState.quest_state,
+        definitions: questDefinitions,
+        statusFilter: questStatusFilter,
+        categoryFilter: questCategoryFilter,
+        selectedQuestId,
+      }),
+    [gameState.quest_state, questCategoryFilter, questStatusFilter, selectedQuestId],
+  );
+  const questSidebar = (
+      <QuestSidebar
+        view={questSidebarView}
+        onNavigate={handleQuestSidebarNavigate}
+        navigationMessage={questNavigationHint?.type === "unavailable" ? `任务导航目标不可用：${questNavigationHint.label}` : undefined}
+        collapsed={questSidebarCollapsed}
+      statusFilter={questStatusFilter}
+      categoryFilter={questCategoryFilter}
+      onCollapsedChange={setQuestSidebarCollapsed}
+      onStatusFilterChange={setQuestStatusFilter}
+      onCategoryFilterChange={setQuestCategoryFilter}
+      onSelectedQuestIdChange={setSelectedQuestId}
+    />
+  );
+
+  function handleQuestSidebarNavigate(entry: QuestNavigationEntry) {
+    if (entry.type === "page") {
+      setQuestNavigationHint(null);
+      setMapReturnTarget("control");
+      setPage(entry.page);
+      return;
+    }
+
+    if (entry.type === "tile") {
+      if (!tiles.some((tile) => tile.id === entry.tile_id)) {
+        setQuestNavigationHint({ type: "unavailable", label: entry.label });
+        return;
+      }
+      setQuestNavigationHint({ type: "tile", tileId: entry.tile_id, label: entry.label });
+      setMapReturnTarget("control");
+      setPage("map");
+      return;
+    }
+
+    const crewMember = crew.find((member) => member.id === entry.crew_id);
+    if (!crewMember) {
+      setQuestNavigationHint({ type: "unavailable", label: entry.label });
+      return;
+    }
+    setQuestNavigationHint({ type: "crew", crewId: crewMember.id, label: entry.label });
+    setPage("station");
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -750,28 +815,33 @@ function App() {
 
   if (page === "station") {
     return (
-      <CommunicationStation
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        objectives={gameState.objectives}
-        eventLogs={gameState.event_logs}
-        elapsedGameSeconds={elapsedGameSeconds}
-        tiles={tiles}
-        gameTimeLabel={gameTimeLabel}
-        pairingSession={mobilePairingSession}
-        mobileSessionStatus={mobileSession.status}
-        onRegeneratePairing={regenerateMobilePairingSession}
-        onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
-        onEnablePhoneFallback={enableMobileFallback}
-        onBack={() => setPage("control")}
-        onStartCall={startCall}
-      />
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
+        <CommunicationStation
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          objectives={gameState.objectives}
+          eventLogs={gameState.event_logs}
+          elapsedGameSeconds={elapsedGameSeconds}
+          tiles={tiles}
+          gameTimeLabel={gameTimeLabel}
+          pairingSession={mobilePairingSession}
+          mobileSessionStatus={mobileSession.status}
+          onRegeneratePairing={regenerateMobilePairingSession}
+          onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
+          onEnablePhoneFallback={enableMobileFallback}
+          onBack={() => setPage("control")}
+          onStartCall={startCall}
+          highlightCrewId={questNavigationHint?.type === "crew" ? questNavigationHint.crewId : null}
+          questNavigationMessage={questNavigationHint?.type === "crew" ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。` : undefined}
+        />
+      </QuestLayout>
     );
   }
 
   if (page === "call") {
     return (
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
         <CallPage
           call={currentCall}
           crew={crew}
@@ -787,12 +857,14 @@ function App() {
           onOpenMap={() => openMap("call")}
           onEndCall={endCall}
           onOpenStation={() => setPage("station")}
-      />
+        />
+      </QuestLayout>
     );
   }
 
   if (page === "map") {
     return (
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
         <MapPage
           tiles={tiles}
           map={map}
@@ -805,28 +877,32 @@ function App() {
           returnTarget={mapReturnTarget}
           moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
           selectedMoveTargetId={currentCall?.selectedTargetTileId}
+          initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
           onSelectMoveTarget={selectMoveTarget}
           onReturn={returnFromMap}
         />
+      </QuestLayout>
     );
   }
 
   return (
     <>
-      <ControlCenter
-        crew={crew}
-        logs={logs}
-        eventLogs={gameState.event_logs}
-        objectives={gameState.objectives}
-        resources={resources}
-        gameTimeLabel={gameTimeLabel}
-        onOpenStation={openStation}
-        onOpenMap={() => openMap("control")}
-        onOpenDebug={() => setDebugOpen(true)}
-        onAppendLog={appendLog}
-        map={map}
-        mobileStatus={mobileStatusCard}
-      />
+      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
+        <ControlCenter
+          crew={crew}
+          logs={logs}
+          eventLogs={gameState.event_logs}
+          objectives={gameState.objectives}
+          resources={resources}
+          gameTimeLabel={gameTimeLabel}
+          onOpenStation={openStation}
+          onOpenMap={() => openMap("control")}
+          onOpenDebug={() => setDebugOpen(true)}
+          onAppendLog={appendLog}
+          map={map}
+          mobileStatus={mobileStatusCard}
+        />
+      </QuestLayout>
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
@@ -841,12 +917,21 @@ function App() {
 
 export default App;
 
+function QuestLayout({ children, sidebar, collapsed }: { children: ReactNode; sidebar: ReactNode; collapsed: boolean }) {
+  return (
+    <div className={`quest-layout ${collapsed ? "quest-layout-collapsed" : ""}`}>
+      <main className="quest-layout-main">{children}</main>
+      {sidebar}
+    </div>
+  );
+}
+
 function createInitialGameState(): GameState {
   const saved = loadGameSave<SavedGameState>(isCompatibleGameSaveState);
   const now = new Date().toISOString();
   const emptyEventState = createEmptyEventRuntimeState();
 
-  if (saved && isSavedBaselineCompatible(saved) && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
+  if (saved && isSavedBaselineCompatible(saved) && typeof saved.elapsedGameSeconds === "number" && Number.isFinite(saved.elapsedGameSeconds) && saved.crew && saved.map && saved.logs && saved.resources) {
     const normalizedCrew = saved.crew.map((member) => {
       const initialMember = initialCrew.find((item) => item.id === member.id) ?? member;
       const normalizedMember = normalizeCrewMember(member as CrewMember, initialMember as CrewMember);
@@ -881,6 +966,7 @@ function createInitialGameState(): GameState {
       crew_actions: saved.crew_actions ?? emptyEventState.crew_actions,
       inventories: saved.inventories ?? emptyEventState.inventories,
       rng_state: saved.rng_state ?? emptyEventState.rng_state,
+      quest_state: normalizeQuestState(saved.quest_state, questDefinitions, saved.elapsedGameSeconds),
     } as GameState;
   }
 
@@ -897,6 +983,7 @@ function createInitialGameState(): GameState {
     logs: initialLogs,
     resources: initialResources,
     eventHistory: {},
+    quest_state: createInitialQuestState(questDefinitions, 0),
     ...emptyEventState,
   };
 
@@ -1858,6 +1945,7 @@ export function mergeEventRuntimeState(state: GameState, eventState: GraphRunner
     event_logs: eventState.event_logs,
     world_history: eventState.world_history,
     world_flags: worldFlags,
+    quest_state: eventState.quest_state ?? state.quest_state,
     crew_actions: eventState.crew_actions,
     inventories: eventState.inventories,
     rng_state: eventState.rng_state,

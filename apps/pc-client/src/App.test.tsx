@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App, { dispatchTimedLocalAction, mergeEventRuntimeState, resolvePhoneRuntimeCallCrewId, toEventEngineState, validatePhoneMessageEnvelope } from "./App";
 import { buildEventContentIndex } from "./events/contentIndex";
-import { crewDefinitions, defaultMapConfig, eventContentLibrary, eventProgramDefinitions, itemDefinitions } from "./content/contentData";
+import { crewDefinitions, defaultMapConfig, eventContentLibrary, eventProgramDefinitions, itemDefinitions, questDefinitions } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
 import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
 import { evaluateCondition } from "./events/conditions";
@@ -10,6 +10,7 @@ import { executeEffects } from "./events/effects";
 import { processTrigger } from "./events/eventEngine";
 import { createEmptyEventRuntimeState, type CrewActionState, type Effect } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
+import { createInitialQuestState, type QuestRuntimeState } from "./questSystem";
 
 function readSavedState() {
   return JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "null") as Record<string, unknown> | null;
@@ -92,6 +93,7 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
     crew_actions: {},
     inventories: {},
     rng_state: null,
+    quest_state: createInitialQuestState(questDefinitions, 0),
     ...overrides,
   };
 }
@@ -128,7 +130,51 @@ describe("App", () => {
       iafs_life_support: { status_enum: "damaged" },
       iafs_shuttle_core: { status_enum: "damaged" },
     });
+    expect(Object.keys(saved.quest_state.quests)).toEqual(questDefinitions.map((quest) => quest.id));
     expect(saved.tiles).toHaveLength(64);
+  });
+
+  it("restores and normalizes quest state from compatible saves", () => {
+    const savedQuestState: QuestRuntimeState = createInitialQuestState(questDefinitions.slice(0, 1), 0);
+    savedQuestState.quests.regroup_after_crash.status = "completed";
+    savedQuestState.quests.regroup_after_crash.completed_at = 42;
+    savedQuestState.quests.regroup_after_crash.current_node_id = "deleted_node";
+    savedQuestState.quests.regroup_after_crash.todos.survey_crash_site.status = "completed";
+    savedQuestState.quests.regroup_after_crash.todos.survey_crash_site.completed_at = 43;
+
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createSavedCrashSiteState({ elapsedGameSeconds: 120, quest_state: savedQuestState })),
+    );
+
+    render(<App />);
+
+    const saved = readSavedState();
+    expect(saved?.quest_state).toMatchObject({
+      quests: {
+        regroup_after_crash: {
+          status: "completed",
+          completed_at: 42,
+          current_node_id: "crash_site_unsecured",
+          todos: {
+            survey_crash_site: {
+              status: "completed",
+              completed_at: 43,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("treats current-schema saves without quest state as incompatible", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState({ elapsedGameSeconds: 999, quest_state: undefined })));
+
+    render(<App />);
+
+    const saved = readSavedState();
+    expect(saved?.elapsedGameSeconds).toBe(0);
+    expect(Object.keys((saved?.quest_state as QuestRuntimeState).quests)).toEqual(questDefinitions.map((quest) => quest.id));
   });
 
   it("ignores legacy saves and starts from the new baseline", () => {
@@ -189,6 +235,18 @@ describe("App", () => {
 
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
     expect(screen.getByText("未记录携带物。")).toBeInTheDocument();
+  });
+
+  it("uses tile quest navigation to open and select the map tile without creating crew actions", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "展开任务" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "查看 IAFS 坠毁点" })[0]);
+
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+    expect(screen.getByText("坐标详情：(0,0)")).toBeInTheDocument();
+    const saved = readSavedState();
+    expect(saved?.crew_actions).toEqual({});
   });
 
   it("advances game time while the app is running", () => {
@@ -658,6 +716,7 @@ function createCompatibleSavedGameState(state: Record<string, unknown>) {
     updated_at_real_time: "2026-04-27T00:00:00.000Z",
     map: createInitialMapState(),
     ...createEmptyEventRuntimeState(),
+    quest_state: createInitialQuestState(questDefinitions, 0),
     ...state,
   };
 }

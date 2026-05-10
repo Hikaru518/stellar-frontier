@@ -1,3 +1,5 @@
+import type { QuestRuntimeState } from "../questSystem";
+
 export const EVENT_SAVE_SCHEMA_VERSION = "event-program-model-v1";
 
 export type Id = string;
@@ -798,6 +800,7 @@ export interface SaveState extends EventRuntimeState {
   elapsed_game_seconds: GameSeconds;
   crew: Record<Id, CrewState>;
   tiles: Record<Id, TileState>;
+  quest_state: QuestRuntimeState;
 }
 
 export function createEmptyEventRuntimeState(): EventRuntimeState {

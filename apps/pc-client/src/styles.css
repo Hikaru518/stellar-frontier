@@ -62,6 +62,28 @@ p {
   padding: 24px 28px 30px;
 }
 
+.quest-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+  gap: 16px;
+  align-items: start;
+  width: min(1680px, calc(100vw - 32px));
+  margin: 16px auto;
+}
+
+.quest-layout-collapsed {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+}
+
+.quest-layout-main {
+  min-width: 0;
+}
+
+.quest-layout-main > .console-shell {
+  width: 100%;
+  margin: 0;
+}
+
 .page-header {
   display: flex;
   align-items: flex-start;
@@ -228,7 +250,7 @@ p {
 
 .control-layout {
   display: grid;
-  grid-template-columns: 260px minmax(360px, 1fr) 360px;
+  grid-template-columns: minmax(220px, 260px) minmax(300px, 1fr) minmax(280px, 360px);
   grid-template-areas:
     "resource facilities log"
     "hint facilities log";
@@ -242,7 +264,7 @@ p {
 .facility-grid {
   grid-area: facilities;
   display: grid;
-  grid-template-columns: repeat(6, minmax(82px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
   grid-auto-rows: minmax(104px, auto);
   gap: 12px;
 }
@@ -375,6 +397,11 @@ p {
 .crew-card-alert {
   border-color: #b45b13;
   background: #f4eadf;
+}
+
+.crew-card-quest-highlight {
+  border-color: #1e6f7a;
+  box-shadow: 0 0 0 2px rgba(30, 111, 122, 0.18);
 }
 
 .avatar-box {
@@ -1191,4 +1218,235 @@ blockquote {
   color: #24384f;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 13px;
+}
+
+.quest-sidebar {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+  border: 2px solid #24384f;
+  background: #e2e6e3;
+  padding: 14px;
+  box-shadow: 5px 5px 0 rgba(36, 56, 79, 0.14);
+}
+
+.quest-sidebar-collapsed {
+  width: min(280px, 100%);
+}
+
+.quest-sidebar-header,
+.quest-detail-header,
+.quest-subquest header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quest-sidebar-header h2,
+.quest-detail-header h3,
+.quest-completion-result h4,
+.quest-subquest h4 {
+  margin-bottom: 6px;
+}
+
+.quest-sidebar-kicker {
+  margin-bottom: 4px;
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quest-sidebar-toggle {
+  width: 100%;
+}
+
+.quest-collapsed-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.quest-collapsed-metrics span {
+  border: 1px solid #77736b;
+  background: #f1eee6;
+  padding: 8px;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  text-align: center;
+}
+
+.quest-collapsed-updates {
+  border-top: 1px dashed #9da5aa;
+  padding-top: 10px;
+}
+
+.quest-collapsed-updates strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.quest-collapsed-updates ul,
+.quest-todo-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quest-filter-group {
+  margin: 0;
+  border: 1px solid #9da5aa;
+  padding: 10px;
+}
+
+.quest-filter-group legend {
+  padding: 0 4px;
+  color: #46505a;
+  font-size: 13px;
+}
+
+.quest-filter-group div,
+.quest-navigation-row,
+.quest-list-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quest-sidebar-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(300px, 1.3fr);
+  gap: 14px;
+}
+
+.quest-list-panel {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.quest-list-item {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  border-color: #77736b;
+  background: #f1eee6;
+  padding: 11px;
+  text-align: left;
+}
+
+.quest-list-item-active {
+  border-color: #b45b13;
+  background: #f4eadf;
+}
+
+.quest-list-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.quest-updated-dot {
+  border: 1px solid #b45b13;
+  background: #fff3df;
+  padding: 2px 6px;
+  color: #b45b13;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
+.quest-list-description,
+.quest-current-intel,
+.quest-subquest p,
+.quest-todo p {
+  color: #46505a;
+}
+
+.quest-detail-panel {
+  min-width: 0;
+}
+
+.quest-current-intel {
+  border-left: 3px solid #24384f;
+  background: #e8edf0;
+  padding: 8px 10px;
+}
+
+.quest-completion-result {
+  border: 1px solid #7ca878;
+  background: #edf3ea;
+  padding: 12px;
+}
+
+.quest-completion-result p,
+.quest-completion-result ul {
+  margin: 0;
+}
+
+.quest-completion-result ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.quest-subquest-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.quest-subquest {
+  border: 1px solid #a9a49a;
+  background: #f7f4ec;
+  padding: 12px;
+}
+
+.quest-subquest-completed,
+.quest-todo-completed {
+  background: #edf3ea;
+}
+
+.quest-todo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+  border-top: 1px dashed #c6c0b4;
+  padding-top: 8px;
+}
+
+.quest-todo .quest-navigation-row {
+  grid-column: 1 / -1;
+}
+
+.quest-todo-completed .quest-todo-title {
+  color: #2f6f44;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.quest-empty-state {
+  color: #46505a;
+}
+
+@media (max-width: 900px) {
+  .quest-layout,
+  .quest-layout-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .quest-layout > .quest-sidebar {
+    grid-row: 1;
+  }
+
+  .quest-sidebar-body {
+    grid-template-columns: 1fr;
+  }
 }

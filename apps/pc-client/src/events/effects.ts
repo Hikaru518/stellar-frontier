@@ -1,5 +1,7 @@
 import { appendDiaryEntryId } from "../diarySystem";
 import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "../content/mapObjects";
+import { questDefinitions } from "../content/contentData";
+import { applyQuestProgress, type QuestProgressOperation, type QuestRuntimeState } from "../questSystem";
 import type {
   CrewActionState,
   CrewActionType,
@@ -31,6 +33,7 @@ export interface EffectGameState extends EventRuntimeState {
   elapsedGameSeconds?: number;
   crew: Record<Id, CrewState>;
   tiles: Record<Id, TileState>;
+  quest_state?: QuestRuntimeState;
   resources?: Record<string, number>;
   map?: {
     tilesById?: Record<string, { revealedObjectIds?: string[] } | undefined>;
@@ -79,6 +82,19 @@ export interface EffectExecutionContext {
   handler_registry?: HandlerDefinition[] | Map<string, HandlerDefinition>;
   effect_handlers?: Record<string, EffectHandler>;
 }
+
+const questProgressOperations = new Set<QuestProgressOperation>([
+  "complete_quest",
+  "complete_subquest",
+  "complete_todo",
+  "set_quest_node",
+  "set_subquest_node",
+  "mark_updated",
+]);
+
+const builtInEffectHandlers: Record<string, EffectHandler> = {
+  quest_progress: questProgressEffectHandler,
+};
 
 interface ApplyResult {
   state: EffectGameState;
@@ -1120,7 +1136,7 @@ function applyHandlerEffect(
     );
   }
 
-  const handler = context.effect_handlers?.[handlerType.value];
+  const handler = context.effect_handlers?.[handlerType.value] ?? builtInEffectHandlers[handlerType.value];
   if (!handler) {
     return fail(
       context.state,
@@ -1145,6 +1161,75 @@ function applyHandlerEffect(
       `${path}.handler_type`,
       `Handler ${handlerType.value} failed: ${error instanceof Error ? error.message : String(error)}`,
     );
+  }
+}
+
+function questProgressEffectHandler({ effect, context, path, params }: EffectHandlerInput): EffectHandlerResult {
+  if (!isQuestRuntimeState(context.state.quest_state)) {
+    return {
+      state: context.state,
+      errors: [error(effect, "handler_error", `${path}.params`, "quest_progress requires GameState.quest_state.")],
+    };
+  }
+
+  const operation = params.operation;
+  if (!isQuestProgressOperation(operation)) {
+    return {
+      state: context.state,
+      errors: [error(effect, "invalid_effect", `${path}.params.operation`, "quest_progress requires a valid operation.")],
+    };
+  }
+
+  const required = requiredQuestProgressFields(operation);
+  const missingField = required.find((field) => typeof params[field] !== "string" || params[field].length === 0);
+  if (missingField) {
+    return {
+      state: context.state,
+      errors: [error(effect, "missing_value", `${path}.params.${missingField}`, `quest_progress ${operation} requires ${missingField}.`)],
+    };
+  }
+
+  const result = applyQuestProgress({
+    state: context.state.quest_state,
+    definitions: questDefinitions,
+    operation,
+    quest_id: params.quest_id as string,
+    subquest_id: stringParam(params.subquest_id),
+    todo_id: stringParam(params.todo_id),
+    node_id: stringParam(params.node_id),
+    occurred_at: now(context),
+  });
+
+  if (result.warnings.length > 0) {
+    return {
+      state: context.state,
+      errors: [error(effect, "handler_error", `${path}.params`, result.warnings.join("; "))],
+    };
+  }
+
+  // `target: world_flags` is only a handler_effect placeholder for schema reuse.
+  // Quest progress writes exclusively to `quest_state`.
+  return {
+    state: {
+      ...context.state,
+      quest_state: result.state,
+    },
+  };
+}
+
+function requiredQuestProgressFields(operation: QuestProgressOperation): string[] {
+  switch (operation) {
+    case "complete_quest":
+    case "mark_updated":
+      return ["quest_id"];
+    case "complete_subquest":
+      return ["quest_id", "subquest_id"];
+    case "complete_todo":
+      return ["quest_id", "todo_id"];
+    case "set_quest_node":
+      return ["quest_id", "node_id"];
+    case "set_subquest_node":
+      return ["quest_id", "subquest_id", "node_id"];
   }
 }
 
@@ -1518,6 +1603,14 @@ function worldFlagValueType(value: WorldFlag["value"]): WorldFlag["value_type"] 
 
 function isCrewTarget(value: unknown): value is CrewState {
   return isRecord(value) && typeof value.current_action_id !== "undefined";
+}
+
+function isQuestRuntimeState(value: unknown): value is QuestRuntimeState {
+  return Boolean(value && typeof value === "object" && "quests" in value && "updated_quest_ids" in value);
+}
+
+function isQuestProgressOperation(value: unknown): value is QuestProgressOperation {
+  return typeof value === "string" && questProgressOperations.has(value as QuestProgressOperation);
 }
 
 function renderTemplate(template: string, effect: Effect, context: EffectExecutionContext): string {

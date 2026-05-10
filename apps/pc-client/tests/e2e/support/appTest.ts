@@ -53,13 +53,16 @@ export async function installSave(page: Page, partial: Record<string, unknown>) 
     world_flags: {},
     crew_actions: {},
     inventories: {},
+    quest_state: createInitialQuestStateForE2e(),
     rng_state: null,
     ...partial,
   };
 
   await page.addInitScript(
     ({ key, value }) => {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      if (!window.localStorage.getItem(key)) {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      }
     },
     { key: GAME_SAVE_KEY, value: save },
   );
@@ -177,4 +180,26 @@ export function findSavedCrew(saved: { crew?: Array<Record<string, unknown>> }, 
   const member = saved.crew?.find((item) => item.id === crewId);
   expect(member).toBeDefined();
   return member!;
+}
+
+function createInitialQuestStateForE2e() {
+  return {
+    quests: {
+      regroup_after_crash: {
+        id: "regroup_after_crash",
+        status: "incomplete",
+        current_node_id: "crash_site_unsecured",
+        updated_at: 0,
+        completed_at: null,
+        todos: {
+          survey_crash_site: { id: "survey_crash_site", status: "incomplete", updated_at: 0, completed_at: null },
+          repair_generator: { id: "repair_generator", status: "incomplete", updated_at: 0, completed_at: null },
+          repair_life_support: { id: "repair_life_support", status: "incomplete", updated_at: 0, completed_at: null },
+          repair_shuttle_core: { id: "repair_shuttle_core", status: "incomplete", updated_at: 0, completed_at: null },
+        },
+        subquests: {},
+      },
+    },
+    updated_quest_ids: [],
+  };
 }

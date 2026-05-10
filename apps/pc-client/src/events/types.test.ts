@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { questDefinitions } from "../content/contentData";
 import type { GameState } from "../data/gameData";
+import { createInitialQuestState } from "../questSystem";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState, loadGameSave } from "../timeSystem";
 import {
   createEmptyEventRuntimeState,
@@ -75,6 +77,7 @@ describe("event program model contracts", () => {
       event_logs: [],
       world_history: {},
       world_flags: {},
+      quest_state: createInitialQuestState(questDefinitions, 0),
       rng_state: null,
     } satisfies SaveState;
 

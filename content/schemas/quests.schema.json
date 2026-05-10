@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/quests.schema.json",
+  "title": "Stellar Frontier Quests",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "quests"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "quests.v1"
+    },
+    "quests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/quest"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "quest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "title", "summary", "description", "initial_node_id", "nodes"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["main", "side"]
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "initial_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "completed_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "subquests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/subquest"
+          }
+        },
+        "todos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/todo"
+          }
+        },
+        "navigation": {
+          "$ref": "#/$defs/navigation_entries"
+        }
+      }
+    },
+    "subquest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "summary", "initial_node_id", "nodes", "todos"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "initial_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "todos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/todo"
+          }
+        },
+        "navigation": {
+          "$ref": "#/$defs/navigation_entries"
+        }
+      }
+    },
+    "todo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "description": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "visible_after_node": {
+          "$ref": "#/$defs/id"
+        },
+        "navigation": {
+          "$ref": "#/$defs/navigation_entries"
+        }
+      }
+    },
+    "node": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/progress_node"
+        },
+        {
+          "$ref": "#/$defs/completed_node"
+        }
+      ]
+    },
+    "progress_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "progress"
+        },
+        "description": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "completed_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title", "summary"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "completed"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "summary": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "outcomes": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/non_empty_string"
+          }
+        }
+      }
+    },
+    "navigation_entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/navigation_entry"
+      }
+    },
+    "navigation_entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "label", "page"],
+          "properties": {
+            "type": {
+              "const": "page"
+            },
+            "label": {
+              "$ref": "#/$defs/non_empty_string"
+            },
+            "page": {
+              "type": "string",
+              "enum": ["control", "station", "map"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "label", "tile_id"],
+          "properties": {
+            "type": {
+              "const": "tile"
+            },
+            "label": {
+              "$ref": "#/$defs/non_empty_string"
+            },
+            "tile_id": {
+              "type": "string",
+              "pattern": "^[0-9]+-[0-9]+$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "label", "crew_id"],
+          "properties": {
+            "type": {
+              "const": "crew"
+            },
+            "label": {
+              "$ref": "#/$defs/non_empty_string"
+            },
+            "crew_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

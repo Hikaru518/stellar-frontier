@@ -358,6 +358,7 @@ export function selectCallOption(input: SelectCallOptionInput): EventEngineResul
 
   const graphResult = advanceRuntimeEvent(input.state, definition, event.id, callChoiceContext(call, event, input.option_id, input.occurred_at), {
     content_index: input.index,
+    handler_registry: input.index.handlersByType,
   });
   if (graphResult.errors.length > 0) {
     return {

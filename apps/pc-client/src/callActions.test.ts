@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { buildCallView } from "./callActions";
-import { defaultMapConfig } from "./content/contentData";
+import { defaultMapConfig, questDefinitions } from "./content/contentData";
 import { universalActions } from "./content/mapObjects";
 import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gameData";
 import type { RuntimeCall } from "./events/types";
+import { createInitialQuestState } from "./questSystem";
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {
@@ -92,6 +93,7 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
     world_history: {},
     world_flags: {},
     rng_state: null,
+    quest_state: createInitialQuestState(questDefinitions, 0),
     ...overrides,
   };
 }
