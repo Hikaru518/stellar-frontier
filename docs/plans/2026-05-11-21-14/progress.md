@@ -1,0 +1,65 @@
+---
+plan: "region-based-map-system"
+branch: "feature/region-based-map-system"
+started: "2026-05-11 22:36"
+status: "in_progress"
+source:
+  implementation_plan: "docs/plans/2026-05-11-21-14/region-based-map-system-implementation-plan.md"
+  tasks_json: "docs/plans/2026-05-11-21-14/region-based-map-system-tasks.json"
+---
+
+# Progress: region-based-map-system
+
+## 总结
+
+### 完成内容与验收要点
+
+执行中。
+
+### 实现与设计的差异
+
+执行中。
+
+## 任务状态
+
+| # | Task ID | 标题 | 状态 | 尝试次数 |
+|---|---------|------|------|---------|
+| 1 | TASK-001 | 添加 MapFeature 类型与 loader 兼容层 | completed | 2 |
+| 2 | TASK-002 | 实现 row spans 与 Feature 查询纯函数 | pending | 0 |
+| 3 | TASK-003 | 扩展 map schema 与 content validation 支持 Feature | pending | 0 |
+| 4 | TASK-004 | 为默认地图 seed 初始 Feature 内容 | pending | 0 |
+| 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | pending | 0 |
+| 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | pending | 0 |
+| 7 | TASK-007 | 实现 Feature condition/effect runtime | pending | 0 |
+| 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | pending | 0 |
+| 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | pending | 0 |
+| 10 | TASK-010 | 实现 Feature survey 结算与去重 | pending | 0 |
+| 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | pending | 0 |
+| 12 | TASK-012 | MapPage 展示 Feature 命中结果 | pending | 0 |
+| 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | pending | 0 |
+| 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | pending | 0 |
+| 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | pending | 0 |
+| 16 | TASK-016 | Editor Feature list 与 inspector | pending | 0 |
+| 17 | TASK-017 | Editor footprint brush 与重叠预览 | pending | 0 |
+| 18 | TASK-018 | 移除 legacy tile area/object gameplay source | pending | 0 |
+| 19 | TASK-019 | 补齐 e2e 与最终验证 | pending | 0 |
+
+状态值：`pending` | `in_progress` | `completed` | `failed`
+
+## 执行日志
+
+### TASK-001: 添加 MapFeature 类型与 loader 兼容层
+- 状态: completed
+- 开始时间: 2026-05-11 22:37
+- 完成时间: 2026-05-11 23:04
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: 旧 developer 子 agent 长时间未返回；按用户指令关闭后重新派发。
+  - 尝试 2: 2026-05-11 22:50 重新派发。
+- developer summary:
+  - 添加 `MapFeatureDefinition`、`FeatureFootprint`、`FeatureRuntimeState` 等类型。
+  - `defaultMapConfig` 归一化旧地图缺省 `features` 为 `[]`。
+  - 增加 focused 测试覆盖旧地图兼容和 passive / investigatable Feature 类型表达。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 45 files / 350 tests

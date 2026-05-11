@@ -4,7 +4,7 @@ import crewContent from "../../../../content/crew/crew.json";
 import itemsContent from "../../../../content/items/items.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
 import type { EventContentLibrary } from "../events/contentIndex";
-import type { CallTemplate, EventDefinition, HandlerDefinition, PresetDefinition } from "../events/types";
+import type { CallTemplate, Condition, EventDefinition, HandlerDefinition, PresetDefinition } from "../events/types";
 
 interface EventManifestContent {
   schema_version: "event-manifest.v1";
@@ -180,6 +180,83 @@ export interface MapSpecialStateDefinition {
   durationGameSeconds?: number;
 }
 
+export type MapFeatureVisibility = "always" | MapVisibility;
+
+export interface FeatureRowSpan {
+  row: number;
+  colStart: number;
+  colEnd: number;
+}
+
+export interface FeatureFootprint {
+  type: "row_spans";
+  spans: FeatureRowSpan[];
+}
+
+export type FeatureActionUnavailableDisplay = "disabled";
+
+export interface FeatureActionSetStatusEffect {
+  type: "set_feature_status";
+  feature_id: string;
+  status: string;
+}
+
+export interface FeatureTimedRepairLocalActionDefinition {
+  kind: "timed_repair";
+  duration_seconds: number;
+  success_effects: FeatureActionSetStatusEffect[];
+  failure_effects: FeatureActionSetStatusEffect[];
+}
+
+export interface FeatureActionDefinition {
+  id: string;
+  category: "feature";
+  label: string;
+  tone?: Tone;
+  conditions: Condition[];
+  event_id?: string;
+  display_when_unavailable?: FeatureActionUnavailableDisplay;
+  unavailable_hint?: string;
+  local_action?: FeatureTimedRepairLocalActionDefinition;
+}
+
+export interface BaseMapFeatureDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  kind: string;
+  priority: number;
+  tags?: string[];
+  visibility: MapFeatureVisibility;
+  footprint: FeatureFootprint;
+}
+
+export interface PassiveMapFeatureDefinition extends BaseMapFeatureDefinition {
+  investigatable?: false;
+  status_options?: never;
+  initial_status?: never;
+  actions?: never;
+}
+
+export interface InvestigatableMapFeatureDefinition extends BaseMapFeatureDefinition {
+  investigatable: true;
+  status_options: string[];
+  initial_status: string;
+  actions: FeatureActionDefinition[];
+}
+
+export type MapFeatureDefinition = PassiveMapFeatureDefinition | InvestigatableMapFeatureDefinition;
+
+export interface FeatureRuntimeState {
+  id: string;
+  status?: string;
+  revealed?: boolean;
+  investigated?: boolean;
+  investigatedAt?: number;
+  lastTriggeredAt?: number;
+  historyKeys?: string[];
+}
+
 export type RadarToneKey = "g" | "d" | "c" | "a" | "w" | "s" | "r" | string;
 
 export interface RadarWorldDefinition {
@@ -261,9 +338,11 @@ export interface MapConfigJsonDefinition {
   initialDiscoveredTileIds: string[];
   radarPath: string;
   tiles: MapTileDefinition[];
+  features?: MapFeatureDefinition[];
 }
 
 export interface MapConfigDefinition extends MapConfigJsonDefinition {
+  features: MapFeatureDefinition[];
   radar: RadarDefinition;
 }
 
@@ -379,6 +458,7 @@ function normalizeMapConfig(rawConfig: MapConfigJsonDefinition): MapConfigDefini
   const radarContent = readRadarContent(rawConfig);
   return {
     ...rawConfig,
+    features: Array.isArray(rawConfig.features) ? rawConfig.features : [],
     radar: stripRadarContentMetadata(radarContent),
     tiles: rawConfig.tiles.map((tile) => ({
       ...tile,

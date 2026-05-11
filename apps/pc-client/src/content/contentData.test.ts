@@ -119,6 +119,56 @@ describe("event content exports", () => {
 });
 
 describe("default map config", () => {
+  it("normalizes legacy map configs without features to an empty feature list", async () => {
+    expect("features" in defaultMapJson).toBe(false);
+    expect(contentData.defaultMapConfig.features).toEqual([]);
+  });
+
+  it("types passive and investigatable map features separately", async () => {
+    const passiveFeature: contentData.MapFeatureDefinition = {
+      id: "snowfield",
+      name: "雪原",
+      kind: "biome:snowfield",
+      priority: 10,
+      visibility: "always",
+      footprint: {
+        type: "row_spans",
+        spans: [{ row: 129, colStart: 129, colEnd: 132 }],
+      },
+    };
+
+    const investigatableFeature: contentData.MapFeatureDefinition = {
+      id: "distress_beacon",
+      name: "异常信标",
+      kind: "signal:distress",
+      priority: 90,
+      tags: ["signal"],
+      visibility: "onDiscovered",
+      footprint: {
+        type: "row_spans",
+        spans: [{ row: 130, colStart: 130, colEnd: 130 }],
+      },
+      investigatable: true,
+      status_options: ["unread", "decoded"],
+      initial_status: "unread",
+      actions: [
+        {
+          id: "distress_beacon:decode",
+          category: "feature",
+          label: "解析信标",
+          conditions: [],
+        },
+      ],
+    };
+
+    expect(passiveFeature.investigatable).toBeUndefined();
+    expect(investigatableFeature.investigatable).toBe(true);
+    if (investigatableFeature.investigatable !== true) {
+      throw new Error("Expected investigatable feature fixture to narrow to the investigatable shape.");
+    }
+    expect(investigatableFeature.actions[0].category).toBe("feature");
+  });
+
   it("exposes tile.objectIds (post-migration) and no inline tile.objects field", async () => {
     expect(contentData.defaultMapConfig.tiles.length).toBeGreaterThan(0);
     const sampleTiles = [
