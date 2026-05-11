@@ -545,8 +545,8 @@
     }
   },
   "trace": {
-    "layerNotice": "[TEMP DEV] 这两个按钮只是临时调试开关，用来单独检查渲染层和 256x256 功能坐标层。",
-    "controlMode": "临时开发模式：渲染层与功能层已拆分显示。",
+    "layerNotice": "[TEMP DEV] 这些按钮只是临时调试开关，用来单独检查渲染层、256x256 功能坐标层和移动调试层。",
+    "controlMode": "临时开发模式：渲染层、功能层与调试层已拆分显示。",
     "callMode": "本次从通话进入：地图交互仍需回到通话确认。",
     "worldLine": "[WORLD] 256 x 256 interactive coordinate grid",
     "jsonLine": "[JSON] radar glyph/tone/regions loaded from content/maps/radar/default-map-radar.json",

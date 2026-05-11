@@ -740,7 +740,7 @@ function readNumberArray(value: unknown): number[] {
   return Array.isArray(value) ? value.filter((item): item is number => typeof item === "number" && Number.isFinite(item)) : [];
 }
 
-function isTilePassable(tile: MapTile) {
+export function isTilePassable(tile: MapTile) {
   return !tile.terrain.includes("不可通行") && !tile.terrain.includes("山");
 }
 

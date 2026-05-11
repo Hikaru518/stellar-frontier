@@ -96,9 +96,9 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("places the three IAFS crash-site objects on tile 129-129 and encloses the larger start zone with mountains", () => {
+  it("places the three IAFS crash-site objects and encloses the wider start zone with mountain obstacles", () => {
     const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "129-129");
-    const ringTileIds = [
+    const clearedOldRingTileIds = [
       "127-128",
       "127-129",
       "127-130",
@@ -114,12 +114,40 @@ describe("mapObjects content", () => {
       "132-129",
       "132-130",
     ];
+    const boundaryMountainTileIds = ["113-108", "113-127", "113-131", "113-149", "144-108", "144-127", "144-131", "144-149", "114-108", "143-149"];
+    const obstacleTileIds = ["122-119", "123-137", "132-124", "135-138"];
+    const coldPassTileIds = ["113-128", "113-129", "113-130"];
+    const redPathTileIds = ["144-128", "144-129", "144-130"];
 
     expect(crashTile?.objectIds).toEqual(crashSiteObjectIds);
 
-    for (const tileId of ringTileIds) {
+    for (const tileId of clearedOldRingTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
+      expect(tile?.terrain).not.toBe("山");
+    }
+
+    for (const tileId of boundaryMountainTileIds) {
+      const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
+      expect(tile?.areaName).toBe("坠毁外缘山体");
       expect(tile?.terrain).toBe("山");
+    }
+
+    for (const tileId of obstacleTileIds) {
+      const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
+      expect(tile?.areaName).toBe("坠毁障碍带");
+      expect(tile?.terrain).toBe("山");
+    }
+
+    for (const tileId of coldPassTileIds) {
+      const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
+      expect(tile?.areaName).toBe("寒潮隘口");
+      expect(tile?.terrain).not.toBe("山");
+    }
+
+    for (const tileId of redPathTileIds) {
+      const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
+      expect(tile?.areaName).toBe("赤岩小径");
+      expect(tile?.terrain).not.toBe("山");
     }
   });
 
