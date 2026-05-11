@@ -226,6 +226,28 @@ function createCrashSiteState(overrides: Partial<GameState> = {}): GameState {
   });
 }
 
+function createFeatureRepairCrashSiteState(overrides: Partial<GameState> = {}): GameState {
+  return createCrashSiteState({
+    map: {
+      ...createCrashSiteState().map,
+      tilesById: {
+        [CRASH_SITE_TILE_ID]: {
+          discovered: true,
+          investigated: true,
+          revealedObjectIds: [],
+        },
+      },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
+      },
+      mapObjects: {},
+    },
+    ...overrides,
+  });
+}
+
 describe("map-object-action pipeline integration", () => {
   it("shows the three crash-site repair actions on a normal call at the crash site", () => {
     const member = createCrashSiteMember();
@@ -318,6 +340,27 @@ describe("map-object-action pipeline integration", () => {
     expect(unlockedRepairTargets[0]?.disabled).toBeUndefined();
     expect(unlockedRepairTargets[1]).toMatchObject({ id: "iafs_shuttle_core:repair" });
     expect(unlockedRepairTargets[1]?.disabled).toBeUndefined();
+  });
+
+  it("keeps feature repair visible but disables it when another crew member is already repairing the feature", () => {
+    const member = createCrashSiteMember();
+    const state = createFeatureRepairCrashSiteState({
+      crew: [member, createCrashSiteMember({ id: "amy", name: "Amy" })],
+      crew_actions: {
+        "repair:amy:iafs_generator:0": createRepairCrewAction({
+          action_params: { target_feature_id: "iafs_generator" },
+        }),
+      },
+    });
+
+    const action = buildCallView({ member, tile: createCrashSiteTile(), gameState: state }).groups
+      .flatMap((group) => group.actions)
+      .find((entry) => entry.id === "iafs_generator:repair");
+
+    expect(action).toBeDefined();
+    expect(action).toMatchObject({ id: "iafs_generator:repair", featureId: "iafs_generator" });
+    expect(action?.disabled).toBe(true);
+    expect(action?.disabledReason).toContain("其他队员");
   });
 
   it("keeps repair visible but disables it with a self-repair reason when the same crew is already repairing it", () => {

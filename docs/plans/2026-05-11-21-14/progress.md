@@ -34,7 +34,7 @@ source:
 | 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | completed | 1 |
 | 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | completed | 1 |
 | 10 | TASK-010 | 实现 Feature survey 结算与去重 | completed | 1 |
-| 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | pending | 0 |
+| 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | completed | 1 |
 | 12 | TASK-012 | MapPage 展示 Feature 命中结果 | pending | 0 |
 | 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | pending | 0 |
 | 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | pending | 0 |
@@ -177,6 +177,20 @@ source:
 - 质量检查:
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 48 files / 379 tests
+
+### TASK-011: 迁移 Feature local timed action / repair 结算
+- 状态: completed
+- 开始时间: 2026-05-12 01:58
+- 完成时间: 2026-05-12 02:19
+- 尝试次数: 1
+- developer summary:
+  - Feature repair 开始时写入 `action_params.target_feature_id`，不再要求新 repair 路径提供 `object_id`。
+  - repair 结算支持 `set_feature_status`，完成 payload 带 `feature_id` / Feature metadata。
+  - repair lock 从 object id 泛化到 repair target id，支持同一 Feature 维修中禁用/拒绝第二次维修。
+  - legacy object repair fallback 保留。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 381 tests
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed

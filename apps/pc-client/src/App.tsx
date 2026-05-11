@@ -10,9 +10,17 @@ import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { defaultMapConfig, eventContentLibrary, questDefinitions, type FeatureRuntimeState, type QuestNavigationEntry } from "./content/contentData";
+import {
+  defaultMapConfig,
+  eventContentLibrary,
+  questDefinitions,
+  type FeatureActionDefinition,
+  type FeatureRuntimeState,
+  type MapFeatureDefinition,
+  type QuestNavigationEntry,
+} from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
-import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
+import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -28,7 +36,8 @@ import {
   type TriggerContext,
   type WorldFlag,
 } from "./events/types";
-import { canMoveToTile, getTileLocationLabel } from "./mapSystem";
+import { canMoveToTile, getFeatureRuntimeStatus, getTileLocationLabel } from "./mapSystem";
+import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
@@ -1723,8 +1732,9 @@ function processAppEventWakeups(state: GameState): GameState {
 
 interface LocationStoryActionSelection {
   member: CrewMember;
-  object: MapObjectDefinition;
-  action: ActionDef;
+  object?: MapObjectDefinition;
+  feature?: MapFeatureDefinition;
+  action: ActionDef | FeatureActionDefinition;
 }
 
 function findVisibleLocationStoryAction(
@@ -1770,7 +1780,7 @@ function findLocationStoryActionSelection(
 }
 
 export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actionId: string): TimedLocalDispatchResult {
-  const selection = findLocationStoryActionSelection(state, crewId, actionId);
+  const selection = findTimedLocalActionSelection(state, crewId, actionId);
   if (!selection || selection.action.local_action?.kind !== "timed_repair") {
     return {
       matched: false,
@@ -1780,7 +1790,7 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     };
   }
 
-  if (isMapObjectRepaired(state, selection.object.id)) {
+  if (isRepairSelectionRepaired(state, selection)) {
     return {
       matched: true,
       accepted: false,
@@ -1789,7 +1799,8 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     };
   }
 
-  const lockReason = getTimedRepairLockReason(state.crew_actions, crewId, selection.object.id);
+  const repairTargetId = getRepairSelectionTargetId(selection);
+  const lockReason = repairTargetId ? getTimedRepairLockReason(state.crew_actions, crewId, repairTargetId) : undefined;
   if (lockReason) {
     return {
       matched: true,
@@ -1810,9 +1821,10 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
   }
 
   const action = createRepairCrewActionState(state, selection);
+  const targetName = getRepairSelectionTargetName(selection);
   const nextMember = {
     ...selection.member,
-    status: `正在维修${selection.object.name}。`,
+    status: `正在维修${targetName}。`,
     statusTone: "accent" as Tone,
     activeAction: {
       id: action.id,
@@ -1834,7 +1846,7 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     },
     logs: appendLogEntry(
       state.logs,
-      `${selection.member.name} 开始维修${selection.object.name}，预计 ${formatDuration(action.duration_seconds)}。`,
+      `${selection.member.name} 开始维修${targetName}，预计 ${formatDuration(action.duration_seconds)}。`,
       "accent",
       state.elapsedGameSeconds,
     ),
@@ -1848,13 +1860,96 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
   };
 }
 
+function findTimedLocalActionSelection(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
+  const featureSelection = findFeatureLocationActionSelection(state, crewId, actionId);
+  if (featureSelection?.action.local_action?.kind === "timed_repair") {
+    return featureSelection;
+  }
+
+  const objectSelection = findLocationStoryActionSelection(state, crewId, actionId);
+  if (objectSelection?.action.local_action?.kind === "timed_repair") {
+    return objectSelection;
+  }
+
+  return undefined;
+}
+
+function findFeatureLocationActionSelection(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): (LocationStoryActionSelection & { tile: MapTile; feature: MapFeatureDefinition; action: FeatureActionDefinition }) | undefined {
+  const member = state.crew.find((item) => item.id === crewId);
+  const tile = member ? createRuntimeTileView(state, member.currentTile) : undefined;
+  if (!member || !tile) {
+    return undefined;
+  }
+
+  for (const feature of getTopInvestigatableFeatures(state, member.currentTile)) {
+    if (feature.investigatable !== true) {
+      continue;
+    }
+    const action = feature.actions.find((item) => item.id === actionId);
+    if (!action) {
+      continue;
+    }
+    return { member, tile, feature, action };
+  }
+
+  return undefined;
+}
+
+function getTopInvestigatableFeatures(state: GameState, tileId: string): MapFeatureDefinition[] {
+  const index = buildFeatureTileIndex(defaultMapConfig);
+  return selectTopInvestigatableFeatures(getInvestigatableFeaturesAtTile(defaultMapConfig, index, state.map, tileId));
+}
+
+function isRepairSelectionRepaired(state: GameState, selection: LocationStoryActionSelection): boolean {
+  if (selection.feature) {
+    return getFeatureRuntimeStatus(state.map, selection.feature) === "repaired";
+  }
+
+  return selection.object ? isMapObjectRepaired(state, selection.object.id) : false;
+}
+
+function getRepairSelectionTargetId(selection: LocationStoryActionSelection): string | undefined {
+  return selection.feature?.id ?? selection.object?.id;
+}
+
+function getRepairSelectionTargetName(selection: LocationStoryActionSelection): string {
+  return selection.feature?.name ?? selection.object?.name ?? "目标";
+}
+
 
 function createRepairCrewActionState(
   state: GameState,
   selection: LocationStoryActionSelection,
 ): CrewActionState {
-  const localAction = selection.action.local_action as TimedRepairLocalActionDef;
-  const actionId = `repair:${selection.member.id}:${selection.object.id}:${state.elapsedGameSeconds}`;
+  const localAction = selection.action.local_action;
+  if (!localAction || localAction.kind !== "timed_repair") {
+    throw new Error(`Cannot create repair crew action for non-repair action ${selection.action.id}.`);
+  }
+
+  const targetId = getRepairSelectionTargetId(selection);
+  const actionId = `repair:${selection.member.id}:${targetId ?? selection.action.id}:${state.elapsedGameSeconds}`;
+  const actionParams: Record<string, unknown> = {
+    action_def_id: selection.action.id,
+    success_effects: localAction.success_effects,
+    failure_effects: localAction.failure_effects,
+  };
+  if (selection.feature) {
+    actionParams.target_feature_id = selection.feature.id;
+  } else if (selection.object) {
+    actionParams.object_id = selection.object.id;
+  }
+  if ("success_check" in localAction && localAction.success_check) {
+    actionParams.success_check = localAction.success_check;
+  }
+
   return {
     id: actionId,
     crew_id: selection.member.id,
@@ -1872,12 +1967,7 @@ function createRepairCrewActionState(
     ends_at: state.elapsedGameSeconds + localAction.duration_seconds,
     progress_seconds: 0,
     duration_seconds: localAction.duration_seconds,
-    action_params: {
-      object_id: selection.object.id,
-      success_check: localAction.success_check,
-      success_effects: localAction.success_effects,
-      failure_effects: localAction.failure_effects,
-    },
+    action_params: actionParams,
     can_interrupt: true,
     interrupt_duration_seconds: 10,
   };
@@ -1908,6 +1998,7 @@ function createLocationStoryActionTriggerContext(
   state: GameState,
   { member, object, action }: LocationStoryActionSelection,
 ): TriggerContext {
+  const objectTags = object?.tags ?? [];
   return {
     trigger_type: "action_complete",
     occurred_at: state.elapsedGameSeconds,
@@ -1919,8 +2010,8 @@ function createLocationStoryActionTriggerContext(
     payload: {
       action_type: actionVerb(action.id),
       action_def_id: action.id,
-      object_id: object.id,
-      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object.tags ?? []),
+      object_id: object?.id ?? null,
+      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), objectTags),
     },
   };
 }

@@ -177,7 +177,7 @@ function evaluateCandidate(
   gameState: GameState,
   member: CrewMember,
 ): CallActionView | null {
-  const { action, object } = candidate;
+  const { action, object, feature } = candidate;
   const failed: Condition[] = [];
   let passed = true;
 
@@ -190,25 +190,25 @@ function evaluateCandidate(
   }
 
   const repairLockReason =
-    action.local_action?.kind === "timed_repair" && object
-      ? getTimedRepairLockReason(gameState.crew_actions, member.id, object.id)
+    action.local_action?.kind === "timed_repair" && (feature || object)
+      ? getTimedRepairLockReason(gameState.crew_actions, member.id, feature?.id ?? object!.id)
       : undefined;
   if (repairLockReason) {
-    return toView(action, object, candidate.feature, {
+    return toView(action, object, feature, {
       disabled: true,
       disabledReason: repairLockReason,
     });
   }
 
   if (passed) {
-    return toView(action, object, candidate.feature, { disabled: false });
+    return toView(action, object, feature, { disabled: false });
   }
 
   if (action.display_when_unavailable !== "disabled") {
     return null;
   }
 
-  return toView(action, object, candidate.feature, {
+  return toView(action, object, feature, {
     disabled: true,
     disabledReason: generateHint(action as ActionDef, failed),
   });
@@ -317,12 +317,19 @@ export function findActiveRepairActionForObject(
   crewActions: Record<string, CrewActionState>,
   objectId: string,
 ): CrewActionState | undefined {
+  return findActiveRepairActionForTarget(crewActions, objectId);
+}
+
+export function findActiveRepairActionForTarget(
+  crewActions: Record<string, CrewActionState>,
+  targetId: string,
+): CrewActionState | undefined {
   return Object.values(crewActions)
     .filter(
       (action) =>
         action.type === "repair" &&
         action.status === "active" &&
-        action.action_params.object_id === objectId,
+        (action.action_params.target_feature_id ?? action.action_params.object_id) === targetId,
     )
     .sort((left, right) => (right.started_at ?? 0) - (left.started_at ?? 0) || right.id.localeCompare(left.id))[0];
 }
@@ -330,9 +337,9 @@ export function findActiveRepairActionForObject(
 export function getTimedRepairLockReason(
   crewActions: Record<string, CrewActionState>,
   crewId: string,
-  objectId: string,
+  targetId: string,
 ): string | undefined {
-  const activeRepair = findActiveRepairActionForObject(crewActions, objectId);
+  const activeRepair = findActiveRepairActionForTarget(crewActions, targetId);
   if (!activeRepair) {
     return undefined;
   }

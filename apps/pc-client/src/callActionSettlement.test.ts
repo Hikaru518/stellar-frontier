@@ -93,6 +93,20 @@ function createRepairMap(tileId = "4-4", objectId = "iafs_generator", status = "
   };
 }
 
+function createFeatureRepairMap(tileId = "4-4", featureId = "iafs_generator", status = "damaged"): GameMapState {
+  return {
+    ...createMap(tileId),
+    featuresById: {
+      [featureId]: {
+        id: featureId,
+        status,
+        revealed: true,
+        investigated: true,
+      },
+    },
+  };
+}
+
 function createCrewAction(overrides: Partial<CrewActionState> = {}): CrewActionState {
   return {
     id: "mike-survey-1-1",
@@ -357,6 +371,56 @@ describe("settleAction", () => {
         payload: expect.objectContaining({
           action_type: "repair",
           object_id: "iafs_generator",
+          repair_result: "success",
+        }),
+      }),
+    ]);
+  });
+
+  it("settles a feature repair success, writes feature status, and emits feature context", () => {
+    const patch = settleAction({
+      member: createMember({ currentTile: "4-4", attributes: { physical: 3, agility: 5, intellect: 3, perception: 3, luck: 3 } }),
+      action: createCrewAction({
+        id: "mike-repair-generator-feature",
+        type: "repair",
+        target_tile_id: "4-4",
+        duration_seconds: 180,
+        action_params: {
+          target_feature_id: "iafs_generator",
+          action_def_id: "iafs_generator:repair",
+          success_effects: [{ type: "set_feature_status", feature_id: "iafs_generator", status: "repaired" }],
+          failure_effects: [],
+        },
+      }),
+      occurredAt: 180,
+      resources: createResources(),
+      baseInventory: [],
+      tiles: [createTile("4-4", { tags: ["crash_site"] })],
+      map: createFeatureRepairMap(),
+      logs: [],
+    });
+
+    expect(patch.map.featuresById?.iafs_generator).toEqual(
+      expect.objectContaining({
+        id: "iafs_generator",
+        status: "repaired",
+        revealed: true,
+        investigated: true,
+      }),
+    );
+    expect(patch.member).toMatchObject({ status: "维修完成，待命中。", statusTone: "success", activeAction: undefined });
+    expect(patch.triggerContexts).toEqual([
+      expect.objectContaining({
+        trigger_type: "action_complete",
+        crew_id: "mike",
+        tile_id: "4-4",
+        payload: expect.objectContaining({
+          action_type: "repair",
+          action_def_id: "iafs_generator:repair",
+          object_id: null,
+          feature_id: "iafs_generator",
+          feature_kind: "facility:power_system",
+          feature_tags: ["iafs", "crash_site", "repair_target", "power_system"],
           repair_result: "success",
         }),
       }),

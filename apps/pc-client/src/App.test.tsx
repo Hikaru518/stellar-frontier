@@ -104,6 +104,27 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function createFeatureRepairCrashSiteState(overrides: Record<string, unknown> = {}) {
+  const base = createSavedCrashSiteState();
+  return {
+    ...base,
+    map: {
+      ...(base.map as Record<string, unknown>),
+      tilesById: {
+        "129-129": {
+          discovered: true,
+          investigated: true,
+          revealedObjectIds: [],
+        },
+      },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+      },
+    },
+    ...overrides,
+  };
+}
+
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -435,7 +456,7 @@ describe("App", () => {
 
 
   it("dispatches a repair selection into a timed repair crew action", () => {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createFeatureRepairCrashSiteState()));
 
     render(<App />);
 
@@ -445,19 +466,31 @@ describe("App", () => {
 
     const saved = readSavedState();
     expect(saved).not.toBeNull();
-    expect(Object.values((saved?.crew_actions ?? {}) as Record<string, { type: string; action_params?: { object_id?: string } }>)).toEqual(
+    const repairActions = Object.values(
+      (saved?.crew_actions ?? {}) as Record<string, { type: string; action_params?: { object_id?: string; target_feature_id?: string } }>,
+    );
+    expect(repairActions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           type: "repair",
-          action_params: expect.objectContaining({ object_id: "iafs_generator" }),
+          action_params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
         }),
       ]),
     );
-    const savedCrew = (saved?.crew ?? []) as Array<{ status: string; activeAction?: { actionType?: string; targetTile?: string } }>;
+    expect(repairActions[0]?.action_params).not.toHaveProperty("object_id");
+    const savedCrew = (saved?.crew ?? []) as Array<{
+      status: string;
+      activeAction?: { actionType?: string; targetTile?: string; params?: { target_feature_id?: string; object_id?: string } };
+    }>;
     expect(savedCrew[0]).toMatchObject({
       status: "正在维修发电机。",
-      activeAction: expect.objectContaining({ actionType: "repair", targetTile: "129-129" }),
+      activeAction: expect.objectContaining({
+        actionType: "repair",
+        targetTile: "129-129",
+        params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
+      }),
     });
+    expect(savedCrew[0]?.activeAction?.params).not.toHaveProperty("object_id");
     expect(saved?.active_calls).toEqual({});
   });
 
@@ -583,7 +616,7 @@ describe("App", () => {
 
   it("allows retrying a repair after a failed attempt has cleared the lock", () => {
     const retryResult = dispatchTimedLocalAction(
-      createSavedCrashSiteState({
+      createFeatureRepairCrashSiteState({
         elapsedGameSeconds: 180,
         crew: [
           {
@@ -603,14 +636,16 @@ describe("App", () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: "repair",
-          action_params: expect.objectContaining({ object_id: "iafs_generator" }),
+          action_params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
         }),
       ]),
     );
+    const retryAction = Object.values(retryResult.state.crew_actions).find((action) => action.type === "repair");
+    expect(retryAction?.action_params).not.toHaveProperty("object_id");
   });
 
-  it("rejects repeat repair submissions when the object is already locked or repaired", () => {
-    const lockedResult = dispatchTimedLocalAction(createSavedCrashSiteState({
+  it("rejects repeat repair submissions when the feature is already locked or repaired", () => {
+    const lockedResult = dispatchTimedLocalAction(createFeatureRepairCrashSiteState({
       crew_actions: {
         "repair:amy:iafs_generator:0": {
           id: "repair:amy:iafs_generator:0",
@@ -629,7 +664,7 @@ describe("App", () => {
           ends_at: 180,
           progress_seconds: 0,
           duration_seconds: 180,
-          action_params: { object_id: "iafs_generator" },
+          action_params: { target_feature_id: "iafs_generator" },
           can_interrupt: true,
           interrupt_duration_seconds: 10,
         },
@@ -638,13 +673,11 @@ describe("App", () => {
     expect(lockedResult.accepted).toBe(false);
     expect(lockedResult.reason).toContain("其他队员");
 
-    const repairedResult = dispatchTimedLocalAction(createSavedCrashSiteState({
+    const repairedResult = dispatchTimedLocalAction(createFeatureRepairCrashSiteState({
       map: {
-        ...(createSavedCrashSiteState().map as Record<string, unknown>),
-        mapObjects: {
-          iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
-          iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-          iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+        ...(createFeatureRepairCrashSiteState().map as Record<string, unknown>),
+        featuresById: {
+          iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
         },
       },
     }) as never, "mike", "iafs_generator:repair");

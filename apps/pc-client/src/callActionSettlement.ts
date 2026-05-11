@@ -54,6 +54,7 @@ interface HandlerContext {
   logs: SystemLog[];
   tile?: TileWithContent;
   object?: MapObjectDefinition;
+  feature?: MapFeatureDefinition;
 }
 
 type ActionHandler = (ctx: HandlerContext) => ActionSettlementPatch;
@@ -76,6 +77,7 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
   const handler = actionHandlers[handlerId];
   const tile = findTile(args.tiles, action.targetTile ?? args.member.currentTile);
   const object = action.objectId ? mapObjectDefinitionById.get(action.objectId) : undefined;
+  const feature = action.targetFeatureId ? findFeature(action.targetFeatureId) : undefined;
 
   if (!handler) {
     return createPatch({
@@ -96,6 +98,7 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
     logs: args.logs,
     tile,
     object,
+    feature,
   });
 }
 
@@ -239,7 +242,11 @@ function settleGenericCompletion(ctx: HandlerContext): ActionSettlementPatch {
 
 function settleRepair(ctx: HandlerContext): ActionSettlementPatch {
   const repairCheck = readRepairSuccessCheck(ctx.action.params.success_check);
-  const repairResult = rollRepairOutcome(repairCheck, ctx.member.attributes.agility) ? "success" : "failure";
+  const repairResult = repairCheck
+    ? (rollRepairOutcome(repairCheck, ctx.member.attributes.agility) ? "success" : "failure")
+    : ctx.action.targetFeatureId
+      ? "success"
+      : "failure";
   const repairEffects = readRepairEffects(
     repairResult === "success" ? ctx.action.params.success_effects : ctx.action.params.failure_effects,
   );
@@ -260,7 +267,12 @@ function settleRepair(ctx: HandlerContext): ActionSettlementPatch {
     member,
     map,
     logs: appendLogEntry(ctx.logs, logText, repairResult === "success" ? "success" : "muted", ctx.occurredAt),
-    triggerContexts: [createActionCompleteTrigger(ctx, ctx.object ? [ctx.object] : [], { repair_result: repairResult })],
+    triggerContexts: [
+      createActionCompleteTrigger(ctx, ctx.object ? [ctx.object] : [], {
+        ...(ctx.action.actionDefId ? { action_def_id: ctx.action.actionDefId } : {}),
+        repair_result: repairResult,
+      }),
+    ],
   });
 }
 
@@ -397,6 +409,7 @@ function createActionCompleteTrigger(
   objects: MapObjectDefinition[],
   payloadPatch: Record<string, unknown> = {},
 ): TriggerContext {
+  const featureTags = ctx.feature?.tags ?? [];
   return {
     trigger_type: "action_complete",
     occurred_at: ctx.occurredAt,
@@ -407,7 +420,14 @@ function createActionCompleteTrigger(
     payload: {
       action_type: ctx.action.actionType,
       object_id: ctx.object?.id ?? null,
-      tags: mergeTags(getTileTags(ctx.tile), objects.flatMap((object) => object.tags ?? [])),
+      ...(ctx.feature
+        ? {
+            feature_id: ctx.feature.id,
+            feature_kind: ctx.feature.kind,
+            feature_tags: featureTags,
+          }
+        : {}),
+      tags: mergeTags(getTileTags(ctx.tile), objects.flatMap((object) => object.tags ?? []), featureTags),
       ...payloadPatch,
     },
   };
@@ -443,6 +463,7 @@ function applyRepairEffects(ctx: HandlerContext, effects: Effect[]): GameMapStat
       rng_state: null,
       map: {
         tilesById: ctx.map.tilesById,
+        featuresById: ctx.map.featuresById,
         mapObjects: ctx.map.mapObjects,
       },
     },
@@ -459,6 +480,7 @@ function applyRepairEffects(ctx: HandlerContext, effects: Effect[]): GameMapStat
   return {
     ...ctx.map,
     tilesById: result.state.map?.tilesById ?? ctx.map.tilesById,
+    featuresById: result.state.map?.featuresById ?? ctx.map.featuresById,
     mapObjects: result.state.map?.mapObjects ?? ctx.map.mapObjects,
   };
 }
@@ -468,8 +490,12 @@ function rollRepairOutcome(check: RepairSuccessCheck, agility: number) {
   return Math.random() < chance;
 }
 
-function readRepairSuccessCheck(value: unknown): RepairSuccessCheck {
-  const record = isRecord(value) ? value : {};
+function readRepairSuccessCheck(value: unknown): RepairSuccessCheck | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const record = value;
 
   return {
     base: numberParam(record.base),
@@ -492,24 +518,48 @@ function readRepairEffects(value: unknown): Effect[] {
 }
 
 function toRepairEffect(value: unknown, index: number): Effect | undefined {
-  if (!isRecord(value) || value.type !== "set_object_status") {
+  if (!isRecord(value)) {
     return undefined;
   }
 
-  const objectId = stringParam(value.object_id);
   const status = stringParam(value.status);
-  if (!objectId || !status) {
+  if (!status) {
     return undefined;
   }
 
-  return {
-    id: `repair_effect_${index}_${objectId}`,
-    type: "set_object_status",
-    target: { type: "world_flags" },
-    params: { object_id: objectId, status },
-    failure_policy: "fail_event",
-    record_policy: { write_event_log: false, write_world_history: false },
-  };
+  if (value.type === "set_feature_status") {
+    const featureId = stringParam(value.feature_id);
+    if (!featureId) {
+      return undefined;
+    }
+
+    return {
+      id: `repair_effect_${index}_${featureId}`,
+      type: "set_feature_status",
+      target: { type: "world_flags" },
+      params: { feature_id: featureId, status },
+      failure_policy: "fail_event",
+      record_policy: { write_event_log: false, write_world_history: false },
+    };
+  }
+
+  if (value.type === "set_object_status") {
+    const objectId = stringParam(value.object_id);
+    if (!objectId) {
+      return undefined;
+    }
+
+    return {
+      id: `repair_effect_${index}_${objectId}`,
+      type: "set_object_status",
+      target: { type: "world_flags" },
+      params: { object_id: objectId, status },
+      failure_policy: "fail_event",
+      record_policy: { write_event_log: false, write_world_history: false },
+    };
+  }
+
+  return undefined;
 }
 
 function clamp(min: number, max: number, value: number) {
