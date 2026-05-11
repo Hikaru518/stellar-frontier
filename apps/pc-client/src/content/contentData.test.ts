@@ -119,9 +119,33 @@ describe("event content exports", () => {
 });
 
 describe("default map config", () => {
-  it("normalizes legacy map configs without features to an empty feature list", async () => {
-    expect("features" in defaultMapJson).toBe(false);
-    expect(contentData.defaultMapConfig.features).toEqual([]);
+  it("exposes seeded feature content for the default crash site", async () => {
+    const rawFeatures = (defaultMapJson as { features?: unknown }).features;
+    expect(Array.isArray(rawFeatures)).toBe(true);
+
+    const features = contentData.defaultMapConfig.features;
+    const featureIds = features.map((feature) => feature.id);
+    const legacyIafsObjectIds = [
+      "iafs_generator",
+      "iafs_life_support",
+      "iafs_shuttle_core",
+      "iafs_scattered_supplies",
+    ];
+
+    expect(features.some((feature) => feature.investigatable !== true)).toBe(true);
+    expect(features.some((feature) => feature.investigatable === true)).toBe(true);
+    expect(featureIds).toEqual(expect.arrayContaining(legacyIafsObjectIds));
+
+    for (const feature of features) {
+      for (const span of feature.footprint.spans) {
+        expect(span.row).toBeGreaterThanOrEqual(1);
+        expect(span.row).toBeLessThanOrEqual(contentData.defaultMapConfig.size.rows);
+        expect(span.colStart).toBeGreaterThanOrEqual(1);
+        expect(span.colStart).toBeLessThanOrEqual(contentData.defaultMapConfig.size.cols);
+        expect(span.colEnd).toBeGreaterThanOrEqual(span.colStart);
+        expect(span.colEnd).toBeLessThanOrEqual(contentData.defaultMapConfig.size.cols);
+      }
+    }
   });
 
   it("types passive and investigatable map features separately", async () => {
