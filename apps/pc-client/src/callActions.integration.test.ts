@@ -162,7 +162,7 @@ function createCrashSiteTile(): MapTile {
 function createCrashSiteMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return createMember({
     id: "mike",
-    name: "Mike",
+    name: "麦克",
     role: "神秘幸存者",
     currentTile: CRASH_SITE_TILE_ID,
     ...overrides,

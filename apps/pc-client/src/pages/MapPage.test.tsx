@@ -24,9 +24,9 @@ describe("MapPage", () => {
   it("keeps crew action buttons visible in the left rail", () => {
     renderMapPage();
 
-    expect(screen.getByRole("button", { name: "查看状态" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "查看背包" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "通话" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "查看状态" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "查看背包" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "通话" }).length).toBeGreaterThan(0);
   });
 
   it("routes crew status and inventory requests to the crew page handlers", () => {
@@ -34,8 +34,8 @@ describe("MapPage", () => {
     const onShowCrewInventory = vi.fn();
     renderMapPage({ onShowCrewStatus, onShowCrewInventory });
 
-    fireEvent.click(screen.getByRole("button", { name: "查看状态" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看背包" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "查看状态" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "查看背包" })[0]!);
 
     expect(onShowCrewStatus).toHaveBeenCalledWith(initialCrew[0].id);
     expect(onShowCrewInventory).toHaveBeenCalledWith(initialCrew[0].id);

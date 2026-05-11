@@ -74,7 +74,8 @@
 - `objective` 可以要求某类行动完成后推进 parent event。
 - 行动完成后用 `action_complete` 或 `objective_completed` 触发事件推进。
 - 事件不能把行动执行进度藏在事件节点内部；行动耗时、路径、中断和完成状态由行动系统维护。
-- 通讯台基础行动由 `content/universal-actions/universal-actions.json` 定义并创建真实行动；事件系统消费 `arrival`、`action_complete`、`idle_time` 或 `call_choice`，而不是把每个普通按钮都建成事件图节点。
+- 通讯台基础行动由 `content/universal-actions/universal-actions.json` 定义并创建真实行动；事件系统消费 `game_start`、`arrival`、`action_complete`、`idle_time` 或 `call_choice`，而不是把每个普通按钮都建成事件图节点。
+- `game_start` 只用于新游戏初始化事件，不在读档时重放；开局 Mike 来电是当前唯一使用者。
 - 地块对象通过类型、标签和可见性参与结构化地点事件条件；剧情动作由事件选项、`action_request` 或 objective 提供。
 
 ## 4. `tile_state` 事件可访问字段

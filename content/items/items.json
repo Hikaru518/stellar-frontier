@@ -1,5 +1,41 @@
 {
   "$schema": "../schemas/items.schema.json",
   "version": 1,
-  "items": []
+  "items": [
+    {
+      "itemId": "repair_kit",
+      "name": "维修套件",
+      "category": "tool",
+      "stackable": true,
+      "usableInResponse": true,
+      "consumedOnUse": true,
+      "maxStack": 5,
+      "description": "包含密封胶、接线夹和小型诊断片的应急维修套件。",
+      "tags": ["repair", "tool", "emergency"],
+      "effects": []
+    },
+    {
+      "itemId": "emergency_food",
+      "name": "应急食物",
+      "category": "consumable",
+      "stackable": true,
+      "usableInResponse": true,
+      "consumedOnUse": true,
+      "maxStack": 20,
+      "description": "密封包装的高热量应急口粮，味道很安全，安全得近乎可疑。",
+      "tags": ["food", "emergency"],
+      "effects": []
+    },
+    {
+      "itemId": "ice_pick",
+      "name": "破冰镐",
+      "category": "tool",
+      "stackable": false,
+      "usableInResponse": true,
+      "consumedOnUse": false,
+      "description": "短柄破冰工具，可用于撬开冰层、固定绳索或临时挖掘。",
+      "tags": ["tool", "mining", "survey"],
+      "effects": []
+    }
+  ]
 }

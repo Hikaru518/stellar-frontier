@@ -48,6 +48,7 @@ export const itemTagLabelByTag: Record<string, string> = {
   mining: "采矿",
   personal: "个人物品",
   resource: "资源",
+  repair: "维修",
   building: "建设",
   build: "建设",
 };

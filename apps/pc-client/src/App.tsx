@@ -169,6 +169,7 @@ function App() {
   const mobileFallback = shouldEnablePcFallback({ transport: mobileSession.status === "offline" ? "offline" : "yuan-wss", lastHeartbeatAt: mobileSession.lastHeartbeatAt, fallbackAfterMs: mobileSession.fallbackAfterMs }, nowMs);
   const mobileMode: MobileMode = typeof mobileSession.lastHeartbeatAt === "number" && !mobileFallback ? "active" : mobileFallback ? "fallback" : "waiting";
   const activeMobileCalls = getActiveRuntimeCalls(gameState, elapsedGameSeconds);
+  const activeRuntimeCallCrewIds = activeMobileCalls.map((call) => call.crew_id);
   const mobileStatusCard = {
     mode: mobileMode,
     lastHeartbeatAt: mobileSession.lastHeartbeatAt,
@@ -306,12 +307,17 @@ function App() {
   }, [returnHomeCompleted]);
 
   useEffect(() => {
-    if (!currentCall || currentCall.runtimeCallId) {
+    if (!currentCall) {
       return;
     }
 
     const runtimeCall = findRuntimeCallForCrew(gameState, currentCall.crewId);
-    if (!runtimeCall) {
+    if (!runtimeCall || currentCall.runtimeCallId === runtimeCall.id) {
+      return;
+    }
+
+    const currentRuntimeCall = currentCall.runtimeCallId ? gameState.active_calls[currentCall.runtimeCallId] : undefined;
+    if (currentRuntimeCall && isRuntimeCallActiveForState(currentRuntimeCall, gameState.elapsedGameSeconds)) {
       return;
     }
 
@@ -319,6 +325,7 @@ function App() {
       call && call.crewId === currentCall.crewId
         ? {
             ...call,
+            type: isUrgentRuntimeCallState(runtimeCall) ? "emergency" : call.type,
             settled: false,
             runtimeCallId: runtimeCall.id,
             result: undefined,
@@ -531,14 +538,14 @@ function App() {
       return;
     }
 
-    const type = "normal";
+    const type = runtimeCall && isUrgentRuntimeCallState(runtimeCall) ? "emergency" : "normal";
     setCurrentCall({ crewId, type, settled: false, runtimeCallId: runtimeCall?.id });
     setGameState((state) => ({
       ...state,
       crew: state.crew.map((item) => (item.id === crewId ? { ...item, hasIncoming: false } : item)),
       logs: appendLogEntry(
         state.logs,
-        `${member.name} 的普通通话已接通。`,
+        runtimeCall ? `${member.name} 的事件通话已接通。` : `${member.name} 的普通通话已接通。`,
         "neutral",
         state.elapsedGameSeconds,
       ),
@@ -947,6 +954,7 @@ function App() {
         objectives={gameState.objectives}
         resources={resources}
         gameTimeLabel={gameTimeLabel}
+        runtimeCallCrewIds={activeRuntimeCallCrewIds}
         onOpenStation={openStation}
         onOpenMap={() => openMap("control")}
         onStartCall={startCall}
@@ -1030,7 +1038,28 @@ function createInitialGameState(): GameState {
     ...emptyEventState,
   };
 
-  return { ...state, tiles: syncTileCrew(state.tiles, state.crew) };
+  return bootstrapGameStartEvent({ ...state, tiles: syncTileCrew(state.tiles, state.crew) });
+}
+
+function bootstrapGameStartEvent(state: GameState): GameState {
+  const result = processTrigger({
+    state: toEventEngineState(state),
+    index: eventContentIndex,
+    context: {
+      trigger_type: "game_start",
+      occurred_at: 0,
+      source: "time_system",
+      crew_id: "mike",
+      tile_id: "129-129",
+      payload: { phase: "new_game" },
+    },
+  });
+
+  if (result.errors.length > 0 || (result.candidate_report?.created_event_ids.length ?? 0) === 0) {
+    return state;
+  }
+
+  return mergeEventRuntimeState(state, result.state);
 }
 
 function isSavedBaselineCompatible(saved: SavedGameState) {

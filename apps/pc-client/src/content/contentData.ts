@@ -124,7 +124,7 @@ export interface DiaryEntryDefinition {
   availability: DiaryAvailability;
 }
 
-export type CrewDefinitionId = "mike" | "amy" | "garry";
+export type CrewDefinitionId = "mike" | "amy" | "garry" | "simon" | "alice";
 
 export interface CrewDefinition {
   crewId: CrewDefinitionId;

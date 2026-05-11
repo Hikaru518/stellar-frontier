@@ -6,22 +6,34 @@ import { mapObjectDefinitions, universalActions } from "./mapObjects";
 describe("minimal content baseline", () => {
   it("exposes the crash-site bootstrap runtime dataset", () => {
     expect(eventContentLibrary.domains).toEqual(["iafs-inspection"]);
-    expect(eventContentLibrary.event_definitions).toHaveLength(11);
-    expect(eventContentLibrary.call_templates).toHaveLength(8);
+    expect(eventContentLibrary.event_definitions).toHaveLength(17);
+    expect(eventContentLibrary.call_templates).toHaveLength(21);
     expect(mapObjectDefinitions.map((definition) => definition.id)).toEqual([
       "iafs_generator",
       "iafs_life_support",
       "iafs_shuttle_core",
+      "iafs_scattered_supplies",
     ]);
 
-    expect(crewDefinitions).toHaveLength(1);
+    expect(crewDefinitions).toHaveLength(3);
     expect(crewDefinitions[0]).toMatchObject({
       crewId: "mike",
+      name: "麦克",
       currentTile: "129-129",
       canCommunicate: true,
     });
+    expect(crewDefinitions[1]).toMatchObject({
+      crewId: "simon",
+      name: "西蒙",
+      attributes: { physical: 4, agility: 5, intellect: 3, perception: 2, luck: 3 },
+    });
+    expect(crewDefinitions[2]).toMatchObject({
+      crewId: "alice",
+      name: "爱丽丝",
+      attributes: { physical: 2, agility: 4, intellect: 3, perception: 4, luck: 5 },
+    });
 
-    expect(itemDefinitions).toEqual([]);
+    expect(itemDefinitions.map((item) => item.itemId)).toEqual(["repair_kit", "emergency_food", "ice_pick"]);
     expect(universalActions.map((action) => action.id)).toEqual([
       "universal:move",
       "universal:standby",
@@ -55,6 +67,7 @@ describe("minimal content baseline", () => {
     ]);
     expect(defaultMapConfig.radar.glyphRows).toHaveLength(256);
     expect(defaultMapConfig.radar.toneRows).toHaveLength(256);
+    expect(defaultMapConfig.tiles.find((tile) => tile.id === "130-130")?.objectIds).toEqual(["iafs_scattered_supplies"]);
     expect(defaultMapConfig.tiles.every((tile) => tile.specialStates.length === 0)).toBe(true);
   });
 });

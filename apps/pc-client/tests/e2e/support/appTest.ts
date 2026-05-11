@@ -95,11 +95,34 @@ export async function waitForRuntimeEventStatus(page: Page, eventDefinitionId: s
 }
 
 export async function startNormalMikeCall(page: Page) {
+  const normalCallButton = mikeCard(page).getByRole("button", { name: "通话" });
+  if ((await normalCallButton.count()) > 0) {
+    await normalCallButton.click();
+    return;
+  }
+
+  await completeOpeningMikeCall(page);
   await mikeCard(page).getByRole("button", { name: "通话" }).click();
 }
 
+export async function completeOpeningMikeCall(page: Page) {
+  const connectButton = page.getByRole("button", { name: "接通" }).first();
+  if ((await connectButton.count()) === 0) {
+    return;
+  }
+
+  await connectButton.click();
+  await page.getByRole("button", { name: "我们会带你回家。先稳住，把眼前的情况说清楚。" }).click();
+  await page.getByRole("button", { name: "让我们先看看手头的情况如何，飞船上还有能够使用的设施吗？" }).click();
+  await page.getByRole("button", { name: "有一些货物掉在了外面，可能派人去搜寻一番。" }).click();
+  await page.getByRole("button", { name: "看样子飞船是没办法重新启航了，得让人寻找一下出去的路。" }).click();
+  await expect(page.getByText("[CALL] 事件通话已关闭。")).toBeVisible();
+  await page.getByRole("button", { name: /任务/ }).click();
+  await expect(page.getByRole("heading", { name: "任务追踪" })).toBeVisible();
+}
+
 export function mikeCard(page: Page) {
-  return page.locator("article.console-crew-card").filter({ hasText: "Mike" }).first();
+  return page.locator("article.console-crew-card").filter({ hasText: "麦克" }).first();
 }
 
 export function objectSection(page: Page, name: string) {

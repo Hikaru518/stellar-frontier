@@ -99,6 +99,73 @@ describe("event engine call option selection", () => {
 });
 
 describe("event engine trigger intake", () => {
+  it("runs the authored opening 麦克 call chain into regrouping situation", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredCrashSiteState(),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(0),
+        trigger_type: "game_start",
+        source: "time_system",
+        crew_id: "mike",
+        tile_id: "129-129",
+        payload: { phase: "new_game" },
+      },
+    });
+    const crashReportCallId = started.event?.active_call_id ?? "";
+
+    expect(started.errors).toEqual([]);
+    expect(started.event?.event_definition_id).toBe("iafs_opening_mike_crash_call");
+    expect(started.state.active_calls[crashReportCallId]?.rendered_lines[0]?.text).toContain("这里是麦克");
+
+    const facilities = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: crashReportCallId,
+      option_id: "promise_return_home",
+      occurred_at: 1,
+    });
+    const facilitiesCallId = facilities.event?.active_call_id ?? "";
+    const cargo = selectCallOption({
+      state: facilities.state,
+      index: indexResult.index,
+      call_id: facilitiesCallId,
+      option_id: "check_usable_facilities",
+      occurred_at: 2,
+    });
+    const cargoCallId = cargo.event?.active_call_id ?? "";
+    const route = selectCallOption({
+      state: cargo.state,
+      index: indexResult.index,
+      call_id: cargoCallId,
+      option_id: "search_scattered_cargo",
+      occurred_at: 3,
+    });
+    const routeCallId = route.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: route.state,
+      index: indexResult.index,
+      call_id: routeCallId,
+      option_id: "find_exit_route",
+      occurred_at: 4,
+    });
+    const quest = ended.state.quest_state?.quests.regroup_after_crash;
+
+    expect(facilities.errors).toEqual([]);
+    expect(cargo.errors).toEqual([]);
+    expect(route.errors).toEqual([]);
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(quest?.current_node_id).toBe("regrouping_situation");
+    expect(ended.state.event_logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ summary: "麦克完成坠毁后首次回报，主线进入重整态势" }),
+      ]),
+    );
+  });
+
   it("completes the crash-site survey quest todo through the authored survey call chain", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
@@ -138,7 +205,90 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
-  it("records repair quest progress immediately when authored repair actions complete", () => {
+  it("reveals the authored scattered supplies object after surveying tile 130-130", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredSuppliesState(90),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(90),
+        trigger_type: "action_complete",
+        source: "crew_action",
+        crew_id: "mike",
+        tile_id: "130-130",
+        action_id: "act_survey_supplies",
+        payload: { action_type: "survey" },
+      },
+    });
+    const callId = started.event?.active_call_id ?? "";
+
+    expect(started.errors).toEqual([]);
+    expect(started.event?.event_definition_id).toBe("iafs_scattered_supplies_survey_reveal");
+    expect(started.state.active_calls[callId]?.rendered_lines.map((line) => line.text).join(" ")).toContain("散落的物资");
+
+    const selected = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "ack",
+      occurred_at: 95,
+    });
+
+    expect(selected.errors).toEqual([]);
+    expect(selected.state.map?.tilesById?.["130-130"]?.revealedObjectIds).toEqual(["iafs_scattered_supplies"]);
+  });
+
+  it.each([
+    {
+      occurredAt: 120,
+      expectedNode: "full_report",
+      expectedText: "一套维修套件、一包应急食物，还有一把破冰镐",
+      expectedItems: [
+        { item_id: "repair_kit", quantity: 1 },
+        { item_id: "emergency_food", quantity: 1 },
+        { item_id: "ice_pick", quantity: 1 },
+      ],
+    },
+    {
+      occurredAt: 240,
+      expectedNode: "late_report",
+      expectedText: "看来我们晚来了一步，有不少东西被风吹走了",
+      expectedItems: [{ item_id: "ice_pick", quantity: 1 }],
+    },
+  ])("branches scattered supplies search results by elapsed time %#", ({ occurredAt, expectedNode, expectedText, expectedItems }) => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+
+    const result = processTrigger({
+      state: createAuthoredSuppliesState(occurredAt),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(occurredAt),
+        trigger_type: "action_complete",
+        source: "call",
+        crew_id: "mike",
+        tile_id: "130-130",
+        action_id: "iafs_scattered_supplies:search",
+        event_definition_id: "iafs_scattered_supplies_search",
+        payload: {
+          action_type: "search",
+          action_def_id: "iafs_scattered_supplies:search",
+          object_id: "iafs_scattered_supplies",
+        },
+      },
+    });
+    const callId = result.event?.active_call_id ?? "";
+
+    expect(result.errors).toEqual([]);
+    expect(result.event?.event_definition_id).toBe("iafs_scattered_supplies_search");
+    expect(result.event?.current_node_id).toBe(expectedNode);
+    expect(result.state.active_calls[callId]?.rendered_lines.map((line) => line.text).join(" ")).toContain(expectedText);
+    expect(result.state.inventories.inv_mike.items).toEqual(expectedItems);
+    expect(result.state.world_flags.iafs_scattered_supplies_searched).toMatchObject({ value: true });
+  });
+
+  it("queues a success callback and records repair quest progress when authored repair actions complete", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const state = createAuthoredCrashSiteState();
@@ -178,11 +328,52 @@ describe("event engine trigger intake", () => {
     });
 
     const quest = result.state.quest_state?.quests.regroup_after_crash;
+    const callId = result.event?.active_call_id ?? "";
     expect(result.errors).toEqual([]);
     expect(result.event?.event_definition_id).toBe("iafs_generator_repair_complete");
-    expect(result.state.active_calls).toEqual({});
+    expect(result.event?.status).toBe("waiting_call");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("发电机这边修好了。");
     expect(quest?.todos.repair_generator).toMatchObject({ status: "completed", completed_at: 360 });
     expect(quest?.status).toBe("completed");
+
+    const selected = selectCallOption({
+      state: result.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "ack",
+      occurred_at: 361,
+    });
+    expect(selected.errors).toEqual([]);
+    expect(selected.event?.status).toBe("resolved");
+    expect(selected.event?.active_call_id).toBeNull();
+    expect(selected.state.active_calls[callId]?.status).toBe("ended");
+  });
+
+  it("queues a failure callback without completing the repair quest todo", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+
+    const result = processTrigger({
+      state: createAuthoredCrashSiteState(),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(360),
+        trigger_type: "action_complete",
+        source: "crew_action",
+        crew_id: "mike",
+        tile_id: "129-129",
+        action_id: "repair:mike:iafs_generator:0",
+        payload: { action_type: "repair", object_id: "iafs_generator", repair_result: "failure" },
+      },
+    });
+
+    const quest = result.state.quest_state?.quests.regroup_after_crash;
+    const callId = result.event?.active_call_id ?? "";
+    expect(result.errors).toEqual([]);
+    expect(result.event?.event_definition_id).toBe("iafs_generator_repair_failed");
+    expect(result.event?.status).toBe("waiting_call");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("发电机这边还没修起来。");
+    expect(quest?.todos.repair_generator?.status).not.toBe("completed");
   });
 
   it("starts arrival candidates and advances call choice contexts", () => {
@@ -503,7 +694,7 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
     crew: {
       mike: {
         ...crew("mike"),
-        display_name: "Mike",
+        display_name: "麦克",
         tile_id: "129-129",
         inventory_id: "inv_mike",
       },
@@ -533,6 +724,49 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
       mapObjects: {},
     },
     quest_state: createInitialQuestState(questDefinitions, 0),
+  };
+}
+
+function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGameState {
+  const state = createAuthoredCrashSiteState();
+  const suppliesTile = {
+    ...state.tiles["129-129"],
+    id: "130-130",
+    coordinates: { x: 130, y: 130 },
+    terrain_type: "south_pass",
+    tags: ["iafs", "supplies"],
+    current_crew_ids: ["mike"],
+  };
+
+  return {
+    ...state,
+    elapsed_game_seconds: elapsedGameSeconds,
+    crew: {
+      ...state.crew,
+      mike: {
+        ...state.crew.mike,
+        tile_id: "130-130",
+      },
+    },
+    tiles: {
+      ...state.tiles,
+      "130-130": suppliesTile,
+    },
+    map: {
+      ...state.map,
+      tilesById: {
+        ...state.map?.tilesById,
+        "130-130": { revealedObjectIds: [] },
+      },
+      mapObjects: {
+        ...state.map?.mapObjects,
+        iafs_scattered_supplies: { id: "iafs_scattered_supplies", status_enum: "unsearched" },
+      },
+    },
+    inventories: {
+      ...state.inventories,
+      inv_mike: { id: "inv_mike", owner_type: "crew", owner_id: "mike", items: [], resources: {} },
+    },
   };
 }
 

@@ -222,6 +222,45 @@
           }
         }
       ]
+    },
+    {
+      "id": "iafs_scattered_supplies",
+      "kind": "resourceNode",
+      "name": "散落的物资",
+      "description": "坠毁时被抛到南侧通道的补给箱和工具袋，正被风雪慢慢掩埋。",
+      "tags": ["iafs", "crash_site", "supplies", "salvage"],
+      "visibility": "hidden",
+      "status_options": ["unsearched"],
+      "initial_status": "unsearched",
+      "actions": [
+        {
+          "id": "iafs_scattered_supplies:search",
+          "category": "object",
+          "label": "搜寻",
+          "tone": "accent",
+          "conditions": [
+            {
+              "type": "crew_action_status",
+              "target": {
+                "type": "primary_crew"
+              },
+              "op": "not_equals",
+              "value": "active"
+            },
+            {
+              "type": "not",
+              "conditions": [
+                {
+                  "type": "world_flag_equals",
+                  "field": "iafs_scattered_supplies_searched",
+                  "value": true
+                }
+              ]
+            }
+          ],
+          "event_id": "iafs_scattered_supplies_search"
+        }
+      ]
     }
   ]
 }

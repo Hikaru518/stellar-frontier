@@ -16,6 +16,7 @@ interface ControlCenterProps {
   onOpenStation: () => void;
   onOpenMap: () => void;
   onStartCall: (crewId: CrewMember["id"]) => void;
+  runtimeCallCrewIds?: string[];
   mobileStatus?: PcMobileStatusCard;
   onShowCrewStatus: (crewId: CrewId) => void;
   onShowCrewInventory: (crewId: CrewId) => void;
@@ -32,12 +33,14 @@ export function ControlCenter({
   onOpenStation,
   onOpenMap,
   onStartCall,
+  runtimeCallCrewIds = [],
   mobileStatus,
   onShowCrewStatus,
   onShowCrewInventory,
 }: ControlCenterProps) {
   const [reportId, setReportId] = useState<string | null>(null);
-  const incomingCrew = crew.filter((member) => member.hasIncoming);
+  const runtimeCallCrewIdSet = new Set(runtimeCallCrewIds);
+  const incomingCrew = crew.filter((member) => member.hasIncoming || runtimeCallCrewIdSet.has(member.id));
   const incomingCount = incomingCrew.length;
   const report = reportId ? map.investigationReportsById[reportId] : undefined;
   const visibleEventLogs = eventLogs

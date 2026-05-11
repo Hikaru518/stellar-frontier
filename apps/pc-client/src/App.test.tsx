@@ -16,6 +16,12 @@ function readSavedState() {
   return JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "null") as Record<string, unknown> | null;
 }
 
+function getMikeCrewCard() {
+  const card = Array.from(document.querySelectorAll("article.console-crew-card")).find((element) => element.textContent?.includes("麦克"));
+  expect(card).not.toBeNull();
+  return card as HTMLElement;
+}
+
 function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
   return {
     saveVersion: GAME_SAVE_VERSION,
@@ -26,7 +32,7 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
     crew: [
       {
         id: "mike",
-        name: "Mike",
+        name: "麦克",
         role: "神秘幸存者",
         currentTile: "129-129",
         location: "IAFS坠毁点",
@@ -109,7 +115,7 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
-    expect(screen.getByText("未读通讯 0")).toBeInTheDocument();
+    expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
   });
 
   it("creates a blank-world save on first load", () => {
@@ -138,7 +144,7 @@ describe("App", () => {
         "131-130",
       ],
     });
-    expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike"]);
+    expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
     expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "129-129", location: "IAFS坠毁点 (0,0)" });
     expect(saved.map.mapObjects).toMatchObject({
       iafs_generator: { status_enum: "damaged" },
@@ -146,6 +152,16 @@ describe("App", () => {
       iafs_shuttle_core: { status_enum: "damaged" },
     });
     expect(Object.keys(saved.quest_state.quests)).toEqual(questDefinitions.map((quest) => quest.id));
+    expect(saved.active_events["iafs_opening_mike_crash_call:0"]).toMatchObject({
+      event_definition_id: "iafs_opening_mike_crash_call",
+      current_node_id: "crash_report",
+      status: "waiting_call",
+    });
+    expect(saved.active_calls["iafs_opening_mike_crash_call:0:crash_report:call"]).toMatchObject({
+      crew_id: "mike",
+      event_node_id: "crash_report",
+      status: "awaiting_choice",
+    });
     expect(saved.tiles).toBeUndefined();
   });
 
@@ -182,6 +198,20 @@ describe("App", () => {
     });
   });
 
+  it("normalizes renamed crew display names from compatible saves", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(createSavedCrashSiteState({
+        crew: [{ ...createSavedCrashSiteState().crew[0], name: "Mike" }],
+      })),
+    );
+
+    render(<App />);
+
+    const saved = readSavedState();
+    expect((saved?.crew as Array<{ id: string; name: string }>).find((member) => member.id === "mike")?.name).toBe("麦克");
+  });
+
   it("treats current-schema saves without quest state as incompatible", () => {
     window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState({ elapsedGameSeconds: 999, quest_state: undefined })));
 
@@ -200,7 +230,7 @@ describe("App", () => {
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(saved.elapsedGameSeconds).toBe(0);
     expect(saved.map.originTileId).toBe("129-129");
-    expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike"]);
+    expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
   });
 
   it("ignores compatible-schema saves whose authored map baseline is outdated", () => {
@@ -248,7 +278,7 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "任务追踪" })).toBeInTheDocument();
     expect(screen.getAllByText("重整坠毁现场").length).toBeGreaterThan(0);
 
-    const mikeCard = screen.getByText("Mike").closest("article");
+    const mikeCard = getMikeCrewCard();
     expect(mikeCard).not.toBeNull();
 
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
@@ -380,7 +410,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
-    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "维修" }));
 
     const saved = readSavedState();
@@ -407,7 +437,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
-    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
 
     expect(screen.getByText(/外壳撕裂/)).toBeInTheDocument();
@@ -434,7 +464,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
-    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
 
     expect(screen.getByText(/供电回路已恢复稳定/)).toBeInTheDocument();
@@ -464,7 +494,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
-    fireEvent.click(screen.getByRole("button", { name: "通话" }));
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
     expect(screen.queryByRole("heading", { name: "发电机" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
