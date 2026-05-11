@@ -311,6 +311,7 @@ p {
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  z-index: 90;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -889,6 +890,29 @@ blockquote {
   color: #5d6368;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
+}
+
+.debug-floating-button {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 80;
+  min-height: 34px;
+  border: 1px dashed #f2ac49;
+  background: rgba(31, 24, 18, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(255, 198, 118, 0.16),
+    4px 4px 0 rgba(0, 0, 0, 0.32);
+  color: #f2ac49;
+  font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.debug-floating-button:hover,
+.debug-floating-button:focus-visible {
+  border-color: #ffd391;
+  color: #ffd391;
 }
 
 .debug-multiplier-row {
