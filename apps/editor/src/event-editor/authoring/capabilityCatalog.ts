@@ -96,6 +96,8 @@ const effectTypeOptions = [
   option("spawn_event", "Spawn event", "Spawn another event definition."),
   option("unlock_event_definition", "Unlock event definition", "Unlock another event definition."),
   option("handler_effect", "Handler effect", "Delegate effect execution to a registered handler."),
+  option("set_feature_status", "Set feature status", "Set a MapFeature runtime status."),
+  option("set_feature_revealed", "Set feature revealed", "Set whether a MapFeature is explicitly revealed."),
   option("set_object_status", "Set object status", "Set a map object runtime status."),
 ] as const satisfies readonly FormSelectOption[];
 
@@ -740,6 +742,30 @@ export const effectCapabilities = [
       handlerType: effectHandlerOptions[0]?.value ?? "TODO_HANDLER",
     }),
     commonUse: "Use bespoke runtime effects while keeping editor choices limited to effect handlers.",
+  }),
+  effectCapability({
+    type: "set_feature_status",
+    label: "Set feature status",
+    description: "Sets a MapFeature runtime status.",
+    fields: [
+      textField("params.feature_id", "Feature id", "Feature id in the authored map."),
+      textField("params.status", "Status", "Runtime status value to write."),
+    ],
+    requiredFields: ["params.feature_id", "params.status"],
+    template: createDefaultEffectTemplate({ type: "set_feature_status" }),
+    commonUse: "Record repair, investigation, damage, or other feature-level state changes.",
+  }),
+  effectCapability({
+    type: "set_feature_revealed",
+    label: "Set feature revealed",
+    description: "Sets whether a MapFeature is explicitly revealed.",
+    fields: [
+      textField("params.feature_id", "Feature id", "Feature id in the authored map."),
+      booleanField("params.revealed", "Revealed", "Whether the feature should be visible from runtime reveal state.", true, true),
+    ],
+    requiredFields: ["params.feature_id", "params.revealed"],
+    template: createDefaultEffectTemplate({ type: "set_feature_revealed" }),
+    commonUse: "Reveal or hide feature-specific map signals without changing feature status.",
   }),
   effectCapability({
     type: "set_object_status",

@@ -29,7 +29,7 @@ source:
 | 3 | TASK-003 | 扩展 map schema 与 content validation 支持 Feature | completed | 1 |
 | 4 | TASK-004 | 为默认地图 seed 初始 Feature 内容 | completed | 1 |
 | 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | completed | 1 |
-| 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | pending | 0 |
+| 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | completed | 2 |
 | 7 | TASK-007 | 实现 Feature condition/effect runtime | pending | 0 |
 | 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | pending | 0 |
 | 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | pending | 0 |
@@ -104,6 +104,24 @@ source:
   - save normalize 将 legacy `mapObjects[id].status_enum` 迁移到同 id `featuresById[id].status`。
   - 添加 Feature runtime status 读取 helper，缺失 state 时回退 `initial_status`。
 - 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 46 files / 361 tests
+
+### TASK-006: 定义 Feature event schema、types 与 handler registry
+- 状态: completed
+- 开始时间: 2026-05-12 00:09
+- 完成时间: 2026-05-12 00:56
+- 尝试次数: 2
+- 尝试记录:
+  - 尝试 1: 子 agent 多次超时未返回；已写入部分 schema/registry/types/editor 文件，但无 summary 和验证结果。2026-05-12 00:50 关闭后重新派发。
+  - 尝试 2: 2026-05-12 00:50 从当前 dirty worktree 继续检查和收尾。
+- developer summary:
+  - 定义 `feature_status_equals` condition schema 与 handler registry entry。
+  - 定义 `set_feature_status`、`set_feature_revealed` effect schema、TS effect type 和 Editor authoring metadata/template。
+  - 增加 schema 接受、handler ref 可解析、Editor metadata/template 测试。
+- 质量检查:
+  - `npm run validate:content`: passed
+  - `npm run editor:test`: passed, 44 files / 232 tests
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 46 files / 361 tests
 

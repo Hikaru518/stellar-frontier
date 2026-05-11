@@ -150,6 +150,12 @@ export function createDefaultEffectTemplate({ type, effectId = type, handlerType
   if (type === "handler_effect") {
     effect.handler_type = handlerType ?? "TODO_HANDLER";
   }
+  if (type === "set_feature_status") {
+    effect.params = { feature_id: "TODO_FEATURE", status: "TODO_STATUS" };
+  }
+  if (type === "set_feature_revealed") {
+    effect.params = { feature_id: "TODO_FEATURE", revealed: true };
+  }
 
   return effect;
 }
@@ -439,6 +445,8 @@ function createDefaultEffectTarget(type: EffectType): Effect["target"] {
     case "set_discovery_state":
     case "set_survey_state":
     case "update_tile_resource":
+    case "set_feature_status":
+    case "set_feature_revealed":
     case "set_object_status":
       return { type: "event_tile" };
     case "add_item":

@@ -147,6 +147,8 @@ export type EffectType =
   | "spawn_event"
   | "unlock_event_definition"
   | "handler_effect"
+  | "set_feature_status"
+  | "set_feature_revealed"
   | "set_object_status";
 
 export type EffectFailurePolicy = "fail_event" | "skip_effect" | "skip_group" | "retry_later";
