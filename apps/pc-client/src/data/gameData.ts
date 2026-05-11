@@ -5,6 +5,7 @@ import {
   type CrewProfile,
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
+  type FeatureRuntimeState,
 } from "../content/contentData";
 import { mapObjectDefinitionById, type RuntimeMapObjectsState } from "../content/mapObjects";
 import type { EventMark, EventRuntimeState } from "../events/types";
@@ -228,10 +229,26 @@ export function createInitialMapState(): GameMapState {
     cols: defaultMapConfig.size.cols,
     originTileId: defaultMapConfig.originTileId,
     tilesById,
+    featuresById: createInitialFeaturesByIdState(),
     discoveredTileIds,
     investigationReportsById: {},
     mapObjects: createInitialMapObjectsState(),
   };
+}
+
+export function createInitialFeaturesByIdState(): Record<string, FeatureRuntimeState | undefined> {
+  const state: Record<string, FeatureRuntimeState | undefined> = {};
+  for (const definition of defaultMapConfig.features) {
+    if (definition.investigatable !== true) {
+      continue;
+    }
+
+    state[definition.id] = {
+      id: definition.id,
+      status: definition.initial_status,
+    };
+  }
+  return state;
 }
 
 export function createInitialMapObjectsState(): RuntimeMapObjectsState {

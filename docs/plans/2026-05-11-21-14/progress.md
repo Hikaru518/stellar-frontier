@@ -28,7 +28,7 @@ source:
 | 2 | TASK-002 | 实现 row spans 与 Feature 查询纯函数 | completed | 1 |
 | 3 | TASK-003 | 扩展 map schema 与 content validation 支持 Feature | completed | 1 |
 | 4 | TASK-004 | 为默认地图 seed 初始 Feature 内容 | completed | 1 |
-| 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | pending | 0 |
+| 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | completed | 1 |
 | 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | pending | 0 |
 | 7 | TASK-007 | 实现 Feature condition/effect runtime | pending | 0 |
 | 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | pending | 0 |
@@ -92,6 +92,20 @@ source:
   - `npm run validate:content`: passed
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 46 files / 359 tests
+
+### TASK-005: 添加 Runtime featuresById 与旧存档迁移
+- 状态: completed
+- 开始时间: 2026-05-11 23:57
+- 完成时间: 2026-05-12 00:08
+- 尝试次数: 1
+- developer summary:
+  - 为 runtime map state 添加 `featuresById`。
+  - 新游戏初始化每个 investigatable Feature 的 `status = initial_status`。
+  - save normalize 将 legacy `mapObjects[id].status_enum` 迁移到同 id `featuresById[id].status`。
+  - 添加 Feature runtime status 读取 helper，缺失 state 时回退 `initial_status`。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 46 files / 361 tests
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed

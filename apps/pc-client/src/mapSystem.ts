@@ -1,4 +1,4 @@
-import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
+import type { FeatureRuntimeState, MapConfigDefinition, MapFeatureDefinition, MapTileDefinition } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport } from "./data/gameData";
 
@@ -33,9 +33,14 @@ export interface RuntimeMapState {
   investigationReportsById: Record<string, InvestigationReport>;
   tilesById: Record<string, RuntimeMapTileState | undefined>;
   /**
-   * Flat by-id state for every map object, populated at game-start from
-   * `mapObjectDefinitionById`. Optional on the type so narrow test fixtures
-   * still compile; runtime always treats `undefined` as `{}`.
+   * Flat by-id runtime state for authored map features. Optional on the type
+   * so narrow test fixtures and legacy saves can be normalized defensively.
+   */
+  featuresById?: Record<string, FeatureRuntimeState | undefined>;
+  /**
+   * Legacy by-id state for map objects. New feature-aware code should read
+   * `featuresById`; this remains optional for old saves and pre-migration
+   * runtime paths that are removed in later feature tasks.
    */
   mapObjects?: RuntimeMapObjectsState;
 }
@@ -81,6 +86,25 @@ export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeM
   }
 
   return true;
+}
+
+export function getFeatureRuntimeStatus(
+  map: Pick<RuntimeMapState, "featuresById"> | undefined,
+  feature: MapFeatureDefinition,
+): string | undefined {
+  return map?.featuresById?.[feature.id]?.status ?? (feature.investigatable === true ? feature.initial_status : undefined);
+}
+
+export function getFeatureRuntimeState(
+  map: Pick<RuntimeMapState, "featuresById"> | undefined,
+  feature: MapFeatureDefinition,
+): FeatureRuntimeState {
+  const status = getFeatureRuntimeStatus(map, feature);
+  return {
+    ...(map?.featuresById?.[feature.id] ?? {}),
+    id: feature.id,
+    ...(status === undefined ? {} : { status }),
+  };
 }
 
 /**

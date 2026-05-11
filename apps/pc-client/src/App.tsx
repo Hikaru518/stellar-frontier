@@ -10,7 +10,7 @@ import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary, questDefinitions, type QuestNavigationEntry } from "./content/contentData";
+import { defaultMapConfig, eventContentLibrary, questDefinitions, type FeatureRuntimeState, type QuestNavigationEntry } from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
 import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
@@ -28,7 +28,6 @@ import {
   type TriggerContext,
   type WorldFlag,
 } from "./events/types";
-import { defaultMapConfig } from "./content/contentData";
 import { canMoveToTile, getTileLocationLabel } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
@@ -78,6 +77,7 @@ const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 const MOBILE_FALLBACK_AFTER_MS = 10000;
 const defaultMapTileById = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile]));
+const defaultMapFeatureById = new Map(defaultMapConfig.features.map((feature) => [feature.id, feature]));
 
 type QuestNavigationHint =
   | { type: "tile"; tileId: string; label: string }
@@ -2431,6 +2431,39 @@ function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGame
   return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone, ...(reportId ? { reportId } : {}) }];
 }
 
+function migrateLegacyMapObjectFeatureStates(mapObjects: GameMapState["mapObjects"] | undefined): Record<string, FeatureRuntimeState | undefined> {
+  const featuresById: Record<string, FeatureRuntimeState | undefined> = {};
+  for (const [objectId, objectState] of Object.entries(mapObjects ?? {})) {
+    const feature = defaultMapFeatureById.get(objectId);
+    if (feature?.investigatable !== true || typeof objectState?.status_enum !== "string") {
+      continue;
+    }
+
+    featuresById[feature.id] = {
+      id: feature.id,
+      status: objectState.status_enum,
+    };
+  }
+  return featuresById;
+}
+
+function normalizeSavedFeatureStates(
+  featuresById: GameMapState["featuresById"] | undefined,
+): Record<string, FeatureRuntimeState | undefined> {
+  const normalized: Record<string, FeatureRuntimeState | undefined> = {};
+  for (const [featureId, featureState] of Object.entries(featuresById ?? {})) {
+    if (!featureState || !defaultMapFeatureById.has(featureId)) {
+      continue;
+    }
+
+    normalized[featureId] = {
+      ...featureState,
+      id: featureId,
+    };
+  }
+  return normalized;
+}
+
 function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
   const fresh = createInitialMapState();
   if (map.configId !== defaultMapConfig.id || map.configVersion !== defaultMapConfig.version) {
@@ -2438,6 +2471,8 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
   }
 
   const discoveredTileIds = Array.isArray(map.discoveredTileIds) ? map.discoveredTileIds.filter((id) => defaultMapTileById.has(id)) : fresh.discoveredTileIds;
+  const migratedFeatureStates = migrateLegacyMapObjectFeatureStates(map.mapObjects);
+  const savedFeatureStates = normalizeSavedFeatureStates(map.featuresById);
   return {
     configId: defaultMapConfig.id,
     configVersion: defaultMapConfig.version,
@@ -2445,6 +2480,7 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
     cols: defaultMapConfig.size.cols,
     originTileId: defaultMapConfig.originTileId,
     tilesById: { ...fresh.tilesById, ...(map.tilesById ?? {}) },
+    featuresById: { ...(fresh.featuresById ?? {}), ...migratedFeatureStates, ...savedFeatureStates },
     discoveredTileIds,
     investigationReportsById: map.investigationReportsById ?? {},
     mapObjects: { ...(fresh.mapObjects ?? {}), ...(map.mapObjects ?? {}) },

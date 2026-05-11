@@ -165,6 +165,36 @@ describe("App", () => {
     expect(saved.tiles).toBeUndefined();
   });
 
+  it("migrates legacy map object status into matching feature runtime state", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          map: {
+            ...(createSavedCrashSiteState().map as Record<string, unknown>),
+            mapObjects: {
+              iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
+              iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+            },
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    const saved = readSavedState();
+    expect(saved?.map).toMatchObject({
+      featuresById: {
+        iafs_generator: {
+          id: "iafs_generator",
+          status: "repaired",
+        },
+      },
+    });
+  });
+
   it("restores and normalizes quest state from compatible saves", () => {
     const savedQuestState: QuestRuntimeState = createInitialQuestState(questDefinitions.slice(0, 1), 0);
     savedQuestState.quests.regroup_after_crash.status = "completed";
