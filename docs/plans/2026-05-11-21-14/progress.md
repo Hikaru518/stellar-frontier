@@ -25,7 +25,7 @@ source:
 | # | Task ID | 标题 | 状态 | 尝试次数 |
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 添加 MapFeature 类型与 loader 兼容层 | completed | 2 |
-| 2 | TASK-002 | 实现 row spans 与 Feature 查询纯函数 | pending | 0 |
+| 2 | TASK-002 | 实现 row spans 与 Feature 查询纯函数 | completed | 1 |
 | 3 | TASK-003 | 扩展 map schema 与 content validation 支持 Feature | pending | 0 |
 | 4 | TASK-004 | 为默认地图 seed 初始 Feature 内容 | pending | 0 |
 | 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | pending | 0 |
@@ -63,3 +63,18 @@ source:
 - 质量检查:
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 45 files / 350 tests
+
+### TASK-002: 实现 row spans 与 Feature 查询纯函数
+- 状态: completed
+- 开始时间: 2026-05-11 23:05
+- 完成时间: 2026-05-11 23:25
+- 尝试次数: 1
+- developer summary:
+  - 新增 `mapFeatureSystem` 纯函数模块。
+  - 覆盖 row spans 展开、tile index、查询排序、未知输入、可见性过滤、可调查过滤、最高优先级选择。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - focused `mapFeatureSystem.test.ts`: passed, 6 tests
+  - focused `contentData.test.ts MapPage.test.tsx`: passed, 22 tests
+  - `apps/pc-client` test: passed on rerun, 46 files / 356 tests
+  - 备注: 第一次全量 test 在两个既有测试上出现 5s timeout；隔离重跑对应文件通过，随后全量重跑通过。
