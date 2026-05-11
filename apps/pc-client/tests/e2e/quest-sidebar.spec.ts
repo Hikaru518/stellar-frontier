@@ -117,7 +117,6 @@ function createCrashSiteSurveyMap() {
       "129-129": {
         discovered: true,
         investigated: false,
-        revealedObjectIds: [],
         revealedSpecialStateIds: [],
       },
     },

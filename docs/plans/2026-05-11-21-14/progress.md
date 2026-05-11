@@ -2,7 +2,7 @@
 plan: "region-based-map-system"
 branch: "feature/region-based-map-system"
 started: "2026-05-11 22:36"
-status: "in_progress"
+status: "completed"
 source:
   implementation_plan: "docs/plans/2026-05-11-21-14/region-based-map-system-implementation-plan.md"
   tasks_json: "docs/plans/2026-05-11-21-14/region-based-map-system-tasks.json"
@@ -14,11 +14,18 @@ source:
 
 ### 完成内容与验收要点
 
-执行中。
+- 19 个实施任务全部完成，并按任务粒度提交。
+- 地图运行时新增 `map.features` / `featuresById` 路径：Feature footprint 支持 row spans、同 tile 多 Feature 命中、按 priority 选择可调查目标，调查/维修/事件结算均写入 Feature runtime state。
+- 默认 IAFS 内容已迁移到 Feature 模型；新内容不再从 `tile.areaName` / `tile.objectIds` 承载玩法语义，新存档也不再初始化 `mapObjects`。
+- MapPage、CallPage 和 Map Editor 均已支持 Feature 命中、Feature 调查/维修按钮、Feature 列表/Inspector 和 footprint brush。
+- e2e 覆盖了 IAFS 调查揭示、Feature repair、Feature inspect、Feature readout、移动选点仍返回 tileId、任务侧栏回归。
 
 ### 实现与设计的差异
 
-执行中。
+- 旧 `content/map-objects`、`object_status_equals`、`set_object_status` 与 `mapObjects` 相关代码仍保留为 legacy 内容/旧存档兼容路径；新版 IAFS 链路和默认地图不依赖它们。
+- 旧 save normalize 会读取 legacy `mapObjects.status_enum` 并迁移到同 id `featuresById.status`；迁移后新存档不会继续持久化 `mapObjects`。
+- 多个子 agent 在写入部分任务后未正常返回 summary；父层逐一复核 diff、补齐缺口、运行验证并提交。
+- Playwright 在 sandbox 内启动 Vite 时遇到 `listen EPERM 127.0.0.1:5173`；同一 e2e 命令提权后通过。
 
 ## 任务状态
 
@@ -42,7 +49,7 @@ source:
 | 16 | TASK-016 | Editor Feature list 与 inspector | completed | 1 |
 | 17 | TASK-017 | Editor footprint brush 与重叠预览 | completed | 1 |
 | 18 | TASK-018 | 移除 legacy tile area/object gameplay source | completed | 1 |
-| 19 | TASK-019 | 补齐 e2e 与最终验证 | pending | 0 |
+| 19 | TASK-019 | 补齐 e2e 与最终验证 | completed | 1 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
 
@@ -321,3 +328,27 @@ source:
   - `git diff --check`: passed
   - `rg '"areaName"|"objectIds"' content/maps/default-map.json`: no matches
   - `rg 'tile\\.objectIds|defaultMapConfig\\.tiles.*objectIds|staticObjectIds|lookupStaticObjectIds|resolveTileObjects' apps/pc-client/src`: no runtime matches
+
+### TASK-019: 补齐 e2e 与最终验证
+- 状态: completed
+- 开始时间: 2026-05-12 04:35
+- 完成时间: 2026-05-12 05:10
+- 尝试次数: 1
+- 尝试记录:
+  - 尝试 1: 重新派发只读 explorer 检查 e2e Feature 语义；父层完成 e2e fixture、断言和最终验证收口。
+- developer summary:
+  - e2e helper 从 `CRASH_SITE_OBJECT_IDS` / `mapObjects` / `revealedObjectIds` fixture 迁移到 `CRASH_SITE_FEATURE_IDS` / `featuresById`。
+  - IAFS runtime e2e 断言 Feature reveal、`target_feature_id` repair action 和 Feature inspect runtime call。
+  - Map e2e 断言同 tile 多 Feature 命中后的 priority focus label：revealed origin 显示 `发电机 +3`，重叠 footprint 显示 `南侧通道 +1`，同时 readout 保留底层 tile id 和全部命中 Feature。
+  - 任务侧栏 e2e fixture 移除空 `revealedObjectIds`，避免继续表达旧 object reveal 模型。
+- 质量检查:
+  - `npm run validate:content`: passed
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 392 tests
+  - `npm run editor:test`: passed, 46 files / 243 tests
+  - focused e2e `tests/e2e/map-and-movement.spec.ts tests/e2e/iafs-runtime.spec.ts`: passed, 11 tests
+  - focused e2e `tests/e2e/map-and-movement.spec.ts tests/e2e/iafs-runtime.spec.ts tests/e2e/quest-sidebar.spec.ts`: passed, 16 tests
+  - `git diff --check`: passed
+- 环境备注:
+  - 直接运行 `node scripts/run-playwright.mjs ...` 时本地 shell 找不到 `vite`；改用 Rush package command。
+  - sandbox 内运行 Playwright dev server 触发 `listen EPERM 127.0.0.1:5173`；提权运行同一 Rush e2e 命令后通过。

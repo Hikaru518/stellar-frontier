@@ -1,11 +1,11 @@
 import {
-  CRASH_SITE_OBJECT_IDS,
+  CRASH_SITE_FEATURE_IDS,
   expect,
+  featureSection,
   findSavedCrew,
   GAME_SAVE_KEY,
   idleMike,
   installSave,
-  objectSection,
   readSave,
   startNormalMikeCall,
   test,
@@ -35,14 +35,16 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await waitForRuntimeEventStatus(page, "iafs_crash_site_survey_reveal", "resolved");
 
   const savedAfterSurvey = await readSave(page);
-  expect(savedAfterSurvey.map.tilesById["129-129"].revealedObjectIds).toEqual(CRASH_SITE_OBJECT_IDS);
+  for (const featureId of CRASH_SITE_FEATURE_IDS) {
+    expect(savedAfterSurvey.map.featuresById[featureId]).toEqual(expect.objectContaining({ id: featureId, revealed: true }));
+  }
 
   await page.getByRole("button", { name: /控制台/ }).click();
   await startNormalMikeCall(page);
 
-  await expect(page.getByRole("heading", { name: "发电机" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "维生装置" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "穿梭机核心" })).toBeVisible();
+  await expect(featureSection(page, "发电机").getByRole("button", { name: "调查" })).toBeVisible();
+  await expect(featureSection(page, "维生装置").getByRole("button", { name: "调查" })).toBeVisible();
+  await expect(featureSection(page, "穿梭机核心").getByRole("button", { name: "调查" })).toBeVisible();
   await expect(page.getByRole("button", { name: "维修" })).toHaveCount(3);
 });
 
@@ -54,7 +56,7 @@ test("dispatches a revealed generator repair into a timed crew action", async ({
   await page.goto("/");
   await startNormalMikeCall(page);
 
-  await objectSection(page, "发电机").getByRole("button", { name: "维修" }).click();
+  await featureSection(page, "发电机").getByRole("button", { name: "维修" }).click();
 
   await expect(page.getByText("维修指令已提交。")).toBeVisible();
   await page.waitForFunction((key) => {
@@ -64,28 +66,28 @@ test("dispatches a revealed generator repair into a timed crew action", async ({
         return false;
       }
 
-      const crewAction = action as { type?: string; action_params?: { object_id?: string } };
-      return crewAction.type === "repair" && crewAction.action_params?.object_id === "iafs_generator";
+      const crewAction = action as { type?: string; action_params?: { target_feature_id?: string } };
+      return crewAction.type === "repair" && crewAction.action_params?.target_feature_id === "iafs_generator";
     });
   }, GAME_SAVE_KEY);
 
   const saved = await readSave(page);
   const repairActions = Object.values(saved.crew_actions ?? {}) as Array<{
     type: string;
-    action_params?: { object_id?: string };
+    action_params?: { target_feature_id?: string };
   }>;
   expect(repairActions).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         type: "repair",
-        action_params: expect.objectContaining({ object_id: "iafs_generator" }),
+        action_params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
       }),
     ]),
   );
   expect(findSavedCrew(saved, "mike")).toMatchObject({ status: "正在维修发电机。" });
 });
 
-test("opens a damaged crash-site object inspection runtime call", async ({ page }) => {
+test("opens a damaged crash-site feature inspection runtime call", async ({ page }) => {
   await installSave(page, {
     map: createRevealedCrashSiteMap(),
   });
@@ -93,7 +95,7 @@ test("opens a damaged crash-site object inspection runtime call", async ({ page 
   await page.goto("/");
   await startNormalMikeCall(page);
 
-  await objectSection(page, "发电机").getByRole("button", { name: "调查" }).click();
+  await featureSection(page, "发电机").getByRole("button", { name: "调查" }).click();
 
   await expect(page.getByText("外壳撕裂，几根主供电线还在断续打火。现在贸然启动只会让发电机继续烧坏。")).toBeVisible();
   await page.getByRole("button", { name: "收到，继续记录。" }).click();
@@ -102,7 +104,7 @@ test("opens a damaged crash-site object inspection runtime call", async ({ page 
 
 test("default survey away from the crash site reports no new clue", async ({ page }) => {
   await installSave(page, {
-    crew: [idleMike("129-128", { status: "坠毁西侧待命。" })],
+    crew: [idleMike("126-126", { status: "远离坠毁点待命。" })],
   });
 
   await page.goto("/");
