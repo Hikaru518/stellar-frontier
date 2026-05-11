@@ -911,6 +911,7 @@ function App() {
     return (
       <MapPage
         tiles={tiles}
+        map={gameState.map}
         crew={crew}
         crewActions={gameState.crew_actions}
         activeCalls={gameState.active_calls}

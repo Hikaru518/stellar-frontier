@@ -2086,6 +2086,57 @@ blockquote {
   color: #79d8ff;
 }
 
+.console-map-feature-readout {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(125, 255, 177, 0.12);
+  border-bottom: 1px solid rgba(125, 255, 177, 0.12);
+}
+
+.console-map-feature-group {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.console-map-feature-kind {
+  color: #79d8ff;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.console-map-feature-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.console-map-feature-item {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  color: #efd9b3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.console-map-feature-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.console-map-feature-status {
+  flex: 0 0 auto;
+  color: #aa906d;
+  font-size: 10px;
+}
+
 .console-task-screen {
   grid-template-rows: auto auto minmax(0, 1fr);
 }

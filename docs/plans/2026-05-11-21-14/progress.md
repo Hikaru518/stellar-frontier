@@ -35,7 +35,7 @@ source:
 | 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | completed | 1 |
 | 10 | TASK-010 | 实现 Feature survey 结算与去重 | completed | 1 |
 | 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | completed | 1 |
-| 12 | TASK-012 | MapPage 展示 Feature 命中结果 | pending | 0 |
+| 12 | TASK-012 | MapPage 展示 Feature 命中结果 | completed | 1 |
 | 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | pending | 0 |
 | 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | pending | 0 |
 | 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | pending | 0 |
@@ -191,6 +191,20 @@ source:
 - 质量检查:
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 48 files / 381 tests
+
+### TASK-012: MapPage 展示 Feature 命中结果
+- 状态: completed
+- 开始时间: 2026-05-12 02:20
+- 完成时间: 2026-05-12 02:34
+- 尝试次数: 1
+- developer summary:
+  - MapPage 点击 readout 基于 `tileId` 查询全部可见 Feature。
+  - Readout 按“背景 / 可调查”分组展示 Feature，并保留 tileId、地形、天气基础信息。
+  - 从通话进入地图时，“标记当前坐标”仍只回传 `tileId`。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 385 tests
+- 备注: 本任务未单独做浏览器视觉验证；后续 UI 任务完成后统一抽查 MapPage readout。
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed

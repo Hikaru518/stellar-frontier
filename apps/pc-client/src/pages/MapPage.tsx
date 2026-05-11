@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GameConsoleLayout } from "../components/Layout";
-import { defaultMapConfig, type MapTileDefinition } from "../content/contentData";
-import type { CrewId, CrewMember, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
+import { defaultMapConfig, type MapFeatureDefinition, type MapTileDefinition } from "../content/contentData";
+import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
+import { buildFeatureTileIndex, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
 import { parseTileId } from "../mapSystem";
 
 const CELL_W = 8;
@@ -27,6 +28,7 @@ interface RenderGlitch {
 
 interface MapPageProps {
   tiles: MapTile[];
+  map: GameMapState;
   crew: CrewMember[];
   crewActions: Record<string, CrewActionState>;
   activeCalls: Record<string, RuntimeCall>;
@@ -47,6 +49,7 @@ interface MapPageProps {
 
 export function MapPage({
   tiles,
+  map,
   crew,
   crewActions,
   activeCalls,
@@ -79,10 +82,17 @@ export function MapPage({
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);
   const configTileById = useMemo(() => new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile])), []);
+  const featureTileIndex = useMemo(() => buildFeatureTileIndex(defaultMapConfig), []);
   const crewWorldCoords = useMemo(() => new Map(crew.map((member) => [member.id, radarCoordFromTileId(member.currentTile)])), [crew]);
   const focusTileId = useMemo(() => tileIdFromRadarCoord(focusCoord), [focusCoord]);
   const focusConfigTile = configTileById.get(focusTileId);
-  const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile), [focusCoord, focusConfigTile]);
+  const visibleFocusFeatures = useMemo(
+    () => getVisibleFeaturesAtTile(defaultMapConfig, featureTileIndex, map, focusTileId),
+    [featureTileIndex, focusTileId, map],
+  );
+  const backgroundFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable !== true), [visibleFocusFeatures]);
+  const investigatableFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable === true), [visibleFocusFeatures]);
+  const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile, visibleFocusFeatures), [focusCoord, focusConfigTile, visibleFocusFeatures]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
 
@@ -452,6 +462,14 @@ export function MapPage({
             <p className="console-map-trace-line">
               [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
             </p>
+            {visibleFocusFeatures.length ? (
+              <div className="console-map-feature-readout" aria-label="Feature 命中结果">
+                {backgroundFocusFeatures.length ? <FeatureHitGroup label="背景" features={backgroundFocusFeatures} /> : null}
+                {investigatableFocusFeatures.length ? <FeatureHitGroup label="可调查" features={investigatableFocusFeatures} map={map} /> : null}
+              </div>
+            ) : (
+              <p className="console-map-trace-line">[FEATURE] 无可见 Feature</p>
+            )}
             {returnTarget === "call" ? (
               <div className="console-map-return-actions">
                 {moveSelectionMember ? (
@@ -529,6 +547,37 @@ export function MapPage({
       </div>
     </GameConsoleLayout>
   );
+}
+
+function FeatureHitGroup({
+  label,
+  features,
+  map,
+}: {
+  label: string;
+  features: readonly MapFeatureDefinition[];
+  map?: Pick<GameMapState, "featuresById">;
+}) {
+  return (
+    <div className="console-map-feature-group">
+      <span className="console-map-feature-kind">{label}</span>
+      <ul className="console-map-feature-list">
+        {features.map((feature) => {
+          const status = getFeatureStatusForReadout(feature, map);
+          return (
+            <li key={feature.id} className="console-map-feature-item">
+              <span className="console-map-feature-name">{feature.name}</span>
+              {status ? <span className="console-map-feature-status">{status}</span> : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function getFeatureStatusForReadout(feature: MapFeatureDefinition, map: Pick<GameMapState, "featuresById"> | undefined) {
+  return map?.featuresById?.[feature.id]?.status ?? (feature.investigatable === true ? feature.initial_status : undefined);
 }
 
 function makeRenderBuffer<T>(rows: number, cols: number, fill: T) {
@@ -645,7 +694,15 @@ function getViewport(center: FocusCoord, zoom: number) {
   };
 }
 
-function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined) {
+function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
+  if (visibleFeatures.length === 1) {
+    return visibleFeatures[0].name;
+  }
+
+  if (visibleFeatures.length > 1) {
+    return `${visibleFeatures[0].name} +${visibleFeatures.length - 1}`;
+  }
+
   if (tile && tile.areaName !== "未命名区域") {
     return tile.areaName;
   }
