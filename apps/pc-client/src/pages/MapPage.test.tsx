@@ -11,7 +11,7 @@ describe("MapPage", () => {
 
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
     expect(screen.getByLabelText("ASCII 地图")).toBeInTheDocument();
-    expect(screen.getByText("render + function / 256 x 256")).toBeInTheDocument();
+    expect(screen.getByText("render + function + debug / 256 x 256")).toBeInTheDocument();
   });
 
   it("does not render the old quest sidebar UI", () => {
@@ -75,6 +75,17 @@ describe("MapPage", () => {
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
   });
 
+  it("keeps the movement debug layer off by default and toggles it on demand", () => {
+    renderMapPage();
+
+    expect(screen.getByText("debug OFF")).toBeInTheDocument();
+    expect(screen.getByText(/X=blocked \/ O=object/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示调试层" }));
+
+    expect(screen.getByText("debug ON")).toBeInTheDocument();
+  });
+
   it("shows selected tile details in the right panel", () => {
     renderMapPage();
 
@@ -82,7 +93,8 @@ describe("MapPage", () => {
     expect(screen.getByText("129-129")).toBeInTheDocument();
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
-    expect(screen.getByText("无当前可见对象")).toBeInTheDocument();
+    expect(screen.getByText("未知信号")).toBeInTheDocument();
+    expect(screen.queryByText("无当前可见对象")).not.toBeInTheDocument();
   });
 
   it("lists only runtime-visible map objects for the selected tile", () => {
@@ -93,6 +105,17 @@ describe("MapPage", () => {
     expect(objectList).not.toHaveTextContent("damaged");
     expect(objectList).not.toHaveTextContent("facility");
     expect(objectList).not.toHaveTextContent("维生装置");
+    expect(objectList).toHaveTextContent("未知信号");
+  });
+
+  it("does not show unknown signal after all tile objects are revealed", () => {
+    renderMapPage({ map: createMapWithRevealedOriginObjects(["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]) });
+
+    const objectList = screen.getByLabelText("当前可见地图对象");
+    expect(objectList).toHaveTextContent("发电机（已损坏）");
+    expect(objectList).toHaveTextContent("维生装置（已损坏）");
+    expect(objectList).toHaveTextContent("穿梭机核心（已损坏）");
+    expect(objectList).not.toHaveTextContent("未知信号");
   });
 
   it("shows the latest system log in the bottom bar", () => {
