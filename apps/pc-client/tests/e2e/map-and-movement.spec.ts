@@ -90,6 +90,7 @@ test("shows authored crash-site radar metadata on the occupied origin tile", asy
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
   await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
+  await expect(page.getByLabel("当前可见地图对象")).toContainText("发电机（已损坏）");
   await expect(page.getByText(/麦克/)).toBeVisible();
 });
 

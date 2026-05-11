@@ -5,6 +5,7 @@ import { generateHint } from "./conditions/hintTemplates";
 import { evaluateCondition } from "./events/conditions";
 import type { Condition, CrewActionState, RuntimeCall } from "./events/types";
 import type { CrewMember, GameState, MapTile } from "./data/gameData";
+import { formatMapObjectStatus } from "./mapSystem";
 
 export interface CallActionGroup {
   title: string;
@@ -96,21 +97,8 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
 
 function formatObjectGroupTitle(object: MapObjectDefinition, gameState: GameState): string {
   const status = gameState.map.mapObjects?.[object.id]?.status_enum ?? object.initial_status;
-  const statusLabel = formatObjectStatus(status);
+  const statusLabel = formatMapObjectStatus(status);
   return statusLabel ? `${object.name}（${statusLabel}）` : object.name;
-}
-
-function formatObjectStatus(status: string | undefined): string {
-  switch (status) {
-    case "damaged":
-      return "已损坏";
-    case "repaired":
-      return "正常";
-    case "unsearched":
-      return "未搜寻";
-    default:
-      return status ?? "";
-  }
 }
 
 function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate[] {
