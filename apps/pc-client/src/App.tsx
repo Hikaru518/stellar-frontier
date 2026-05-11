@@ -830,123 +830,123 @@ function App() {
     );
   }
 
-  if (page === "ending") {
-    return (
-      <EndingPage
-        completedAtLabel={completedAtLabel}
-        gameTimeLabel={gameTimeLabel}
-        onResetGame={resetGame}
-        onReturnControl={() => setPage("control")}
-      />
-    );
-  }
+  const pageContent = (() => {
+    if (page === "ending") {
+      return (
+        <EndingPage
+          completedAtLabel={completedAtLabel}
+          gameTimeLabel={gameTimeLabel}
+          onResetGame={resetGame}
+          onReturnControl={() => setPage("control")}
+        />
+      );
+    }
 
-  if (page === "station") {
-    return (
-      <TaskPage
-        view={questSidebarView}
-        statusFilter={questStatusFilter}
-        categoryFilter={questCategoryFilter}
-        navigationMessage={
-          questNavigationHint?.type === "crew"
-            ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。`
-            : questNavigationHint?.type === "unavailable"
-              ? `任务导航目标不可用：${questNavigationHint.label}`
-              : undefined
-        }
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        tiles={tiles}
-        gameTimeLabel={gameTimeLabel}
-        logs={logs}
-        onStatusFilterChange={setQuestStatusFilter}
-        onCategoryFilterChange={setQuestCategoryFilter}
-        onSelectedQuestIdChange={setSelectedQuestId}
-        onNavigate={handleQuestSidebarNavigate}
-        onOpenControl={openControlOverview}
-        onOpenMap={() => openMap("control")}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-      />
-    );
-  }
+    if (page === "station") {
+      return (
+        <TaskPage
+          view={questSidebarView}
+          statusFilter={questStatusFilter}
+          categoryFilter={questCategoryFilter}
+          navigationMessage={
+            questNavigationHint?.type === "crew"
+              ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。`
+              : questNavigationHint?.type === "unavailable"
+                ? `任务导航目标不可用：${questNavigationHint.label}`
+                : undefined
+          }
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          tiles={tiles}
+          gameTimeLabel={gameTimeLabel}
+          logs={logs}
+          onStatusFilterChange={setQuestStatusFilter}
+          onCategoryFilterChange={setQuestCategoryFilter}
+          onSelectedQuestIdChange={setSelectedQuestId}
+          onNavigate={handleQuestSidebarNavigate}
+          onOpenControl={openControlOverview}
+          onOpenMap={() => openMap("control")}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+        />
+      );
+    }
 
-  if (page === "call") {
-    return (
-      <CallPage
-        call={currentCall}
-        crew={crew}
-        tiles={tiles}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        gameTimeLabel={gameTimeLabel}
-        gameState={gameState}
-        logs={logs}
-        onDecision={handleDecision}
-        onConfirmMove={confirmMove}
-        onClearMoveTarget={clearMoveTarget}
-        onOpenMap={() => openMap("call")}
-        onOpenControl={openControlOverview}
-        onOpenTask={openStation}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-      />
-    );
-  }
+    if (page === "call") {
+      return (
+        <CallPage
+          call={currentCall}
+          crew={crew}
+          tiles={tiles}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          gameTimeLabel={gameTimeLabel}
+          gameState={gameState}
+          logs={logs}
+          onDecision={handleDecision}
+          onConfirmMove={confirmMove}
+          onClearMoveTarget={clearMoveTarget}
+          onOpenMap={() => openMap("call")}
+          onOpenControl={openControlOverview}
+          onOpenTask={openStation}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+        />
+      );
+    }
 
-  if (page === "map") {
-    return (
-      <MapPage
-        tiles={tiles}
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        gameTimeLabel={gameTimeLabel}
-        returnTarget={mapReturnTarget}
-        moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
-        initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
-        onOpenControl={openControlOverview}
-        onOpenTask={openStation}
-        onReturnFromMap={returnFromMap}
-        onSelectMoveTarget={selectMoveTarget}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-        logs={logs}
-      />
-    );
-  }
+    if (page === "map") {
+      return (
+        <MapPage
+          tiles={tiles}
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          gameTimeLabel={gameTimeLabel}
+          returnTarget={mapReturnTarget}
+          moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
+          initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+          onOpenControl={openControlOverview}
+          onOpenTask={openStation}
+          onReturnFromMap={returnFromMap}
+          onSelectMoveTarget={selectMoveTarget}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+          logs={logs}
+        />
+      );
+    }
 
-  if (page === "crew") {
-    return (
-      <CrewConsolePage
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        tiles={tiles}
-        eventLogs={gameState.event_logs}
-        logs={logs}
-        gameTimeLabel={gameTimeLabel}
-        selectedCrewId={crewConsoleView.crewId}
-        mode={crewConsoleView.mode}
-        onOpenControl={openControlOverview}
-        onOpenTask={openStation}
-        onOpenMap={() => openMap("control")}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-      />
-    );
-  }
+    if (page === "crew") {
+      return (
+        <CrewConsolePage
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          tiles={tiles}
+          eventLogs={gameState.event_logs}
+          logs={logs}
+          gameTimeLabel={gameTimeLabel}
+          selectedCrewId={crewConsoleView.crewId}
+          mode={crewConsoleView.mode}
+          onOpenControl={openControlOverview}
+          onOpenTask={openStation}
+          onOpenMap={() => openMap("control")}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+        />
+      );
+    }
 
-  return (
-    <>
+    return (
       <ControlCenter
         crew={crew}
         logs={logs}
@@ -963,6 +963,15 @@ function App() {
         onShowCrewStatus={openCrewStatusPage}
         onShowCrewInventory={openCrewInventoryPage}
       />
+    );
+  })();
+
+  return (
+    <>
+      {pageContent}
+      <button type="button" className="debug-floating-button" onClick={() => setDebugOpen(true)}>
+        [DEBUG]
+      </button>
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
