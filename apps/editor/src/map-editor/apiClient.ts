@@ -8,6 +8,7 @@ type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 export interface MapEditorLibraryMap {
   id: string;
   file_path: string;
+  radar_file_path: string;
   data: MapEditorDraft;
 }
 
@@ -45,6 +46,7 @@ export interface ValidateMapResponse {
 export interface SaveMapResponse {
   saved: boolean;
   file_path?: string;
+  radar_file_path?: string;
   errors?: MapValidationIssue[];
   warnings?: MapValidationIssue[];
 }

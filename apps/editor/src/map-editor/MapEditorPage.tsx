@@ -146,13 +146,14 @@ export default function MapEditorPage({
       const savedMap: MapEditorLibraryMap = {
         id: editorState.draft.id,
         file_path: filePath,
+        radar_file_path: result.radar_file_path ?? editorState.draft.radarPath,
         data: editorState.draft,
       };
       setLibrary((current) => (current ? upsertLibraryMap(current, savedMap) : current));
       setSelectedMapId(savedMap.id);
       setActiveMapFilePath(filePath);
       setSavedDraft(editorState.draft);
-      setNotice(`Saved ${filePath}.`);
+      setNotice(`Saved ${filePath} and ${savedMap.radar_file_path}.`);
     } catch (saveError) {
       const issue = issueFromSaveError(saveError);
       setValidationIssues({ errors: [issue], warnings: [] });

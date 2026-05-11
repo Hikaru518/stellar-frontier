@@ -73,6 +73,7 @@ function createMapLibraryResponse() {
       {
         id: "default-map",
         file_path: "content/maps/default-map.json",
+        radar_file_path: "content/maps/radar/default-map-radar.json",
         data: {
           id: "default-map",
           name: "Default Map",
@@ -80,6 +81,7 @@ function createMapLibraryResponse() {
           size: { rows: 2, cols: 2 },
           originTileId: "1-1",
           initialDiscoveredTileIds: ["1-1"],
+          radarPath: "content/maps/radar/default-map-radar.json",
           tiles: [
             createMapTile("1-1", 1, 1),
             createMapTile("1-2", 1, 2),

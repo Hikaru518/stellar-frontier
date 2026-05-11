@@ -92,6 +92,7 @@ function baseMap() {
     size: { rows: 1, cols: 2 },
     originTileId: "1-1",
     initialDiscoveredTileIds: ["1-1"],
+    radarPath: "content/maps/radar/test-map-radar.json",
     tiles: [
       {
         id: "1-1",

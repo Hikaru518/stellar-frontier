@@ -14,6 +14,7 @@ import { createPathGuard } from "./pathGuard.mjs";
 export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 4317;
 export const API_VERSION = "event-editor-helper.v1";
+const MAX_JSON_BODY_BYTES = 50_000_000;
 
 export function createHelperServer({
   repoRoot = path.resolve(import.meta.dirname, "../../.."),
@@ -156,17 +157,26 @@ async function routeRequest(request, response, { repoRoot }) {
 
     const explicitSavePath = hasExplicitMapSavePath(body);
     const filePath = getMapSavePath(body, data);
+    const radarPath = getMapRadarSavePath(data);
     const guard = createPathGuard(repoRoot, ["content/maps"]);
     const absolutePath = guard.resolveAllowedPath(filePath);
+    const absoluteRadarPath = guard.resolveAllowedPath(radarPath);
     if (!explicitSavePath && await fileExists(absolutePath)) {
       throw httpError(409, "file_exists", `Map file already exists: ${filePath}`);
     }
+    if (!explicitSavePath && await fileExists(absoluteRadarPath)) {
+      throw httpError(409, "file_exists", `Map radar file already exists: ${radarPath}`);
+    }
+    const { mapData, radarData } = splitMapDraftForSave(data, radarPath);
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fs.writeFile(absolutePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+    await fs.mkdir(path.dirname(absoluteRadarPath), { recursive: true });
+    await fs.writeFile(absolutePath, `${JSON.stringify(mapData, null, 2)}\n`, "utf8");
+    await fs.writeFile(absoluteRadarPath, `${JSON.stringify(radarData, null, 2)}\n`, "utf8");
     sendJson(response, 200, {
       ...validation,
       saved: true,
       file_path: filePath,
+      radar_file_path: radarPath,
     });
     return;
   }
@@ -369,7 +379,7 @@ async function readJsonBody(request) {
   let byteLength = 0;
   for await (const chunk of request) {
     byteLength += chunk.byteLength;
-    if (byteLength > 1_000_000) {
+    if (byteLength > MAX_JSON_BODY_BYTES) {
       throw httpError(413, "request_too_large", "JSON request body is too large.");
     }
     chunks.push(chunk);
@@ -415,6 +425,40 @@ function defaultMapSavePath(data) {
 
 function isAllowedMapSavePath(filePath) {
   return typeof filePath === "string" && /^content\/maps\/[a-z][a-z0-9_-]*\.json$/.test(filePath);
+}
+
+function getMapRadarSavePath(data) {
+  const radarPath = data?.radarPath ?? defaultMapRadarSavePath(data);
+  if (!isAllowedMapRadarPath(radarPath)) {
+    throw httpError(400, "path_not_allowed", "Map radar path must be content/maps/radar/<file>.json.");
+  }
+  return radarPath;
+}
+
+function defaultMapRadarSavePath(data) {
+  if (typeof data?.id !== "string" || !/^[a-z][a-z0-9_-]*$/.test(data.id)) {
+    throw httpError(400, "invalid_map_id", "Map id must be a safe file name.");
+  }
+  return `content/maps/radar/${data.id}-radar.json`;
+}
+
+function isAllowedMapRadarPath(filePath) {
+  return typeof filePath === "string" && /^content\/maps\/radar\/[a-z][a-z0-9_-]*\.json$/.test(filePath);
+}
+
+function splitMapDraftForSave(data, radarPath) {
+  const { radar, ...mapData } = data;
+  return {
+    mapData: {
+      ...mapData,
+      radarPath,
+    },
+    radarData: {
+      $schema: "../../schemas/map-radar.schema.json",
+      mapId: data.id,
+      ...radar,
+    },
+  };
 }
 
 function isAllowedAssetPath(assetPath) {

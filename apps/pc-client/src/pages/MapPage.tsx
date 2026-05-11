@@ -8,6 +8,8 @@ import { parseTileId } from "../mapSystem";
 
 const CELL_W = 8;
 const CELL_H = 10;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 6;
 const RADAR = defaultMapConfig.radar;
 const RADAR_WORLD = RADAR.world;
 
@@ -182,7 +184,7 @@ export function MapPage({
 
   function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
     event.preventDefault();
-    const nextZoom = clamp(zoom * (event.deltaY < 0 ? 1.14 : 1 / 1.14), 0.7, 6);
+    const nextZoom = clamp(zoom * (event.deltaY < 0 ? 1.14 : 1 / 1.14), MIN_ZOOM, MAX_ZOOM);
     if (nextZoom === zoom) {
       return;
     }
@@ -633,8 +635,8 @@ function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorld
 }
 
 function getViewport(center: FocusCoord, zoom: number) {
-  const width = RADAR_WORLD.width / zoom;
-  const height = RADAR_WORLD.height / zoom;
+  const width = Math.min(RADAR_WORLD.width, RADAR_WORLD.width / zoom);
+  const height = Math.min(RADAR_WORLD.height, RADAR_WORLD.height / zoom);
   return {
     width,
     height,

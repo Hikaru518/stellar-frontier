@@ -53,6 +53,22 @@ describe("MapPage", () => {
     expect(screen.getAllByText(/^\[FOCUS\]/).length).toBeGreaterThan(0);
   });
 
+  it("keeps the minimum zoom at full-world coverage instead of sampling outside the radar", () => {
+    renderMapPage();
+
+    const mapSurface = screen.getByLabelText("ASCII 地图");
+    Object.defineProperty(mapSurface, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
+    });
+
+    fireEvent.wheel(mapSurface, { deltaY: 480 });
+    fireEvent.click(mapSurface, { clientX: 800, clientY: 560 });
+
+    expect(mapSurface).toHaveAttribute("data-focus-tile-id", "205-228");
+    expect(screen.queryByText(/\[ZOOM\] 0\./)).not.toBeInTheDocument();
+  });
+
   it("uses center-origin display coordinates for the function layer", () => {
     renderMapPage();
 

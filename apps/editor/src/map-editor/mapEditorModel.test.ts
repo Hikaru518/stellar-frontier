@@ -25,9 +25,11 @@ describe("mapEditorModel", () => {
     ]);
     expect(draft.originTileId).toBe("2-3");
     expect(draft.initialDiscoveredTileIds).toEqual(["2-3"]);
+    expect(draft.radarPath).toBe("content/maps/radar/test-map-radar.json");
     expect(draft.radar.world).toEqual({ width: 5, height: 3, origin: { x: 2, y: 1 } });
     expect(draft.radar.glyphRows).toEqual([".....", ".....", "....."]);
     expect(draft.radar.toneRows).toEqual(["ggggg", "ggggg", "ggggg"]);
+    expect(draft.radar.trace.jsonLine).toContain("content/maps/radar/test-map-radar.json");
   });
 
   it("normalizes existing map content that has no radar field", () => {
@@ -36,6 +38,7 @@ describe("mapEditorModel", () => {
 
     const state = createInitialMapEditorState(draft);
 
+    expect(state.draft.radarPath).toBe("content/maps/radar/test-map-radar.json");
     expect(state.draft.radar.glyphRows).toEqual(["."]);
     expect(state.draft.radar.toneRows).toEqual(["g"]);
   });

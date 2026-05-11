@@ -16,6 +16,7 @@ export function createMapEditorDraft(input: CreateMapDraftInput): MapEditorDraft
   const rows = assertPositiveInteger(input.rows, "rows");
   const cols = assertPositiveInteger(input.cols, "cols");
   const originTileId = getTileId(Math.ceil(rows / 2), Math.ceil(cols / 2));
+  const radarPath = defaultRadarPath(input.id);
 
   return {
     id: input.id,
@@ -24,8 +25,9 @@ export function createMapEditorDraft(input: CreateMapDraftInput): MapEditorDraft
     size: { rows, cols },
     originTileId,
     initialDiscoveredTileIds: [originTileId],
+    radarPath,
     tiles: createGameplayTiles(rows, cols),
-    radar: createDefaultRadar(rows, cols, originTileId),
+    radar: createDefaultRadar(rows, cols, originTileId, radarPath),
   };
 }
 
@@ -43,9 +45,11 @@ export function createInitialMapEditorState(draft: MapEditorDraft): MapEditorSta
 export function normalizeMapEditorDraft(draft: MapEditorDraft): MapEditorDraft {
   const rows = draft.size.rows;
   const cols = draft.size.cols;
+  const radarPath = draft.radarPath ?? defaultRadarPath(draft.id);
   return {
     ...draft,
-    radar: normalizeRadar(draft.radar, rows, cols, draft.originTileId),
+    radarPath,
+    radar: normalizeRadar(draft.radar, rows, cols, draft.originTileId, radarPath),
   };
 }
 
@@ -97,7 +101,7 @@ function createGameplayTiles(rows: number, cols: number): MapTileDefinition[] {
   return tiles;
 }
 
-function createDefaultRadar(rows: number, cols: number, originTileId: string): MapEditorDraft["radar"] {
+function createDefaultRadar(rows: number, cols: number, originTileId: string, radarPath: string): MapEditorDraft["radar"] {
   const origin = parseTileId(originTileId) ?? { row: Math.ceil(rows / 2), col: Math.ceil(cols / 2) };
   return {
     world: {
@@ -125,15 +129,15 @@ function createDefaultRadar(rows: number, cols: number, originTileId: string): M
       controlMode: "语义地图编辑模式：运行时雷达读取此 JSON。",
       callMode: "从通话进入地图后只标记目标，仍需回通话确认。",
       worldLine: `[WORLD] ${cols} x ${rows} interactive coordinate grid`,
-      jsonLine: "[JSON] radar glyph/tone/regions loaded from content/maps/default-map.json",
+      jsonLine: `[JSON] radar glyph/tone/regions loaded from ${radarPath}`,
       emptyLine: "[MAP] WAITING FOR FIELD INPUT",
     },
     regions: [],
   };
 }
 
-function normalizeRadar(radar: MapEditorDraft["radar"] | undefined, rows: number, cols: number, originTileId: string): MapEditorDraft["radar"] {
-  const fallback = createDefaultRadar(rows, cols, originTileId);
+function normalizeRadar(radar: MapEditorDraft["radar"] | undefined, rows: number, cols: number, originTileId: string, radarPath: string): MapEditorDraft["radar"] {
+  const fallback = createDefaultRadar(rows, cols, originTileId, radarPath);
   if (!radar) {
     return fallback;
   }
@@ -161,6 +165,10 @@ function normalizeRadar(radar: MapEditorDraft["radar"] | undefined, rows: number
     },
     regions: Array.isArray(radar.regions) ? radar.regions : [],
   };
+}
+
+function defaultRadarPath(mapId: string): string {
+  return `content/maps/radar/${mapId}-radar.json`;
 }
 
 function normalizeRows(rowsValue: string[] | undefined, rows: number, cols: number, fill: string): string[] {

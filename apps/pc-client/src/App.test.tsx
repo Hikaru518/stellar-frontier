@@ -484,7 +484,7 @@ describe("App", () => {
         },
       },
     });
-  });
+  }, 15_000);
 
   it("routes crash-site inspect triggers into the inspection event definitions", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);

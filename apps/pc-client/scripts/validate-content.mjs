@@ -19,6 +19,8 @@ const questSchemaPath = "content/schemas/quests.schema.json";
 const questDataPaths = listJsonFiles("content/quests");
 const mapSchemaPath = "content/schemas/maps.schema.json";
 const mapDataPaths = listJsonFiles("content/maps");
+const mapRadarSchemaPath = "content/schemas/map-radar.schema.json";
+const mapRadarDataPaths = listJsonFiles("content/maps/radar");
 
 const contentAssetGroups = [
   {
@@ -69,6 +71,7 @@ const schemaPaths = new Set([
   ...contentFilePairs.map(([, schemaPath]) => schemaPath),
   questSchemaPath,
   mapSchemaPath,
+  mapRadarSchemaPath,
   ...contentAssetGroups.map(({ schemaPath }) => schemaPath),
   ...eventSchemaPaths,
 ]);
@@ -80,6 +83,7 @@ for (const schema of Object.values(schemasByPath)) {
 const loaded = Object.fromEntries(contentFilePairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
 const loadedQuests = Object.fromEntries(questDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
 const loadedMaps = Object.fromEntries(mapDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
+const loadedMapRadars = Object.fromEntries(mapRadarDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
 
 let failed = false;
 let eventSchemaFailed = false;
@@ -100,6 +104,10 @@ for (const [dataPath, questData] of Object.entries(loadedQuests)) {
 
 for (const [dataPath, mapData] of Object.entries(loadedMaps)) {
   failed = validateJsonFile(dataPath, mapSchemaPath, mapData) || failed;
+}
+
+for (const [dataPath, radarData] of Object.entries(loadedMapRadars)) {
+  failed = validateJsonFile(dataPath, mapRadarSchemaPath, radarData) || failed;
 }
 
 for (const { directoryPath, schemaPath } of eventAssetGroups) {
@@ -128,7 +136,7 @@ if (!eventSchemaFailed) {
   failed = validateEventProgramReferences() || failed;
 }
 
-failed = validateReferences(loaded, loadedMaps) || failed;
+failed = validateReferences(loaded, loadedMaps, loadedMapRadars) || failed;
 failed = validateQuestContentReferences(loadedQuests, loaded, loadedMaps) || failed;
 failed = validateQuestProgressEffectReferences(loadedQuests) || failed;
 
@@ -380,7 +388,7 @@ function escapeJsonPointer(value) {
   return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
-function validateReferences(data, maps) {
+function validateReferences(data, maps, mapRadars) {
   let hasError = false;
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
@@ -418,6 +426,7 @@ function validateReferences(data, maps) {
       validateMap(map, knownObjectIds, {
         requireDefaultSize: dataPath === "content/maps/default-map.json",
         dataPath,
+        mapRadars,
       }) || hasError;
   }
 
@@ -629,55 +638,70 @@ function validateMap(map, knownObjectIds, options) {
     hasError = report(`Map tile count must match size coverage: expected ${rows * cols}, got ${tileById.size}`) || hasError;
   }
 
-  hasError = validateRadar(map.radar, options.dataPath, rows, cols) || hasError;
+  const radar = options.mapRadars[map.radarPath];
+  if (!radar) {
+    hasError = report(`Map radarPath does not exist in ${options.dataPath}: ${map.radarPath}`) || hasError;
+  } else {
+    hasError = validateRadar(radar, {
+      dataPath: options.dataPath,
+      radarPath: map.radarPath,
+      mapId: map.id,
+      rows,
+      cols,
+    }) || hasError;
+  }
 
   return hasError;
 }
 
-function validateRadar(radar, dataPath, rows, cols) {
+function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols }) {
   let hasError = false;
   if (!radar) {
     return report(`Map radar definition is required: ${dataPath}`);
   }
 
+  if (radar.mapId !== mapId) {
+    hasError = report(`Map radar mapId mismatch in ${radarPath}: ${radar.mapId} vs ${mapId}`) || hasError;
+  }
+
   if (radar.world?.width !== cols || radar.world?.height !== rows) {
     hasError =
-      report(`Map radar world must match map size in ${dataPath}: ${radar.world?.width} x ${radar.world?.height} vs ${cols} x ${rows}`) ||
+      report(`Map radar world must match map size in ${radarPath}: ${radar.world?.width} x ${radar.world?.height} vs ${cols} x ${rows}`) ||
       hasError;
   }
 
   if (!isInsideRadar(radar, radar.world?.origin?.x, radar.world?.origin?.y)) {
-    hasError = report(`Map radar origin is out of bounds in ${dataPath}`) || hasError;
+    hasError = report(`Map radar origin is out of bounds in ${radarPath}`) || hasError;
   }
 
-  hasError = validateRadarRows(radar.glyphRows, "glyphRows", dataPath, rows, cols) || hasError;
-  hasError = validateRadarRows(radar.toneRows, "toneRows", dataPath, rows, cols) || hasError;
+  hasError = validateRadarRows(radar.glyphRows, "glyphRows", radarPath, rows, cols) || hasError;
+  hasError = validateRadarRows(radar.toneRows, "toneRows", radarPath, rows, cols) || hasError;
 
   const toneKeys = new Set(Object.keys(radar.palette ?? {}));
-  for (const [rowIndex, row] of (radar.toneRows ?? []).entries()) {
+  for (const [rowIndex, row] of (Array.isArray(radar.toneRows) ? radar.toneRows : []).entries()) {
     for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
       const tone = row[colIndex];
       if (!toneKeys.has(tone)) {
-        hasError = report(`Unknown radar tone in ${dataPath}/radar/toneRows/${rowIndex}/${colIndex}: ${tone}`) || hasError;
+        hasError = report(`Unknown radar tone in ${radarPath}/toneRows/${rowIndex}/${colIndex}: ${tone}`) || hasError;
       }
     }
   }
 
   for (const [symbolId, symbol] of Object.entries(radar.symbols ?? {})) {
     if (!toneKeys.has(symbol?.tone)) {
-      hasError = report(`Unknown radar symbol tone in ${dataPath}/radar/symbols/${symbolId}: ${symbol?.tone}`) || hasError;
+      hasError = report(`Unknown radar symbol tone in ${radarPath}/symbols/${symbolId}: ${symbol?.tone}`) || hasError;
     }
   }
 
   const regionIds = new Set();
   for (const region of radar.regions ?? []) {
     if (!addUnique(regionIds, region.id)) {
-      hasError = report(`Duplicate radar region id in ${dataPath}: ${region.id}`) || hasError;
+      hasError = report(`Duplicate radar region id in ${radarPath}: ${region.id}`) || hasError;
     }
     if (!toneKeys.has(region.tone)) {
-      hasError = report(`Unknown radar region tone in ${dataPath}/radar/regions/${region.id}: ${region.tone}`) || hasError;
+      hasError = report(`Unknown radar region tone in ${radarPath}/regions/${region.id}: ${region.tone}`) || hasError;
     }
-    hasError = validateRadarRegionBounds(radar, region, dataPath) || hasError;
+    hasError = validateRadarRegionBounds(radar, region, radarPath) || hasError;
   }
 
   return hasError;
@@ -724,7 +748,14 @@ function validateRadarRegionBounds(radar, region, dataPath) {
 }
 
 function isInsideRadar(radar, x, y) {
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < radar.world.width && y < radar.world.height;
+  return Number.isInteger(x)
+    && Number.isInteger(y)
+    && Number.isInteger(radar.world?.width)
+    && Number.isInteger(radar.world?.height)
+    && x >= 0
+    && y >= 0
+    && x < radar.world.width
+    && y < radar.world.height;
 }
 
 function addUnique(set, value) {

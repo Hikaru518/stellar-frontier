@@ -428,9 +428,14 @@ describe("helper server", () => {
       valid: true,
       saved: true,
       file_path: "content/maps/new-map.json",
+      radar_file_path: "content/maps/radar/new-map-radar.json",
     }));
     const saved = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/new-map.json"), "utf8"));
     expect(saved.id).toBe("new-map");
+    expect(saved.radar).toBeUndefined();
+    expect(saved.radarPath).toBe("content/maps/radar/new-map-radar.json");
+    const savedRadar = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/radar/new-map-radar.json"), "utf8"));
+    expect(savedRadar).toEqual(expect.objectContaining({ mapId: "new-map", glyphRows: ["."] }));
   });
 
   it("rejects new map saves when the derived content/maps file already exists", async () => {
@@ -503,8 +508,10 @@ describe("helper server", () => {
     await new Promise((resolve) => server.close(resolve));
     tempRepoRoot = await fs.mkdtemp(path.join(os.tmpdir(), "stellar-map-server-"));
     await writeTempJson("content/maps/default-map.json", minimalMap("default-map"));
+    await writeTempJson("content/maps/radar/default-map-radar.json", minimalRadar("default-map"));
     await writeTempJson("content/map-objects/resources.json", { map_objects: [] });
     await writeTempJson("content/schemas/maps.schema.json", { title: "maps schema" });
+    await writeTempJson("content/schemas/map-radar.schema.json", { title: "map radar schema" });
     await writeTempJson("content/schemas/map-objects.schema.json", { title: "map objects schema" });
     await fs.mkdir(path.join(tempRepoRoot, "assets/test"), { recursive: true });
     await fs.writeFile(path.join(tempRepoRoot, "assets/test/sample.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
@@ -615,6 +622,7 @@ function minimalMap(id) {
     size: { rows: 1, cols: 1 },
     originTileId: "1-1",
     initialDiscoveredTileIds: ["1-1"],
+    radarPath: `content/maps/radar/${id}-radar.json`,
     tiles: [
       {
         id: "1-1",
@@ -633,25 +641,37 @@ function minimalMap(id) {
         specialStates: [],
       },
     ],
-    radar: {
-      world: { width: 1, height: 1, origin: { x: 0, y: 0 } },
-      glyphRows: ["."],
-      toneRows: ["g"],
-      palette: { g: "#9bbf74" },
-      symbols: {
-        crew: { glyph: "@", tone: "g" },
-        focus: { glyph: "X", tone: "g" },
-      },
-      trace: {
-        layerNotice: "notice",
-        controlMode: "control",
-        callMode: "call",
-        worldLine: "world",
-        jsonLine: "json",
-        emptyLine: "empty",
-      },
-      regions: [],
+    radar: minimalRadarBody(),
+  };
+}
+
+function minimalRadar(mapId) {
+  return {
+    $schema: "../../schemas/map-radar.schema.json",
+    mapId,
+    ...minimalRadarBody(),
+  };
+}
+
+function minimalRadarBody() {
+  return {
+    world: { width: 1, height: 1, origin: { x: 0, y: 0 } },
+    glyphRows: ["."],
+    toneRows: ["g"],
+    palette: { g: "#9bbf74" },
+    symbols: {
+      crew: { glyph: "@", tone: "g" },
+      focus: { glyph: "X", tone: "g" },
     },
+    trace: {
+      layerNotice: "notice",
+      controlMode: "control",
+      callMode: "call",
+      worldLine: "world",
+      jsonLine: "json",
+      emptyLine: "empty",
+    },
+    regions: [],
   };
 }
 

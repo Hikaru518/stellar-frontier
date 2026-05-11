@@ -7,6 +7,7 @@ const MAP_OBJECT_ROOT = "content/map-objects";
 const SCHEMA_ROOT = "content/schemas";
 const SCHEMA_PATHS = [
   "content/schemas/maps.schema.json",
+  "content/schemas/map-radar.schema.json",
   "content/schemas/map-objects.schema.json",
 ];
 
@@ -32,10 +33,17 @@ async function loadMaps(guard) {
   const maps = [];
 
   for (const filePath of mapPaths) {
-    const data = await readJson(guard, filePath);
+    const sourceData = await readJson(guard, filePath);
+    const radarPath = sourceData.radarPath;
+    const radarContent = await readJson(guard, radarPath);
+    const data = {
+      ...sourceData,
+      radar: stripRadarMetadata(radarContent),
+    };
     maps.push({
       id: data.id ?? path.posix.basename(filePath, ".json"),
       file_path: filePath,
+      radar_file_path: radarPath,
       data,
     });
   }
@@ -96,4 +104,9 @@ async function listJsonFiles(guard, relativeDirectory, { recursive }) {
 async function readJson(guard, relativePath) {
   const absolutePath = guard.resolveAllowedPath(relativePath);
   return JSON.parse(await fs.readFile(absolutePath, "utf8"));
+}
+
+function stripRadarMetadata(radarContent) {
+  const { $schema: _schema, mapId: _mapId, ...radar } = radarContent;
+  return radar;
 }

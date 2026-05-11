@@ -12,6 +12,7 @@ describe("mapContentStore", () => {
   beforeEach(async () => {
     repoRoot = await fs.mkdtemp(path.join(os.tmpdir(), "stellar-map-store-"));
     await writeJson("content/maps/default-map.json", minimalMap("default-map"));
+    await writeJson("content/maps/radar/default-map-radar.json", minimalRadar("default-map"));
     await writeJson("content/map-objects/resources.json", {
       map_objects: [
         {
@@ -23,6 +24,7 @@ describe("mapContentStore", () => {
       ],
     });
     await writeJson("content/schemas/maps.schema.json", { title: "maps schema" });
+    await writeJson("content/schemas/map-radar.schema.json", { title: "map radar schema" });
     await writeJson("content/schemas/map-objects.schema.json", { title: "map objects schema" });
   });
 
@@ -37,6 +39,7 @@ describe("mapContentStore", () => {
       expect.objectContaining({
         id: "default-map",
         file_path: "content/maps/default-map.json",
+        radar_file_path: "content/maps/radar/default-map-radar.json",
         data: expect.objectContaining({ id: "default-map" }),
       }),
     ]);
@@ -50,6 +53,7 @@ describe("mapContentStore", () => {
     expect(Object.keys(library.schemas)).toEqual(
       expect.arrayContaining([
         "content/schemas/maps.schema.json",
+        "content/schemas/map-radar.schema.json",
         "content/schemas/map-objects.schema.json",
       ]),
     );
@@ -57,6 +61,7 @@ describe("mapContentStore", () => {
 
   it("does not read maps from the real repository when a temporary repo root is supplied", async () => {
     await writeJson("content/maps/temp-only.json", minimalMap("temp-only"));
+    await writeJson("content/maps/radar/temp-only-radar.json", minimalRadar("temp-only"));
 
     const library = await loadMapEditorLibrary({ repoRoot });
 
@@ -81,6 +86,7 @@ function minimalMap(id) {
     size: { rows: 1, cols: 1 },
     originTileId: "1-1",
     initialDiscoveredTileIds: ["1-1"],
+    radarPath: `content/maps/radar/${id}-radar.json`,
     tiles: [
       {
         id: "1-1",
@@ -99,24 +105,29 @@ function minimalMap(id) {
         specialStates: [],
       },
     ],
-    radar: {
-      world: { width: 1, height: 1, origin: { x: 0, y: 0 } },
-      glyphRows: ["."],
-      toneRows: ["g"],
-      palette: { g: "#9bbf74" },
-      symbols: {
-        crew: { glyph: "@", tone: "g" },
-        focus: { glyph: "X", tone: "g" },
-      },
-      trace: {
-        layerNotice: "notice",
-        controlMode: "control",
-        callMode: "call",
-        worldLine: "world",
-        jsonLine: "json",
-        emptyLine: "empty",
-      },
-      regions: [],
+  };
+}
+
+function minimalRadar(mapId) {
+  return {
+    $schema: "../../schemas/map-radar.schema.json",
+    mapId,
+    world: { width: 1, height: 1, origin: { x: 0, y: 0 } },
+    glyphRows: ["."],
+    toneRows: ["g"],
+    palette: { g: "#9bbf74" },
+    symbols: {
+      crew: { glyph: "@", tone: "g" },
+      focus: { glyph: "X", tone: "g" },
     },
+    trace: {
+      layerNotice: "notice",
+      controlMode: "control",
+      callMode: "call",
+      worldLine: "world",
+      jsonLine: "json",
+      emptyLine: "empty",
+    },
+    regions: [],
   };
 }

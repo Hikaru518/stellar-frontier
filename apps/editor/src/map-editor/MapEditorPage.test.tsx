@@ -106,9 +106,11 @@ function createLibraryResponse(overrides: Partial<MapEditorLibraryResponse> = {}
 }
 
 function createMapAsset(id: string, name: string, filePath: string, size: { rows: number; cols: number } = { rows: 2, cols: 2 }) {
+  const data = createMapEditorDraft({ id, name, rows: size.rows, cols: size.cols });
   return {
     id,
     file_path: filePath,
-    data: createMapEditorDraft({ id, name, rows: size.rows, cols: size.cols }),
+    radar_file_path: data.radarPath,
+    data,
   };
 }

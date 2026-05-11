@@ -95,6 +95,7 @@ export interface MapEditorDraft {
   };
   originTileId: string;
   initialDiscoveredTileIds: string[];
+  radarPath: string;
   tiles: MapTileDefinition[];
   radar: RadarDefinition;
 }

@@ -25,6 +25,7 @@ test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) =
   await expect(stage).toBeVisible();
   await expect(stage).toHaveAttribute("data-focus-tile-id", "129-129");
   await expect(page.getByText("render + function / 256 x 256")).toBeVisible();
+  await expect(page.getByText("[JSON] radar glyph/tone/regions loaded from content/maps/radar/default-map-radar.json")).toBeVisible();
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
   await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
 });
@@ -44,10 +45,37 @@ test("renders the console radar canvas inside a stable fixed map viewport", asyn
   expect(initialBox?.width).toBeGreaterThan(0);
 
   await page.clock.runFor(1_000);
+  await stage.evaluate((element) => {
+    element.dispatchEvent(new WheelEvent("wheel", { deltaY: 2_000, bubbles: true, cancelable: true }));
+  });
 
   const laterBox = await stage.boundingBox();
   expect(laterBox?.height).toBeCloseTo(initialBox?.height ?? 0, 0);
   expect(laterBox?.width).toBeCloseTo(initialBox?.width ?? 0, 0);
+
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".console-retro-map-function-canvas") as HTMLCanvasElement | null;
+    return !!canvas && canvas.width > 0 && canvas.height > 0;
+  });
+  const lowerRightPaintedPixels = await functionCanvas.evaluate((canvas) => {
+    const context = (canvas as HTMLCanvasElement).getContext("2d");
+    if (!context || canvas.width <= 0 || canvas.height <= 0) {
+      return 0;
+    }
+    const sampleX = Math.floor(canvas.width * 0.72);
+    const sampleY = Math.floor(canvas.height * 0.72);
+    const sampleW = Math.max(1, Math.floor(canvas.width * 0.22));
+    const sampleH = Math.max(1, Math.floor(canvas.height * 0.22));
+    const pixels = context.getImageData(sampleX, sampleY, sampleW, sampleH).data;
+    let painted = 0;
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] > 0) {
+        painted += 1;
+      }
+    }
+    return painted;
+  });
+  expect(lowerRightPaintedPixels).toBeGreaterThan(0);
 });
 
 test("shows authored crash-site radar metadata on the occupied origin tile", async ({ page }) => {
