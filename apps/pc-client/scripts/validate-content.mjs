@@ -638,6 +638,8 @@ function validateMap(map, knownObjectIds, options) {
     hasError = report(`Map tile count must match size coverage: expected ${rows * cols}, got ${tileById.size}`) || hasError;
   }
 
+  hasError = validateMapFeatures(map, { rows, cols, dataPath: options.dataPath }) || hasError;
+
   const radar = options.mapRadars[map.radarPath];
   if (!radar) {
     hasError = report(`Map radarPath does not exist in ${options.dataPath}: ${map.radarPath}`) || hasError;
@@ -652,6 +654,177 @@ function validateMap(map, knownObjectIds, options) {
   }
 
   return hasError;
+}
+
+function validateMapFeatures(map, { rows, cols, dataPath }) {
+  let hasError = false;
+  const featureIds = new Set();
+  const features = Array.isArray(map.features) ? map.features : [];
+  const mapId = map.id ?? "<missing>";
+
+  for (const [index, feature] of features.entries()) {
+    if (!feature || typeof feature !== "object") {
+      continue;
+    }
+
+    const featureId = typeof feature.id === "string" && feature.id.length > 0 ? feature.id : `<index:${index}>`;
+    const context = { dataPath, mapId, featureId };
+
+    if (typeof feature.id === "string" && !addUnique(featureIds, feature.id)) {
+      hasError = reportMapFeatureIssue(context, "id", "Duplicate feature id") || hasError;
+    }
+
+    hasError = validateMapFeatureInvestigationFields(feature, context) || hasError;
+    hasError = validateMapFeatureFootprint(feature, { ...context, rows, cols }) || hasError;
+  }
+
+  return hasError;
+}
+
+function validateMapFeatureInvestigationFields(feature, context) {
+  let hasError = false;
+
+  if (feature.investigatable === true) {
+    if (!Array.isArray(feature.status_options) || feature.status_options.length === 0) {
+      hasError = reportMapFeatureIssue(context, "status_options", "Investigatable feature must define non-empty status_options") || hasError;
+    }
+
+    if (typeof feature.initial_status !== "string" || feature.initial_status.length === 0) {
+      hasError = reportMapFeatureIssue(context, "initial_status", "Investigatable feature must define initial_status") || hasError;
+    } else if (Array.isArray(feature.status_options) && !feature.status_options.includes(feature.initial_status)) {
+      hasError = reportMapFeatureIssue(context, "initial_status", "Feature initial_status must be included in status_options") || hasError;
+    }
+
+    if (!Array.isArray(feature.actions)) {
+      hasError = reportMapFeatureIssue(context, "actions", "Investigatable feature must define actions") || hasError;
+    }
+
+    return hasError;
+  }
+
+  for (const field of ["status_options", "initial_status", "actions"]) {
+    if (hasOwnField(feature, field)) {
+      hasError = reportMapFeatureIssue(context, field, "Non-investigatable feature must not define investigatable-only field") || hasError;
+    }
+  }
+
+  return hasError;
+}
+
+function validateMapFeatureFootprint(feature, context) {
+  const footprint = feature.footprint;
+  if (!footprint || typeof footprint !== "object" || footprint.type !== "row_spans") {
+    return false;
+  }
+
+  let hasError = false;
+  const spans = Array.isArray(footprint.spans) ? footprint.spans : [];
+  if (spans.length === 0) {
+    return reportMapFeatureIssue(context, "footprint.spans", "Map feature footprint spans must not be empty");
+  }
+
+  const coveredTileIds = new Set();
+  for (const [index, span] of spans.entries()) {
+    if (!span || typeof span !== "object") {
+      continue;
+    }
+
+    const field = `footprint.spans[${index}]`;
+    const { row, colStart, colEnd } = span;
+    if (!Number.isInteger(row) || !Number.isInteger(colStart) || !Number.isInteger(colEnd)) {
+      hasError = reportMapFeatureIssue(context, field, "Map feature row span coordinates must be integers") || hasError;
+      continue;
+    }
+
+    let spanHasError = false;
+    if (colStart > colEnd) {
+      spanHasError = reportMapFeatureIssue(context, field, "Map feature row span colStart must be <= colEnd") || spanHasError;
+    }
+
+    if (!isInsideMapCoordinate(context, row, colStart) || !isInsideMapCoordinate(context, row, colEnd)) {
+      spanHasError = reportMapFeatureIssue(context, field, "Map feature row span is out of bounds") || spanHasError;
+    }
+
+    if (spanHasError) {
+      hasError = true;
+      continue;
+    }
+
+    let overlapsPreviousSpan = false;
+    for (let col = colStart; col <= colEnd; col += 1) {
+      if (coveredTileIds.has(`${row}-${col}`)) {
+        overlapsPreviousSpan = true;
+        break;
+      }
+    }
+
+    if (overlapsPreviousSpan) {
+      hasError = reportMapFeatureIssue(context, field, "Map feature row span overlaps another span in the same feature") || hasError;
+    }
+
+    for (let col = colStart; col <= colEnd; col += 1) {
+      coveredTileIds.add(`${row}-${col}`);
+    }
+  }
+
+  if (coveredTileIds.size > 0) {
+    hasError = validateMapFeatureFootprintContiguous(coveredTileIds, context) || hasError;
+  }
+
+  return hasError;
+}
+
+function validateMapFeatureFootprintContiguous(coveredTileIds, context) {
+  const firstTileId = coveredTileIds.values().next().value;
+  if (typeof firstTileId !== "string") {
+    return false;
+  }
+
+  const visited = new Set([firstTileId]);
+  const stack = [firstTileId];
+  while (stack.length > 0) {
+    const tileId = stack.pop();
+    const coord = parseTileCoord(tileId);
+    if (!coord) {
+      continue;
+    }
+
+    for (const neighbor of [
+      `${coord.row - 1}-${coord.col}`,
+      `${coord.row + 1}-${coord.col}`,
+      `${coord.row}-${coord.col - 1}`,
+      `${coord.row}-${coord.col + 1}`,
+    ]) {
+      if (!coveredTileIds.has(neighbor) || visited.has(neighbor)) {
+        continue;
+      }
+      visited.add(neighbor);
+      stack.push(neighbor);
+    }
+  }
+
+  if (visited.size === coveredTileIds.size) {
+    return false;
+  }
+
+  return reportMapFeatureIssue(context, "footprint.spans", "Map feature footprint must be four-direction contiguous");
+}
+
+function parseTileCoord(tileId) {
+  const match = /^(\d+)-(\d+)$/.exec(tileId);
+  if (!match) {
+    return null;
+  }
+
+  return { row: Number(match[1]), col: Number(match[2]) };
+}
+
+function isInsideMapCoordinate({ rows, cols }, row, col) {
+  return row >= 1 && row <= rows && col >= 1 && col <= cols;
+}
+
+function reportMapFeatureIssue({ dataPath, mapId, featureId }, field, message) {
+  return report(`${message} in map ${mapId} feature ${featureId} field ${field} at ${dataPath}`);
 }
 
 function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols }) {
@@ -765,6 +938,10 @@ function addUnique(set, value) {
 
   set.add(value);
   return true;
+}
+
+function hasOwnField(value, field) {
+  return Object.prototype.hasOwnProperty.call(value, field);
 }
 
 function validateQuestProgressEffectReferences(questFiles) {

@@ -55,6 +55,12 @@
       "items": {
         "$ref": "#/$defs/tile"
       }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mapFeature"
+      }
     }
   },
   "$defs": {
@@ -74,9 +80,25 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
+    "colonId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
+    },
+    "customKind": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?::[A-Za-z][A-Za-z0-9_-]*)*$"
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "muted", "accent", "danger", "success"]
+    },
     "visibility": {
       "type": "string",
       "enum": ["onDiscovered", "onInvestigated", "hidden"]
+    },
+    "mapFeatureVisibility": {
+      "type": "string",
+      "enum": ["always", "onDiscovered", "onInvestigated", "hidden"]
     },
     "environment": {
       "type": "object",
@@ -188,6 +210,210 @@
           "minimum": 1
         }
       }
+    },
+    "featureFootprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "spans"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "row_spans"
+        },
+        "spans": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/featureRowSpan"
+          }
+        }
+      }
+    },
+    "featureRowSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "colStart", "colEnd"],
+      "properties": {
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "colStart": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "colEnd": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "featureActionEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "feature_id", "status"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "set_feature_status"
+        },
+        "feature_id": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "featureLocalAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "duration_seconds", "success_effects", "failure_effects"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "timed_repair"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "success_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureActionEffect"
+          }
+        },
+        "failure_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureActionEffect"
+          }
+        }
+      }
+    },
+    "featureActionDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "label", "conditions"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/colonId"
+        },
+        "category": {
+          "type": "string",
+          "const": "feature"
+        },
+        "label": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "tone": {
+          "$ref": "#/$defs/tone"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_when_unavailable": {
+          "type": "string",
+          "enum": ["disabled"]
+        },
+        "unavailable_hint": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "local_action": {
+          "$ref": "#/$defs/featureLocalAction"
+        }
+      }
+    },
+    "mapFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "priority", "visibility", "footprint"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "kind": {
+          "$ref": "#/$defs/customKind"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          }
+        },
+        "visibility": {
+          "$ref": "#/$defs/mapFeatureVisibility"
+        },
+        "footprint": {
+          "$ref": "#/$defs/featureFootprint"
+        },
+        "investigatable": {
+          "type": "boolean"
+        },
+        "status_options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "initial_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureActionDef"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["investigatable"],
+            "properties": {
+              "investigatable": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["status_options", "initial_status", "actions"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["status_options"] },
+                { "required": ["initial_status"] },
+                { "required": ["actions"] }
+              ]
+            }
+          }
+        }
+      ]
     },
     "tile": {
       "type": "object",

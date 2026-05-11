@@ -26,7 +26,7 @@ source:
 |---|---------|------|------|---------|
 | 1 | TASK-001 | 添加 MapFeature 类型与 loader 兼容层 | completed | 2 |
 | 2 | TASK-002 | 实现 row spans 与 Feature 查询纯函数 | completed | 1 |
-| 3 | TASK-003 | 扩展 map schema 与 content validation 支持 Feature | pending | 0 |
+| 3 | TASK-003 | 扩展 map schema 与 content validation 支持 Feature | completed | 1 |
 | 4 | TASK-004 | 为默认地图 seed 初始 Feature 内容 | pending | 0 |
 | 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | pending | 0 |
 | 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | pending | 0 |
@@ -78,3 +78,17 @@ source:
   - focused `contentData.test.ts MapPage.test.tsx`: passed, 22 tests
   - `apps/pc-client` test: passed on rerun, 46 files / 356 tests
   - 备注: 第一次全量 test 在两个既有测试上出现 5s timeout；隔离重跑对应文件通过，随后全量重跑通过。
+
+### TASK-003: 扩展 map schema 与 content validation 支持 Feature
+- 状态: completed
+- 开始时间: 2026-05-11 23:26
+- 完成时间: 2026-05-11 23:41
+- 尝试次数: 1
+- developer summary:
+  - 扩展 `maps.schema.json`，支持 optional `features`、`row_spans` footprint、priority、visibility、custom kind、investigatable/status/actions。
+  - 扩展 `validate-content`，校验 Feature id 唯一性、span 非空/边界/重叠/四方向连续、initial_status、非 investigatable 字段限制。
+  - 增加 validator 集成测试，覆盖合法 features 和拒绝场景。
+- 质量检查:
+  - `npm run validate:content`: passed
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 46 files / 359 tests
