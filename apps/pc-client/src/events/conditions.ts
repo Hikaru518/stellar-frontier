@@ -1,3 +1,5 @@
+import { defaultMapConfig, type FeatureRuntimeState } from "../content/contentData";
+import { getFeatureRuntimeStatus } from "../mapSystem";
 import type {
   CompareOp,
   Condition,
@@ -43,6 +45,10 @@ export interface ConditionGameState extends Partial<EventRuntimeState> {
   tiles?: Record<Id, unknown> | unknown[];
   resources?: Record<string, unknown>;
   baseInventory?: unknown[];
+  map?: {
+    featuresById?: Record<string, FeatureRuntimeState | undefined>;
+    mapObjects?: Record<string, { status_enum?: string } | undefined>;
+  };
 }
 
 export interface ConditionHandlerInput {
@@ -117,6 +123,23 @@ const builtInConditionHandlers: Record<string, ConditionHandler> = {
     const entry = mapObjects?.[objectId.value];
     return pass(Boolean(entry && entry.status_enum === status.value));
   },
+  feature_status_equals({ context, condition, path, params }) {
+    const featureId = readStringParam(params, "feature_id", `${path}.params.feature_id`, condition.handler_type ?? "handler");
+    if (featureId.errors.length > 0) {
+      return featureId;
+    }
+    const status = readStringParam(params, "status", `${path}.params.status`, condition.handler_type ?? "handler");
+    if (status.errors.length > 0) {
+      return status;
+    }
+
+    const feature = defaultMapConfig.features.find((candidate) => candidate.id === featureId.value);
+    if (!feature) {
+      return pass(false);
+    }
+
+    return pass(getFeatureRuntimeStatus(context.state.map, feature) === status.value);
+  },
 };
 
 /**
@@ -133,6 +156,17 @@ const builtInHandlerDefinitions: Record<string, HandlerDefinition> = {
     kind: "condition",
     description: "Checks whether a runtime map object's status_enum equals the requested value.",
     params_schema_ref: "#/$defs/object_status_equals_params",
+    allowed_target_types: [],
+    deterministic: true,
+    uses_random: false,
+    failure_policy: "fail_event",
+    sample_fixtures: [],
+  },
+  feature_status_equals: {
+    handler_type: "feature_status_equals",
+    kind: "condition",
+    description: "Checks whether a runtime map feature status equals the requested value.",
+    params_schema_ref: "#/$defs/feature_status_equals_params",
     allowed_target_types: [],
     deterministic: true,
     uses_random: false,

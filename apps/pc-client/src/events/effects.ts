@@ -1,6 +1,6 @@
 import { appendDiaryEntryId } from "../diarySystem";
 import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "../content/mapObjects";
-import { questDefinitions } from "../content/contentData";
+import { defaultMapConfig, questDefinitions, type FeatureRuntimeState } from "../content/contentData";
 import { applyQuestProgress, type QuestProgressOperation, type QuestRuntimeState } from "../questSystem";
 import type {
   CrewActionState,
@@ -37,6 +37,7 @@ export interface EffectGameState extends EventRuntimeState {
   resources?: Record<string, number>;
   map?: {
     tilesById?: Record<string, { revealedObjectIds?: string[] } | undefined>;
+    featuresById?: Record<string, FeatureRuntimeState | undefined>;
     mapObjects?: RuntimeMapObjectsState;
   };
 }
@@ -247,6 +248,10 @@ function applyEffect(effect: Effect, context: EffectExecutionContext, path: stri
       return unlockEventDefinition(effect, context, path);
     case "handler_effect":
       return applyHandlerEffect(effect, context, target.target, path);
+    case "set_feature_status":
+      return setFeatureStatus(effect, context, path);
+    case "set_feature_revealed":
+      return setFeatureRevealed(effect, context, path);
     case "set_object_status":
       return setObjectStatus(effect, context, path);
     default:
@@ -263,6 +268,95 @@ function getMapObjectDefinition(objectId: string): MapObjectDefinition | undefin
     return override.get(objectId);
   }
   return mapObjectDefinitionById.get(objectId);
+}
+
+function getMapFeatureDefinition(featureId: string) {
+  return defaultMapConfig.features.find((feature) => feature.id === featureId);
+}
+
+function warnIfUnknownFeature(effect: Effect, featureId: string) {
+  const definition = getMapFeatureDefinition(featureId);
+  if (!definition) {
+    console.warn(
+      `[${effect.type}] Feature definition for ${featureId} not found; writing state anyway.`,
+    );
+  }
+  return definition;
+}
+
+function setFeatureStatus(effect: Effect, context: EffectExecutionContext, path: string): ApplyResult {
+  const featureId = readString(effect, "feature_id", path);
+  const status = readString(effect, "status", path);
+  if (featureId.errors.length > 0 || status.errors.length > 0) {
+    return { state: context.state, errors: [...featureId.errors, ...status.errors] };
+  }
+
+  const definition = warnIfUnknownFeature(effect, featureId.value);
+  if (definition?.investigatable === true && !definition.status_options.includes(status.value)) {
+    console.warn(
+      `[${effect.type}] status ${status.value} not in options for ${featureId.value}.`,
+    );
+  } else if (definition && definition.investigatable !== true) {
+    console.warn(
+      `[${effect.type}] Feature ${featureId.value} is not investigatable; writing status anyway.`,
+    );
+  }
+
+  const previousMap = context.state.map ?? {};
+  const previousFeatures = previousMap.featuresById ?? {};
+  const previousEntry = previousFeatures[featureId.value];
+  const nextFeatures: Record<string, FeatureRuntimeState | undefined> = {
+    ...previousFeatures,
+    [featureId.value]: {
+      ...(previousEntry ?? {}),
+      id: featureId.value,
+      status: status.value,
+    },
+  };
+
+  return {
+    state: {
+      ...context.state,
+      map: {
+        ...previousMap,
+        featuresById: nextFeatures,
+      },
+    },
+    errors: [],
+  };
+}
+
+function setFeatureRevealed(effect: Effect, context: EffectExecutionContext, path: string): ApplyResult {
+  const featureId = readString(effect, "feature_id", path);
+  const revealed = readBoolean(effect, "revealed", path);
+  if (featureId.errors.length > 0 || revealed.errors.length > 0) {
+    return { state: context.state, errors: [...featureId.errors, ...revealed.errors] };
+  }
+
+  warnIfUnknownFeature(effect, featureId.value);
+
+  const previousMap = context.state.map ?? {};
+  const previousFeatures = previousMap.featuresById ?? {};
+  const previousEntry = previousFeatures[featureId.value];
+  const nextFeatures: Record<string, FeatureRuntimeState | undefined> = {
+    ...previousFeatures,
+    [featureId.value]: {
+      ...(previousEntry ?? {}),
+      id: featureId.value,
+      revealed: revealed.value,
+    },
+  };
+
+  return {
+    state: {
+      ...context.state,
+      map: {
+        ...previousMap,
+        featuresById: nextFeatures,
+      },
+    },
+    errors: [],
+  };
 }
 
 function setObjectStatus(effect: Effect, context: EffectExecutionContext, path: string): ApplyResult {
@@ -1534,6 +1628,18 @@ function readString(effect: Effect, name: string, path: string, aliases: string[
   return {
     value: "",
     errors: [error(effect, "missing_value", `${path}.params.${name}`, `${effect.type} requires string param ${name}.`)],
+  };
+}
+
+function readBoolean(effect: Effect, name: string, path: string): ReadParam<boolean> {
+  const value = effect.params[name];
+  if (typeof value === "boolean") {
+    return { value, errors: [] };
+  }
+
+  return {
+    value: false,
+    errors: [error(effect, "missing_value", `${path}.params.${name}`, `${effect.type} requires boolean param ${name}.`)],
   };
 }
 

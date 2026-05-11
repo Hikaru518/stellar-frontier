@@ -30,7 +30,7 @@ source:
 | 4 | TASK-004 | 为默认地图 seed 初始 Feature 内容 | completed | 1 |
 | 5 | TASK-005 | 添加 Runtime featuresById 与旧存档迁移 | completed | 1 |
 | 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | completed | 2 |
-| 7 | TASK-007 | 实现 Feature condition/effect runtime | pending | 0 |
+| 7 | TASK-007 | 实现 Feature condition/effect runtime | completed | 1 |
 | 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | pending | 0 |
 | 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | pending | 0 |
 | 10 | TASK-010 | 实现 Feature survey 结算与去重 | pending | 0 |
@@ -124,6 +124,19 @@ source:
   - `npm run editor:test`: passed, 44 files / 232 tests
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 46 files / 361 tests
+
+### TASK-007: 实现 Feature condition/effect runtime
+- 状态: completed
+- 开始时间: 2026-05-12 00:57
+- 完成时间: 2026-05-12 01:10
+- 尝试次数: 1
+- developer summary:
+  - 实现 `feature_status_equals` condition，读取 `GameState.map.featuresById`，缺失 runtime state 时回退 authored `initial_status`。
+  - 实现 `set_feature_status` 与 `set_feature_revealed`，只写 `featuresById`，保留已有 runtime 字段。
+  - 补充未知 `feature_id` 的非崩溃路径：condition 返回 false，effect warning 后写入最小 state。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 371 tests
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed
