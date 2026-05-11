@@ -136,4 +136,115 @@ describe("buildCallView", () => {
     expect(view.runtimeCall).toBe(runtimeCall);
     expect(view.groups.flatMap((group) => group.actions).map((action) => action.id)).not.toContain("runtime-option");
   });
+
+  it("uses feature runtime status when evaluating feature inline action visibility", () => {
+    const member = createMember({ currentTile: "129-129" });
+    const tile = createTile("129-129");
+
+    const damagedView = buildCallView({
+      member,
+      tile,
+      gameState: createFeatureState("damaged", { member }),
+    });
+    expect(findGroup(damagedView, "发电机")?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "iafs_generator:repair",
+          label: "维修",
+          featureId: "iafs_generator",
+        }),
+      ]),
+    );
+
+    const repairedView = buildCallView({
+      member,
+      tile,
+      gameState: createFeatureState("repaired", { member }),
+    });
+    const repairedFeatureActions = findGroup(repairedView, "发电机")?.actions ?? [];
+    expect(repairedFeatureActions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", featureId: "iafs_generator" })]),
+    );
+    expect(repairedFeatureActions.find((action) => action.id === "iafs_generator:repair")).toBeUndefined();
+  });
+
+  it("keeps a failed feature inline action visible with a disabled reason when requested", () => {
+    const feature = defaultMapConfig.features.find((entry) => entry.id === "iafs_generator");
+    if (feature?.investigatable !== true) {
+      throw new Error("Expected iafs_generator to be an investigatable feature.");
+    }
+    const repairAction = feature.actions.find((action) => action.id === "iafs_generator:repair");
+    if (!repairAction) {
+      throw new Error("Expected iafs_generator:repair feature action to exist.");
+    }
+    const originalDisplay = repairAction.display_when_unavailable;
+    const originalHint = repairAction.unavailable_hint;
+
+    try {
+      repairAction.display_when_unavailable = "disabled";
+      repairAction.unavailable_hint = "发电机已经修复。";
+
+      const member = createMember({ currentTile: "129-129" });
+      const view = buildCallView({
+        member,
+        tile: createTile("129-129"),
+        gameState: createFeatureState("repaired", { member }),
+      });
+      const action = findGroup(view, "发电机")?.actions.find((entry) => entry.id === "iafs_generator:repair");
+
+      expect(action).toMatchObject({
+        id: "iafs_generator:repair",
+        disabled: true,
+        disabledReason: "发电机已经修复。",
+        featureId: "iafs_generator",
+      });
+    } finally {
+      if (originalDisplay === undefined) {
+        delete repairAction.display_when_unavailable;
+      } else {
+        repairAction.display_when_unavailable = originalDisplay;
+      }
+      if (originalHint === undefined) {
+        delete repairAction.unavailable_hint;
+      } else {
+        repairAction.unavailable_hint = originalHint;
+      }
+    }
+  });
 });
+
+function createFeatureState(status: "damaged" | "repaired", { member }: { member: CrewMember }): GameState {
+  const tile = createTile("129-129");
+  return createGameState({
+    crew: [member],
+    map: {
+      configId: defaultMapConfig.id,
+      configVersion: defaultMapConfig.version,
+      rows: defaultMapConfig.size.rows,
+      cols: defaultMapConfig.size.cols,
+      originTileId: defaultMapConfig.originTileId,
+      discoveredTileIds: [tile.id],
+      investigationReportsById: {},
+      tilesById: {
+        [tile.id]: {
+          discovered: true,
+          investigated: true,
+          revealedObjectIds: [],
+        },
+      },
+      featuresById: {
+        iafs_generator: {
+          id: "iafs_generator",
+          status,
+          revealed: true,
+        },
+      },
+      mapObjects: {},
+    },
+    tiles: [tile],
+  });
+}
+
+function findGroup(view: ReturnType<typeof buildCallView>, name: string) {
+  return view.groups.find((group) => group.title === name || group.title.startsWith(`${name}（`));
+}
