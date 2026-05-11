@@ -1,9 +1,10 @@
-import { defaultMapConfig, type Tone } from "./content/contentData";
+import { defaultMapConfig, type FeatureRuntimeState, type MapFeatureDefinition, type Tone } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
 import type { CrewMember, GameMapState, MapTile, ResourceSummary, SystemLog } from "./data/gameData";
 import { executeEffects } from "./events/effects";
 import type { Effect } from "./events/types";
 import type { InventoryEntry } from "./inventorySystem";
+import { getFeatureRuntimeState } from "./mapSystem";
 import { addInventoryItem } from "./inventorySystem";
 import { formatGameTime } from "./timeSystem";
 import type { CrewActionState, TriggerContext } from "./events/types";
@@ -14,6 +15,8 @@ interface SettlementRuntimeAction {
   id: string;
   actionType: SettlementRuntimeActionType;
   targetTile?: string | null;
+  targetFeatureId?: string;
+  actionDefId?: string;
   objectId?: string;
   params: Record<string, unknown>;
   handler?: string;
@@ -97,6 +100,10 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
 }
 
 function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
+  if (ctx.action.targetFeatureId) {
+    return settleFeatureSurvey(ctx, ctx.action.targetFeatureId);
+  }
+
   const tileId = ctx.action.targetTile ?? ctx.member.currentTile;
   const tile = ctx.tile;
   const objects = getTileObjectsForTile(tile);
@@ -132,6 +139,60 @@ function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
     map,
     logs: appendLogEntry(ctx.logs, `${ctx.member.name} 完成一轮调查。`, "neutral", ctx.occurredAt),
     triggerContexts: [createActionCompleteTrigger(ctx, getPayloadObjects(ctx, revealedObjects))],
+  });
+}
+
+function settleFeatureSurvey(ctx: HandlerContext, featureId: string): ActionSettlementPatch {
+  const feature = findFeature(featureId);
+  if (!feature) {
+    return createPatch({
+      ...ctx,
+      member: {
+        ...ctx.member,
+        status: "调查失败，待命中。",
+        statusTone: "danger",
+        activeAction: undefined,
+      },
+      logs: appendLogEntry(ctx.logs, `行动完成失败：调查目标 ${featureId} 不存在。`, "danger", ctx.occurredAt),
+      triggerContexts: [],
+    });
+  }
+
+  const tileId = ctx.action.targetTile ?? ctx.member.currentTile;
+  const previousTile = ctx.map.tilesById[tileId] ?? {};
+  const nextFeatureState = createSurveyedFeatureState(ctx, feature);
+  const map = {
+    ...ctx.map,
+    discoveredTileIds: addUnique(ctx.map.discoveredTileIds, tileId),
+    tilesById: {
+      ...ctx.map.tilesById,
+      [tileId]: {
+        ...previousTile,
+        discovered: true,
+        investigated: true,
+        status: "已调查",
+      },
+    },
+    featuresById: {
+      ...(ctx.map.featuresById ?? {}),
+      [feature.id]: nextFeatureState.state,
+    },
+  };
+  const tiles = patchTile(ctx.tiles, tileId, { investigated: true, status: "已调查" });
+  const member = {
+    ...ctx.member,
+    status: "调查完成，待命中。",
+    statusTone: "neutral" as Tone,
+    activeAction: undefined,
+  };
+
+  return createPatch({
+    ...ctx,
+    member,
+    tiles,
+    map,
+    logs: appendLogEntry(ctx.logs, `${ctx.member.name} 完成一轮调查。`, "neutral", ctx.occurredAt),
+    triggerContexts: [createActionCompleteTrigger(ctx, [], createFeatureSurveyPayload(ctx, feature, nextFeatureState.firstInvestigation))],
   });
 }
 
@@ -228,6 +289,8 @@ function normalizeSettlementAction(action: CrewActionState): SettlementRuntimeAc
     id: action.id,
     actionType: action.type as SettlementRuntimeActionType,
     targetTile: action.target_tile_id ?? action.to_tile_id,
+    targetFeatureId: stringParam(action.action_params.target_feature_id),
+    actionDefId: stringParam(action.action_params.action_def_id),
     objectId: stringParam(action.action_params.object_id),
     params: action.action_params,
     handler: stringParam(action.action_params.handler),
@@ -281,6 +344,52 @@ function getPayloadObjects(ctx: HandlerContext, fallbackObjects: MapObjectDefini
   }
 
   return fallbackObjects;
+}
+
+function findFeature(featureId: string): MapFeatureDefinition | undefined {
+  return defaultMapConfig.features.find((feature) => feature.id === featureId);
+}
+
+function createSurveyedFeatureState(
+  ctx: HandlerContext,
+  feature: MapFeatureDefinition,
+): { state: FeatureRuntimeState; firstInvestigation: boolean } {
+  const previousState = getFeatureRuntimeState(ctx.map, feature);
+  const previousHistoryKeys = previousState.historyKeys ?? [];
+  const revealHistoryKey = getFeatureSurveyRevealHistoryKey(feature.id);
+  const firstInvestigation = previousState.investigated !== true && !previousHistoryKeys.includes(revealHistoryKey);
+  const nextHistoryKeys = firstInvestigation ? addUnique(previousHistoryKeys, revealHistoryKey) : previousState.historyKeys;
+  const state: FeatureRuntimeState = {
+    ...previousState,
+    id: feature.id,
+    revealed: true,
+    investigated: true,
+    investigatedAt: previousState.investigatedAt ?? ctx.occurredAt,
+    lastTriggeredAt: firstInvestigation ? ctx.occurredAt : previousState.lastTriggeredAt,
+    ...(nextHistoryKeys ? { historyKeys: nextHistoryKeys } : {}),
+  };
+
+  return { state, firstInvestigation };
+}
+
+function createFeatureSurveyPayload(
+  ctx: HandlerContext,
+  feature: MapFeatureDefinition,
+  firstInvestigation: boolean,
+): Record<string, unknown> {
+  const featureTags = feature.tags ?? [];
+  return {
+    ...(ctx.action.actionDefId ? { action_def_id: ctx.action.actionDefId } : {}),
+    feature_id: feature.id,
+    feature_kind: feature.kind,
+    feature_tags: featureTags,
+    feature_first_investigation: firstInvestigation,
+    tags: mergeTags(getTileTags(ctx.tile), featureTags),
+  };
+}
+
+function getFeatureSurveyRevealHistoryKey(featureId: string): string {
+  return `survey:${featureId}:revealed`;
 }
 
 function createActionCompleteTrigger(

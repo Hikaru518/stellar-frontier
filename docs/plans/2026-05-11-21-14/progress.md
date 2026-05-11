@@ -33,7 +33,7 @@ source:
 | 7 | TASK-007 | 实现 Feature condition/effect runtime | completed | 1 |
 | 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | completed | 1 |
 | 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | completed | 1 |
-| 10 | TASK-010 | 实现 Feature survey 结算与去重 | pending | 0 |
+| 10 | TASK-010 | 实现 Feature survey 结算与去重 | completed | 1 |
 | 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | pending | 0 |
 | 12 | TASK-012 | MapPage 展示 Feature 命中结果 | pending | 0 |
 | 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | pending | 0 |
@@ -162,6 +162,21 @@ source:
 - 质量检查:
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 48 files / 376 tests
+
+### TASK-010: 实现 Feature survey 结算与去重
+- 状态: completed
+- 开始时间: 2026-05-12 01:42
+- 完成时间: 2026-05-12 01:57
+- 尝试次数: 1
+- developer summary:
+  - `survey` settlement 支持 `action_params.target_feature_id`。
+  - 调查目标 Feature 后更新 `featuresById[featureId]` 的 `revealed / investigated / investigatedAt / lastTriggeredAt / historyKeys`。
+  - TriggerContext payload 增加 `feature_id / feature_kind / feature_tags / action_def_id / feature_first_investigation`。
+  - 同一 Feature 跨 tile 再调查不会重复写入一次性 reveal history。
+  - 未知 `target_feature_id` 返回失败日志并清理 active action，不崩溃。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 379 tests
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed
