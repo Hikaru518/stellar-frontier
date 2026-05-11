@@ -13,7 +13,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { buildCallView } from "./callActions";
-import { defaultMapConfig, questDefinitions } from "./content/contentData";
+import { defaultMapConfig, questDefinitions, type MapFeatureDefinition } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
 import { executeEffects, type EffectExecutionContext, type EffectGameState } from "./events/effects";
 import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gameData";
@@ -24,9 +24,11 @@ const CRASH_SITE_TILE_ID = "129-129";
 
 const STUB_TILE_ID = "2-3";
 const STUB_OBJECT_ID = "__integration_locked_door__";
+const originalMapFeatures = [...defaultMapConfig.features];
 
 afterEach(() => {
   mapObjectDefinitionById.delete(STUB_OBJECT_ID);
+  defaultMapConfig.features = originalMapFeatures;
 });
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
@@ -249,6 +251,33 @@ function createFeatureRepairCrashSiteState(overrides: Partial<GameState> = {}): 
 }
 
 describe("map-object-action pipeline integration", () => {
+  it("exposes lower-priority features as context without promoting them to action groups", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({ id: "__integration_high_feature__", name: "高优先级目标", priority: 30 }),
+      createInvestigatableFeature({ id: "__integration_low_feature__", name: "低优先级目标", priority: 10 }),
+    ]);
+
+    const member = createMember();
+    const view = buildCallView({ member, tile: createTile(), gameState: createGameState({ crew: [member] }) });
+
+    expect(view.featureContexts).toEqual([
+      expect.objectContaining({
+        id: "__integration_high_feature__",
+        name: "高优先级目标",
+        statusLabel: "已损坏",
+        isActionTarget: true,
+      }),
+      expect.objectContaining({
+        id: "__integration_low_feature__",
+        name: "低优先级目标",
+        statusLabel: "已损坏",
+        isActionTarget: false,
+      }),
+    ]);
+    expect(view.groups.map((group) => group.title)).toEqual(expect.arrayContaining(["高优先级目标（已损坏）"]));
+    expect(view.groups.map((group) => group.title)).not.toEqual(expect.arrayContaining(["低优先级目标（已损坏）"]));
+  });
+
   it("shows the three crash-site repair actions on a normal call at the crash site", () => {
     const member = createCrashSiteMember();
     const view = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
@@ -583,4 +612,40 @@ describe("map-object-action pipeline integration", () => {
 
 function findGroup(view: ReturnType<typeof buildCallView>, objectName: string) {
   return view.groups.find((group) => group.title === objectName || group.title.startsWith(`${objectName}（`));
+}
+
+function setFeatureFixtures(features: MapFeatureDefinition[]): void {
+  defaultMapConfig.features = [...originalMapFeatures, ...features];
+}
+
+function createInvestigatableFeature({
+  id,
+  name,
+  priority,
+}: {
+  id: string;
+  name: string;
+  priority: number;
+}): MapFeatureDefinition {
+  return {
+    id,
+    name,
+    kind: "test:feature",
+    priority,
+    visibility: "always",
+    footprint: { type: "row_spans", spans: [{ row: 2, colStart: 3, colEnd: 3 }] },
+    investigatable: true,
+    status_options: ["damaged", "repaired"],
+    initial_status: "damaged",
+    actions: [
+      {
+        id: `${id}:inspect`,
+        category: "feature",
+        label: "调查",
+        tone: "neutral",
+        conditions: [],
+        event_id: `${id}:inspect`,
+      },
+    ],
+  };
 }

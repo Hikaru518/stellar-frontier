@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { buildCallView } from "../callActions";
+import { buildCallView, type CallActionTargetView, type CallFeatureContextView } from "../callActions";
 import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
@@ -9,6 +9,7 @@ import { getTileLocationLabel } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
 type CallActionOption = ActionOption & {
+  target?: CallActionTargetView;
   disabled?: boolean;
   disabledReason?: string;
 };
@@ -19,6 +20,7 @@ interface CallView {
   meta: string;
   actions: CallActionOption[];
   actionGroups: CallActionGroupView[];
+  featureContexts: CallFeatureContextView[];
   badge: string;
   isRuntime: boolean;
 }
@@ -106,6 +108,7 @@ export function CallPage({
           meta: "事件通话已关闭",
           actions: [],
           actionGroups: [],
+          featureContexts: [],
           badge: "已关闭",
           isRuntime: true,
         };
@@ -120,19 +123,20 @@ export function CallPage({
           label: option.text,
         })),
         actionGroups: [],
+        featureContexts: [],
         badge: formatRuntimeCallStatus(runtimeCall),
         isRuntime: true,
       };
     }
 
     const currentTile = tiles.find((tile) => tile.id === member.currentTile);
-    const actionGroups = currentTile
+    const normalCallView = currentTile
       ? buildCallView({
           member,
           tile: currentTile,
           gameState,
-        }).groups
-      : [];
+        })
+      : null;
 
     return {
       scene: "通话画面 / 状态确认 / 当前坐标回传",
@@ -143,7 +147,8 @@ export function CallPage({
       ],
       meta: `地点：${currentLocation} / 行动：${memberActionView.actionTitle}`,
       actions: [],
-      actionGroups,
+      actionGroups: normalCallView?.groups ?? [],
+      featureContexts: normalCallView?.featureContexts ?? [],
       badge: "普通通话",
       isRuntime: false,
     };
@@ -271,6 +276,8 @@ export function CallPage({
             />
           ) : null}
 
+          {!callView.isRuntime && callView.featureContexts.length ? <FeatureContextPanel features={callView.featureContexts} /> : null}
+
           {callView.isRuntime ? (
             <div className="console-call-action-groups">
               <section className="console-call-action-group">
@@ -380,10 +387,46 @@ function renderActionButton(action: CallActionOption, callClosed: boolean, onDec
       disabled={disabled}
     >
       <span>{action.label}</span>
+      {action.target?.kind === "feature" ? (
+        <small className="choice-target-meta" aria-hidden="true">
+          {formatFeatureTargetMeta(action.target)}
+        </small>
+      ) : null}
       {action.hint ? <small>{action.hint}</small> : null}
-      {action.disabledReason ? <small>{action.disabledReason}</small> : null}
+      {action.disabledReason ? <small className="choice-disabled-reason">{action.disabledReason}</small> : null}
     </button>
   );
+}
+
+function FeatureContextPanel({ features }: { features: CallFeatureContextView[] }) {
+  return (
+    <section className="console-call-feature-context" aria-label="Feature 目标上下文">
+      <h3>Feature上下文</h3>
+      <div className="feature-context-list">
+        {features.map((feature) => (
+          <div key={feature.id} className={`feature-context-row ${feature.isActionTarget ? "feature-context-row-target" : ""}`}>
+            <strong>{feature.name}</strong>
+            <span>{formatFeatureContextStatus(feature)}</span>
+            <em>{feature.isActionTarget ? "可行动目标" : "仅上下文"}</em>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function formatFeatureTargetMeta(target: CallActionTargetView) {
+  const parts = [`目标：${target.name}`];
+  const status = target.statusLabel ?? target.status;
+  if (status) {
+    parts.push(`状态：${status}`);
+  }
+  return parts.join(" / ");
+}
+
+function formatFeatureContextStatus(feature: CallFeatureContextView) {
+  const status = feature.statusLabel ?? feature.status;
+  return status ? `状态：${status}` : "状态：未知";
 }
 
 function MoveConfirmPanel({

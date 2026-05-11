@@ -13,6 +13,24 @@ export interface CallActionGroup {
   actions: CallActionView[];
 }
 
+export interface CallActionTargetView {
+  kind: "feature" | "object";
+  id: string;
+  name: string;
+  status?: string;
+  statusLabel?: string;
+}
+
+export interface CallFeatureContextView {
+  kind: "feature";
+  id: string;
+  name: string;
+  priority: number;
+  isActionTarget: boolean;
+  status?: string;
+  statusLabel?: string;
+}
+
 export interface CallActionView {
   /** The unique action id from `ActionDef.id`. The dispatch layer parses this. */
   id: string;
@@ -22,6 +40,7 @@ export interface CallActionView {
   tone: ActionDef["tone"] | FeatureActionDefinition["tone"];
   objectId?: string;
   featureId?: string;
+  target?: CallActionTargetView;
   disabled?: boolean;
   disabledReason?: string;
 }
@@ -62,10 +81,15 @@ interface ActionCandidate {
  */
 export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
   groups: CallActionGroup[];
+  featureContexts: CallFeatureContextView[];
   runtimeCall?: RuntimeCall;
 } {
   const runtimeCall = findRuntimeCallForMember(member, gameState);
-  const candidates = collectCandidates(tile, gameState);
+  const investigatableFeatures = getInvestigatableFeatures(tile, gameState);
+  const topInvestigatableFeatures = selectTopInvestigatableFeatures(investigatableFeatures);
+  const topFeatureIds = new Set(topInvestigatableFeatures.map((feature) => feature.id));
+  const featureContexts = investigatableFeatures.map((feature) => toFeatureContextView(feature, gameState, topFeatureIds.has(feature.id)));
+  const candidates = collectCandidates(tile, gameState, topInvestigatableFeatures);
   const evaluated = candidates.flatMap((candidate) => {
     const context = buildCallActionContext({ member, tile, gameState, feature: candidate.feature });
     const view = evaluateCandidate(candidate, context, gameState, member);
@@ -89,7 +113,7 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
     featureViewsByFeatureId.set(candidate.feature.id, entry);
   }
 
-  for (const feature of getTopInvestigatableFeatures(tile, gameState)) {
+  for (const feature of topInvestigatableFeatures) {
     const entry = featureViewsByFeatureId.get(feature.id);
     if (!entry || entry.views.length === 0) {
       continue;
@@ -115,7 +139,7 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
     groups.push({ title: formatObjectGroupTitle(entry.object, gameState), actions: entry.views });
   }
 
-  return runtimeCall ? { groups, runtimeCall } : { groups };
+  return runtimeCall ? { groups, featureContexts, runtimeCall } : { groups, featureContexts };
 }
 
 function formatFeatureGroupTitle(feature: MapFeatureDefinition, gameState: GameState): string {
@@ -136,6 +160,10 @@ function formatObjectStatus(status: string | undefined): string {
       return "已损坏";
     case "repaired":
       return "正常";
+    case "available":
+      return "可调查";
+    case "investigated":
+      return "已调查";
     case "unsearched":
       return "未搜寻";
     default:
@@ -143,10 +171,14 @@ function formatObjectStatus(status: string | undefined): string {
   }
 }
 
-function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate[] {
+function collectCandidates(
+  tile: MapTile,
+  gameState: GameState,
+  topInvestigatableFeatures: readonly MapFeatureDefinition[],
+): ActionCandidate[] {
   const candidates: ActionCandidate[] = universalActions.map((action) => ({ action }));
 
-  for (const feature of getTopInvestigatableFeatures(tile, gameState)) {
+  for (const feature of topInvestigatableFeatures) {
     if (feature.investigatable !== true) {
       continue;
     }
@@ -194,21 +226,21 @@ function evaluateCandidate(
       ? getTimedRepairLockReason(gameState.crew_actions, member.id, feature?.id ?? object!.id)
       : undefined;
   if (repairLockReason) {
-    return toView(action, object, feature, {
+    return toView(action, object, feature, gameState, {
       disabled: true,
       disabledReason: repairLockReason,
     });
   }
 
   if (passed) {
-    return toView(action, object, feature, { disabled: false });
+    return toView(action, object, feature, gameState, { disabled: false });
   }
 
   if (action.display_when_unavailable !== "disabled") {
     return null;
   }
 
-  return toView(action, object, feature, {
+  return toView(action, object, feature, gameState, {
     disabled: true,
     disabledReason: generateHint(action as ActionDef, failed),
   });
@@ -218,6 +250,7 @@ function toView(
   action: ActionDef | FeatureActionDefinition,
   object: MapObjectDefinition | undefined,
   feature: MapFeatureDefinition | undefined,
+  gameState: GameState,
   options: { disabled: boolean; disabledReason?: string },
 ): CallActionView {
   const targetName = object?.name ?? feature?.name;
@@ -236,6 +269,10 @@ function toView(
   if (feature) {
     view.featureId = feature.id;
   }
+  const target = toActionTargetView(object, feature, gameState);
+  if (target) {
+    view.target = target;
+  }
   if (options.disabled) {
     view.disabled = true;
     if (options.disabledReason) {
@@ -245,9 +282,57 @@ function toView(
   return view;
 }
 
-function getTopInvestigatableFeatures(tile: MapTile, gameState: GameState): MapFeatureDefinition[] {
+function toActionTargetView(
+  object: MapObjectDefinition | undefined,
+  feature: MapFeatureDefinition | undefined,
+  gameState: GameState,
+): CallActionTargetView | undefined {
+  if (feature) {
+    const status = getFeatureRuntimeStatus(gameState.map, feature);
+    const statusLabel = formatObjectStatus(status);
+    return {
+      kind: "feature",
+      id: feature.id,
+      name: feature.name,
+      ...(status === undefined ? {} : { status }),
+      ...(statusLabel ? { statusLabel } : {}),
+    };
+  }
+  if (object) {
+    const status = gameState.map.mapObjects?.[object.id]?.status_enum ?? object.initial_status;
+    const statusLabel = formatObjectStatus(status);
+    return {
+      kind: "object",
+      id: object.id,
+      name: object.name,
+      ...(status === undefined ? {} : { status }),
+      ...(statusLabel ? { statusLabel } : {}),
+    };
+  }
+  return undefined;
+}
+
+function toFeatureContextView(
+  feature: MapFeatureDefinition,
+  gameState: GameState,
+  isActionTarget: boolean,
+): CallFeatureContextView {
+  const status = getFeatureRuntimeStatus(gameState.map, feature);
+  const statusLabel = formatObjectStatus(status);
+  return {
+    kind: "feature",
+    id: feature.id,
+    name: feature.name,
+    priority: feature.priority,
+    isActionTarget,
+    ...(status === undefined ? {} : { status }),
+    ...(statusLabel ? { statusLabel } : {}),
+  };
+}
+
+function getInvestigatableFeatures(tile: MapTile, gameState: GameState): MapFeatureDefinition[] {
   const index = buildFeatureTileIndex(defaultMapConfig);
-  return selectTopInvestigatableFeatures(getInvestigatableFeaturesAtTile(defaultMapConfig, index, gameState.map, tile.id));
+  return getInvestigatableFeaturesAtTile(defaultMapConfig, index, gameState.map, tile.id);
 }
 
 function getRevealedObjectIds(tile: MapTile, gameState: GameState): string[] {

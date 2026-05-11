@@ -36,7 +36,7 @@ source:
 | 10 | TASK-010 | 实现 Feature survey 结算与去重 | completed | 1 |
 | 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | completed | 1 |
 | 12 | TASK-012 | MapPage 展示 Feature 命中结果 | completed | 1 |
-| 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | pending | 0 |
+| 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | completed | 1 |
 | 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | pending | 0 |
 | 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | pending | 0 |
 | 16 | TASK-016 | Editor Feature list 与 inspector | pending | 0 |
@@ -205,6 +205,20 @@ source:
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 48 files / 385 tests
 - 备注: 本任务未单独做浏览器视觉验证；后续 UI 任务完成后统一抽查 MapPage readout。
+
+### TASK-013: CallPage 展示 Feature 目标文案与按钮
+- 状态: completed
+- 开始时间: 2026-05-12 02:35
+- 完成时间: 2026-05-12 03:00
+- 尝试次数: 1
+- developer summary:
+  - 扩展 `buildCallView`，输出 Feature action target meta 与低优先级 Feature context。
+  - CallPage 渲染 Feature 名称、状态、禁用原因，并显示低优先级 Feature 作为上下文。
+  - 移动确认保持使用 selected tile 的位置/地形目标，不显示目标 tile 上的 Feature id/name。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 389 tests
+- 备注: 本任务未单独做浏览器视觉验证；后续 UI 任务完成后统一抽查 CallPage。
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed
