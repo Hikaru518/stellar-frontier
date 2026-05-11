@@ -1,11 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { buildCallView } from "./callActions";
-import { defaultMapConfig, questDefinitions } from "./content/contentData";
+import { defaultMapConfig, questDefinitions, type MapFeatureDefinition } from "./content/contentData";
 import { universalActions } from "./content/mapObjects";
 import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gameData";
 import type { RuntimeCall } from "./events/types";
 import { createInitialQuestState } from "./questSystem";
+
+const originalMapFeatures = [...defaultMapConfig.features];
+
+afterEach(() => {
+  defaultMapConfig.features = originalMapFeatures;
+});
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {
@@ -211,7 +217,104 @@ describe("buildCallView", () => {
       }
     }
   });
+
+  it("generates only one feature investigation action for the single top-priority candidate", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({ id: "test_top_feature", name: "高优先级目标", priority: 20 }),
+      createInvestigatableFeature({ id: "test_low_feature", name: "低优先级目标", priority: 10 }),
+    ]);
+
+    const view = buildCallView({ member: createMember(), tile: createTile("1-1"), gameState: createGameState() });
+    const featureActions = featureActionViews(view);
+
+    expect(featureActions).toEqual([
+      expect.objectContaining({
+        id: "test_top_feature:investigate",
+        label: "调查高优先级目标",
+        featureId: "test_top_feature",
+      }),
+    ]);
+  });
+
+  it("generates distinguishable feature investigation actions for tied top-priority candidates", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({ id: "test_alpha_feature", name: "Alpha 目标", priority: 20 }),
+      createInvestigatableFeature({ id: "test_zeta_feature", name: "Zeta 目标", priority: 20 }),
+      createInvestigatableFeature({ id: "test_low_feature", name: "低优先级目标", priority: 10 }),
+    ]);
+
+    const view = buildCallView({ member: createMember(), tile: createTile("1-1"), gameState: createGameState() });
+
+    expect(featureActionViews(view)).toEqual([
+      expect.objectContaining({ id: "test_alpha_feature:investigate", featureId: "test_alpha_feature" }),
+      expect.objectContaining({ id: "test_zeta_feature:investigate", featureId: "test_zeta_feature" }),
+    ]);
+  });
+
+  it("does not generate feature investigation actions when every feature at the tile is hidden", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({
+        id: "test_hidden_high_feature",
+        name: "隐藏高优先级目标",
+        priority: 30,
+        visibility: "hidden",
+      }),
+      createInvestigatableFeature({
+        id: "test_hidden_low_feature",
+        name: "隐藏低优先级目标",
+        priority: 10,
+        visibility: "hidden",
+      }),
+    ]);
+
+    const view = buildCallView({ member: createMember(), tile: createTile("1-1"), gameState: createGameState() });
+
+    expect(featureActionViews(view)).toEqual([]);
+    expect(view.groups.map((group) => group.title)).toEqual(["基础行动"]);
+  });
 });
+
+function setFeatureFixtures(features: MapFeatureDefinition[]): void {
+  defaultMapConfig.features = [...originalMapFeatures, ...features];
+}
+
+function createInvestigatableFeature({
+  id,
+  name,
+  priority,
+  visibility = "always",
+}: {
+  id: string;
+  name: string;
+  priority: number;
+  visibility?: MapFeatureDefinition["visibility"];
+}): MapFeatureDefinition {
+  return {
+    id,
+    name,
+    kind: "test:feature",
+    priority,
+    visibility,
+    footprint: { type: "row_spans", spans: [{ row: 1, colStart: 1, colEnd: 1 }] },
+    investigatable: true,
+    status_options: ["available"],
+    initial_status: "available",
+    actions: [
+      {
+        id: `${id}:investigate`,
+        category: "feature",
+        label: "调查{featureName}",
+        tone: "neutral",
+        conditions: [],
+        event_id: `${id}:event`,
+      },
+    ],
+  };
+}
+
+function featureActionViews(view: ReturnType<typeof buildCallView>) {
+  return view.groups.flatMap((group) => group.actions).filter((action) => action.featureId);
+}
 
 function createFeatureState(status: "damaged" | "repaired", { member }: { member: CrewMember }): GameState {
   const tile = createTile("129-129");

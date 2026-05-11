@@ -5,7 +5,7 @@ import { generateHint } from "./conditions/hintTemplates";
 import { evaluateCondition } from "./events/conditions";
 import type { Condition, CrewActionState, RuntimeCall } from "./events/types";
 import type { CrewMember, GameState, MapTile } from "./data/gameData";
-import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile } from "./mapFeatureSystem";
+import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
 import { getFeatureRuntimeStatus } from "./mapSystem";
 
 export interface CallActionGroup {
@@ -45,8 +45,9 @@ interface ActionCandidate {
  *
  * The pipeline (see `docs/plans/2026-04-29-01-40/technical-design.md` §4):
  *
- * 1. Collect candidates: every universal action, visible Feature inline action,
- *    plus revealed object actions that already point at structured event content.
+ * 1. Collect candidates: every universal action, top-priority visible Feature
+ *    inline action, plus revealed object actions that already point at
+ *    structured event content.
  * 2. Build a single `ConditionEvaluationContext` via `buildCallActionContext`.
  * 3. Evaluate each candidate's `conditions[]`. The decision matrix:
  *    - all pass               → visible + enabled.
@@ -88,7 +89,7 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
     featureViewsByFeatureId.set(candidate.feature.id, entry);
   }
 
-  for (const feature of getVisibleInvestigatableFeatures(tile, gameState)) {
+  for (const feature of getTopInvestigatableFeatures(tile, gameState)) {
     const entry = featureViewsByFeatureId.get(feature.id);
     if (!entry || entry.views.length === 0) {
       continue;
@@ -145,7 +146,7 @@ function formatObjectStatus(status: string | undefined): string {
 function collectCandidates(tile: MapTile, gameState: GameState): ActionCandidate[] {
   const candidates: ActionCandidate[] = universalActions.map((action) => ({ action }));
 
-  for (const feature of getVisibleInvestigatableFeatures(tile, gameState)) {
+  for (const feature of getTopInvestigatableFeatures(tile, gameState)) {
     if (feature.investigatable !== true) {
       continue;
     }
@@ -244,9 +245,9 @@ function toView(
   return view;
 }
 
-function getVisibleInvestigatableFeatures(tile: MapTile, gameState: GameState): MapFeatureDefinition[] {
+function getTopInvestigatableFeatures(tile: MapTile, gameState: GameState): MapFeatureDefinition[] {
   const index = buildFeatureTileIndex(defaultMapConfig);
-  return getInvestigatableFeaturesAtTile(defaultMapConfig, index, gameState.map, tile.id);
+  return selectTopInvestigatableFeatures(getInvestigatableFeaturesAtTile(defaultMapConfig, index, gameState.map, tile.id));
 }
 
 function getRevealedObjectIds(tile: MapTile, gameState: GameState): string[] {

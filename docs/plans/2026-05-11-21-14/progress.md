@@ -32,7 +32,7 @@ source:
 | 6 | TASK-006 | 定义 Feature event schema、types 与 handler registry | completed | 2 |
 | 7 | TASK-007 | 实现 Feature condition/effect runtime | completed | 1 |
 | 8 | TASK-008 | 让 call action 上下文支持 Feature 状态 | completed | 1 |
-| 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | pending | 0 |
+| 9 | TASK-009 | 生成最高优先级 Feature 调查候选 | completed | 1 |
 | 10 | TASK-010 | 实现 Feature survey 结算与去重 | pending | 0 |
 | 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | pending | 0 |
 | 12 | TASK-012 | MapPage 展示 Feature 命中结果 | pending | 0 |
@@ -150,6 +150,18 @@ source:
 - 质量检查:
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 48 files / 373 tests
+
+### TASK-009: 生成最高优先级 Feature 调查候选
+- 状态: completed
+- 开始时间: 2026-05-12 01:28
+- 完成时间: 2026-05-12 01:41
+- 尝试次数: 1
+- developer summary:
+  - `buildCallView` 的 Feature 候选改为只收集当前 tile 上最高 priority 的可见可调查 Feature。
+  - 增加 focused tests 覆盖单一最高优先级、并列最高优先级、低优先级过滤、全部不可见不生成 Feature action。
+- 质量检查:
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 376 tests
 
 ### TASK-004: 为默认地图 seed 初始 Feature 内容
 - 状态: completed
