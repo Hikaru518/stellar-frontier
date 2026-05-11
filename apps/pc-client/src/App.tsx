@@ -1763,6 +1763,11 @@ function findLocationStoryActionSelection(
   crewId: CrewId,
   actionId: string,
 ): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
+  const featureSelection = findFeatureLocationActionSelection(state, crewId, actionId);
+  if (featureSelection) {
+    return featureSelection;
+  }
+
   const member = state.crew.find((item) => item.id === crewId);
   const tile = member ? createRuntimeTileView(state, member.currentTile) : undefined;
   if (!member || !tile) {
@@ -1997,9 +2002,10 @@ function triggerLocationStoryAction(
 
 function createLocationStoryActionTriggerContext(
   state: GameState,
-  { member, object, action }: LocationStoryActionSelection,
+  { member, object, feature, action }: LocationStoryActionSelection,
 ): TriggerContext {
   const objectTags = object?.tags ?? [];
+  const featureTags = feature?.tags ?? [];
   return {
     trigger_type: "action_complete",
     occurred_at: state.elapsedGameSeconds,
@@ -2012,7 +2018,14 @@ function createLocationStoryActionTriggerContext(
       action_type: actionVerb(action.id),
       action_def_id: action.id,
       object_id: object?.id ?? null,
-      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), objectTags),
+      ...(feature
+        ? {
+            feature_id: feature.id,
+            feature_kind: feature.kind,
+            feature_tags: featureTags,
+          }
+        : {}),
+      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), objectTags, featureTags),
     },
   };
 }

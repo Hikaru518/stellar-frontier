@@ -37,7 +37,7 @@ source:
 | 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | completed | 1 |
 | 12 | TASK-012 | MapPage 展示 Feature 命中结果 | completed | 1 |
 | 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | completed | 1 |
-| 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | pending | 0 |
+| 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | in_progress | 1 |
 | 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | pending | 0 |
 | 16 | TASK-016 | Editor Feature list 与 inspector | pending | 0 |
 | 17 | TASK-017 | Editor footprint brush 与重叠预览 | pending | 0 |
@@ -88,6 +88,20 @@ source:
   - 扩展 `maps.schema.json`，支持 optional `features`、`row_spans` footprint、priority、visibility、custom kind、investigatable/status/actions。
   - 扩展 `validate-content`，校验 Feature id 唯一性、span 非空/边界/重叠/四方向连续、initial_status、非 investigatable 字段限制。
   - 增加 validator 集成测试，覆盖合法 features 和拒绝场景。
+- 质量检查:
+  - `npm run validate:content`: passed
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 46 files / 359 tests
+
+### TASK-004: 为默认地图 seed 初始 Feature 内容
+- 状态: completed
+- 开始时间: 2026-05-11 23:42
+- 完成时间: 2026-05-11 23:56
+- 尝试次数: 1
+- developer summary:
+  - 为 `default-map.json` 添加 6 个初始 Feature：IAFS 坠毁点、南侧通道、发电机、维生装置、穿梭机核心、散落物资。
+  - 保留 legacy `tile.areaName/objectIds`，未修改 runtime、事件、schema 或 validator。
+  - 增加默认地图 Feature 内容契约测试。
 - 质量检查:
   - `npm run validate:content`: passed
   - `apps/pc-client` lint: passed
@@ -220,16 +234,20 @@ source:
   - `apps/pc-client` test: passed, 48 files / 389 tests
 - 备注: 本任务未单独做浏览器视觉验证；后续 UI 任务完成后统一抽查 CallPage。
 
-### TASK-004: 为默认地图 seed 初始 Feature 内容
+### TASK-014: 迁移 IAFS 事件和 action 内容到 feature_id
 - 状态: completed
-- 开始时间: 2026-05-11 23:42
-- 完成时间: 2026-05-11 23:56
+- 开始时间: 2026-05-12 03:01
+- 完成时间: 2026-05-12 03:21
 - 尝试次数: 1
+- 尝试记录:
+  - 尝试 1: 子 agent 写入实现后未正常返回；父层关闭该 agent，复核 diff 并完成质量检查。
 - developer summary:
-  - 为 `default-map.json` 添加 6 个初始 Feature：IAFS 坠毁点、南侧通道、发电机、维生装置、穿梭机核心、散落物资。
-  - 保留 legacy `tile.areaName/objectIds`，未修改 runtime、事件、schema 或 validator。
-  - 增加默认地图 Feature 内容契约测试。
+  - IAFS 默认地图的 repair/search authored actions 改为 `feature_status_equals` / `set_feature_status`。
+  - IAFS 事件定义的 reveal、inspect、repair callback、supplies search 触发条件改为 `feature_id` / Feature runtime state。
+  - 默认 crash-site 和 scattered-supplies tile 不再通过 `objectIds` 承载 gameplay 对象，旧 map-object 定义保留兼容路径。
+  - App location-story trigger payload 为 Feature action 写入 `feature_id` / `feature_kind` / `feature_tags`，并保留 legacy `object_id: null`。
+  - 补充内容基线、事件引擎、App、call action 集成测试。
 - 质量检查:
   - `npm run validate:content`: passed
   - `apps/pc-client` lint: passed
-  - `apps/pc-client` test: passed, 46 files / 359 tests
+  - `apps/pc-client` test: passed, 48 files / 392 tests

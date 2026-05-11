@@ -96,7 +96,7 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("places the three IAFS crash-site objects on tile 129-129 and encloses the larger start zone with mountains", () => {
+  it("leaves IAFS crash-site tile object ids empty and encloses the larger start zone with mountains", () => {
     const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "129-129");
     const ringTileIds = [
       "127-128",
@@ -115,7 +115,8 @@ describe("mapObjects content", () => {
       "132-130",
     ];
 
-    expect(crashTile?.objectIds).toEqual(crashSiteObjectIds);
+    expect(crashTile?.objectIds).toEqual([]);
+    expect(defaultMapJson.features?.map((feature) => feature.id)).toEqual(expect.arrayContaining([...crashSiteObjectIds]));
 
     for (const tileId of ringTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);

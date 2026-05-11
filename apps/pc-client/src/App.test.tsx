@@ -502,8 +502,8 @@ describe("App", () => {
     expect(saved?.active_calls).toEqual({});
   });
 
-  it("investigating a damaged crash-site object creates a runtime event call", () => {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+  it("investigating a damaged crash-site feature creates a runtime event call", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createFeatureRepairCrashSiteState()));
 
     render(<App />);
 
@@ -515,17 +515,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
   });
 
-  it("investigating a repaired crash-site object creates a repaired-state runtime event call", () => {
+  it("investigating a repaired crash-site feature creates a repaired-state runtime event call", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(
-        createSavedCrashSiteState({
+        createFeatureRepairCrashSiteState({
           map: {
-            ...(createSavedCrashSiteState().map as Record<string, unknown>),
-            mapObjects: {
-              iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
-              iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-              iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+            ...(createFeatureRepairCrashSiteState().map as Record<string, unknown>),
+            featuresById: {
+              iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
+              iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
             },
           },
         }),
@@ -542,7 +542,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
   });
 
-  it("reveals hidden crash-site objects only after surveying the crash site event", () => {
+  it("reveals hidden crash-site features only after surveying the crash site event", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -556,6 +556,11 @@ describe("App", () => {
                 investigated: true,
                 revealedObjectIds: [],
               },
+            },
+            featuresById: {
+              iafs_generator: { id: "iafs_generator", status: "damaged", revealed: false },
+              iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: false },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: false },
             },
           },
         }),
@@ -579,10 +584,10 @@ describe("App", () => {
 
     const saved = readSavedState();
     expect(saved?.map).toMatchObject({
-      tilesById: {
-        "129-129": {
-          revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
-        },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
       },
     });
   }, 15_000);
@@ -612,7 +617,7 @@ describe("App", () => {
         payload: {
           action_type: "inspect",
           action_def_id: "iafs_generator:inspect",
-          object_id: "iafs_generator",
+          feature_id: "iafs_generator",
           tags: ["iafs", "crash_site", "repair_target", "power_system"],
         },
       },
