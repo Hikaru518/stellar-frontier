@@ -105,6 +105,7 @@ export function validateMapEditorMap(data, { mapObjects = [] } = {}) {
   if (hasValidSize) {
     validateCoverage({ rows, cols, tileById, tileCount: tiles.length, issues });
   }
+  validateMapFeatures(data.features, { rows, cols, hasValidSize, issues });
   validateRadar(data.radar, { rows, cols, issues });
 
   return toResult(issues);
@@ -167,6 +168,205 @@ function validateCoverage({ rows, cols, tileById, tileCount, issues }) {
   }
 }
 
+function validateMapFeatures(featuresValue, { rows, cols, hasValidSize, issues }) {
+  if (featuresValue === undefined) {
+    return;
+  }
+
+  if (!Array.isArray(featuresValue)) {
+    pushIssue(issues, {
+      code: "features_not_array",
+      message: "Map features must be an array.",
+      path: "/features",
+      target: { kind: "map", field: "features" },
+    });
+    return;
+  }
+
+  const featureIds = new Set();
+  for (const [featureIndex, feature] of featuresValue.entries()) {
+    const featurePath = `/features/${featureIndex}`;
+    if (!feature || typeof feature !== "object" || Array.isArray(feature)) {
+      pushIssue(issues, {
+        code: "feature_not_object",
+        message: "Map feature must be an object.",
+        path: featurePath,
+        target: { kind: "feature" },
+      });
+      continue;
+    }
+
+    const featureId = typeof feature.id === "string" && feature.id.length > 0 ? feature.id : `<index:${featureIndex}>`;
+    if (typeof feature.id === "string") {
+      if (featureIds.has(feature.id)) {
+        pushFeatureIssue(issues, {
+          code: "duplicate_feature_id",
+          message: `Duplicate map feature id: ${feature.id}.`,
+          path: `${featurePath}/id`,
+          featureId,
+          field: "id",
+        });
+      } else {
+        featureIds.add(feature.id);
+      }
+    }
+
+    validateFeatureFootprint(feature.footprint, {
+      rows,
+      cols,
+      hasValidSize,
+      issues,
+      featurePath,
+      featureId,
+    });
+  }
+}
+
+function validateFeatureFootprint(footprint, { rows, cols, hasValidSize, issues, featurePath, featureId }) {
+  if (!footprint || typeof footprint !== "object" || Array.isArray(footprint) || footprint.type !== "row_spans") {
+    pushFeatureIssue(issues, {
+      code: "unsupported_feature_footprint",
+      message: "Map feature footprint must use row_spans.",
+      path: `${featurePath}/footprint`,
+      featureId,
+      field: "footprint",
+    });
+    return;
+  }
+
+  if (!Array.isArray(footprint.spans) || footprint.spans.length === 0) {
+    pushFeatureIssue(issues, {
+      code: "feature_footprint_empty",
+      message: "Map feature footprint spans must not be empty.",
+      path: `${featurePath}/footprint/spans`,
+      featureId,
+      field: "footprint.spans",
+    });
+    return;
+  }
+
+  const coveredTileIds = new Set();
+  for (const [spanIndex, span] of footprint.spans.entries()) {
+    const field = `footprint.spans[${spanIndex}]`;
+    const path = `${featurePath}/footprint/spans/${spanIndex}`;
+    if (!span || typeof span !== "object" || Array.isArray(span)) {
+      pushFeatureIssue(issues, {
+        code: "feature_span_not_object",
+        message: "Map feature row span must be an object.",
+        path,
+        featureId,
+        field,
+      });
+      continue;
+    }
+
+    const { row, colStart, colEnd } = span;
+    if (!Number.isInteger(row) || !Number.isInteger(colStart) || !Number.isInteger(colEnd)) {
+      pushFeatureIssue(issues, {
+        code: "feature_span_invalid_coordinates",
+        message: "Map feature row span coordinates must be integers.",
+        path,
+        featureId,
+        field,
+      });
+      continue;
+    }
+
+    let spanHasError = false;
+    if (colStart > colEnd) {
+      spanHasError = true;
+      pushFeatureIssue(issues, {
+        code: "feature_span_invalid_range",
+        message: "Map feature row span colStart must be <= colEnd.",
+        path,
+        featureId,
+        field,
+      });
+    }
+
+    if (hasValidSize && (!isInsideMapCoordinate({ rows, cols }, row, colStart) || !isInsideMapCoordinate({ rows, cols }, row, colEnd))) {
+      spanHasError = true;
+      pushFeatureIssue(issues, {
+        code: "feature_span_out_of_bounds",
+        message: `Map feature row span is outside ${rows} x ${cols}.`,
+        path,
+        featureId,
+        field,
+      });
+    }
+
+    if (spanHasError) {
+      continue;
+    }
+
+    let overlapsPreviousSpan = false;
+    for (let col = colStart; col <= colEnd; col += 1) {
+      if (coveredTileIds.has(`${row}-${col}`)) {
+        overlapsPreviousSpan = true;
+        break;
+      }
+    }
+
+    if (overlapsPreviousSpan) {
+      pushFeatureIssue(issues, {
+        code: "feature_span_overlap",
+        message: "Map feature row span overlaps another span in the same feature.",
+        path,
+        featureId,
+        field,
+      });
+    }
+
+    for (let col = colStart; col <= colEnd; col += 1) {
+      coveredTileIds.add(`${row}-${col}`);
+    }
+  }
+
+  if (coveredTileIds.size > 0) {
+    validateFeatureFootprintContiguous(coveredTileIds, { issues, featurePath, featureId });
+  }
+}
+
+function validateFeatureFootprintContiguous(coveredTileIds, { issues, featurePath, featureId }) {
+  const firstTileId = coveredTileIds.values().next().value;
+  if (typeof firstTileId !== "string") {
+    return;
+  }
+
+  const visited = new Set([firstTileId]);
+  const stack = [firstTileId];
+  while (stack.length > 0) {
+    const tileId = stack.pop();
+    const coord = parseTileCoord(tileId);
+    if (!coord) {
+      continue;
+    }
+
+    for (const neighbor of [
+      `${coord.row - 1}-${coord.col}`,
+      `${coord.row + 1}-${coord.col}`,
+      `${coord.row}-${coord.col - 1}`,
+      `${coord.row}-${coord.col + 1}`,
+    ]) {
+      if (!coveredTileIds.has(neighbor) || visited.has(neighbor)) {
+        continue;
+      }
+      visited.add(neighbor);
+      stack.push(neighbor);
+    }
+  }
+
+  if (visited.size !== coveredTileIds.size) {
+    pushFeatureIssue(issues, {
+      code: "feature_footprint_not_contiguous",
+      message: "Map feature footprint must be four-direction contiguous.",
+      path: `${featurePath}/footprint/spans`,
+      featureId,
+      field: "footprint.spans",
+    });
+  }
+}
+
 function validateRadar(radar, { rows, cols, issues }) {
   if (!radar || typeof radar !== "object" || Array.isArray(radar)) {
     pushIssue(issues, {
@@ -225,6 +425,28 @@ function validateRadarRows(value, { rows, cols, field, issues }) {
         target: { kind: "radar", field },
       });
     }
+  });
+}
+
+function parseTileCoord(tileId) {
+  const match = /^(\d+)-(\d+)$/.exec(tileId);
+  if (!match) {
+    return null;
+  }
+
+  return { row: Number(match[1]), col: Number(match[2]) };
+}
+
+function isInsideMapCoordinate({ rows, cols }, row, col) {
+  return row >= 1 && row <= rows && col >= 1 && col <= cols;
+}
+
+function pushFeatureIssue(issues, { code, message, path, featureId, field }) {
+  pushIssue(issues, {
+    code,
+    message,
+    path,
+    target: { kind: "feature", featureId, field },
   });
 }
 

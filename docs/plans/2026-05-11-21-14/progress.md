@@ -37,8 +37,8 @@ source:
 | 11 | TASK-011 | 迁移 Feature local timed action / repair 结算 | completed | 1 |
 | 12 | TASK-012 | MapPage 展示 Feature 命中结果 | completed | 1 |
 | 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | completed | 1 |
-| 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | in_progress | 1 |
-| 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | pending | 0 |
+| 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | completed | 1 |
+| 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | completed | 1 |
 | 16 | TASK-016 | Editor Feature list 与 inspector | pending | 0 |
 | 17 | TASK-017 | Editor footprint brush 与重叠预览 | pending | 0 |
 | 18 | TASK-018 | 移除 legacy tile area/object gameplay source | pending | 0 |
@@ -251,3 +251,18 @@ source:
   - `npm run validate:content`: passed
   - `apps/pc-client` lint: passed
   - `apps/pc-client` test: passed, 48 files / 392 tests
+
+### TASK-015: Editor helper、types 与 validation 支持 Feature
+- 状态: completed
+- 开始时间: 2026-05-12 03:22
+- 完成时间: 2026-05-12 03:35
+- 尝试次数: 1
+- developer summary:
+  - Editor map draft 类型新增轻量 `MapFeatureDefinition` / `FeatureFootprint`，`createMapEditorDraft` 与 `normalizeMapEditorDraft` 统一提供 `features: []`。
+  - helper load 旧地图时补齐 `features: []`，已有 `features` 原样保留；helper save 测试覆盖 `features` 写回 map JSON。
+  - helper validation 新增 Feature id、row_spans 边界、重叠和四方向连续性校验，Feature issue target 使用 `kind: "feature"`。
+  - 修复前序 Feature effect metadata 测试中的 TypeScript lint 问题，保证 editor lint 可通过。
+- 质量检查:
+  - `npm run validate:content`: passed
+  - `apps/editor` lint: passed
+  - `npm run editor:test`: passed, 44 files / 234 tests

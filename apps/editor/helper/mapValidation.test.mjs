@@ -78,59 +78,60 @@ describe("mapValidation", () => {
     expect(result.valid).toBe(false);
     expect(errorCodes(result)).toContain("invalid_radar_glyphRows_row");
   });
+
+  it("rejects duplicate feature ids, out-of-bounds spans, and non-contiguous footprints", () => {
+    const draft = {
+      ...baseMap({ rows: 2, cols: 3 }),
+      features: [
+        feature("duplicate_feature", [{ row: 1, colStart: 1, colEnd: 1 }]),
+        feature("duplicate_feature", [{ row: 1, colStart: 2, colEnd: 2 }]),
+        feature("outside_feature", [{ row: 3, colStart: 1, colEnd: 1 }]),
+        feature("split_feature", [
+          { row: 1, colStart: 1, colEnd: 1 },
+          { row: 2, colStart: 3, colEnd: 3 },
+        ]),
+      ],
+    };
+
+    const result = validateMapEditorMap(draft, { mapObjects });
+
+    expect(result.valid).toBe(false);
+    expect(errorCodes(result)).toEqual(
+      expect.arrayContaining([
+        "duplicate_feature_id",
+        "feature_span_out_of_bounds",
+        "feature_footprint_not_contiguous",
+      ]),
+    );
+    for (const code of ["duplicate_feature_id", "feature_span_out_of_bounds", "feature_footprint_not_contiguous"]) {
+      expect(result.errors.find((error) => error.code === code)?.target?.kind).toBe("feature");
+    }
+  });
 });
 
 function errorCodes(result) {
   return result.errors.map((error) => error.code);
 }
 
-function baseMap() {
+function baseMap({ rows = 1, cols = 2 } = {}) {
   return {
     id: "test-map",
     name: "Test Map",
     version: 3,
-    size: { rows: 1, cols: 2 },
+    size: { rows, cols },
     originTileId: "1-1",
     initialDiscoveredTileIds: ["1-1"],
     radarPath: "content/maps/radar/test-map-radar.json",
-    tiles: [
-      {
-        id: "1-1",
-        row: 1,
-        col: 1,
-        areaName: "Area 1-1",
-        terrain: "平原",
-        weather: "晴朗",
-        environment: {
-          temperatureCelsius: 20,
-          humidityPercent: 40,
-          magneticFieldMicroTesla: 50,
-          radiationLevel: "none",
-        },
-        objectIds: ["known-object"],
-        specialStates: [],
-      },
-      {
-        id: "1-2",
-        row: 1,
-        col: 2,
-        areaName: "Area 1-2",
-        terrain: "平原",
-        weather: "晴朗",
-        environment: {
-          temperatureCelsius: 20,
-          humidityPercent: 40,
-          magneticFieldMicroTesla: 50,
-          radiationLevel: "none",
-        },
-        objectIds: [],
-        specialStates: [],
-      },
-    ],
+    features: [],
+    tiles: Array.from({ length: rows * cols }, (_, index) => {
+      const row = Math.floor(index / cols) + 1;
+      const col = (index % cols) + 1;
+      return tile(row, col, row === 1 && col === 1 ? ["known-object"] : []);
+    }),
     radar: {
-      world: { width: 2, height: 1, origin: { x: 0, y: 0 } },
-      glyphRows: [".."],
-      toneRows: ["gg"],
+      world: { width: cols, height: rows, origin: { x: 0, y: 0 } },
+      glyphRows: Array.from({ length: rows }, () => ".".repeat(cols)),
+      toneRows: Array.from({ length: rows }, () => "g".repeat(cols)),
       palette: { g: "#9bbf74" },
       symbols: {
         crew: { glyph: "@", tone: "g" },
@@ -145,6 +146,39 @@ function baseMap() {
         emptyLine: "empty",
       },
       regions: [],
+    },
+  };
+}
+
+function tile(row, col, objectIds) {
+  return {
+    id: `${row}-${col}`,
+    row,
+    col,
+    areaName: `Area ${row}-${col}`,
+    terrain: "平原",
+    weather: "晴朗",
+    environment: {
+      temperatureCelsius: 20,
+      humidityPercent: 40,
+      magneticFieldMicroTesla: 50,
+      radiationLevel: "none",
+    },
+    objectIds,
+    specialStates: [],
+  };
+}
+
+function feature(id, spans) {
+  return {
+    id,
+    name: id,
+    kind: "site:test",
+    priority: 10,
+    visibility: "onDiscovered",
+    footprint: {
+      type: "row_spans",
+      spans,
     },
   };
 }

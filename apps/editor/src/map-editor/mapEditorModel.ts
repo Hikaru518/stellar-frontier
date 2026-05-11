@@ -27,6 +27,7 @@ export function createMapEditorDraft(input: CreateMapDraftInput): MapEditorDraft
     initialDiscoveredTileIds: [originTileId],
     radarPath,
     tiles: createGameplayTiles(rows, cols),
+    features: [],
     radar: createDefaultRadar(rows, cols, originTileId, radarPath),
   };
 }
@@ -49,6 +50,7 @@ export function normalizeMapEditorDraft(draft: MapEditorDraft): MapEditorDraft {
   return {
     ...draft,
     radarPath,
+    features: Array.isArray(draft.features) ? draft.features : [],
     radar: normalizeRadar(draft.radar, rows, cols, draft.originTileId, radarPath),
   };
 }

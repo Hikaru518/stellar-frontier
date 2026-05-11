@@ -36,6 +36,46 @@ export interface MapTileDefinition {
   specialStates: MapSpecialStateDefinition[];
 }
 
+export type MapFeatureVisibility = "always" | MapVisibility;
+
+export interface FeatureRowSpan {
+  row: number;
+  colStart: number;
+  colEnd: number;
+}
+
+export interface FeatureFootprint {
+  type: "row_spans";
+  spans: FeatureRowSpan[];
+}
+
+export interface FeatureActionDefinition {
+  id: string;
+  category: "feature";
+  label: string;
+  tone?: string;
+  conditions: unknown[];
+  event_id?: string;
+  display_when_unavailable?: "disabled";
+  unavailable_hint?: string;
+  local_action?: unknown;
+}
+
+export interface MapFeatureDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  kind: string;
+  priority: number;
+  tags?: string[];
+  visibility: MapFeatureVisibility;
+  footprint: FeatureFootprint;
+  investigatable?: boolean;
+  status_options?: string[];
+  initial_status?: string;
+  actions?: FeatureActionDefinition[];
+}
+
 export interface RadarWorldDefinition {
   width: number;
   height: number;
@@ -97,6 +137,7 @@ export interface MapEditorDraft {
   initialDiscoveredTileIds: string[];
   radarPath: string;
   tiles: MapTileDefinition[];
+  features: MapFeatureDefinition[];
   radar: RadarDefinition;
 }
 

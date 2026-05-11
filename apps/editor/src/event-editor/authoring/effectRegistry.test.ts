@@ -233,13 +233,13 @@ function createFeatureEffect(type: EffectType, params: Record<string, unknown>) 
   };
 }
 
-function expectValid(label: string, valid: boolean | undefined, errors: unknown): void {
-  if (!valid) {
+function expectValid(label: string, valid: unknown, errors: unknown): void {
+  if (valid !== true) {
     throw new Error(`${label} should be valid. Errors: ${JSON.stringify(errors)}`);
   }
 }
 
-function expectInvalid(label: string, valid: boolean | undefined): void {
+function expectInvalid(label: string, valid: unknown): void {
   if (valid !== false) {
     throw new Error(`${label} should be invalid.`);
   }
@@ -253,7 +253,7 @@ function resolveJsonPointer(root: unknown, pointer: string): unknown {
   return pointer
     .slice(2)
     .split("/")
-    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"))
+    .map((segment) => segment.replace(/~1/g, "/").replace(/~0/g, "~"))
     .reduce<unknown>((value, segment) => {
       if (!isRecord(value) || !(segment in value)) {
         throw new Error(`Unresolved JSON pointer ${pointer}`);

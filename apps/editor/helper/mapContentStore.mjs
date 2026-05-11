@@ -38,6 +38,7 @@ async function loadMaps(guard) {
     const radarContent = await readJson(guard, radarPath);
     const data = {
       ...sourceData,
+      features: Array.isArray(sourceData.features) ? sourceData.features : [],
       radar: stripRadarMetadata(radarContent),
     };
     maps.push({
