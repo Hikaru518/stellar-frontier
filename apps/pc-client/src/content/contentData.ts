@@ -175,22 +175,54 @@ export interface MapSpecialStateDefinition {
   durationGameSeconds?: number;
 }
 
-export interface MapVisualCellDefinition {
-  tilesetId: string;
-  tileIndex: number;
+export type RadarToneKey = "g" | "d" | "c" | "a" | "w" | "s" | "r" | string;
+
+export interface RadarWorldDefinition {
+  width: number;
+  height: number;
+  origin: {
+    x: number;
+    y: number;
+  };
 }
 
-export interface MapVisualLayerDefinition {
+export interface RadarSymbolDefinition {
+  glyph: string;
+  tone: RadarToneKey;
+}
+
+export type RadarRegionShapeDefinition =
+  | { type: "circle"; x: number; y: number; radius: number }
+  | { type: "box"; x1: number; y1: number; x2: number; y2: number };
+
+export interface RadarRegionDefinition {
   id: string;
-  name: string;
-  visible: boolean;
-  locked: boolean;
-  opacity: number;
-  cells: Record<string, MapVisualCellDefinition>;
+  label: string;
+  priority: number;
+  shape: RadarRegionShapeDefinition;
+  tone: RadarToneKey;
 }
 
-export interface MapVisualDefinition {
-  layers: MapVisualLayerDefinition[];
+export interface RadarTraceDefinition {
+  layerNotice: string;
+  controlMode: string;
+  callMode: string;
+  worldLine: string;
+  jsonLine: string;
+  emptyLine: string;
+}
+
+export interface RadarDefinition {
+  world: RadarWorldDefinition;
+  glyphRows: string[];
+  toneRows: string[];
+  palette: Record<RadarToneKey, string>;
+  symbols: {
+    crew: RadarSymbolDefinition;
+    focus: RadarSymbolDefinition;
+  };
+  trace: RadarTraceDefinition;
+  regions: RadarRegionDefinition[];
 }
 
 export interface MapTileDefinition {
@@ -217,8 +249,8 @@ export interface MapConfigDefinition {
   };
   originTileId: string;
   initialDiscoveredTileIds: string[];
+  radar: RadarDefinition;
   tiles: MapTileDefinition[];
-  visual?: MapVisualDefinition;
 }
 
 export type QuestCategory = "main" | "side";

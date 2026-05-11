@@ -375,7 +375,6 @@ describe("helper server", () => {
     const body = await response.json();
     expect(Array.isArray(body.maps)).toBe(true);
     expect(body.maps.length).toBeGreaterThan(0);
-    expect(typeof body.tileset_registry).toBe("object");
     expect(Array.isArray(body.map_objects)).toBe(true);
     expect(typeof body.schemas).toBe("object");
   });
@@ -504,21 +503,8 @@ describe("helper server", () => {
     await new Promise((resolve) => server.close(resolve));
     tempRepoRoot = await fs.mkdtemp(path.join(os.tmpdir(), "stellar-map-server-"));
     await writeTempJson("content/maps/default-map.json", minimalMap("default-map"));
-    await writeTempJson("content/maps/tilesets/registry.json", {
-      tilesets: [
-        {
-          id: "test-tileset",
-          name: "Test Tileset",
-          tileWidth: 16,
-          tileHeight: 16,
-          tileCount: 4,
-          columns: 2,
-        },
-      ],
-    });
     await writeTempJson("content/map-objects/resources.json", { map_objects: [] });
     await writeTempJson("content/schemas/maps.schema.json", { title: "maps schema" });
-    await writeTempJson("content/schemas/map-tilesets.schema.json", { title: "tileset schema" });
     await writeTempJson("content/schemas/map-objects.schema.json", { title: "map objects schema" });
     await fs.mkdir(path.join(tempRepoRoot, "assets/test"), { recursive: true });
     await fs.writeFile(path.join(tempRepoRoot, "assets/test/sample.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
@@ -647,19 +633,24 @@ function minimalMap(id) {
         specialStates: [],
       },
     ],
-    visual: {
-      layers: [
-        {
-          id: "terrain",
-          name: "Terrain",
-          visible: true,
-          locked: false,
-          opacity: 1,
-          cells: {
-            "1-1": { tilesetId: "test-tileset", tileIndex: 0 },
-          },
-        },
-      ],
+    radar: {
+      world: { width: 1, height: 1, origin: { x: 0, y: 0 } },
+      glyphRows: ["."],
+      toneRows: ["g"],
+      palette: { g: "#9bbf74" },
+      symbols: {
+        crew: { glyph: "@", tone: "g" },
+        focus: { glyph: "X", tone: "g" },
+      },
+      trace: {
+        layerNotice: "notice",
+        controlMode: "control",
+        callMode: "call",
+        worldLine: "world",
+        jsonLine: "json",
+        emptyLine: "empty",
+      },
+      regions: [],
     },
   };
 }

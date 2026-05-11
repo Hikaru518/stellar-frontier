@@ -614,19 +614,21 @@ export function getCrewActionTiming(member: CrewMember, elapsedGameSeconds: numb
 }
 
 function findRoute(tiles: MapTile[], fromTileId: string, targetTileId: string) {
-  const start = getTile(tiles, fromTileId);
-  const target = getTile(tiles, targetTileId);
+  const tileById = new Map(tiles.map((tile) => [tile.id, tile]));
+  const start = tileById.get(fromTileId);
+  const target = tileById.get(targetTileId);
   if (!start || !target) {
     return [];
   }
 
-  const tileById = new Map(tiles.map((tile) => [tile.id, tile]));
   const queue = [fromTileId];
+  let queueIndex = 0;
   const visited = new Set([fromTileId]);
   const previous = new Map<string, string>();
 
-  while (queue.length > 0) {
-    const currentId = queue.shift();
+  while (queueIndex < queue.length) {
+    const currentId = queue[queueIndex];
+    queueIndex += 1;
     if (!currentId) {
       break;
     }
@@ -640,7 +642,7 @@ function findRoute(tiles: MapTile[], fromTileId: string, targetTileId: string) {
       continue;
     }
 
-    for (const neighbor of getOrderedNeighbors(current, target, tiles)) {
+    for (const neighbor of getOrderedNeighbors(current, target, tileById)) {
       if (visited.has(neighbor.id) || !isTilePassable(neighbor)) {
         continue;
       }
@@ -653,8 +655,13 @@ function findRoute(tiles: MapTile[], fromTileId: string, targetTileId: string) {
   return [];
 }
 
-function getOrderedNeighbors(current: MapTile, target: MapTile, tiles: MapTile[]) {
-  const candidates = tiles.filter((tile) => Math.abs(tile.row - current.row) + Math.abs(tile.col - current.col) === 1);
+function getOrderedNeighbors(current: MapTile, target: MapTile, tileById: Map<string, MapTile>) {
+  const candidates = [
+    tileById.get(`${current.row}-${current.col + 1}`),
+    tileById.get(`${current.row + 1}-${current.col}`),
+    tileById.get(`${current.row}-${current.col - 1}`),
+    tileById.get(`${current.row - 1}-${current.col}`),
+  ].filter((tile): tile is MapTile => Boolean(tile));
   return candidates.sort((a, b) => neighborScore(a, current, target) - neighborScore(b, current, target));
 }
 

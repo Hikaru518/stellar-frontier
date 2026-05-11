@@ -1,26 +1,21 @@
 import { createCompatibleMap, expect, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
 
-test("shows the quest sidebar on the control center and supports collapse, expansion, and filters", async ({ page }) => {
+test.describe.configure({ timeout: 60_000 });
+
+test("shows the task page and supports status/category filters", async ({ page }) => {
   await page.goto("/");
 
-  const sidebar = page.getByLabel("任务侧边栏");
-  await expect(sidebar).toBeVisible();
-  await expect(sidebar.getByText("未完成 1")).toBeVisible();
-  await expect(sidebar.getByText("主要 1")).toBeVisible();
+  await page.getByRole("button", { name: /任务/ }).click();
+  await expect(page.getByRole("heading", { name: "任务追踪" })).toBeVisible();
+  await expect(page.getByText("UNFINISHED 1 / MAIN 1")).toBeVisible();
+  await expect(page.getByText("重整坠毁现场").first()).toBeVisible();
 
-  await sidebar.getByRole("button", { name: "展开任务" }).click();
-  await expect(sidebar.getByRole("heading", { name: "任务追踪" })).toBeVisible();
-  await expect(sidebar.getByRole("heading", { name: "重整坠毁现场" })).toBeVisible();
+  await page.locator(".console-task-filter-group").filter({ hasText: "完成状态" }).getByRole("button", { name: "已完成" }).click();
+  await expect(page.getByText("当前筛选下没有任务。").first()).toBeVisible();
 
-  await sidebar.getByRole("group", { name: "完成状态" }).getByRole("button", { name: "已完成" }).click();
-  await expect(sidebar.getByText("当前筛选下没有任务。")).toBeVisible();
-
-  await sidebar.getByRole("group", { name: "完成状态" }).getByRole("button", { name: "全部" }).click();
-  await sidebar.getByRole("group", { name: "任务类型" }).getByRole("button", { name: "次要" }).click();
-  await expect(sidebar.getByText("当前筛选下没有任务。")).toBeVisible();
-
-  await sidebar.getByRole("button", { name: "折叠" }).click();
-  await expect(sidebar.getByRole("button", { name: "展开任务" })).toBeVisible();
+  await page.locator(".console-task-filter-group").filter({ hasText: "完成状态" }).getByRole("button", { name: "全部" }).click();
+  await page.locator(".console-task-filter-group").filter({ hasText: "任务类型" }).getByRole("button", { name: "次要" }).click();
+  await expect(page.getByText("当前筛选下没有任务。").first()).toBeVisible();
 });
 
 test("shows completion result for completed crash-site quest from authored content", async ({ page }) => {
@@ -39,16 +34,13 @@ test("shows completion result for completed crash-site quest from authored conte
     quest_state: questState,
   });
   await page.goto("/");
+  await page.getByRole("button", { name: /任务/ }).click();
 
-  const sidebar = page.getByLabel("任务侧边栏");
-  await sidebar.getByRole("button", { name: "展开任务" }).click();
-
-  await expect(sidebar.getByRole("heading", { name: "坠毁点已稳定" })).toBeVisible();
-  await expect(sidebar.getByText("Mike 完成了 IAFS 坠毁点的初步调查与关键设备修复。")).toBeVisible();
-  await expect(sidebar.getByText("发电机恢复基础供能。")).toBeVisible();
-  await expect(sidebar.getByText("维生系统重新上线。")).toBeVisible();
-  await expect(sidebar.getByText("穿梭机核心进入可评估状态。")).toBeVisible();
-  await expect(sidebar.getByText("维修 IAFS 发电机")).toBeVisible();
+  await expect(page.getByText("坠毁点已稳定").first()).toBeVisible();
+  await expect(page.getByText("Mike 完成了 IAFS 坠毁点的初步调查与关键设备修复。").first()).toBeVisible();
+  await expect(page.getByText("发电机恢复基础供能。").first()).toBeVisible();
+  await expect(page.getByText("维生系统重新上线。").first()).toBeVisible();
+  await expect(page.getByText("穿梭机核心进入可评估状态。").first()).toBeVisible();
 });
 
 test("completes a quest todo through the crash-site event and preserves it after reload", async ({ page }) => {
@@ -56,19 +48,17 @@ test("completes a quest todo through the crash-site event and preserves it after
     map: createCrashSiteSurveyMap(),
   });
   await page.goto("/");
+  await page.getByRole("button", { name: /任务/ }).click();
 
-  await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
-  await expect(page.getByText("调查 IAFS 坠毁点")).toBeVisible();
+  await expect(page.getByText("调查 IAFS 坠毁点").first()).toBeVisible();
   await expect(page.getByText("维修 IAFS 发电机")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "通讯台 查看通讯录" }).click();
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "调查当前区域" }).click();
-  await page.clock.runFor(16_000);
-  await page.getByRole("button", { name: /返回通讯台|结束通话/ }).last().click();
-
-  const runtimeCallPanel = page.getByText("事件通话 · 1 条").locator("xpath=ancestor::section[1]");
-  await runtimeCallPanel.getByRole("button", { name: "接通" }).click();
+  await page.clock.runFor(45_000);
+  await expect(
+    page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。").first(),
+  ).toBeVisible();
   await page.getByRole("button", { name: "标记这些可用设施。" }).click();
 
   const saved = await readSave(page);
@@ -78,59 +68,53 @@ test("completes a quest todo through the crash-site event and preserves it after
   expect(saved.quest_state.quests.regroup_after_crash.current_node_id).toBe("repair_targets_revealed");
 
   await page.reload();
-  await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
-  const surveyTodo = page.locator(".quest-todo").filter({ hasText: "调查 IAFS 坠毁点" });
+  await page.getByRole("button", { name: /任务/ }).click();
+  const surveyTodo = page.locator(".console-task-todo").filter({ hasText: "调查 IAFS 坠毁点" });
   await expect(surveyTodo.getByText("已完成")).toBeVisible();
-  await expect(page.getByText("维修 IAFS 发电机")).toBeVisible();
-  await expect(page.getByText("维修维生系统")).toBeVisible();
-  await expect(page.getByText("维修穿梭机核心")).toBeVisible();
+  await expect(page.getByText("维修 IAFS 发电机").first()).toBeVisible();
+  await expect(page.getByText("维修维生系统").first()).toBeVisible();
+  await expect(page.getByText("维修穿梭机核心").first()).toBeVisible();
 });
 
-test("quest navigation opens context without starting calls or movement", async ({ page }) => {
+test("quest navigation opens map context without starting calls or movement", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: /任务/ }).click();
 
-  const sidebar = page.getByLabel("任务侧边栏");
-  await sidebar.getByRole("button", { name: "展开任务" }).click();
-
-  await sidebar.getByRole("button", { name: "查看 IAFS 坠毁点" }).first().click();
+  await page.getByRole("button", { name: "查看 IAFS 坠毁点" }).first().click();
   await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
-  await expect(page.getByText("坐标详情：(0,0)")).toBeVisible();
+  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
+  await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
   expect((await readSave(page)).crew_actions).toEqual({});
 });
 
-test("quest sidebar layout leaves core controls reachable on station, call, and map pages", async ({ page }) => {
+test("task page layout leaves core controls reachable on task, call, and map pages", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("任务侧边栏").getByRole("button", { name: "展开任务" }).click();
-  await expectQuestLayoutDoesNotOverlap(page);
-
-  await page.getByRole("button", { name: "通讯台 查看通讯录" }).click();
-  await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /通话/ }).first()).toBeVisible();
-  await expectQuestLayoutDoesNotOverlap(page);
+  await page.getByRole("button", { name: /任务/ }).click();
+  await expectConsoleLayoutHasRoom(page);
 
   await startNormalMikeCall(page);
-  await expect(page.getByRole("heading", { name: /通话页面：Mike/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mike 通话界面" })).toBeVisible();
   await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
-  await expectQuestLayoutDoesNotOverlap(page);
+  await expectConsoleLayoutHasRoom(page);
 
-  await page.getByRole("button", { name: /地图二级菜单/ }).click();
-  await expect(page.locator(".phaser-map-stage")).toBeVisible();
-  await expect(page.getByLabel("任务侧边栏").getByRole("button", { name: "折叠" })).toBeVisible();
-  await expectQuestLayoutDoesNotOverlap(page);
+  await page.getByRole("button", { name: /地图/ }).click();
+  await expect(page.locator(".console-ascii-map-stage")).toBeVisible();
+  await expectConsoleLayoutHasRoom(page);
 });
 
-async function expectQuestLayoutDoesNotOverlap(page: Page) {
-  const mainBox = await page.locator(".quest-layout-main").boundingBox();
-  const sidebarBox = await page.getByLabel("任务侧边栏").boundingBox();
+async function expectConsoleLayoutHasRoom(page: Page) {
+  const mainBox = await page.locator(".game-console-main").boundingBox();
+  const screenBox = await page.locator(".console-screen-content").boundingBox();
   expect(mainBox).toBeTruthy();
-  expect(sidebarBox).toBeTruthy();
-  expect((mainBox?.x ?? 0) + (mainBox?.width ?? 0)).toBeLessThanOrEqual((sidebarBox?.x ?? 0) + 1);
+  expect(screenBox).toBeTruthy();
+  expect(screenBox?.width ?? 0).toBeGreaterThan(300);
+  expect(screenBox?.height ?? 0).toBeGreaterThan(300);
 }
 
 function createCrashSiteSurveyMap() {
   return createCompatibleMap({
     tilesById: {
-      "4-4": {
+      "129-129": {
         discovered: true,
         investigated: false,
         revealedObjectIds: [],

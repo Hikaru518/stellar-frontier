@@ -24,7 +24,7 @@ export default function ValidationPanel({ errors, warnings, onIssueSelect }: Val
         <ul className="validation-issue-list">
           {issues.map((issue, index) => {
             const targetLabel = formatIssueTarget(issue);
-            const canNavigate = Boolean(getIssueTileId(issue) || getIssueLayerId(issue));
+            const canNavigate = Boolean(getIssueTileId(issue));
             return (
               <li key={`${issue.severity}-${issue.code}-${index}`} className={`validation-issue validation-${issue.severity}`}>
                 <button type="button" disabled={!canNavigate} onClick={() => onIssueSelect(issue)}>
@@ -53,16 +53,10 @@ export function getIssueTileId(issue: MapValidationIssue): string | null {
   return /(?:tiles|cells|initialDiscoveredTileIds|originTileId)[.[/]([0-9]+-[0-9]+)/.exec(path)?.[1] ?? null;
 }
 
-export function getIssueLayerId(issue: MapValidationIssue): string | null {
-  return issue.target?.layerId ?? null;
-}
-
 function formatIssueTarget(issue: MapValidationIssue): string {
   const parts = [
     issue.target?.kind,
-    issue.target?.layerId ? `layer ${issue.target.layerId}` : null,
     issue.target?.tileId ? `tile ${issue.target.tileId}` : null,
-    issue.target?.tilesetId ? `tileset ${issue.target.tilesetId}` : null,
     issue.target?.field ?? issue.path,
   ].filter(Boolean);
 

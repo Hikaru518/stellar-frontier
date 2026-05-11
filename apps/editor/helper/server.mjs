@@ -134,7 +134,6 @@ async function routeRequest(request, response, { repoRoot }) {
     const library = await loadMapEditorLibrary({ repoRoot });
     sendJson(response, 200, validateMapEditorMap(data, {
       mapObjects: library.map_objects,
-      tilesetRegistry: library.tileset_registry,
     }));
     return;
   }
@@ -145,7 +144,6 @@ async function routeRequest(request, response, { repoRoot }) {
     const library = await loadMapEditorLibrary({ repoRoot });
     const validation = validateMapEditorMap(data, {
       mapObjects: library.map_objects,
-      tilesetRegistry: library.tileset_registry,
     });
 
     if (!validation.valid) {

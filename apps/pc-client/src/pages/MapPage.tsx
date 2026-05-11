@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GameConsoleLayout } from "../components/Layout";
+import { defaultMapConfig, type MapTileDefinition } from "../content/contentData";
 import type { CrewId, CrewMember, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
+import { parseTileId } from "../mapSystem";
 
-const WORLD_SIZE = 256;
-const ORIGIN = { x: 128, y: 128 };
 const CELL_W = 8;
 const CELL_H = 10;
-const RETRO_RAMP = " .,:;irsXA253hMHGS#9B&@";
+const RADAR = defaultMapConfig.radar;
+const RADAR_WORLD = RADAR.world;
 
 type FocusCoord = { x: number; y: number };
-type RenderTone =
-  | "g"
-  | "d"
-  | "c"
-  | "a"
-  | "w"
-  | "s"
-  | "r";
+type RenderTone = string;
 
 interface RenderGlitch {
   x: number;
@@ -41,6 +35,8 @@ interface MapPageProps {
   initialSelectedTileId?: string;
   onOpenControl: () => void;
   onOpenTask: () => void;
+  onReturnFromMap: () => void;
+  onSelectMoveTarget: (tileId: string) => void;
   onStartCall: (crewId: CrewId) => void;
   onShowCrewStatus: (crewId: CrewId) => void;
   onShowCrewInventory: (crewId: CrewId) => void;
@@ -59,6 +55,8 @@ export function MapPage({
   initialSelectedTileId,
   onOpenControl,
   onOpenTask,
+  onReturnFromMap,
+  onSelectMoveTarget,
   onStartCall,
   onShowCrewStatus,
   onShowCrewInventory,
@@ -78,8 +76,11 @@ export function MapPage({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);
-  const crewWorldCoords = useMemo(() => new Map(crew.map((member) => [member.id, worldFromCrewTile(member.currentTile)])), [crew]);
-  const focusLabel = useMemo(() => sampleWorldLabel(focusCoord.x, focusCoord.y), [focusCoord]);
+  const configTileById = useMemo(() => new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile])), []);
+  const crewWorldCoords = useMemo(() => new Map(crew.map((member) => [member.id, radarCoordFromTileId(member.currentTile)])), [crew]);
+  const focusTileId = useMemo(() => tileIdFromRadarCoord(focusCoord), [focusCoord]);
+  const focusConfigTile = configTileById.get(focusTileId);
+  const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile), [focusCoord, focusConfigTile]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
 
@@ -128,7 +129,7 @@ export function MapPage({
     const ny = (clientY - rect.top) / rect.height;
     return clampCoord({
       x: Math.floor(viewport.left + nx * viewport.width),
-      y: Math.floor(viewport.top + (1 - ny) * viewport.height),
+      y: Math.floor(viewport.top + ny * viewport.height),
     });
   }
 
@@ -198,6 +199,10 @@ export function MapPage({
       return undefined;
     }
 
+    if (isE2eAnimationDisabled()) {
+      return undefined;
+    }
+
     if (!(canvasRef.current instanceof HTMLCanvasElement)) {
       return undefined;
     }
@@ -209,15 +214,7 @@ export function MapPage({
     }
     const context: CanvasRenderingContext2D = ctx;
 
-    const palette: Record<RenderTone, string> = {
-      g: "#9bbf74",
-      d: "#8f7a5d",
-      c: "#74a6a6",
-      a: "#f0a64d",
-      w: "#e7d0a4",
-      s: "#7dffb1",
-      r: "#ff6b5f",
-    };
+    const palette: Record<RenderTone, string> = RADAR.palette;
 
     let animationId = 0;
     const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
@@ -251,8 +248,8 @@ export function MapPage({
       for (let row = 0; row < rows; row += 1) {
         for (let col = 0; col < cols; col += 1) {
           const worldX = Math.floor(viewport.left + (col / cols) * viewport.width);
-          const worldY = Math.floor(viewport.top + ((rows - row) / rows) * viewport.height);
-          const { char, tone } = sampleRenderCell(worldX, worldY, focusCoord, crewWorldCoords);
+          const worldY = Math.floor(viewport.top + (row / rows) * viewport.height);
+          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord, crewWorldCoords);
           chars[row][col] = char;
           tones[row][col] = tone;
         }
@@ -322,19 +319,19 @@ export function MapPage({
       const cellW = width / viewport.width;
       const cellH = height / viewport.height;
       const visibleLeft = Math.max(0, Math.floor(viewport.left));
-      const visibleRight = Math.min(WORLD_SIZE - 1, Math.ceil(viewport.left + viewport.width));
-      const visibleBottom = Math.max(0, Math.floor(viewport.top));
-      const visibleTop = Math.min(WORLD_SIZE - 1, Math.ceil(viewport.top + viewport.height));
+      const visibleRight = Math.min(RADAR_WORLD.width - 1, Math.ceil(viewport.left + viewport.width));
+      const visibleTop = Math.max(0, Math.floor(viewport.top));
+      const visibleBottom = Math.min(RADAR_WORLD.height - 1, Math.ceil(viewport.top + viewport.height));
 
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, canvasEl.width, canvasEl.height);
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       context.fillStyle = "rgba(120, 216, 255, 0.3)";
-      for (let y = visibleBottom; y <= visibleTop; y += 1) {
+      for (let y = visibleTop; y <= visibleBottom; y += 1) {
         for (let x = visibleLeft; x <= visibleRight; x += 1) {
           const sx = (x - viewport.left) * cellW;
-          const sy = (viewport.top + viewport.height - y - 1) * cellH;
+          const sy = (y - viewport.top) * cellH;
           context.fillRect(sx, sy, Math.max(0.55, cellW * 0.34), Math.max(0.55, cellH * 0.34));
         }
       }
@@ -342,11 +339,11 @@ export function MapPage({
       if (
         focusCoord.x >= visibleLeft &&
         focusCoord.x <= visibleRight &&
-        focusCoord.y >= visibleBottom &&
-        focusCoord.y <= visibleTop
+        focusCoord.y >= visibleTop &&
+        focusCoord.y <= visibleBottom
       ) {
         const sx = (focusCoord.x - viewport.left) * cellW;
-        const sy = (viewport.top + viewport.height - focusCoord.y - 1) * cellH;
+        const sy = (focusCoord.y - viewport.top) * cellH;
         context.fillStyle = "rgba(255, 215, 131, 0.92)";
         context.fillRect(sx, sy, Math.max(2, cellW), Math.max(2, cellH));
         context.strokeStyle = "rgba(255, 215, 131, 0.98)";
@@ -421,7 +418,7 @@ export function MapPage({
           </div>
           <div className="console-map-trace">
             <p className="console-map-trace-lead">
-              [TEMP DEV] 这两个按钮只是临时调试开关，用来单独检查渲染层和 256x256 功能坐标层。
+              {RADAR.trace.layerNotice}
             </p>
             <div className="console-layer-toggle-list">
               <button
@@ -446,10 +443,32 @@ export function MapPage({
               </button>
             </div>
             <p className="console-map-trace-lead">
-              {returnTarget === "call" ? "本次从通话进入：地图交互仍需回到通话确认。" : "临时开发模式：渲染层与功能层已拆分显示。"}
+              {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
             </p>
-            <p className="console-map-trace-line">[WORLD] 256 x 256 interactive coordinate grid</p>
-            <p className="console-map-trace-line">[JSON] future hooks / links / triggers attach here</p>
+            <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
+            <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
+            <p className="console-map-trace-line">
+              [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
+            </p>
+            {returnTarget === "call" ? (
+              <div className="console-map-return-actions">
+                {moveSelectionMember ? (
+                  <button
+                    type="button"
+                    className="console-crew-button"
+                    onClick={() => {
+                      pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
+                      onSelectMoveTarget(focusTileId);
+                    }}
+                  >
+                    标记当前坐标
+                  </button>
+                ) : null}
+                <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
+                  返回当前通话
+                </button>
+              </div>
+            ) : null}
             {traceLines.length ? (
               traceLines.map((line, index) => (
                 <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
@@ -457,7 +476,7 @@ export function MapPage({
                 </p>
               ))
             ) : (
-              <p className="console-map-trace-line">[MAP] WAITING FOR 256x256 FIELD INPUT</p>
+              <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
             )}
           </div>
         </section>
@@ -473,13 +492,14 @@ export function MapPage({
         <div className="console-screen-header">
           <span>crt situation map</span>
           <strong>卫星雷达地图 / retro lofi field</strong>
-          <span>render + function / 256 x 256</span>
+          <span>render + function / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
         </div>
 
         <div
           ref={stageRef}
           className={`console-ascii-map-stage ${dragging ? "console-ascii-map-stage-dragging" : ""}`}
           aria-label="ASCII 地图"
+          data-focus-tile-id={focusTileId}
           role="application"
           onClick={handleStageClick}
           onPointerDown={handlePointerDown}
@@ -589,84 +609,84 @@ function spawnRenderGlitch(glitches: RenderGlitch[], rows: number, cols: number,
   }
 }
 
-function sampleRenderCell(x: number, y: number, focusCoord: FocusCoord, crewWorldCoords: Map<CrewId, FocusCoord>) {
+function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorldCoords: Map<CrewId, FocusCoord>) {
   for (const coord of crewWorldCoords.values()) {
     if (distance(x, y, coord.x, coord.y) <= 1.2) {
-      return { char: "@", tone: "c" as RenderTone };
+      return { char: RADAR.symbols.crew.glyph, tone: RADAR.symbols.crew.tone as RenderTone };
     }
   }
 
   if (x === focusCoord.x && y === focusCoord.y) {
-    return { char: "X", tone: "s" as RenderTone };
+    return { char: RADAR.symbols.focus.glyph, tone: RADAR.symbols.focus.tone as RenderTone };
   }
 
-  const wx = (x - ORIGIN.x) / 16;
-  const wy = (y - ORIGIN.y) / 16;
-  const e =
-    Math.sin(wx * 1.2) * 0.44 +
-    Math.sin(wy * 1.6 + wx * 0.35) * 0.28 +
-    Math.cos((wx + wy) * 0.7) * 0.22 +
-    Math.sin(wx * 2.7 - wy * 2.1) * 0.09;
-  const level = clamp((e + 1.15) / 2.3, 0, 1);
-  const char = RETRO_RAMP[Math.floor(level * (RETRO_RAMP.length - 1))] ?? ".";
-  const tone: RenderTone = level < 0.28 ? "c" : level < 0.62 ? "g" : "a";
-  return { char, tone };
+  if (x < 0 || y < 0 || x >= RADAR_WORLD.width || y >= RADAR_WORLD.height) {
+    return { char: " ", tone: "g" as RenderTone };
+  }
+
+  const row = RADAR.glyphRows[y] ?? "";
+  const toneRow = RADAR.toneRows[y] ?? "";
+  return {
+    char: row[x] ?? " ",
+    tone: (toneRow[x] ?? "g") as RenderTone,
+  };
 }
 
 function getViewport(center: FocusCoord, zoom: number) {
-  const width = WORLD_SIZE / zoom;
-  const height = WORLD_SIZE / zoom;
+  const width = RADAR_WORLD.width / zoom;
+  const height = RADAR_WORLD.height / zoom;
   return {
     width,
     height,
-    left: center.x - width / 2,
-    top: center.y - height / 2,
+    left: clamp(center.x - width / 2, 0, Math.max(0, RADAR_WORLD.width - width)),
+    top: clamp(center.y - height / 2, 0, Math.max(0, RADAR_WORLD.height - height)),
   };
 }
 
-function sampleWorldLabel(x: number, y: number) {
-  if (distance(x, y, 128, 128) <= 6) return "坠毁初始落点";
-  if (distance(x, y, 132, 120) <= 6) return "拾荒营地";
-  if (distance(x, y, 128, 168) <= 8) return "霜湾聚落";
-  if (distance(x, y, 128, 88) <= 8) return "烬炉城寨";
-  if (inBox(x, y, 140, 136, 188, 184)) return "门域";
-  if (inBox(x, y, 96, 96, 160, 160)) return "灰烬霜带";
-  return "未命名区域";
+function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined) {
+  if (tile && tile.areaName !== "未命名区域") {
+    return tile.areaName;
+  }
+
+  const region = [...RADAR.regions]
+    .sort((left, right) => right.priority - left.priority)
+    .find((entry) => isInsideRegion(coord, entry.shape));
+  return region?.label ?? tile?.areaName ?? "未命名区域";
 }
 
-function toDisplayCoord(coord: FocusCoord): FocusCoord {
-  return {
-    x: coord.x - ORIGIN.x,
-    y: coord.y - ORIGIN.y,
-  };
+function isInsideRegion(coord: FocusCoord, shape: (typeof RADAR.regions)[number]["shape"]) {
+  if (shape.type === "circle") {
+    return distance(coord.x, coord.y, shape.x, shape.y) <= shape.radius;
+  }
+
+  return coord.x >= shape.x1 && coord.x <= shape.x2 && coord.y >= shape.y1 && coord.y <= shape.y2;
 }
 
 function formatDisplayCoord(coord: FocusCoord) {
-  const display = toDisplayCoord(coord);
-  return `(${display.x},${display.y})`;
+  return `(${coord.x - RADAR_WORLD.origin.x},${RADAR_WORLD.origin.y - coord.y})`;
 }
 
 function focusFromTileId(tileId?: string): FocusCoord {
-  return worldFromCrewTile(tileId ?? "4-4");
+  return radarCoordFromTileId(tileId ?? defaultMapConfig.originTileId);
 }
 
-function worldFromCrewTile(tileId?: string): FocusCoord {
-  const match = /^(\d+)-(\d+)$/.exec(tileId ?? "");
-  if (!match) {
-    return { x: ORIGIN.x, y: ORIGIN.y };
+function tileIdFromRadarCoord(coord: FocusCoord) {
+  return `${coord.y + 1}-${coord.x + 1}`;
+}
+
+function radarCoordFromTileId(tileId?: string): FocusCoord {
+  const coord = tileId ? parseTileId(tileId) : null;
+  if (!coord) {
+    return clampCoord(RADAR_WORLD.origin);
   }
-  const row = Number(match[1]);
-  const col = Number(match[2]);
-  return {
-    x: clamp(ORIGIN.x + (col - 4) * 8, 0, WORLD_SIZE - 1),
-    y: clamp(ORIGIN.y + (4 - row) * 8, 0, WORLD_SIZE - 1),
-  };
+
+  return clampCoord({ x: coord.col - 1, y: coord.row - 1 });
 }
 
 function clampCoord(coord: FocusCoord): FocusCoord {
   return {
-    x: clamp(coord.x, 0, WORLD_SIZE - 1),
-    y: clamp(coord.y, 0, WORLD_SIZE - 1),
+    x: clamp(coord.x, 0, RADAR_WORLD.width - 1),
+    y: clamp(coord.y, 0, RADAR_WORLD.height - 1),
   };
 }
 
@@ -678,6 +698,10 @@ function distance(x: number, y: number, tx: number, ty: number) {
   return Math.hypot(x - tx, y - ty);
 }
 
-function inBox(x: number, y: number, x1: number, y1: number, x2: number, y2: number) {
-  return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+function isE2eAnimationDisabled() {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem("stellar-frontier-e2e-disable-animation") === "1";
+  } catch {
+    return false;
+  }
 }

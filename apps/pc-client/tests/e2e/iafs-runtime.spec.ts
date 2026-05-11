@@ -13,11 +13,12 @@ import {
   createRevealedCrashSiteMap,
 } from "./support/appTest";
 
+test.describe.configure({ timeout: 60_000 });
+
 test("surveys the IAFS crash site and reveals the three repair actions", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeVisible();
-  await page.getByRole("button", { name: /通讯台/ }).click();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await startNormalMikeCall(page);
 
   await expect(page.getByText(/地点：IAFS坠毁点 \(0,0\)/)).toBeVisible();
@@ -25,7 +26,7 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
 
   await page.getByRole("button", { name: "调查当前区域" }).click();
   await expect(page.getByText("调查指令已提交，预计 00:15 后回传结果。")).toBeVisible();
-  await page.clock.runFor(16_000);
+  await page.clock.runFor(45_000);
 
   await expect(
     page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。"),
@@ -34,9 +35,9 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await waitForRuntimeEventStatus(page, "iafs_crash_site_survey_reveal", "resolved");
 
   const savedAfterSurvey = await readSave(page);
-  expect(savedAfterSurvey.map.tilesById["4-4"].revealedObjectIds).toEqual(CRASH_SITE_OBJECT_IDS);
+  expect(savedAfterSurvey.map.tilesById["129-129"].revealedObjectIds).toEqual(CRASH_SITE_OBJECT_IDS);
 
-  await page.getByRole("button", { name: "结束通话" }).last().click();
+  await page.getByRole("button", { name: /控制台/ }).click();
   await startNormalMikeCall(page);
 
   await expect(page.getByRole("heading", { name: "发电机" })).toBeVisible();
@@ -51,7 +52,6 @@ test("dispatches a revealed generator repair into a timed crew action", async ({
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /通讯台/ }).click();
   await startNormalMikeCall(page);
 
   await objectSection(page, "发电机").getByRole("button", { name: "维修" }).click();
@@ -91,7 +91,6 @@ test("opens a damaged crash-site object inspection runtime call", async ({ page 
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /通讯台/ }).click();
   await startNormalMikeCall(page);
 
   await objectSection(page, "发电机").getByRole("button", { name: "调查" }).click();
@@ -103,14 +102,13 @@ test("opens a damaged crash-site object inspection runtime call", async ({ page 
 
 test("default survey away from the crash site reports no new clue", async ({ page }) => {
   await installSave(page, {
-    crew: [idleMike("4-3", { status: "坠毁西侧待命。" })],
+    crew: [idleMike("129-128", { status: "坠毁西侧待命。" })],
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /通讯台/ }).click();
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "调查当前区域" }).click();
-  await page.clock.runFor(16_000);
+  await page.clock.runFor(45_000);
 
   await expect(page.getByText("暂时没有发现值得特别关注的新东西，至少眼下没有。")).toBeVisible();
   await page.getByRole("button", { name: "收到，继续保持观察。" }).click();

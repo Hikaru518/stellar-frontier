@@ -2,8 +2,6 @@ import type { MapConfigDefinition, MapTileDefinition } from "./content/contentDa
 import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport } from "./data/gameData";
 
-export type VisibleTileStatus = "discovered" | "frontier" | "unknownHole";
-
 export interface TileCoord {
   row: number;
   col: number;
@@ -42,24 +40,6 @@ export interface RuntimeMapState {
   mapObjects?: RuntimeMapObjectsState;
 }
 
-export interface VisibleTileCell {
-  id: string;
-  row: number;
-  col: number;
-  displayX: number;
-  displayY: number;
-  status: VisibleTileStatus;
-  tile?: MapTileDefinition;
-}
-
-export interface VisibleTileWindow {
-  minRow: number;
-  maxRow: number;
-  minCol: number;
-  maxCol: number;
-  cells: VisibleTileCell[];
-}
-
 export function getTileId(row: number, col: number) {
   return `${row}-${col}`;
 }
@@ -92,91 +72,6 @@ export function getTileLocationLabel(config: MapConfigDefinition, tileId: string
   }
 
   return `${tile.areaName} ${formatDisplayCoord(getDisplayCoord(tile, origin))}`;
-}
-
-export function getVisibleTileWindow(config: MapConfigDefinition, runtimeMap: RuntimeMapState): VisibleTileWindow {
-  const discoveredIds = getDiscoveredIds(runtimeMap);
-  const frontierIds = new Set<string>();
-
-  for (const tileId of discoveredIds) {
-    const coord = parseTileId(tileId);
-    if (!coord) {
-      continue;
-    }
-
-    for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
-      for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
-        if (rowOffset === 0 && colOffset === 0) {
-          continue;
-        }
-
-        const row = coord.row + rowOffset;
-        const col = coord.col + colOffset;
-        const neighborId = getTileId(row, col);
-        if (isInsideMap(config, row, col) && !discoveredIds.has(neighborId)) {
-          frontierIds.add(neighborId);
-        }
-      }
-    }
-  }
-
-  const visibleIds = [...discoveredIds, ...frontierIds];
-  const visibleCoords = visibleIds.map((id) => parseTileId(id)).filter((coord): coord is TileCoord => Boolean(coord));
-  if (visibleCoords.length === 0) {
-    return { minRow: 0, maxRow: 0, minCol: 0, maxCol: 0, cells: [] };
-  }
-
-  const minRow = Math.min(...visibleCoords.map((coord) => coord.row));
-  const maxRow = Math.max(...visibleCoords.map((coord) => coord.row));
-  const minCol = Math.min(...visibleCoords.map((coord) => coord.col));
-  const maxCol = Math.max(...visibleCoords.map((coord) => coord.col));
-  const origin = getOrigin(config);
-  const cells: VisibleTileCell[] = [];
-
-  for (let row = minRow; row <= maxRow; row += 1) {
-    for (let col = minCol; col <= maxCol; col += 1) {
-      const id = getTileId(row, col);
-      const displayCoord = origin ? getDisplayCoord({ row, col }, origin) : { displayX: col, displayY: row };
-      cells.push({
-        id,
-        row,
-        col,
-        ...displayCoord,
-        status: discoveredIds.has(id) ? "discovered" : frontierIds.has(id) ? "frontier" : "unknownHole",
-        tile: getTile(config, id),
-      });
-    }
-  }
-
-  return { minRow, maxRow, minCol, maxCol, cells };
-}
-
-export function getFullTileWindow(config: MapConfigDefinition): VisibleTileWindow {
-  const origin = getOrigin(config);
-  const cells: VisibleTileCell[] = [];
-
-  for (let row = 1; row <= config.size.rows; row += 1) {
-    for (let col = 1; col <= config.size.cols; col += 1) {
-      const id = getTileId(row, col);
-      const displayCoord = origin ? getDisplayCoord({ row, col }, origin) : { displayX: col, displayY: row };
-      cells.push({
-        id,
-        row,
-        col,
-        ...displayCoord,
-        status: "discovered",
-        tile: getTile(config, id),
-      });
-    }
-  }
-
-  return {
-    minRow: 1,
-    maxRow: config.size.rows,
-    minCol: 1,
-    maxCol: config.size.cols,
-    cells,
-  };
 }
 
 export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeMapState, tileId: string) {
@@ -216,20 +111,6 @@ function getTile(config: MapConfigDefinition, tileId: string) {
 
 function getOrigin(config: MapConfigDefinition) {
   return getTile(config, config.originTileId) ?? parseTileId(config.originTileId);
-}
-
-function getDiscoveredIds(runtimeMap: RuntimeMapState) {
-  const discoveredIds = new Set(runtimeMap.discoveredTileIds);
-  for (const [tileId, tileState] of Object.entries(runtimeMap.tilesById)) {
-    if (tileState?.discovered) {
-      discoveredIds.add(tileId);
-    }
-  }
-  return discoveredIds;
-}
-
-function isDiscovered(runtimeMap: RuntimeMapState, tileId: string) {
-  return getDiscoveredIds(runtimeMap).has(tileId);
 }
 
 function isInsideMap(config: MapConfigDefinition, row: number, col: number) {

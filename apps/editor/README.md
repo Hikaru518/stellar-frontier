@@ -5,11 +5,11 @@ Game Editor 是本仓库的本地内容编辑工具，作为 Rush app 位于 `ap
 当前包含两个可用模块：
 
 - **Event Editor**：浏览结构化事件、通话模板、preset、handler、schema 和 graph，编辑并保存事件内容。
-- **Map Editor**：新建 / 选择地图，编辑 gameplay tile、origin、初始 discovered 标记、地块对象、特殊状态、视觉层和 tileset palette，保存到 `content/maps/*.json`。
+- **Map Editor**：新建 / 选择地图，编辑 explicit gameplay tile、origin、初始 discovered 标记、地块对象、特殊状态和 radar glyph/tone，保存到 `content/maps/*.json`。
 
 Editor 由两部分组成：
 
-- `editor:helper`：只监听 `127.0.0.1` 的本地 helper，负责读取、校验、保存 content，并通过白名单路径读取 `assets/` 中的 PNG tileset。
+- `editor:helper`：只监听 `127.0.0.1` 的本地 helper，负责读取、校验、保存 content。
 - `editor:dev`：独立 Vite editor 前端，负责浏览内容库、编辑 draft、保存到内容文件。
 - `apps/editor/scripts/generate-event-content-manifest.mjs`：Event Editor 专属生成脚本，用于根据 `content/events/manifest.json` 刷新 PC 运行时聚合模块。
 
@@ -56,10 +56,9 @@ Event Editor：
 
 Map Editor：
 
-- 可编辑内容包括 `content/maps/*.json` 中的地图尺寸、origin、`initialDiscoveredTileIds`、tile gameplay 字段和 `visual.layers`。
-- 只读参考包括 `content/maps/tilesets/registry.json`、`content/map-objects/*.json`、`content/schemas/maps.schema.json`、`content/schemas/map-tilesets.schema.json` 和 `content/schemas/map-objects.schema.json`。
-- 视觉素材来自 registry 指向的 `assets/` PNG；helper 只允许读取仓库内 `assets/**/*.png`。
-- 保存前 helper 会校验地图 schema、object 引用、visual cell tile id、tileset id 和 tile index 范围；校验失败不会写入最终 content 文件。
+- 可编辑内容包括 `content/maps/*.json` 中的地图尺寸、origin、`initialDiscoveredTileIds`、tile gameplay 字段和 `radar` 表现层。
+- 只读参考包括 `content/map-objects/*.json`、`content/schemas/maps.schema.json` 和 `content/schemas/map-objects.schema.json`。
+- 保存前 helper 会校验地图 schema、object 引用、256x256 coverage、radar rows 和 palette tone；校验失败不会写入最终 content 文件。
 
 ## 验收命令
 

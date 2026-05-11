@@ -22,7 +22,6 @@ describe("validate-content quest references", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "stellar-content-"));
     tempRoots.push(root);
     fs.cpSync(path.join(projectRoot, "content"), path.join(root, "content"), { recursive: true });
-    createReferencedTilesetFiles(root);
 
     const questPath = path.join(root, "content/quests/quests.json");
     const quests = JSON.parse(fs.readFileSync(questPath, "utf8"));
@@ -36,17 +35,6 @@ describe("validate-content quest references", () => {
     expect(result.output).toContain("repair_targets_revealed");
   });
 });
-
-function createReferencedTilesetFiles(root: string): void {
-  const registry = JSON.parse(fs.readFileSync(path.join(root, "content/maps/tilesets/registry.json"), "utf8"));
-  for (const tileset of registry.tilesets ?? []) {
-    for (const relativePath of [tileset.assetPath, path.join("apps/pc-client/public", tileset.publicPath)]) {
-      const filePath = path.join(root, relativePath);
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, "");
-    }
-  }
-}
 
 function runValidator(root: string): { status: number; output: string } {
   try {

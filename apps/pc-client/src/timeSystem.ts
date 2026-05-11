@@ -2,7 +2,7 @@ import { EVENT_SAVE_SCHEMA_VERSION } from "./events/types";
 
 export const LEGACY_GAME_SAVE_KEY = "stellar-frontier-save-v1";
 export const GAME_SAVE_KEY = "stellar-frontier-save-v2";
-export const GAME_SAVE_VERSION = 2;
+export const GAME_SAVE_VERSION = 3;
 export const GAME_SAVE_SCHEMA_VERSION = EVENT_SAVE_SCHEMA_VERSION;
 
 export function formatGameTime(elapsedGameSeconds: number) {
@@ -89,7 +89,7 @@ export function isCompatibleGameSaveState(value: unknown) {
 }
 
 function omitDeprecatedSaveFields(key: string, value: unknown) {
-  if (key === "bag") {
+  if (key === "bag" || key === "tiles") {
     return undefined;
   }
 

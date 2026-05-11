@@ -4,8 +4,6 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import eventManifest from "../../../../content/events/manifest.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
-import tilesetRegistry from "../../../../content/maps/tilesets/registry.json";
-import mapTilesetsSchema from "../../../../content/schemas/map-tilesets.schema.json";
 import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import { buildEventContentIndex } from "../events/contentIndex";
 import type { CallTemplate, EventDefinition, PresetDefinition } from "../events/types";
@@ -132,111 +130,40 @@ describe("default map config", () => {
     }
   });
 
-  it("types authored visual layers on MapConfigDefinition", () => {
-    const mapWithVisual: MapConfigDefinition = {
-      ...(structuredClone(defaultMapJson) as MapConfigDefinition),
-      visual: {
-        layers: [
-          {
-            id: "base",
-            name: "Base",
-            visible: true,
-            locked: false,
-            opacity: 0.75,
-            cells: {
-              "4-4": {
-                tilesetId: "kenney-tiny-battle",
-                tileIndex: 12,
-              },
-            },
-          },
-        ],
-      },
-    };
+  it("types radar presentation rows on MapConfigDefinition", () => {
+    const mapWithRadar = structuredClone(defaultMapJson) as MapConfigDefinition;
 
-    expect(mapWithVisual.visual?.layers[0]).toMatchObject({
-      id: "base",
-      opacity: 0.75,
-      cells: { "4-4": { tilesetId: "kenney-tiny-battle", tileIndex: 12 } },
-    });
+    expect(mapWithRadar.radar.world).toMatchObject({ width: 256, height: 256, origin: { x: 128, y: 128 } });
+    expect(mapWithRadar.radar.glyphRows).toHaveLength(256);
+    expect(mapWithRadar.radar.toneRows).toHaveLength(256);
   });
 });
 
-describe("map visual content contracts", () => {
+describe("map radar content contracts", () => {
   const ajv = new Ajv2020({ allErrors: true });
   const validateMap = ajv.compile(mapsSchema);
 
-  it("accepts authored visual layers with tile-id keyed cells", () => {
-    const mapWithVisual = structuredClone(defaultMapJson) as MapConfigDefinition;
+  it("accepts authored radar rows with palette-backed tones", () => {
+    const mapWithRadar = structuredClone(defaultMapJson) as MapConfigDefinition;
 
-    mapWithVisual.visual = {
-      layers: [
-        {
-          id: "base",
-          name: "Base",
-          visible: true,
-          locked: false,
-          opacity: 1,
-          cells: {
-            "4-4": {
-              tilesetId: "kenney-tiny-battle",
-              tileIndex: 0,
-            },
-          },
-        },
-      ],
-    };
-
-    expect(validateMap(mapWithVisual)).toBe(true);
+    expect(validateMap(mapWithRadar)).toBe(true);
   });
 
-  it("rejects unknown visual fields", () => {
-    const mapWithUnknownVisualField = structuredClone(defaultMapJson) as unknown as MapConfigDefinition & {
-      visual: {
-        layers: [];
-        unknownVisualField: boolean;
-      };
+  it("rejects removed visual fields", () => {
+    const mapWithVisualField = {
+      ...(structuredClone(defaultMapJson) as MapConfigDefinition),
+      visual: { layers: [] },
     };
 
-    mapWithUnknownVisualField.visual = {
-      layers: [],
-      unknownVisualField: true,
-    };
-
-    expect(validateMap(mapWithUnknownVisualField)).toBe(false);
+    expect(validateMap(mapWithVisualField)).toBe(false);
     expect(validateMap.errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          instancePath: "/visual",
           keyword: "additionalProperties",
+          params: expect.objectContaining({ additionalProperty: "visual" }),
         }),
       ]),
     );
-  });
-});
-
-describe("map tileset registry", () => {
-  const ajv = new Ajv2020({ allErrors: true });
-  const validateRegistry = ajv.compile(mapTilesetsSchema);
-
-  it("registers the Kenney Tiny Battle packed spritesheet", () => {
-    expect(validateRegistry(tilesetRegistry)).toBe(true);
-
-    const kenneyTileset = tilesetRegistry.tilesets.find((tileset) => tileset.id === "kenney-tiny-battle");
-    expect(kenneyTileset).toMatchObject({
-      tileWidth: 16,
-      tileHeight: 16,
-      spacing: 0,
-      columns: 18,
-      tileCount: 198,
-      publicPath: "maps/tilesets/kenney-tiny-battle/tilemap_packed.png",
-    });
-    expect(kenneyTileset).toBeDefined();
-
-    const tileIndexes = kenneyTileset?.categories.flatMap((category) => category.tileIndexes) ?? [];
-    expect(tileIndexes.length).toBeGreaterThan(0);
-    expect(tileIndexes.every((tileIndex) => tileIndex >= 0 && tileIndex < 198)).toBe(true);
-    expect(fs.existsSync(path.join(repoRoot, "apps/pc-client/public", kenneyTileset?.publicPath ?? ""))).toBe(true);
   });
 });
 

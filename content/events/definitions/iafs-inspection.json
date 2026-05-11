@@ -13,12 +13,12 @@
         "type": "action_complete",
         "required_context": ["crew_id", "tile_id", "action_id"],
         "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "4-4" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "129-129" } },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
         ]
       },
       "candidate_selection": { "priority": 110, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
-      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:4-4", "allow_while_active": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:129-129", "allow_while_active": false },
       "event_graph": {
         "entry_node_id": "report",
         "nodes": [

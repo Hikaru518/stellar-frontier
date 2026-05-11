@@ -11,28 +11,6 @@ export interface MapEditorLibraryMap {
   data: MapEditorDraft;
 }
 
-export interface MapEditorTilesetCategory {
-  id: string;
-  name: string;
-  tileIndexes: number[];
-}
-
-export interface MapEditorTileset {
-  id: string;
-  name: string;
-  assetPath: string;
-  publicPath?: string;
-  tileWidth: number;
-  tileHeight: number;
-  columns: number;
-  tileCount: number;
-  categories?: MapEditorTilesetCategory[];
-}
-
-export interface MapEditorTilesetRegistry {
-  tilesets: MapEditorTileset[];
-}
-
 export interface MapEditorMapObject {
   id: string;
   name: string;
@@ -42,7 +20,6 @@ export interface MapEditorMapObject {
 
 export interface MapEditorLibraryResponse {
   maps: MapEditorLibraryMap[];
-  tileset_registry: MapEditorTilesetRegistry;
   map_objects: MapEditorMapObject[];
   schemas: Record<string, unknown>;
 }
@@ -52,10 +29,8 @@ export interface MapValidationIssue {
   code: string;
   message: string;
   target?: {
-    kind: "map" | "tile" | "layer" | "cell" | "tileset";
+    kind: "map" | "tile" | "radar";
     tileId?: string;
-    layerId?: string;
-    tilesetId?: string;
     field?: string;
   };
   path?: string;

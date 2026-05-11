@@ -86,13 +86,34 @@ function createMapLibraryResponse() {
             createMapTile("2-1", 2, 1),
             createMapTile("2-2", 2, 2),
           ],
-          visual: { layers: [] },
+          radar: createRadarFixture(2, 2),
         },
       },
     ],
-    tileset_registry: { tilesets: [] },
     map_objects: [],
     schemas: {},
+  };
+}
+
+function createRadarFixture(rows: number, cols: number) {
+  return {
+    world: { width: cols, height: rows, origin: { x: 0, y: 0 } },
+    glyphRows: Array.from({ length: rows }, () => ".".repeat(cols)),
+    toneRows: Array.from({ length: rows }, () => "g".repeat(cols)),
+    palette: { g: "#9bbf74", r: "#ff6b5f" },
+    symbols: {
+      crew: { glyph: "@", tone: "g" },
+      focus: { glyph: "X", tone: "r" },
+    },
+    trace: {
+      layerNotice: "notice",
+      controlMode: "control",
+      callMode: "call",
+      worldLine: "world",
+      jsonLine: "json",
+      emptyLine: "empty",
+    },
+    regions: [],
   };
 }
 

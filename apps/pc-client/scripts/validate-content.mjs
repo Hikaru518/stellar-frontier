@@ -19,7 +19,6 @@ const questSchemaPath = "content/schemas/quests.schema.json";
 const questDataPaths = listJsonFiles("content/quests");
 const mapSchemaPath = "content/schemas/maps.schema.json";
 const mapDataPaths = listJsonFiles("content/maps");
-const tilesetRegistryPair = ["content/maps/tilesets/registry.json", "content/schemas/map-tilesets.schema.json"];
 
 const contentAssetGroups = [
   {
@@ -70,7 +69,6 @@ const schemaPaths = new Set([
   ...contentFilePairs.map(([, schemaPath]) => schemaPath),
   questSchemaPath,
   mapSchemaPath,
-  tilesetRegistryPair[1],
   ...contentAssetGroups.map(({ schemaPath }) => schemaPath),
   ...eventSchemaPaths,
 ]);
@@ -82,7 +80,6 @@ for (const schema of Object.values(schemasByPath)) {
 const loaded = Object.fromEntries(contentFilePairs.map(([dataPath]) => [dataPath, readJson(dataPath)]));
 const loadedQuests = Object.fromEntries(questDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
 const loadedMaps = Object.fromEntries(mapDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
-const tilesetRegistry = readJson(tilesetRegistryPair[0]);
 
 let failed = false;
 let eventSchemaFailed = false;
@@ -104,8 +101,6 @@ for (const [dataPath, questData] of Object.entries(loadedQuests)) {
 for (const [dataPath, mapData] of Object.entries(loadedMaps)) {
   failed = validateJsonFile(dataPath, mapSchemaPath, mapData) || failed;
 }
-
-failed = validateJsonFile(tilesetRegistryPair[0], tilesetRegistryPair[1], tilesetRegistry) || failed;
 
 for (const { directoryPath, schemaPath } of eventAssetGroups) {
   for (const dataPath of listJsonFiles(directoryPath)) {
@@ -129,10 +124,11 @@ for (const [dataPath, schemaPath] of eventAssetFiles) {
 
 if (!eventSchemaFailed) {
   failed = validateStructuredEventCrewReferences() || failed;
+  failed = validateStructuredEventTileReferences(loadedMaps) || failed;
   failed = validateEventProgramReferences() || failed;
 }
 
-failed = validateReferences(loaded, loadedMaps, tilesetRegistry) || failed;
+failed = validateReferences(loaded, loadedMaps) || failed;
 failed = validateQuestContentReferences(loadedQuests, loaded, loadedMaps) || failed;
 failed = validateQuestProgressEffectReferences(loadedQuests) || failed;
 
@@ -215,6 +211,68 @@ function validateStructuredEventCrewReferences() {
     }
   }
   return hasError;
+}
+
+function validateStructuredEventTileReferences(maps) {
+  const tileIds = new Set(Object.values(maps).flatMap((map) => (Array.isArray(map.tiles) ? map.tiles.map((tile) => tile.id) : [])));
+  let hasError = false;
+  for (const { directoryPath } of eventAssetGroups) {
+    for (const dataPath of listJsonFiles(directoryPath)) {
+      hasError = validateTileReferencesInValue(readJson(dataPath), dataPath, [], tileIds) || hasError;
+    }
+  }
+  return hasError;
+}
+
+function validateTileReferencesInValue(value, dataPath, segments, tileIds) {
+  if (Array.isArray(value)) {
+    return value.reduce(
+      (hasError, item, index) => validateTileReferencesInValue(item, dataPath, [...segments, index], tileIds) || hasError,
+      false,
+    );
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  let hasError = false;
+  for (const [key, child] of Object.entries(value)) {
+    if (isTileReferenceKey(key) && typeof child === "string" && !child.includes("{")) {
+      hasError = validateKnownTileId(child, dataPath, [...segments, key], tileIds) || hasError;
+      continue;
+    }
+
+    if ((key === "tile_ids" || key === "path_tile_ids" || key === "related_tile_ids") && Array.isArray(child)) {
+      hasError =
+        child.reduce(
+          (childHasError, tileId, index) =>
+            (typeof tileId === "string" && !tileId.includes("{") && validateKnownTileId(tileId, dataPath, [...segments, key, index], tileIds)) ||
+            childHasError,
+          false,
+        ) || hasError;
+      continue;
+    }
+
+    if ((key === "id" || key === "ref") && typeof child === "string" && value.type === "tile_id" && !child.includes("{")) {
+      hasError = validateKnownTileId(child, dataPath, [...segments, key], tileIds) || hasError;
+      continue;
+    }
+
+    hasError = validateTileReferencesInValue(child, dataPath, [...segments, key], tileIds) || hasError;
+  }
+  return hasError;
+}
+
+function isTileReferenceKey(key) {
+  return key === "tile_id" || key === "target_tile_id" || key === "from_tile_id" || key === "to_tile_id" || key === "origin_tile_id" || key === "primary_tile_id";
+}
+
+function validateKnownTileId(tileId, dataPath, segments, tileIds) {
+  if (tileIds.has(tileId)) {
+    return false;
+  }
+  return report(`Unknown tile id in structured event content: ${tileId} at ${dataPath}${formatJsonPath(segments)}`);
 }
 
 function validateCrewReferencesInValue(value, dataPath, segments, crewIds) {
@@ -322,10 +380,11 @@ function escapeJsonPointer(value) {
   return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
-function validateReferences(data, maps, registry) {
+function validateReferences(data, maps) {
   let hasError = false;
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
+  const mapTileIds = new Set(Object.values(maps).flatMap((map) => (Array.isArray(map.tiles) ? map.tiles.map((tile) => tile.id) : [])));
 
   const itemIds = new Set();
   const crewIds = new Set();
@@ -346,15 +405,17 @@ function validateReferences(data, maps, registry) {
         hasError = report(`Unknown itemId in crew ${member.crewId}: ${entry.itemId}`);
       }
     }
+
+    if (!mapTileIds.has(member.currentTile)) {
+      hasError = report(`Unknown currentTile in crew ${member.crewId}: ${member.currentTile}`) || hasError;
+    }
   }
 
   const { ids: knownObjectIds, hasError: catalogFailed } = collectMapObjectIds();
   hasError = catalogFailed || hasError;
-  const { tilesetsById, hasError: tilesetRegistryFailed } = validateTilesetRegistry(registry);
-  hasError = tilesetRegistryFailed || hasError;
   for (const [dataPath, map] of Object.entries(maps)) {
     hasError =
-      validateMap(map, knownObjectIds, tilesetsById, {
+      validateMap(map, knownObjectIds, {
         requireDefaultSize: dataPath === "content/maps/default-map.json",
         dataPath,
       }) || hasError;
@@ -490,64 +551,7 @@ function collectMapObjectIds() {
   return { ids, hasError };
 }
 
-function validateTilesetRegistry(registry) {
-  let hasError = false;
-  const tilesetsById = new Map();
-  const tilesetIds = new Set();
-  const publicTilesetRoot = path.resolve(root, "apps/pc-client/public/maps/tilesets");
-  const publicRoot = path.resolve(root, "apps/pc-client/public");
-
-  for (const tileset of registry.tilesets ?? []) {
-    if (!addUnique(tilesetIds, tileset.id)) {
-      hasError = report(`Duplicate map tileset id: ${tileset.id}`) || hasError;
-    } else {
-      tilesetsById.set(tileset.id, tileset);
-    }
-
-    const assetPath = path.resolve(root, tileset.assetPath);
-    if (!fs.existsSync(assetPath)) {
-      hasError = report(`Map tileset assetPath does not exist for ${tileset.id}: ${tileset.assetPath}`) || hasError;
-    }
-
-    const publicPath = path.resolve(publicRoot, tileset.publicPath);
-    if (!publicPath.startsWith(`${publicTilesetRoot}${path.sep}`)) {
-      hasError =
-        report(`Map tileset publicPath must be under apps/pc-client/public/maps/tilesets: ${tileset.publicPath}`) ||
-        hasError;
-    } else if (!fs.existsSync(publicPath)) {
-      hasError = report(`Map tileset publicPath does not exist for ${tileset.id}: ${tileset.publicPath}`) || hasError;
-    }
-
-    if (tileset.columns * tileset.tileWidth !== tileset.imageWidth) {
-      hasError = report(`Map tileset imageWidth does not match columns * tileWidth for ${tileset.id}`) || hasError;
-    }
-
-    const expectedRows = Math.ceil(tileset.tileCount / tileset.columns);
-    if (expectedRows * tileset.tileHeight !== tileset.imageHeight) {
-      hasError = report(`Map tileset imageHeight does not match tileCount/columns rows for ${tileset.id}`) || hasError;
-    }
-
-    const categoryIds = new Set();
-    for (const category of tileset.categories ?? []) {
-      if (!addUnique(categoryIds, category.id)) {
-        hasError = report(`Duplicate category id in tileset ${tileset.id}: ${category.id}`) || hasError;
-      }
-
-      for (const tileIndex of category.tileIndexes ?? []) {
-        if (tileIndex < 0 || tileIndex >= tileset.tileCount) {
-          hasError =
-            report(
-              `Tileset category tileIndex out of bounds in ${tileset.id}/${category.id}: ${tileIndex} for tileCount ${tileset.tileCount}`,
-            ) || hasError;
-        }
-      }
-    }
-  }
-
-  return { tilesetsById, hasError };
-}
-
-function validateMap(map, knownObjectIds, tilesetsById, options) {
+function validateMap(map, knownObjectIds, options) {
   let hasError = false;
   const { rows, cols } = map.size;
   const tileIds = new Set();
@@ -555,8 +559,8 @@ function validateMap(map, knownObjectIds, tilesetsById, options) {
   const referencedObjectIds = new Map();
   const initialDiscoveredTileIds = new Set(map.initialDiscoveredTileIds);
 
-  if (options.requireDefaultSize && (rows !== 8 || cols !== 8)) {
-    hasError = report(`Default map must be 8 x 8, got ${rows} x ${cols}`) || hasError;
+  if (options.requireDefaultSize && (rows !== 256 || cols !== 256)) {
+    hasError = report(`Default map must be 256 x 256, got ${rows} x ${cols}`) || hasError;
   }
 
   if (!initialDiscoveredTileIds.has(map.originTileId)) {
@@ -625,35 +629,102 @@ function validateMap(map, knownObjectIds, tilesetsById, options) {
     hasError = report(`Map tile count must match size coverage: expected ${rows * cols}, got ${tileById.size}`) || hasError;
   }
 
-  const layerIds = new Set();
-  for (const layer of map.visual?.layers ?? []) {
-    if (!addUnique(layerIds, layer.id)) {
-      hasError = report(`Duplicate visual layer id in ${options.dataPath}: ${layer.id}`) || hasError;
-    }
+  hasError = validateRadar(map.radar, options.dataPath, rows, cols) || hasError;
 
-    for (const [tileId, cell] of Object.entries(layer.cells ?? {})) {
-      if (!tileById.has(tileId)) {
-        hasError = report(`Unknown visual cell tileId in ${options.dataPath}/${layer.id}: ${tileId}`) || hasError;
-      }
+  return hasError;
+}
 
-      const tileset = tilesetsById.get(cell.tilesetId);
-      if (!tileset) {
-        hasError =
-          report(`Unknown visual cell tilesetId in ${options.dataPath}/${layer.id}/${tileId}: ${cell.tilesetId}`) ||
-          hasError;
-        continue;
-      }
+function validateRadar(radar, dataPath, rows, cols) {
+  let hasError = false;
+  if (!radar) {
+    return report(`Map radar definition is required: ${dataPath}`);
+  }
 
-      if (cell.tileIndex < 0 || cell.tileIndex >= tileset.tileCount) {
-        hasError =
-          report(
-            `Visual cell tileIndex out of bounds in ${options.dataPath}/${layer.id}/${tileId}: ${cell.tileIndex} for ${cell.tilesetId}`,
-          ) || hasError;
+  if (radar.world?.width !== cols || radar.world?.height !== rows) {
+    hasError =
+      report(`Map radar world must match map size in ${dataPath}: ${radar.world?.width} x ${radar.world?.height} vs ${cols} x ${rows}`) ||
+      hasError;
+  }
+
+  if (!isInsideRadar(radar, radar.world?.origin?.x, radar.world?.origin?.y)) {
+    hasError = report(`Map radar origin is out of bounds in ${dataPath}`) || hasError;
+  }
+
+  hasError = validateRadarRows(radar.glyphRows, "glyphRows", dataPath, rows, cols) || hasError;
+  hasError = validateRadarRows(radar.toneRows, "toneRows", dataPath, rows, cols) || hasError;
+
+  const toneKeys = new Set(Object.keys(radar.palette ?? {}));
+  for (const [rowIndex, row] of (radar.toneRows ?? []).entries()) {
+    for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+      const tone = row[colIndex];
+      if (!toneKeys.has(tone)) {
+        hasError = report(`Unknown radar tone in ${dataPath}/radar/toneRows/${rowIndex}/${colIndex}: ${tone}`) || hasError;
       }
     }
   }
 
+  for (const [symbolId, symbol] of Object.entries(radar.symbols ?? {})) {
+    if (!toneKeys.has(symbol?.tone)) {
+      hasError = report(`Unknown radar symbol tone in ${dataPath}/radar/symbols/${symbolId}: ${symbol?.tone}`) || hasError;
+    }
+  }
+
+  const regionIds = new Set();
+  for (const region of radar.regions ?? []) {
+    if (!addUnique(regionIds, region.id)) {
+      hasError = report(`Duplicate radar region id in ${dataPath}: ${region.id}`) || hasError;
+    }
+    if (!toneKeys.has(region.tone)) {
+      hasError = report(`Unknown radar region tone in ${dataPath}/radar/regions/${region.id}: ${region.tone}`) || hasError;
+    }
+    hasError = validateRadarRegionBounds(radar, region, dataPath) || hasError;
+  }
+
   return hasError;
+}
+
+function validateRadarRows(rowsValue, fieldName, dataPath, rows, cols) {
+  let hasError = false;
+  if (!Array.isArray(rowsValue) || rowsValue.length !== rows) {
+    return report(`Map radar ${fieldName} row count must be ${rows} in ${dataPath}`);
+  }
+
+  for (const [index, row] of rowsValue.entries()) {
+    if (typeof row !== "string" || row.length !== cols) {
+      hasError = report(`Map radar ${fieldName}/${index} must contain ${cols} cells in ${dataPath}`) || hasError;
+    }
+  }
+  return hasError;
+}
+
+function validateRadarRegionBounds(radar, region, dataPath) {
+  const shape = region.shape;
+  if (!shape) {
+    return false;
+  }
+
+  if (shape.type === "circle") {
+    return isInsideRadar(radar, shape.x, shape.y)
+      ? false
+      : report(`Radar region circle center out of bounds in ${dataPath}/radar/regions/${region.id}`);
+  }
+
+  if (shape.type === "box") {
+    let hasError = false;
+    if (shape.x2 < shape.x1 || shape.y2 < shape.y1) {
+      hasError = report(`Radar region box coordinates must be ordered in ${dataPath}/radar/regions/${region.id}`) || hasError;
+    }
+    if (!isInsideRadar(radar, shape.x1, shape.y1) || !isInsideRadar(radar, shape.x2, shape.y2)) {
+      hasError = report(`Radar region box out of bounds in ${dataPath}/radar/regions/${region.id}`) || hasError;
+    }
+    return hasError;
+  }
+
+  return false;
+}
+
+function isInsideRadar(radar, x, y) {
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < radar.world.width && y < radar.world.height;
 }
 
 function addUnique(set, value) {
