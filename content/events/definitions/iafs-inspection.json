@@ -96,19 +96,19 @@
       "version": 1,
       "domain": "iafs-inspection",
       "title": "南侧通道调查发现散落物资",
-      "summary": "调查 5-5 后，队员辨认出南侧通道的未知对象是一片散落物资。",
+      "summary": "调查 130-130 后，队员辨认出南侧通道的未知对象是一片散落物资。",
       "tags": ["iafs", "survey", "supplies"],
       "status": "approved",
       "trigger": {
         "type": "action_complete",
         "required_context": ["crew_id", "tile_id", "action_id"],
         "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "5-5" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "130-130" } },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
         ]
       },
       "candidate_selection": { "priority": 110, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
-      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:5-5", "allow_while_active": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:130-130", "allow_while_active": false },
       "event_graph": {
         "entry_node_id": "report",
         "nodes": [

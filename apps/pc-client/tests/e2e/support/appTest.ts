@@ -116,8 +116,9 @@ export async function completeOpeningMikeCall(page: Page) {
   await page.getByRole("button", { name: "让我们先看看手头的情况如何，飞船上还有能够使用的设施吗？" }).click();
   await page.getByRole("button", { name: "有一些货物掉在了外面，可能派人去搜寻一番。" }).click();
   await page.getByRole("button", { name: "看样子飞船是没办法重新启航了，得让人寻找一下出去的路。" }).click();
-  await page.getByRole("button", { name: "结束通话" }).last().click();
-  await expect(page.getByRole("heading", { name: "通讯台", exact: true })).toBeVisible();
+  await expect(page.getByText("[CALL] 事件通话已关闭。")).toBeVisible();
+  await page.getByRole("button", { name: /任务/ }).click();
+  await expect(page.getByRole("heading", { name: "任务追踪" })).toBeVisible();
 }
 
 export function mikeCard(page: Page) {

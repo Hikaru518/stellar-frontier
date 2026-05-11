@@ -35,10 +35,10 @@ test("opens the communication station and shows 麦克's empty inventory", async
   await expect(page.getByText("NO CARRIED ITEMS.")).toBeVisible();
 });
 
-test("shows the control center mobile sync status without opening the removed station page", async ({ page }) => {
+test("shows the control center mobile sync status with incoming station state", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByText("COMMUNICATION STATION ......... READY")).toBeVisible();
+  await expect(page.getByText("COMMUNICATION STATION ......... INCOMING")).toBeVisible();
   await expect(page.getByText("mobile")).toBeVisible();
   await expect(page.getByText("WAIT")).toBeVisible();
 });

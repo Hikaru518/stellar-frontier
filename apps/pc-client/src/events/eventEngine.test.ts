@@ -205,7 +205,7 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
-  it("reveals the authored scattered supplies object after surveying tile 5-5", () => {
+  it("reveals the authored scattered supplies object after surveying tile 130-130", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -216,7 +216,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "5-5",
+        tile_id: "130-130",
         action_id: "act_survey_supplies",
         payload: { action_type: "survey" },
       },
@@ -236,7 +236,7 @@ describe("event engine trigger intake", () => {
     });
 
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["5-5"]?.revealedObjectIds).toEqual(["iafs_scattered_supplies"]);
+    expect(selected.state.map?.tilesById?.["130-130"]?.revealedObjectIds).toEqual(["iafs_scattered_supplies"]);
   });
 
   it.each([
@@ -268,7 +268,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "call",
         crew_id: "mike",
-        tile_id: "5-5",
+        tile_id: "130-130",
         action_id: "iafs_scattered_supplies:search",
         event_definition_id: "iafs_scattered_supplies_search",
         payload: {
@@ -361,7 +361,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "4-4",
+        tile_id: "129-129",
         action_id: "repair:mike:iafs_generator:0",
         payload: { action_type: "repair", object_id: "iafs_generator", repair_result: "failure" },
       },
@@ -730,9 +730,9 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
 function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGameState {
   const state = createAuthoredCrashSiteState();
   const suppliesTile = {
-    ...state.tiles["4-4"],
-    id: "5-5",
-    coordinates: { x: 5, y: 5 },
+    ...state.tiles["129-129"],
+    id: "130-130",
+    coordinates: { x: 130, y: 130 },
     terrain_type: "south_pass",
     tags: ["iafs", "supplies"],
     current_crew_ids: ["mike"],
@@ -745,18 +745,18 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
       ...state.crew,
       mike: {
         ...state.crew.mike,
-        tile_id: "5-5",
+        tile_id: "130-130",
       },
     },
     tiles: {
       ...state.tiles,
-      "5-5": suppliesTile,
+      "130-130": suppliesTile,
     },
     map: {
       ...state.map,
       tilesById: {
         ...state.map?.tilesById,
-        "5-5": { revealedObjectIds: [] },
+        "130-130": { revealedObjectIds: [] },
       },
       mapObjects: {
         ...state.map?.mapObjects,
