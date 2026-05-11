@@ -29,7 +29,7 @@ import {
   type WorldFlag,
 } from "./events/types";
 import { defaultMapConfig } from "./content/contentData";
-import { canMoveToTile, getTileLocationLabel } from "./mapSystem";
+import { canMoveToTile, getTileLocationLabel, resolveVisibleTileObjects } from "./mapSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
@@ -911,6 +911,7 @@ function App() {
           returnTarget={mapReturnTarget}
           moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
           initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+          map={gameState.map}
           onOpenControl={openControlOverview}
           onOpenTask={openStation}
           onReturnFromMap={returnFromMap}
@@ -1595,32 +1596,12 @@ function findCandidateObject(tileId: string, verb: string, map: GameMapState | u
   if (!configTile) {
     return undefined;
   }
-  for (const objectId of configTile.objectIds) {
-    const definition = mapObjectDefinitionById.get(objectId);
-    if (!definition) {
-      continue;
-    }
-    if (!isObjectVisible(tileId, definition, map)) {
-      continue;
-    }
-    if (definition.actions.some((action) => action.id === `${objectId}:${verb}`)) {
+  for (const { definition } of resolveVisibleTileObjects(configTile, map)) {
+    if (definition.actions.some((action) => action.id === `${definition.id}:${verb}`)) {
       return definition;
     }
   }
   return undefined;
-}
-
-function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: GameMapState | undefined) {
-  if (!map) {
-    return true;
-  }
-
-  const runtimeTile = map.tilesById[tileId];
-  return (
-    definition.visibility === "onDiscovered" ||
-    runtimeTile?.revealedObjectIds?.includes(definition.id) ||
-    (definition.visibility === "onInvestigated" && runtimeTile?.investigated)
-  );
 }
 
 /**
@@ -1940,9 +1921,7 @@ function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefini
     return [];
   }
 
-  return configTile.objectIds
-    .map((objectId) => mapObjectDefinitionById.get(objectId))
-    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)));
+  return resolveVisibleTileObjects(configTile, state.map).map(({ definition }) => definition);
 }
 
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {

@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { initialCrew, initialLogs, initialTiles } from "../data/gameData";
+import { createInitialMapState, initialCrew, initialLogs, initialTiles } from "../data/gameData";
 import { MapPage } from "./MapPage";
 
 describe("MapPage", () => {
@@ -75,6 +75,26 @@ describe("MapPage", () => {
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
   });
 
+  it("shows selected tile details in the right panel", () => {
+    renderMapPage();
+
+    expect(screen.getByText("地图详情")).toBeInTheDocument();
+    expect(screen.getByText("129-129")).toBeInTheDocument();
+    expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
+    expect(screen.getByText("无当前可见对象")).toBeInTheDocument();
+  });
+
+  it("lists only runtime-visible map objects for the selected tile", () => {
+    renderMapPage({ map: createMapWithRevealedOriginObjects(["iafs_generator"]) });
+
+    const objectList = screen.getByLabelText("当前可见地图对象");
+    expect(objectList).toHaveTextContent("发电机（已损坏）");
+    expect(objectList).not.toHaveTextContent("damaged");
+    expect(objectList).not.toHaveTextContent("facility");
+    expect(objectList).not.toHaveTextContent("维生装置");
+  });
+
   it("shows the latest system log in the bottom bar", () => {
     renderMapPage();
 
@@ -92,6 +112,7 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       elapsedGameSeconds={0}
       gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
       returnTarget="control"
+      map={createInitialMapState()}
       onOpenControl={vi.fn()}
       onOpenTask={vi.fn()}
       onReturnFromMap={vi.fn()}
@@ -103,4 +124,20 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       {...overrides}
     />
   );
+}
+
+function createMapWithRevealedOriginObjects(revealedObjectIds: string[]) {
+  const map = createInitialMapState();
+  return {
+    ...map,
+    tilesById: {
+      ...map.tilesById,
+      "129-129": {
+        ...(map.tilesById["129-129"] ?? {}),
+        discovered: true,
+        investigated: true,
+        revealedObjectIds,
+      },
+    },
+  };
 }

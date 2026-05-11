@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GameConsoleLayout } from "../components/Layout";
+import { FieldList, GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig, type MapTileDefinition } from "../content/contentData";
-import type { CrewId, CrewMember, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
+import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
-import { parseTileId } from "../mapSystem";
+import { formatMapObjectStatus, parseTileId, resolveVisibleTileObjects } from "../mapSystem";
 
 const CELL_W = 8;
 const CELL_H = 10;
@@ -35,6 +35,7 @@ interface MapPageProps {
   returnTarget: MapReturnTarget;
   moveSelectionCrewId?: CrewId | null;
   initialSelectedTileId?: string;
+  map: GameMapState;
   onOpenControl: () => void;
   onOpenTask: () => void;
   onReturnFromMap: () => void;
@@ -55,6 +56,7 @@ export function MapPage({
   returnTarget,
   moveSelectionCrewId,
   initialSelectedTileId,
+  map,
   onOpenControl,
   onOpenTask,
   onReturnFromMap,
@@ -84,6 +86,7 @@ export function MapPage({
   const focusConfigTile = configTileById.get(focusTileId);
   const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile), [focusCoord, focusConfigTile]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
+  const visibleFocusObjects = useMemo(() => (focusConfigTile ? resolveVisibleTileObjects(focusConfigTile, map) : []), [focusConfigTile, map]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
 
   const crewActionViews = useMemo(
@@ -414,74 +417,103 @@ export function MapPage({
         </div>
       }
       rightPanel={
-        <section className="console-side-panel">
-          <div className="console-column-header">
-            <span>map trace</span>
-          </div>
-          <div className="console-map-trace">
-            <p className="console-map-trace-lead">
-              {RADAR.trace.layerNotice}
-            </p>
-            <div className="console-layer-toggle-list">
-              <button
-                type="button"
-                className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
-                onClick={() => {
-                  setShowRenderLayer((value) => !value);
-                  pushTrace(`[LAYER] render ${showRenderLayer ? "OFF" : "ON"}`);
-                }}
-              >
-                显示渲染层
-              </button>
-              <button
-                type="button"
-                className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
-                onClick={() => {
-                  setShowFunctionalLayer((value) => !value);
-                  pushTrace(`[LAYER] function ${showFunctionalLayer ? "OFF" : "ON"}`);
-                }}
-              >
-                显示功能层
-              </button>
+        <div className="console-right-stack">
+          <section className="console-side-panel">
+            <div className="console-column-header">
+              <span>地图详情</span>
             </div>
-            <p className="console-map-trace-lead">
-              {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
-            </p>
-            <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
-            <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
-            <p className="console-map-trace-line">
-              [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
-            </p>
-            {returnTarget === "call" ? (
-              <div className="console-map-return-actions">
-                {moveSelectionMember ? (
-                  <button
-                    type="button"
-                    className="console-crew-button"
-                    onClick={() => {
-                      pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
-                      onSelectMoveTarget(focusTileId);
-                    }}
-                  >
-                    标记当前坐标
-                  </button>
-                ) : null}
-                <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
-                  返回当前通话
+            <FieldList
+              rows={[
+                ["区块", focusTileId],
+                ["坐标", focusDisplayCoord],
+                ["区域", focusLabel],
+                ["地形", focusConfigTile?.terrain ?? "未知地形"],
+                ["天气", focusConfigTile?.weather ?? "未知天气"],
+              ]}
+            />
+            <div className="console-map-trace" aria-label="当前可见地图对象">
+              <p className="console-map-trace-lead">地图对象</p>
+              {visibleFocusObjects.length ? (
+                visibleFocusObjects.map(({ definition, runtime }) => (
+                  <p key={definition.id} className="console-map-trace-line">
+                    {formatMapObjectLabel(definition.name, formatMapObjectStatus(runtime?.status_enum ?? definition.initial_status))}
+                  </p>
+                ))
+              ) : (
+                <p className="console-map-trace-line">无当前可见对象</p>
+              )}
+            </div>
+          </section>
+
+          <section className="console-side-panel">
+            <div className="console-column-header">
+              <span>map trace</span>
+            </div>
+            <div className="console-map-trace">
+              <p className="console-map-trace-lead">
+                {RADAR.trace.layerNotice}
+              </p>
+              <div className="console-layer-toggle-list">
+                <button
+                  type="button"
+                  className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => {
+                    setShowRenderLayer((value) => !value);
+                    pushTrace(`[LAYER] render ${showRenderLayer ? "OFF" : "ON"}`);
+                  }}
+                >
+                  显示渲染层
+                </button>
+                <button
+                  type="button"
+                  className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => {
+                    setShowFunctionalLayer((value) => !value);
+                    pushTrace(`[LAYER] function ${showFunctionalLayer ? "OFF" : "ON"}`);
+                  }}
+                >
+                  显示功能层
                 </button>
               </div>
-            ) : null}
-            {traceLines.length ? (
-              traceLines.map((line, index) => (
-                <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
-                  {line}
-                </p>
-              ))
-            ) : (
-              <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
-            )}
-          </div>
-        </section>
+              <p className="console-map-trace-lead">
+                {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
+              </p>
+              <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
+              <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
+              <p className="console-map-trace-line">
+                [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
+              </p>
+              {returnTarget === "call" ? (
+                <div className="console-map-return-actions">
+                  {moveSelectionMember ? (
+                    <button
+                      type="button"
+                      className="console-crew-button"
+                      onClick={() => {
+                        pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
+                        onSelectMoveTarget(focusTileId);
+                      }}
+                    >
+                      标记当前坐标
+                    </button>
+                  ) : null}
+                  <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
+                    返回当前通话
+                  </button>
+                </div>
+              ) : null}
+              {traceLines.length ? (
+                traceLines.map((line, index) => (
+                  <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
+              )}
+            </div>
+          </section>
+        </div>
       }
       bottomBar={
         <div className="console-bottom-strip">
@@ -654,6 +686,10 @@ function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefin
     .sort((left, right) => right.priority - left.priority)
     .find((entry) => isInsideRegion(coord, entry.shape));
   return region?.label ?? tile?.areaName ?? "未命名区域";
+}
+
+function formatMapObjectLabel(name: string, statusLabel: string) {
+  return statusLabel ? `${name}（${statusLabel}）` : name;
 }
 
 function isInsideRegion(coord: FocusCoord, shape: (typeof RADAR.regions)[number]["shape"]) {
