@@ -331,14 +331,14 @@ export function CallPage({
             <section className="console-screen-block console-call-visual-grid">
               <div className="console-call-art-block">
                 <p className="console-screen-command">] OPEN SIGNAL-CAPTURE.BAS</p>
-                {buildCallAsciiScene(callView, member, callClosed).map((line) => (
-                  <p key={line} className="console-call-art-line">{line}</p>
+                {buildCallAsciiScene(callView, member, callClosed).map((line, index) => (
+                  <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
                 ))}
               </div>
               <div className="console-call-portrait-block">
                 <p className="console-screen-command">] CREW PORTRAIT</p>
-                {buildCrewPortrait(member, callView.isRuntime).map((line) => (
-                  <p key={line} className="console-call-portrait-line">{line}</p>
+                {buildCrewPortrait(member, callView.isRuntime).map((line, index) => (
+                  <p key={`portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
                 ))}
                 <div className="console-call-profile-copy">
                   <p className="console-screen-line console-screen-line-cyan">CREW: {member.name.toUpperCase()} / {member.role}</p>
@@ -350,8 +350,8 @@ export function CallPage({
             </section>
             <section className="console-screen-block">
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
-              {(call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line) => (
-                <p key={line} className="console-call-dialogue-line">{line}</p>
+              {(call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
+                <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
               ))}
               <p className={callView.isRuntime ? "console-screen-line console-screen-line-rose" : "console-screen-line console-screen-line-cyan"}>
                 {callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : memberActionView.timingText}
