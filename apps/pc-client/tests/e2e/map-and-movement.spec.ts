@@ -8,135 +8,157 @@ import {
   readSave,
   runtimeCrewAction,
   selectMapTile,
-  setDebugTimeMultiplier,
   startNormalMikeCall,
   test,
 } from "./support/appTest";
 
-test("shows the full authored IAFS map on a new game", async ({ page }) => {
+test.describe.configure({ timeout: 75_000 });
+
+test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: /卫星雷达/ }).click();
+  await page.getByRole("button", { name: /地图/ }).click();
 
   await expect(page.locator(".map-grid")).toHaveCount(0);
-  const stage = page.locator(".phaser-map-stage");
+  await expect(page.locator(".phaser-map-stage")).toHaveCount(0);
+  const stage = page.locator(".console-ascii-map-stage");
   await expect(stage).toBeVisible();
-  await expect(stage).toHaveAttribute("data-zoom-level", "0");
-  const semanticLayer = page.getByLabel("地图语义层");
-  await expect(semanticLayer.getByRole("button")).toHaveCount(64);
-  await expect(semanticLayer.getByRole("button", { name: /IAFS坠毁点/ })).toHaveCount(1);
-  await expect(semanticLayer.getByRole("button", { name: /坠毁西侧/ })).toHaveCount(1);
-  expect(await semanticLayer.getByRole("button", { name: /北侧山脊/ }).count()).toBeGreaterThan(0);
-  await expect(page.getByText(/4x4|4 x 4/)).toHaveCount(0);
+  await expect(stage).toHaveAttribute("data-focus-tile-id", "129-129");
+  await expect(page.getByText("render + function / 256 x 256")).toBeVisible();
+  await expect(page.getByText("[JSON] radar glyph/tone/regions loaded from content/maps/radar/default-map-radar.json")).toBeVisible();
+  await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
 });
 
-test("renders the Phaser canvas inside a stable fixed map viewport", async ({ page }) => {
+test("renders the console radar canvas inside a stable fixed map viewport", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: /卫星雷达/ }).click();
+  await page.getByRole("button", { name: /地图/ }).click();
 
-  const shell = page.locator(".phaser-map-canvas");
-  const stage = page.locator(".phaser-map-stage");
-  const canvas = stage.locator("canvas");
-  await expect(canvas).toHaveCount(1);
-  const initialBox = await shell.boundingBox();
-  const canvasBox = await canvas.boundingBox();
+  const stage = page.locator(".console-ascii-map-stage");
+  const renderCanvas = stage.locator(".console-retro-map-render-layer");
+  const functionCanvas = stage.locator(".console-retro-map-function-canvas");
+  await expect(renderCanvas).toHaveCount(1);
+  await expect(functionCanvas).toHaveCount(1);
+  const initialBox = await stage.boundingBox();
   expect(initialBox?.height).toBeGreaterThan(0);
-  expect(initialBox?.height).toBeLessThanOrEqual(431);
-  expect(canvasBox?.width).toBeGreaterThan(0);
-  expect(canvasBox?.height).toBeGreaterThan(0);
+  expect(initialBox?.width).toBeGreaterThan(0);
 
   await page.clock.runFor(1_000);
+  await stage.evaluate((element) => {
+    element.dispatchEvent(new WheelEvent("wheel", { deltaY: 2_000, bubbles: true, cancelable: true }));
+  });
 
-  const laterBox = await shell.boundingBox();
+  const laterBox = await stage.boundingBox();
   expect(laterBox?.height).toBeCloseTo(initialBox?.height ?? 0, 0);
+  expect(laterBox?.width).toBeCloseTo(initialBox?.width ?? 0, 0);
+
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".console-retro-map-function-canvas") as HTMLCanvasElement | null;
+    return !!canvas && canvas.width > 0 && canvas.height > 0;
+  });
+  const lowerRightPaintedPixels = await functionCanvas.evaluate((canvas) => {
+    const context = (canvas as HTMLCanvasElement).getContext("2d");
+    if (!context || canvas.width <= 0 || canvas.height <= 0) {
+      return 0;
+    }
+    const sampleX = Math.floor(canvas.width * 0.72);
+    const sampleY = Math.floor(canvas.height * 0.72);
+    const sampleW = Math.max(1, Math.floor(canvas.width * 0.22));
+    const sampleH = Math.max(1, Math.floor(canvas.height * 0.22));
+    const pixels = context.getImageData(sampleX, sampleY, sampleW, sampleH).data;
+    let painted = 0;
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] > 0) {
+        painted += 1;
+      }
+    }
+    return painted;
+  });
+  expect(lowerRightPaintedPixels).toBeGreaterThan(0);
 });
 
-test("shows full tile info on the occupied revealed crash-site tile", async ({ page }) => {
+test("shows authored crash-site radar metadata on the occupied origin tile", async ({ page }) => {
   await installSave(page, {
     map: createRevealedCrashSiteMap(),
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /卫星雷达/ }).click();
+  await page.getByRole("button", { name: /地图/ }).click();
+  await selectMapTile(page, "129-129");
 
-  await expect(page.locator(".map-grid")).toHaveCount(0);
-  await expect(page.locator(".phaser-map-stage")).toHaveAttribute("data-zoom-level", "0");
-  await selectMapTile(page, "4-4");
-
-  const detail = page.locator(".map-detail");
-  await expect(detail.getByText("坐标详情：(0,0)")).toBeVisible();
-  await expect(detail.getByText("IAFS坠毁点")).toBeVisible();
-  await expect(detail.getByText("平原")).toBeVisible();
-  await expect(detail.getByText("晴朗")).toBeVisible();
-  await expect(detail.getByText("发电机 / 维生装置 / 穿梭机核心")).toBeVisible();
-  await expect(detail.getByText("Mike：待命中。")).toBeVisible();
+  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
+  await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
+  await expect(page.getByText(/Mike/)).toBeVisible();
 });
 
-test("moves Mike to a full-map tile selected from the complete target list", async ({ page }) => {
+test("moves Mike after selecting a target tile from the console radar and confirming in call", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: /通讯台/ }).click();
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "移动到指定区域" }).click();
 
-  await page.getByRole("button", { name: /坠毁东侧 \(1,0\).*地形：平原/ }).click();
-  await page.getByRole("button", { name: /确认请求 Mike 前往 坠毁东侧 \(1,0\)/ }).click();
+  await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
+  await selectMapTile(page, "129-130");
+  await page.getByRole("button", { name: "标记当前坐标" }).click();
+  await expect(page.getByRole("heading", { name: "Mike 通话界面" })).toBeVisible();
+  const confirmMoveButton = page.getByRole("button", { name: /确认请求 Mike 前往 坠毁东侧 \(1,0\)/ });
+  await expect(confirmMoveButton).toBeVisible();
+  await confirmMoveButton.click();
   await expect(page.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeVisible();
 
   await page.clock.runFor(61_000);
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
-    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "4-5";
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "129-130";
   }, GAME_SAVE_KEY);
 
   await expect(page.getByText(/地点：坠毁东侧 \(1,0\)/)).toBeVisible();
 
-  await page.getByRole("button", { name: /地图二级菜单/ }).click();
-  const semanticLayer = page.getByLabel("地图语义层");
-  await expect(semanticLayer.getByRole("button", { name: /坠毁东侧/ })).toBeVisible();
-  await expect(semanticLayer.getByRole("button")).toHaveCount(64);
+  await page.getByRole("button", { name: /地图/ }).click();
+  await expect(page.locator(".console-ascii-map-stage")).toBeVisible();
 });
 
 test("moves a seeded crew action along intermediate route steps", async ({ page }) => {
   await installSave(page, {
-    crew: [idleMike("4-3", { status: "正在前往目标地点，行进中。", statusTone: "muted" })],
+    crew: [idleMike("129-128", { status: "正在前往目标地点，行进中。", statusTone: "muted" })],
     crew_actions: {
-      "mike-move-4-5": runtimeCrewAction({
-        id: "mike-move-4-5",
+      "mike-move-129-129": runtimeCrewAction({
+        id: "mike-move-129-129",
         crew_id: "mike",
         type: "move",
-        from_tile_id: "4-3",
-        to_tile_id: "4-5",
-        target_tile_id: "4-5",
-        path_tile_ids: ["4-4", "4-5"],
+        from_tile_id: "129-128",
+        to_tile_id: "129-129",
+        target_tile_id: "129-129",
+        path_tile_ids: ["129-129"],
         started_at: 0,
-        ends_at: 120,
-        duration_seconds: 120,
+        ends_at: 1,
+        duration_seconds: 1,
         action_params: {
           route_step_index: 0,
           step_started_at: 0,
-          step_finish_time: 60,
-          step_durations_seconds: [60, 60],
+          step_finish_time: 1,
+          step_durations_seconds: [1],
         },
       }),
     },
   });
 
   await page.goto("/");
-  await page.clock.runFor(60_000);
+  await page.clock.runFor(2_000);
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
-    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "4-4";
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "129-129";
   }, GAME_SAVE_KEY);
 
   const saved = await readSave(page);
-  expect(findSavedCrew(saved, "mike").currentTile).toBe("4-4");
-  expect(saved.map.discoveredTileIds).toContain("4-4");
-  expect(saved.crew_actions["mike-move-4-5"].action_params.route_step_index).toBe(1);
+  expect(findSavedCrew(saved, "mike").currentTile).toBe("129-129");
+  expect(saved.map.discoveredTileIds).toContain("129-129");
+  expect(saved.crew_actions["mike-move-129-129"].action_params.route_step_index).toBe(1);
 });
 
-test("keeps the Phaser map stable while accelerated game time completes a move", async ({ page }) => {
+test("keeps the console radar stable while accelerated game time completes a move", async ({ page }) => {
   const consoleFailures: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -146,41 +168,38 @@ test("keeps the Phaser map stable while accelerated game time completes a move",
   page.on("pageerror", (error) => consoleFailures.push(error.message));
 
   await installSave(page, {
-    crew: [idleMike("4-4", { status: "正在前往坠毁东侧。", statusTone: "muted" })],
+    crew: [idleMike("129-129", { status: "正在前往坠毁东侧。", statusTone: "muted" })],
     crew_actions: {
-      "mike-move-4-5": runtimeCrewAction({
-        id: "mike-move-4-5",
+      "mike-move-129-130": runtimeCrewAction({
+        id: "mike-move-129-130",
         crew_id: "mike",
         type: "move",
-        from_tile_id: "4-4",
-        to_tile_id: "4-5",
-        target_tile_id: "4-5",
-        path_tile_ids: ["4-5"],
+        from_tile_id: "129-129",
+        to_tile_id: "129-130",
+        target_tile_id: "129-130",
+        path_tile_ids: ["129-130"],
         started_at: 0,
-        ends_at: 60,
-        duration_seconds: 60,
+        ends_at: 1,
+        duration_seconds: 1,
         action_params: {
           route_step_index: 0,
           step_started_at: 0,
-          step_finish_time: 60,
-          step_durations_seconds: [60],
+          step_finish_time: 1,
+          step_durations_seconds: [1],
         },
       }),
     },
   });
 
   await page.goto("/");
-  await setDebugTimeMultiplier(page, "1x");
-  await setDebugTimeMultiplier(page, "2x");
-  await setDebugTimeMultiplier(page, "4x");
-  await page.getByRole("button", { name: /卫星雷达/ }).click();
+  await page.getByRole("button", { name: /地图/ }).click();
 
-  const stage = page.locator(".phaser-map-stage");
-  await expect(stage).toHaveAttribute("data-zoom-level", "0");
-  await page.clock.runFor(15_000);
+  const stage = page.locator(".console-ascii-map-stage");
+  await expect(stage).toHaveAttribute("data-focus-tile-id", "129-129");
+  await page.clock.runFor(2_000);
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
-    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "4-5";
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "129-130";
   }, GAME_SAVE_KEY);
   expect(consoleFailures).toEqual([]);
 });

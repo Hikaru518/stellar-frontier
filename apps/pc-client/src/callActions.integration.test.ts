@@ -20,6 +20,8 @@ import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gam
 import type { Condition, CrewActionState, Effect } from "./events/types";
 import { createInitialQuestState } from "./questSystem";
 
+const CRASH_SITE_TILE_ID = "129-129";
+
 const STUB_TILE_ID = "2-3";
 const STUB_OBJECT_ID = "__integration_locked_door__";
 
@@ -144,9 +146,9 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
 }
 
 function createCrashSiteTile(): MapTile {
-  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === "4-4")!;
+  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === CRASH_SITE_TILE_ID)!;
   return {
-    id: "4-4",
+    id: CRASH_SITE_TILE_ID,
     coord: "(0,0)",
     row: configTile.row,
     col: configTile.col,
@@ -162,7 +164,7 @@ function createCrashSiteMember(overrides: Partial<CrewMember> = {}): CrewMember 
     id: "mike",
     name: "Mike",
     role: "神秘幸存者",
-    currentTile: "4-4",
+    currentTile: CRASH_SITE_TILE_ID,
     ...overrides,
   });
 }
@@ -177,9 +179,9 @@ function createRepairCrewAction(overrides: Partial<CrewActionState> = {}): CrewA
     parent_event_id: null,
     objective_id: null,
     action_request_id: null,
-    from_tile_id: "4-4",
+    from_tile_id: CRASH_SITE_TILE_ID,
     to_tile_id: null,
-    target_tile_id: "4-4",
+    target_tile_id: CRASH_SITE_TILE_ID,
     path_tile_ids: [],
     started_at: 0,
     ends_at: 180,
@@ -204,10 +206,10 @@ function createCrashSiteState(overrides: Partial<GameState> = {}): GameState {
       rows: defaultMapConfig.size.rows,
       cols: defaultMapConfig.size.cols,
       originTileId: defaultMapConfig.originTileId,
-      discoveredTileIds: ["4-4"],
+      discoveredTileIds: [CRASH_SITE_TILE_ID],
       investigationReportsById: {},
       tilesById: {
-        "4-4": {
+        [CRASH_SITE_TILE_ID]: {
           discovered: true,
           investigated: true,
           revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
@@ -225,7 +227,7 @@ function createCrashSiteState(overrides: Partial<GameState> = {}): GameState {
 }
 
 describe("map-object-action pipeline integration", () => {
-  it("shows the three crash-site repair actions on a normal call at 4-4", () => {
+  it("shows the three crash-site repair actions on a normal call at the crash site", () => {
     const member = createCrashSiteMember();
     const view = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
@@ -278,7 +280,7 @@ describe("map-object-action pipeline integration", () => {
         map: {
           ...createCrashSiteState().map,
           tilesById: {
-            "4-4": {
+            [CRASH_SITE_TILE_ID]: {
               discovered: true,
               investigated: true,
               revealedObjectIds: [],

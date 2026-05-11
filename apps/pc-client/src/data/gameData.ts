@@ -12,7 +12,7 @@ import type { InventoryEntry } from "../inventorySystem";
 import { getDisplayCoord, getTileLocationLabel, parseTileId, type RuntimeMapState } from "../mapSystem";
 import type { QuestRuntimeState } from "../questSystem";
 
-export type PageId = "control" | "station" | "call" | "map" | "ending";
+export type PageId = "control" | "station" | "call" | "map" | "crew" | "ending";
 
 export type CrewId = CrewDefinition["crewId"];
 
@@ -193,25 +193,33 @@ export function createBaseInventoryFromResources(resourceSummary: Pick<ResourceS
 
 export function createInitialMapState(): GameMapState {
   const discoveredTileIds = [...defaultMapConfig.initialDiscoveredTileIds];
-  const tilesById: GameMapState["tilesById"] = Object.fromEntries(
-    defaultMapConfig.tiles.map((mapTile) => [
-      mapTile.id,
-      {
-        discovered: discoveredTileIds.includes(mapTile.id),
-        investigated: discoveredTileIds.includes(mapTile.id),
-        activeSpecialStateIds: mapTile.specialStates.filter((state) => state.startsActive).map((state) => state.id),
-        revealedObjectIds: mapTile.objectIds
-          .map((objectId) => mapObjectDefinitionById.get(objectId))
-          .filter((object): object is NonNullable<typeof object> =>
-            Boolean(object && object.visibility === "onDiscovered" && discoveredTileIds.includes(mapTile.id)),
-          )
-          .map((object) => object.id),
-        revealedSpecialStateIds: mapTile.specialStates
-          .filter((state) => state.visibility === "onDiscovered" && state.startsActive && discoveredTileIds.includes(mapTile.id))
-          .map((state) => state.id),
-      },
-    ]),
-  );
+  const discoveredTileIdsSet = new Set(discoveredTileIds);
+  const tilesById: GameMapState["tilesById"] = {};
+
+  for (const mapTile of defaultMapConfig.tiles) {
+    const activeSpecialStateIds = mapTile.specialStates.filter((state) => state.startsActive).map((state) => state.id);
+    const discovered = discoveredTileIdsSet.has(mapTile.id);
+    if (!discovered && activeSpecialStateIds.length === 0 && mapTile.objectIds.length === 0) {
+      continue;
+    }
+
+    tilesById[mapTile.id] = {
+      discovered,
+      investigated: discovered,
+      activeSpecialStateIds,
+      revealedObjectIds: discovered
+        ? mapTile.objectIds
+            .map((objectId) => mapObjectDefinitionById.get(objectId))
+            .filter((object): object is NonNullable<typeof object> => Boolean(object && object.visibility === "onDiscovered"))
+            .map((object) => object.id)
+        : [],
+      revealedSpecialStateIds: discovered
+        ? mapTile.specialStates
+            .filter((state) => state.visibility === "onDiscovered" && state.startsActive)
+            .map((state) => state.id)
+        : [],
+    };
+  }
 
   return {
     configId: defaultMapConfig.id,
@@ -239,14 +247,16 @@ export function createInitialMapObjectsState(): RuntimeMapObjectsState {
 
 export function createMapTilesFromConfig(map: GameMapState, previousTiles: Array<Partial<MapTile> & { id?: string }> = []): MapTile[] {
   const previousTileById = new Map(previousTiles.filter((tile): tile is Partial<MapTile> & { id: string } => typeof tile.id === "string").map((tile) => [tile.id, tile]));
+  const origin = parseTileId(defaultMapConfig.originTileId);
 
   return defaultMapConfig.tiles.map((mapTile) => {
     const state = map.tilesById[mapTile.id];
     const previousTile = previousTileById.get(mapTile.id);
     const discovered = map.discoveredTileIds.includes(mapTile.id) || Boolean(state?.discovered);
+    const displayCoord = origin ? getDisplayCoord(mapTile, origin) : { displayX: mapTile.col, displayY: mapTile.row };
     const tile: MapTile = {
       id: mapTile.id,
-      coord: getMapTileDisplayCoord(mapTile.id),
+      coord: `(${displayCoord.displayX},${displayCoord.displayY})`,
       row: mapTile.row,
       col: mapTile.col,
       terrain: mapTile.terrain,
@@ -323,8 +333,8 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
 }
 
 function getMapTileDisplayCoord(tileId: string) {
-  const tile = defaultMapConfig.tiles.find((item) => item.id === tileId);
   const origin = parseTileId(defaultMapConfig.originTileId);
+  const tile = parseTileId(tileId);
   if (!tile || !origin) {
     return tileId;
   }

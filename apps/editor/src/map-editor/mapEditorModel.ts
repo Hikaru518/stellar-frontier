@@ -4,17 +4,19 @@ import type {
   MapEditorState,
   MapEnvironmentDefinition,
   MapTileDefinition,
-  MapVisualLayerDefinition,
 } from "./types";
 
-export const DEFAULT_MAP_VERSION = 1;
+export const DEFAULT_MAP_VERSION = 3;
 export const DEFAULT_TERRAIN = "平原";
 export const DEFAULT_WEATHER = "晴朗";
+const DEFAULT_RADAR_GLYPH = ".";
+const DEFAULT_RADAR_TONE = "g";
 
 export function createMapEditorDraft(input: CreateMapDraftInput): MapEditorDraft {
   const rows = assertPositiveInteger(input.rows, "rows");
   const cols = assertPositiveInteger(input.cols, "cols");
   const originTileId = getTileId(Math.ceil(rows / 2), Math.ceil(cols / 2));
+  const radarPath = defaultRadarPath(input.id);
 
   return {
     id: input.id,
@@ -23,8 +25,9 @@ export function createMapEditorDraft(input: CreateMapDraftInput): MapEditorDraft
     size: { rows, cols },
     originTileId,
     initialDiscoveredTileIds: [originTileId],
+    radarPath,
     tiles: createGameplayTiles(rows, cols),
-    visual: { layers: [] },
+    radar: createDefaultRadar(rows, cols, originTileId, radarPath),
   };
 }
 
@@ -32,7 +35,6 @@ export function createInitialMapEditorState(draft: MapEditorDraft): MapEditorSta
   const normalizedDraft = normalizeMapEditorDraft(draft);
   return {
     draft: normalizedDraft,
-    activeLayerId: normalizedDraft.visual.layers[0]?.id ?? null,
     history: {
       past: [],
       future: [],
@@ -41,28 +43,13 @@ export function createInitialMapEditorState(draft: MapEditorDraft): MapEditorSta
 }
 
 export function normalizeMapEditorDraft(draft: MapEditorDraft): MapEditorDraft {
+  const rows = draft.size.rows;
+  const cols = draft.size.cols;
+  const radarPath = draft.radarPath ?? defaultRadarPath(draft.id);
   return {
     ...draft,
-    visual: {
-      layers: draft.visual?.layers ?? [],
-    },
-  };
-}
-
-export function createVisualLayer(
-  id: string,
-  name: string,
-  overrides: Partial<Omit<MapVisualLayerDefinition, "id" | "name" | "cells">> & {
-    cells?: Record<string, MapVisualLayerDefinition["cells"][string]>;
-  } = {},
-): MapVisualLayerDefinition {
-  return {
-    id,
-    name,
-    visible: overrides.visible ?? true,
-    locked: overrides.locked ?? false,
-    opacity: overrides.opacity ?? 1,
-    cells: overrides.cells ?? {},
+    radarPath,
+    radar: normalizeRadar(draft.radar, rows, cols, draft.originTileId, radarPath),
   };
 }
 
@@ -112,6 +99,83 @@ function createGameplayTiles(rows: number, cols: number): MapTileDefinition[] {
     }
   }
   return tiles;
+}
+
+function createDefaultRadar(rows: number, cols: number, originTileId: string, radarPath: string): MapEditorDraft["radar"] {
+  const origin = parseTileId(originTileId) ?? { row: Math.ceil(rows / 2), col: Math.ceil(cols / 2) };
+  return {
+    world: {
+      width: cols,
+      height: rows,
+      origin: { x: origin.col - 1, y: origin.row - 1 },
+    },
+    glyphRows: Array.from({ length: rows }, () => DEFAULT_RADAR_GLYPH.repeat(cols)),
+    toneRows: Array.from({ length: rows }, () => DEFAULT_RADAR_TONE.repeat(cols)),
+    palette: {
+      g: "#9bbf74",
+      d: "#8f7a5d",
+      c: "#74a6a6",
+      a: "#f0a64d",
+      w: "#e7d0a4",
+      s: "#7dffb1",
+      r: "#ff6b5f",
+    },
+    symbols: {
+      crew: { glyph: "@", tone: "c" },
+      focus: { glyph: "X", tone: "s" },
+    },
+    trace: {
+      layerNotice: "雷达层来自 map JSON，可在语义编辑器中修改 glyph/tone。",
+      controlMode: "语义地图编辑模式：运行时雷达读取此 JSON。",
+      callMode: "从通话进入地图后只标记目标，仍需回通话确认。",
+      worldLine: `[WORLD] ${cols} x ${rows} interactive coordinate grid`,
+      jsonLine: `[JSON] radar glyph/tone/regions loaded from ${radarPath}`,
+      emptyLine: "[MAP] WAITING FOR FIELD INPUT",
+    },
+    regions: [],
+  };
+}
+
+function normalizeRadar(radar: MapEditorDraft["radar"] | undefined, rows: number, cols: number, originTileId: string, radarPath: string): MapEditorDraft["radar"] {
+  const fallback = createDefaultRadar(rows, cols, originTileId, radarPath);
+  if (!radar) {
+    return fallback;
+  }
+
+  return {
+    ...fallback,
+    ...radar,
+    world: {
+      ...fallback.world,
+      ...radar.world,
+      width: cols,
+      height: rows,
+      origin: radar.world?.origin ?? fallback.world.origin,
+    },
+    glyphRows: normalizeRows(radar.glyphRows, rows, cols, DEFAULT_RADAR_GLYPH),
+    toneRows: normalizeRows(radar.toneRows, rows, cols, DEFAULT_RADAR_TONE),
+    palette: radar.palette ?? fallback.palette,
+    symbols: {
+      ...fallback.symbols,
+      ...radar.symbols,
+    },
+    trace: {
+      ...fallback.trace,
+      ...radar.trace,
+    },
+    regions: Array.isArray(radar.regions) ? radar.regions : [],
+  };
+}
+
+function defaultRadarPath(mapId: string): string {
+  return `content/maps/radar/${mapId}-radar.json`;
+}
+
+function normalizeRows(rowsValue: string[] | undefined, rows: number, cols: number, fill: string): string[] {
+  return Array.from({ length: rows }, (_, index) => {
+    const row = rowsValue?.[index] ?? "";
+    return (row + fill.repeat(cols)).slice(0, cols);
+  });
 }
 
 function createDefaultEnvironment(): MapEnvironmentDefinition {

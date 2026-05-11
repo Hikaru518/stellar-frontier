@@ -16,14 +16,14 @@ describe("ValidationPanel", () => {
     expect(screen.getByText("No validation issues reported.")).toBeInTheDocument();
   });
 
-  it("lists validation issues and invokes jump handling for tile and layer targets", () => {
+  it("lists validation issues and invokes jump handling for tile targets", () => {
     const onIssueSelect = vi.fn();
     const errors: MapValidationIssue[] = [
       {
         severity: "error",
-        code: "unknown_visual_cell_tile",
-        message: "Visual cell references missing tile.",
-        target: { kind: "cell", tileId: "2-3", layerId: "base" },
+        code: "unknown_object_id",
+        message: "Tile references missing object.",
+        target: { kind: "tile", tileId: "2-3", field: "objectIds" },
       },
     ];
 
@@ -31,13 +31,13 @@ describe("ValidationPanel", () => {
 
     const panel = screen.getByLabelText("Validation panel");
     expect(within(panel).getByText("1 errors")).toBeInTheDocument();
-    expect(within(panel).getByText("unknown_visual_cell_tile")).toBeInTheDocument();
+    expect(within(panel).getByText("unknown_object_id")).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole("button"));
 
     expect(onIssueSelect).toHaveBeenCalledWith(errors[0]);
   });
 
   it("can derive tile ids from helper issue paths", () => {
-    expect(getIssueTileId({ severity: "error", code: "x", message: "x", path: "visual.layers[0].cells.1-2" })).toBe("1-2");
+    expect(getIssueTileId({ severity: "error", code: "x", message: "x", path: "tiles/1-2/objectIds/0" })).toBe("1-2");
   });
 });

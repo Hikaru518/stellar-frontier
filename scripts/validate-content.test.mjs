@@ -232,19 +232,7 @@ function createContentRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "stellar-content-"));
   tempRoots.push(root);
   fs.cpSync(path.join(projectRoot, "content"), path.join(root, "content"), { recursive: true });
-  createReferencedTilesetFiles(root);
   return root;
-}
-
-function createReferencedTilesetFiles(root) {
-  const registry = readJson(root, "content/maps/tilesets/registry.json");
-  for (const tileset of registry.tilesets ?? []) {
-    for (const relativePath of [tileset.assetPath, path.join("apps/pc-client/public", tileset.publicPath)]) {
-      const filePath = path.join(root, relativePath);
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, "");
-    }
-  }
 }
 
 function runValidator(root) {

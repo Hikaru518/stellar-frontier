@@ -1,72 +1,10 @@
-import {
-  bucketFillVisualCells,
-  eraseVisualCell,
-  paintVisualCell,
-  rectangleFillVisualCells,
-} from "./visualLayerOps";
+import { parseTileId } from "./mapEditorModel";
 import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapTileDefinition, SemanticBrush } from "./types";
 
 export const MAP_EDITOR_HISTORY_LIMIT = 100;
 
 export function mapEditorReducer(state: MapEditorState, command: MapEditorCommand): MapEditorState {
   switch (command.type) {
-    case "visual/brush":
-      return commitDraftChange(state, paintVisualCell(state.draft, state.activeLayerId, command.tileId, command.cell));
-    case "visual/eraser":
-      return commitDraftChange(state, eraseVisualCell(state.draft, state.activeLayerId, command.tileId));
-    case "visual/bucketFill":
-      return commitDraftChange(
-        state,
-        bucketFillVisualCells(state.draft, state.activeLayerId, command.tileId, command.cell),
-      );
-    case "visual/rectangleFill":
-      return commitDraftChange(
-        state,
-        rectangleFillVisualCells(state.draft, state.activeLayerId, command.fromTileId, command.toTileId, command.cell),
-      );
-    case "layer/setActive":
-      if (state.activeLayerId === command.layerId) {
-        return state;
-      }
-      return {
-        ...state,
-        activeLayerId: command.layerId,
-      };
-    case "layer/add": {
-      const nextState = commitDraftChange(state, {
-        ...state.draft,
-        visual: {
-          ...state.draft.visual,
-          layers: [...state.draft.visual.layers, command.layer],
-        },
-      });
-      return {
-        ...nextState,
-        activeLayerId: command.layer.id,
-      };
-    }
-    case "layer/rename":
-      return commitLayerChange(state, command.layerId, (layer) => {
-        const name = command.name.trim();
-        return layer.name === name || name.length === 0 ? layer : { ...layer, name };
-      });
-    case "layer/move":
-      return moveLayer(state, command.layerId, command.direction);
-    case "layer/delete":
-      return deleteLayer(state, command.layerId);
-    case "layer/setVisible":
-      return commitLayerChange(state, command.layerId, (layer) =>
-        layer.visible === command.visible ? layer : { ...layer, visible: command.visible },
-      );
-    case "layer/setLocked":
-      return commitLayerChange(state, command.layerId, (layer) =>
-        layer.locked === command.locked ? layer : { ...layer, locked: command.locked },
-      );
-    case "layer/setOpacity":
-      return commitLayerChange(state, command.layerId, (layer) => {
-        const opacity = Math.max(0, Math.min(1, command.opacity));
-        return layer.opacity === opacity ? layer : { ...layer, opacity };
-      });
     case "gameplay/updateTile":
       return updateGameplayTile(state, command.tileId, command.patch);
     case "gameplay/setOrigin":
@@ -75,6 +13,8 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
       return setDiscoveredTile(state, command.tileId, command.discovered);
     case "gameplay/applySemanticBrush":
       return applySemanticBrush(state, command.tileId, command.brush);
+    case "radar/updateCell":
+      return updateRadarCell(state, command.tileId, { glyph: command.glyph, tone: command.tone });
     case "history/undo":
       return undo(state);
     case "history/redo":
@@ -123,7 +63,8 @@ function updateGameplayTile(
 }
 
 function setOriginTile(state: MapEditorState, tileId: string): MapEditorState {
-  if (!state.draft.tiles.some((tile) => tile.id === tileId)) {
+  const point = parseTileId(tileId);
+  if (!point || !state.draft.tiles.some((tile) => tile.id === tileId)) {
     return state;
   }
 
@@ -139,6 +80,13 @@ function setOriginTile(state: MapEditorState, tileId: string): MapEditorState {
     ...state.draft,
     originTileId: tileId,
     initialDiscoveredTileIds,
+    radar: {
+      ...state.draft.radar,
+      world: {
+        ...state.draft.radar.world,
+        origin: { x: point.col - 1, y: point.row - 1 },
+      },
+    },
   });
 }
 
@@ -173,84 +121,63 @@ function applySemanticBrush(state: MapEditorState, tileId: string, brush: Semant
     return updateGameplayTile(state, tileId, { terrain: brush.value });
   }
 
-  return updateGameplayTile(state, tileId, { weather: brush.value });
+  if (brush.kind === "weather") {
+    return updateGameplayTile(state, tileId, { weather: brush.value });
+  }
+
+  if (brush.kind === "radarGlyph") {
+    return updateRadarCell(state, tileId, { glyph: brush.glyph });
+  }
+
+  return updateRadarCell(state, tileId, { tone: brush.tone });
 }
 
-function commitLayerChange(
-  state: MapEditorState,
-  layerId: string,
-  updateLayer: (layer: MapEditorDraft["visual"]["layers"][number]) => MapEditorDraft["visual"]["layers"][number],
-): MapEditorState {
-  const layerIndex = state.draft.visual.layers.findIndex((layer) => layer.id === layerId);
-  if (layerIndex < 0) {
+function updateRadarCell(state: MapEditorState, tileId: string, patch: { glyph?: string; tone?: string }): MapEditorState {
+  const point = parseTileId(tileId);
+  if (!point || point.row > state.draft.size.rows || point.col > state.draft.size.cols) {
     return state;
   }
 
-  const currentLayer = state.draft.visual.layers[layerIndex];
-  if (!currentLayer) {
-    return state;
-  }
+  const rowIndex = point.row - 1;
+  const colIndex = point.col - 1;
+  const glyph = normalizeSingleChar(patch.glyph);
+  const tone = normalizeSingleChar(patch.tone);
+  const nextGlyphRows = glyph ? replaceCharAt(state.draft.radar.glyphRows, rowIndex, colIndex, glyph) : state.draft.radar.glyphRows;
+  const nextToneRows = tone ? replaceCharAt(state.draft.radar.toneRows, rowIndex, colIndex, tone) : state.draft.radar.toneRows;
 
-  const nextLayer = updateLayer(currentLayer);
-  if (nextLayer === currentLayer) {
+  if (nextGlyphRows === state.draft.radar.glyphRows && nextToneRows === state.draft.radar.toneRows) {
     return state;
   }
 
   return commitDraftChange(state, {
     ...state.draft,
-    visual: {
-      ...state.draft.visual,
-      layers: state.draft.visual.layers.map((layer, index) => (index === layerIndex ? nextLayer : layer)),
+    radar: {
+      ...state.draft.radar,
+      glyphRows: nextGlyphRows,
+      toneRows: nextToneRows,
     },
   });
 }
 
-function moveLayer(state: MapEditorState, layerId: string, direction: "up" | "down"): MapEditorState {
-  const layerIndex = state.draft.visual.layers.findIndex((layer) => layer.id === layerId);
-  const targetIndex = direction === "up" ? layerIndex - 1 : layerIndex + 1;
-  if (layerIndex < 0 || targetIndex < 0 || targetIndex >= state.draft.visual.layers.length) {
-    return state;
+function replaceCharAt(rows: string[], rowIndex: number, colIndex: number, char: string): string[] {
+  const currentRow = rows[rowIndex];
+  if (!currentRow || currentRow[colIndex] === char) {
+    return rows;
   }
 
-  const nextLayers = [...state.draft.visual.layers];
-  const [layer] = nextLayers.splice(layerIndex, 1);
-  if (!layer) {
-    return state;
-  }
-  nextLayers.splice(targetIndex, 0, layer);
-
-  return commitDraftChange(state, {
-    ...state.draft,
-    visual: {
-      ...state.draft.visual,
-      layers: nextLayers,
-    },
+  return rows.map((row, index) => {
+    if (index !== rowIndex) {
+      return row;
+    }
+    return `${row.slice(0, colIndex)}${char}${row.slice(colIndex + 1)}`;
   });
 }
 
-function deleteLayer(state: MapEditorState, layerId: string): MapEditorState {
-  const layerIndex = state.draft.visual.layers.findIndex((layer) => layer.id === layerId);
-  if (layerIndex < 0) {
-    return state;
+function normalizeSingleChar(value: string | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
   }
-
-  const nextLayers = state.draft.visual.layers.filter((layer) => layer.id !== layerId);
-  const nextState = commitDraftChange(state, {
-    ...state.draft,
-    visual: {
-      ...state.draft.visual,
-      layers: nextLayers,
-    },
-  });
-
-  if (state.activeLayerId !== layerId) {
-    return nextState;
-  }
-
-  return {
-    ...nextState,
-    activeLayerId: nextLayers[Math.min(layerIndex, nextLayers.length - 1)]?.id ?? null,
-  };
+  return value.trim().slice(0, 1) || null;
 }
 
 function commitDraftChange(state: MapEditorState, nextDraft: MapEditorDraft): MapEditorState {

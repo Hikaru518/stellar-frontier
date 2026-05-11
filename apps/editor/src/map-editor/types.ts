@@ -36,22 +36,52 @@ export interface MapTileDefinition {
   specialStates: MapSpecialStateDefinition[];
 }
 
-export interface MapVisualCellDefinition {
-  tilesetId: string;
-  tileIndex: number;
+export interface RadarWorldDefinition {
+  width: number;
+  height: number;
+  origin: {
+    x: number;
+    y: number;
+  };
 }
 
-export interface MapVisualLayerDefinition {
+export interface RadarSymbolDefinition {
+  glyph: string;
+  tone: string;
+}
+
+export type RadarRegionShapeDefinition =
+  | { type: "circle"; x: number; y: number; radius: number }
+  | { type: "box"; x1: number; y1: number; x2: number; y2: number };
+
+export interface RadarRegionDefinition {
   id: string;
-  name: string;
-  visible: boolean;
-  locked: boolean;
-  opacity: number;
-  cells: Record<string, MapVisualCellDefinition>;
+  label: string;
+  priority: number;
+  shape: RadarRegionShapeDefinition;
+  tone: string;
 }
 
-export interface MapVisualDefinition {
-  layers: MapVisualLayerDefinition[];
+export interface RadarTraceDefinition {
+  layerNotice: string;
+  controlMode: string;
+  callMode: string;
+  worldLine: string;
+  jsonLine: string;
+  emptyLine: string;
+}
+
+export interface RadarDefinition {
+  world: RadarWorldDefinition;
+  glyphRows: string[];
+  toneRows: string[];
+  palette: Record<string, string>;
+  symbols: {
+    crew: RadarSymbolDefinition;
+    focus: RadarSymbolDefinition;
+  };
+  trace: RadarTraceDefinition;
+  regions: RadarRegionDefinition[];
 }
 
 export interface MapEditorDraft {
@@ -65,8 +95,9 @@ export interface MapEditorDraft {
   };
   originTileId: string;
   initialDiscoveredTileIds: string[];
+  radarPath: string;
   tiles: MapTileDefinition[];
-  visual: MapVisualDefinition;
+  radar: RadarDefinition;
 }
 
 export interface CreateMapDraftInput {
@@ -88,11 +119,8 @@ export interface MapEditorHistory {
 
 export interface MapEditorState {
   draft: MapEditorDraft;
-  activeLayerId: string | null;
   history: MapEditorHistory;
 }
-
-export type VisualPaintTool = "brush" | "eraser" | "bucketFill" | "rectangleFill";
 
 export type SemanticBrush =
   | {
@@ -109,66 +137,17 @@ export type SemanticBrush =
   | {
       kind: "discovered";
       discovered: boolean;
+    }
+  | {
+      kind: "radarGlyph";
+      glyph: string;
+    }
+  | {
+      kind: "radarTone";
+      tone: string;
     };
 
 export type MapEditorCommand =
-  | {
-      type: "visual/brush";
-      tileId: string;
-      cell: MapVisualCellDefinition;
-    }
-  | {
-      type: "visual/eraser";
-      tileId: string;
-    }
-  | {
-      type: "visual/bucketFill";
-      tileId: string;
-      cell: MapVisualCellDefinition;
-    }
-  | {
-      type: "visual/rectangleFill";
-      fromTileId: string;
-      toTileId: string;
-      cell: MapVisualCellDefinition;
-    }
-  | {
-      type: "layer/setActive";
-      layerId: string | null;
-    }
-  | {
-      type: "layer/add";
-      layer: MapVisualLayerDefinition;
-    }
-  | {
-      type: "layer/rename";
-      layerId: string;
-      name: string;
-    }
-  | {
-      type: "layer/move";
-      layerId: string;
-      direction: "up" | "down";
-    }
-  | {
-      type: "layer/delete";
-      layerId: string;
-    }
-  | {
-      type: "layer/setVisible";
-      layerId: string;
-      visible: boolean;
-    }
-  | {
-      type: "layer/setLocked";
-      layerId: string;
-      locked: boolean;
-    }
-  | {
-      type: "layer/setOpacity";
-      layerId: string;
-      opacity: number;
-    }
   | {
       type: "gameplay/updateTile";
       tileId: string;
@@ -187,6 +166,12 @@ export type MapEditorCommand =
       type: "gameplay/applySemanticBrush";
       tileId: string;
       brush: SemanticBrush;
+    }
+  | {
+      type: "radar/updateCell";
+      tileId: string;
+      glyph?: string;
+      tone?: string;
     }
   | {
       type: "history/undo";

@@ -13,7 +13,7 @@
       "nodes": [
         {
           "id": "crash_site_unsecured",
-          "description": "坠毁区域尚未完成调查。先让队员在 4-4 执行调查，确认还有哪些关键装置可用。"
+          "description": "坠毁区域尚未完成调查。先让队员在 129-129 执行调查，确认还有哪些关键装置可用。"
         },
         {
           "id": "repair_targets_revealed",
@@ -35,12 +35,12 @@
         {
           "id": "survey_crash_site",
           "title": "调查 IAFS 坠毁点",
-          "description": "在 4-4 完成一次区域调查，确认坠毁点周边是否还有可用模块。",
+          "description": "在 129-129 完成一次区域调查，确认坠毁点周边是否还有可用模块。",
           "navigation": [
             {
               "type": "tile",
               "label": "查看 IAFS 坠毁点",
-              "tile_id": "4-4"
+              "tile_id": "129-129"
             }
           ]
         },

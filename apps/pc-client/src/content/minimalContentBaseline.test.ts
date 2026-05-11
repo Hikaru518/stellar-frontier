@@ -17,7 +17,7 @@ describe("minimal content baseline", () => {
     expect(crewDefinitions).toHaveLength(1);
     expect(crewDefinitions[0]).toMatchObject({
       crewId: "mike",
-      currentTile: "4-4",
+      currentTile: "129-129",
       canCommunicate: true,
     });
 
@@ -29,30 +29,32 @@ describe("minimal content baseline", () => {
       "universal:survey",
     ]);
 
-    expect(defaultMapConfig.size).toEqual({ rows: 8, cols: 8 });
-    expect(defaultMapConfig.originTileId).toBe("4-4");
+    expect(defaultMapConfig.size).toEqual({ rows: 256, cols: 256 });
+    expect(defaultMapConfig.originTileId).toBe("129-129");
     expect(defaultMapConfig.initialDiscoveredTileIds).toEqual([
-      "3-3",
-      "3-4",
-      "3-5",
-      "4-3",
-      "4-4",
-      "4-5",
-      "4-6",
-      "5-3",
-      "5-4",
-      "5-5",
-      "5-6",
-      "6-3",
-      "6-4",
-      "6-5",
+      "128-128",
+      "128-129",
+      "128-130",
+      "129-128",
+      "129-129",
+      "129-130",
+      "129-131",
+      "130-128",
+      "130-129",
+      "130-130",
+      "130-131",
+      "131-128",
+      "131-129",
+      "131-130",
     ]);
-    expect(defaultMapConfig.tiles).toHaveLength(64);
-    expect(defaultMapConfig.tiles.find((tile) => tile.id === "4-4")?.objectIds).toEqual([
+    expect(defaultMapConfig.tiles).toHaveLength(65536);
+    expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")?.objectIds).toEqual([
       "iafs_generator",
       "iafs_life_support",
       "iafs_shuttle_core",
     ]);
+    expect(defaultMapConfig.radar.glyphRows).toHaveLength(256);
+    expect(defaultMapConfig.radar.toneRows).toHaveLength(256);
     expect(defaultMapConfig.tiles.every((tile) => tile.specialStates.length === 0)).toBe(true);
   });
 });

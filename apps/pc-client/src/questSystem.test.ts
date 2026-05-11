@@ -49,7 +49,7 @@ const questDefinitions: QuestDefinition[] = [
             id: "main_todo",
             title: "Main Todo",
             description: "Todo description",
-            navigation: [{ type: "tile", label: "Crash Site", tile_id: "4-4" }],
+            navigation: [{ type: "tile", label: "Crash Site", tile_id: "129-129" }],
           },
           {
             id: "second_todo",

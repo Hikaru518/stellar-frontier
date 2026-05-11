@@ -134,9 +134,9 @@ https://<用户名>.github.io/stellar-frontier/
 - **手机私人终端**：PC 通讯台可生成 QR 码与短手输码；手机端作为 Yuan Terminal companion 接收 PC 授权的私密通讯，只回传 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。Stellar 仅维护共享 dual-device 业务库，不维护专属 relay server。
 - **Yuan 双端链路**：PC 与手机都实例化真实 Yuan `Terminal`，开启 `enable_WebRTC: true`，通过 Yuan service 传输心跳、私密来电、已读和接听事件；Yuan WSS 是稳定基线，WebRTC DataChannel 是机会性局域网升级。
 - **通话**：承载角色事件、普通行动（移动 / 调查 / 采集 / 建设 / 待命）和紧急决策；选择结果会更新队员、地图与系统日志。
-- **地图**：以 Phaser 可配置网格（默认 `8 x 8`）展示完整地图、视觉 tile、地形、地块对象、特殊状态、路线预览与队员位置。地图只读，不直接下达指令；从通话进入时只标记候选目的地，最终仍需回到通话确认。临时战争迷雾 / `3 x 3` 探索限制已取消，后续会单独设计。
+- **地图**：以 content-authored `256 x 256` explicit tiles 作为玩法事实源，并用 JSON 驱动的 console radar 表现层展示地形、区域、队员位置和路线选择。地图只读，不直接下达指令；从通话进入时只标记候选目的地，最终仍需回到通话确认。临时战争迷雾 / `3 x 3` 探索限制已取消，后续会单独设计。
 - **人物详情**：展示背景档案、5 维轻量属性、自由性格标签、专长以及关键节点日记，并按通讯/失联/找回状态控制日记可见性。
-- **本地 Game Editor**：独立 `apps/editor` 工具，包含 Event Editor 与 Map Editor；Map Editor 可用 `assets/` 中登记的 tileset 资源编辑 `content/maps/*.json` 的 gameplay tile 与视觉层。
+- **本地 Game Editor**：独立 `apps/editor` 工具，包含 Event Editor 与 Map Editor；Map Editor 维护 `content/maps/*.json` 的 explicit gameplay tile、origin、初始 discovered、地块对象、特殊状态和 radar glyph/tone。
 - **Debug toolbox / 作弊菜单**：调整时间倍率（`1x` / `2x` / `4x` / `8x`）和重置浏览器存档，仅用于开发与验收。
 - **全局时间**：游戏内时间从开始新游戏起持续推进；玩家关闭游戏后世界停止，再次进入时从保存的 `elapsedGameSeconds` 继续。
 

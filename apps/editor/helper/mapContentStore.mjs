@@ -5,10 +5,9 @@ import { createPathGuard } from "./pathGuard.mjs";
 const MAP_ROOT = "content/maps";
 const MAP_OBJECT_ROOT = "content/map-objects";
 const SCHEMA_ROOT = "content/schemas";
-const TILESET_REGISTRY_PATH = "content/maps/tilesets/registry.json";
 const SCHEMA_PATHS = [
   "content/schemas/maps.schema.json",
-  "content/schemas/map-tilesets.schema.json",
+  "content/schemas/map-radar.schema.json",
   "content/schemas/map-objects.schema.json",
 ];
 
@@ -16,16 +15,14 @@ export async function loadMapEditorLibrary({
   repoRoot = path.resolve(import.meta.dirname, "../../.."),
 } = {}) {
   const guard = createPathGuard(repoRoot, [MAP_ROOT, MAP_OBJECT_ROOT, SCHEMA_ROOT]);
-  const [maps, tilesetRegistry, mapObjects, schemas] = await Promise.all([
+  const [maps, mapObjects, schemas] = await Promise.all([
     loadMaps(guard),
-    readJson(guard, TILESET_REGISTRY_PATH),
     loadMapObjects(guard),
     loadSchemas(guard),
   ]);
 
   return {
     maps,
-    tileset_registry: tilesetRegistry,
     map_objects: mapObjects,
     schemas,
   };
@@ -36,10 +33,17 @@ async function loadMaps(guard) {
   const maps = [];
 
   for (const filePath of mapPaths) {
-    const data = await readJson(guard, filePath);
+    const sourceData = await readJson(guard, filePath);
+    const radarPath = sourceData.radarPath;
+    const radarContent = await readJson(guard, radarPath);
+    const data = {
+      ...sourceData,
+      radar: stripRadarMetadata(radarContent),
+    };
     maps.push({
       id: data.id ?? path.posix.basename(filePath, ".json"),
       file_path: filePath,
+      radar_file_path: radarPath,
       data,
     });
   }
@@ -100,4 +104,9 @@ async function listJsonFiles(guard, relativeDirectory, { recursive }) {
 async function readJson(guard, relativePath) {
   const absolutePath = guard.resolveAllowedPath(relativePath);
   return JSON.parse(await fs.readFile(absolutePath, "utf8"));
+}
+
+function stripRadarMetadata(radarContent) {
+  const { $schema: _schema, mapId: _mapId, ...radar } = radarContent;
+  return radar;
 }

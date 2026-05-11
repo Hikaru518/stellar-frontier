@@ -1,126 +1,106 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ComponentProps } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
-import { createInitialMapState, initialCrew, initialTiles } from "../data/gameData";
-import type { PhaserMapCanvasProps } from "../phaser-map/PhaserMapCanvas";
+import { initialCrew, initialLogs, initialTiles } from "../data/gameData";
 import { MapPage } from "./MapPage";
 
-const phaserMapCanvasState = vi.hoisted(() => ({ latestProps: null as PhaserMapCanvasProps | null }));
-
-vi.mock("../phaser-map/PhaserMapCanvas", () => ({
-  PhaserMapCanvas: (props: PhaserMapCanvasProps) => {
-    phaserMapCanvasState.latestProps = props;
-    return (
-      <div className="phaser-map-stage">
-        <button type="button" onClick={() => props.setZoomLevelInReact?.(3)}>
-          simulate wheel zoom
-        </button>
-      </div>
-    );
-  },
-}));
-
 describe("MapPage", () => {
-  beforeEach(() => {
-    phaserMapCanvasState.latestProps = null;
-  });
-
-  it("renders four zoom pips and updates active zoom from Phaser", () => {
-    renderMapPage();
-    const zoomBar = screen.getByLabelText("地图缩放级别");
-    expect(within(zoomBar).getAllByRole("listitem")).toHaveLength(4);
-    expect(within(zoomBar).getByText("全局")).toHaveClass("zoom-level-active");
-
-    fireEvent.click(screen.getByRole("button", { name: "simulate wheel zoom" }));
-    expect(within(zoomBar).getByText("精细")).toHaveClass("zoom-level-active");
-  });
-
-  it("passes the full authored 8x8 map into Phaser", () => {
+  it("renders a single interactive ascii map surface after the header", () => {
     renderMapPage();
 
-    expect(phaserMapCanvasState.latestProps?.columns).toBe(8);
-    expect(phaserMapCanvasState.latestProps?.tileViews).toHaveLength(64);
-    expect(phaserMapCanvasState.latestProps?.tileViews.find((tile) => tile.id === "1-1")).toMatchObject({
-      row: 0,
-      col: 0,
-      status: "discovered",
-      displayCoord: "(-3,3)",
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+    expect(screen.getByLabelText("ASCII 地图")).toBeInTheDocument();
+    expect(screen.getByText("render + function / 256 x 256")).toBeInTheDocument();
+  });
+
+  it("does not render the old quest sidebar UI", () => {
+    renderMapPage();
+
+    expect(screen.queryByRole("button", { name: "展开任务" })).not.toBeInTheDocument();
+    expect(screen.queryByText("最近更新")).not.toBeInTheDocument();
+  });
+
+  it("keeps crew action buttons visible in the left rail", () => {
+    renderMapPage();
+
+    expect(screen.getByRole("button", { name: "查看状态" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看背包" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "通话" })).toBeInTheDocument();
+  });
+
+  it("routes crew status and inventory requests to the crew page handlers", () => {
+    const onShowCrewStatus = vi.fn();
+    const onShowCrewInventory = vi.fn();
+    renderMapPage({ onShowCrewStatus, onShowCrewInventory });
+
+    fireEvent.click(screen.getByRole("button", { name: "查看状态" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看背包" }));
+
+    expect(onShowCrewStatus).toHaveBeenCalledWith(initialCrew[0].id);
+    expect(onShowCrewInventory).toHaveBeenCalledWith(initialCrew[0].id);
+  });
+
+  it("records map interaction info in the right trace panel", () => {
+    renderMapPage();
+
+    const mapSurface = screen.getByLabelText("ASCII 地图");
+    Object.defineProperty(mapSurface, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
     });
-    expect(phaserMapCanvasState.latestProps?.tileViews.find((tile) => tile.id === "4-4")).toMatchObject({
-      row: 3,
-      col: 3,
-      status: "discovered",
-      displayCoord: "(0,0)",
-    });
-    expect(phaserMapCanvasState.latestProps?.tileViews.find((tile) => tile.id === "8-8")).toMatchObject({
-      row: 7,
-      col: 7,
-      status: "discovered",
-      displayCoord: "(4,-4)",
-    });
+    fireEvent.click(mapSurface, { clientX: 220, clientY: 180 });
+    expect(screen.getAllByText(/^\[FOCUS\]/).length).toBeGreaterThan(0);
   });
 
-  it("shows authored tile details after selecting a tile", () => {
+  it("keeps the minimum zoom at full-world coverage instead of sampling outside the radar", () => {
     renderMapPage();
 
-    act(() => phaserMapCanvasState.latestProps?.onSelectTile("1-1"));
-    expect(screen.getByText("起点")).toBeInTheDocument();
-    expect(screen.getByText("未确认新的地块对象")).toBeInTheDocument();
+    const mapSurface = screen.getByLabelText("ASCII 地图");
+    Object.defineProperty(mapSurface, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
+    });
 
-    act(() => phaserMapCanvasState.latestProps?.onSelectTile("4-4"));
-    expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
-    expect(screen.getByText("未知对象")).toBeInTheDocument();
+    fireEvent.wheel(mapSurface, { deltaY: 480 });
+    fireEvent.click(mapSurface, { clientX: 800, clientY: 560 });
+
+    expect(mapSurface).toHaveAttribute("data-focus-tile-id", "205-228");
+    expect(screen.queryByText(/\[ZOOM\] 0\./)).not.toBeInTheDocument();
   });
 
-  it("shows unknown objects on radar before crash-site objects are revealed", () => {
-    render(
-      <MapPage
-        tiles={initialTiles}
-        map={{
-          ...createInitialMapState(),
-          tilesById: {
-            ...createInitialMapState().tilesById,
-            "4-4": {
-              ...createInitialMapState().tilesById["4-4"],
-              revealedObjectIds: [],
-            },
-          },
-        }}
-        crew={initialCrew}
-        crewActions={{}}
-        activeCalls={{}}
-        eventLogs={[]}
-        elapsedGameSeconds={0}
-        gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
-        returnTarget="control"
-        onReturn={vi.fn()}
-      />,
-    );
-
-    act(() => phaserMapCanvasState.latestProps?.onSelectTile("4-4"));
-    expect(screen.getByText("未知对象")).toBeInTheDocument();
-  });
-
-  it("passes no authored visual layers for the current map content", () => {
+  it("uses center-origin display coordinates for the function layer", () => {
     renderMapPage();
 
-    expect(phaserMapCanvasState.latestProps?.tileViews.every((tile) => (tile.visualLayers ?? []).length === 0)).toBe(true);
+    expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
+  });
+
+  it("shows the latest system log in the bottom bar", () => {
+    renderMapPage();
+
+    expect(screen.getByText(initialLogs[initialLogs.length - 1].text)).toBeInTheDocument();
   });
 });
 
-function renderMapPage() {
+function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) {
   return render(
     <MapPage
       tiles={initialTiles}
-      map={createInitialMapState()}
       crew={initialCrew}
       crewActions={{}}
       activeCalls={{}}
-      eventLogs={[]}
       elapsedGameSeconds={0}
       gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
       returnTarget="control"
-      onReturn={vi.fn()}
-    />,
+      onOpenControl={vi.fn()}
+      onOpenTask={vi.fn()}
+      onReturnFromMap={vi.fn()}
+      onSelectMoveTarget={vi.fn()}
+      onStartCall={vi.fn()}
+      onShowCrewStatus={vi.fn()}
+      onShowCrewInventory={vi.fn()}
+      logs={initialLogs}
+      {...overrides}
+    />
   );
 }

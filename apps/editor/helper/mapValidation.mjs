@@ -1,7 +1,6 @@
-export function validateMapEditorMap(data, { mapObjects = [], tilesetRegistry = { tilesets: [] } } = {}) {
+export function validateMapEditorMap(data, { mapObjects = [] } = {}) {
   const issues = [];
   const objectIds = new Set(mapObjects.map((object) => object.id).filter(Boolean));
-  const tilesetsById = new Map((tilesetRegistry.tilesets ?? []).map((tileset) => [tileset.id, tileset]));
 
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     pushIssue(issues, {
@@ -22,6 +21,15 @@ export function validateMapEditorMap(data, { mapObjects = [], tilesetRegistry = 
       message: "Map size must include positive integer rows and cols.",
       path: "/size",
       target: { kind: "map", field: "size" },
+    });
+  }
+
+  if (typeof data.radarPath !== "string" || !/^content\/maps\/radar\/[a-z][a-z0-9_-]*\.json$/.test(data.radarPath)) {
+    pushIssue(issues, {
+      code: "invalid_radar_path",
+      message: "Map radarPath must be content/maps/radar/<file>.json.",
+      path: "/radarPath",
+      target: { kind: "radar", field: "radarPath" },
     });
   }
 
@@ -97,7 +105,7 @@ export function validateMapEditorMap(data, { mapObjects = [], tilesetRegistry = 
   if (hasValidSize) {
     validateCoverage({ rows, cols, tileById, tileCount: tiles.length, issues });
   }
-  validateVisualLayers(data.visual, { tileById, tilesetsById, issues });
+  validateRadar(data.radar, { rows, cols, issues });
 
   return toResult(issues);
 }
@@ -159,96 +167,65 @@ function validateCoverage({ rows, cols, tileById, tileCount, issues }) {
   }
 }
 
-function validateVisualLayers(visual, { tileById, tilesetsById, issues }) {
-  if (visual === undefined) {
-    return;
-  }
-
-  const layers = Array.isArray(visual?.layers) ? visual.layers : [];
-  if (!Array.isArray(visual?.layers)) {
+function validateRadar(radar, { rows, cols, issues }) {
+  if (!radar || typeof radar !== "object" || Array.isArray(radar)) {
     pushIssue(issues, {
-      code: "visual_layers_not_array",
-      message: "Map visual.layers must be an array when visual is present.",
-      path: "/visual/layers",
-      target: { kind: "map", field: "visual.layers" },
+      code: "missing_radar",
+      message: "Map radar presentation data is required.",
+      path: "/radar",
+      target: { kind: "radar", field: "radar" },
     });
     return;
   }
 
-  const layerIds = new Set();
-  for (const [layerIndex, layer] of layers.entries()) {
-    const layerPath = `/visual/layers/${layerIndex}`;
-    if (!layer || typeof layer !== "object" || Array.isArray(layer)) {
-      pushIssue(issues, {
-        code: "visual_layer_not_object",
-        message: "Visual layer must be an object.",
-        path: layerPath,
-        target: { kind: "layer" },
-      });
-      continue;
-    }
+  if (radar.world?.width !== cols || radar.world?.height !== rows) {
+    pushIssue(issues, {
+      code: "radar_world_size_mismatch",
+      message: `Radar world must match map size: expected ${cols} x ${rows}.`,
+      path: "/radar/world",
+      target: { kind: "radar", field: "world" },
+    });
+  }
 
-    if (layerIds.has(layer.id)) {
-      pushIssue(issues, {
-        code: "duplicate_visual_layer_id",
-        message: `Duplicate visual layer id: ${layer.id}.`,
-        path: `${layerPath}/id`,
-        target: { kind: "layer", layerId: layer.id, field: "id" },
-      });
-    } else if (typeof layer.id === "string") {
-      layerIds.add(layer.id);
-    }
+  validateRadarRows(radar.glyphRows, { rows, cols, field: "glyphRows", issues });
+  validateRadarRows(radar.toneRows, { rows, cols, field: "toneRows", issues });
 
-    validateVisualCells(layer.cells, { layer, layerPath, tileById, tilesetsById, issues });
+  const toneKeys = new Set(Object.keys(radar.palette ?? {}));
+  for (const [rowIndex, row] of (Array.isArray(radar.toneRows) ? radar.toneRows : []).entries()) {
+    for (const [colIndex, tone] of [...row].entries()) {
+      if (!toneKeys.has(tone)) {
+        pushIssue(issues, {
+          code: "unknown_radar_tone",
+          message: `Radar tone "${tone}" is not in radar.palette.`,
+          path: `/radar/toneRows/${rowIndex}/${colIndex}`,
+          target: { kind: "radar", field: "toneRows" },
+        });
+      }
+    }
   }
 }
 
-function validateVisualCells(cells, { layer, layerPath, tileById, tilesetsById, issues }) {
-  if (cells === undefined) {
-    return;
-  }
-
-  if (!cells || typeof cells !== "object" || Array.isArray(cells)) {
+function validateRadarRows(value, { rows, cols, field, issues }) {
+  if (!Array.isArray(value) || value.length !== rows) {
     pushIssue(issues, {
-      code: "visual_cells_not_object",
-      message: "Visual layer cells must be an object.",
-      path: `${layerPath}/cells`,
-      target: { kind: "layer", layerId: layer.id, field: "cells" },
+      code: `invalid_radar_${field}`,
+      message: `Radar ${field} must contain ${rows} rows.`,
+      path: `/radar/${field}`,
+      target: { kind: "radar", field },
     });
     return;
   }
 
-  for (const [tileId, cell] of Object.entries(cells)) {
-    const cellPath = `${layerPath}/cells/${escapeJsonPointer(tileId)}`;
-    if (!tileById.has(tileId)) {
+  value.forEach((row, index) => {
+    if (typeof row !== "string" || row.length !== cols) {
       pushIssue(issues, {
-        code: "unknown_visual_cell_tile_id",
-        message: `Unknown visual cell tileId in layer ${layer.id}: ${tileId}.`,
-        path: cellPath,
-        target: { kind: "cell", tileId, layerId: layer.id, field: "tileId" },
+        code: `invalid_radar_${field}_row`,
+        message: `Radar ${field}[${index}] must be a string with ${cols} characters.`,
+        path: `/radar/${field}/${index}`,
+        target: { kind: "radar", field },
       });
     }
-
-    const tileset = tilesetsById.get(cell?.tilesetId);
-    if (!tileset) {
-      pushIssue(issues, {
-        code: "unknown_tileset_id",
-        message: `Unknown visual cell tilesetId in layer ${layer.id}/${tileId}: ${cell?.tilesetId}.`,
-        path: `${cellPath}/tilesetId`,
-        target: { kind: "cell", tileId, layerId: layer.id, tilesetId: cell?.tilesetId, field: "tilesetId" },
-      });
-      continue;
-    }
-
-    if (!Number.isInteger(cell.tileIndex) || cell.tileIndex < 0 || cell.tileIndex >= tileset.tileCount) {
-      pushIssue(issues, {
-        code: "tile_index_out_of_bounds",
-        message: `Visual cell tileIndex out of bounds in layer ${layer.id}/${tileId}: ${cell.tileIndex} for ${cell.tilesetId}.`,
-        path: `${cellPath}/tileIndex`,
-        target: { kind: "cell", tileId, layerId: layer.id, tilesetId: cell.tilesetId, field: "tileIndex" },
-      });
-    }
-  }
+  });
 }
 
 function pushIssue(issues, { code, message, path, target }) {
@@ -269,8 +246,4 @@ function toResult(issues) {
     errors,
     warnings,
   };
-}
-
-function escapeJsonPointer(value) {
-  return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }

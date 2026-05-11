@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CallPage } from "./pages/CallPage";
-import { CommunicationStation } from "./pages/CommunicationStation";
 import { ControlCenter } from "./pages/ControlCenter";
+import { CrewConsolePage, type CrewConsoleMode } from "./pages/CrewConsolePage";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
 import { MapPage } from "./pages/MapPage";
+import { TaskPage } from "./pages/TaskPage";
 import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
@@ -76,6 +77,7 @@ if (eventContentIndexResult.errors.length > 0) {
 const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 const MOBILE_FALLBACK_AFTER_MS = 10000;
+const defaultMapTileById = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile]));
 
 type QuestNavigationHint =
   | { type: "tile"; tileId: string; label: string }
@@ -90,7 +92,6 @@ type SavedGameState = Partial<Omit<GameState, "crew">> & {
 
 type MobileMode = "waiting" | "active" | "fallback";
 type MobileSessionStatus = "waiting" | "connected" | "offline";
-
 interface MobileSessionState {
   status: MobileSessionStatus;
   lastHeartbeatAt?: number;
@@ -148,6 +149,10 @@ function App() {
   const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
   const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
   const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
+  const [crewConsoleView, setCrewConsoleView] = useState<{ mode: CrewConsoleMode; crewId: CrewId | null }>({
+    mode: "status",
+    crewId: null,
+  });
   const [mobilePairingSession, setMobilePairingSession] = useState(() => createPhoneTerminalPairingSession());
   const [mobileSession, setMobileSession] = useState<MobileSessionState>({ status: "waiting", fallbackAfterMs: MOBILE_FALLBACK_AFTER_MS });
   const terminalRef = useRef<YuanDualDeviceTerminal | null>(null);
@@ -365,6 +370,20 @@ function App() {
     setPage("station");
   }
 
+  function openControlOverview() {
+    setPage("control");
+  }
+
+  function openCrewStatusPage(crewId: CrewId) {
+    setCrewConsoleView({ mode: "status", crewId });
+    setPage("crew");
+  }
+
+  function openCrewInventoryPage(crewId: CrewId) {
+    setCrewConsoleView({ mode: "inventory", crewId });
+    setPage("crew");
+  }
+
   function openMap(returnTarget: MapReturnTarget) {
     setMapReturnTarget(returnTarget);
     setPage("map");
@@ -560,6 +579,8 @@ function App() {
             }
           : call,
       );
+      setMapReturnTarget("call");
+      setPage("map");
       appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
       return;
     }
@@ -815,94 +836,125 @@ function App() {
 
   if (page === "station") {
     return (
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <CommunicationStation
-          crew={crew}
-          crewActions={gameState.crew_actions}
-          activeCalls={gameState.active_calls}
-          objectives={gameState.objectives}
-          eventLogs={gameState.event_logs}
-          elapsedGameSeconds={elapsedGameSeconds}
-          tiles={tiles}
-          gameTimeLabel={gameTimeLabel}
-          pairingSession={mobilePairingSession}
-          mobileSessionStatus={mobileSession.status}
-          onRegeneratePairing={regenerateMobilePairingSession}
-          onSendPrivateSignal={() => void sendMobileSnapshot("phone.call.incoming", { title: "手机终端测试来电", body: "这是一条 PC 授权的手机端测试通讯。" })}
-          onEnablePhoneFallback={enableMobileFallback}
-          onBack={() => setPage("control")}
-          onStartCall={startCall}
-          highlightCrewId={questNavigationHint?.type === "crew" ? questNavigationHint.crewId : null}
-          questNavigationMessage={questNavigationHint?.type === "crew" ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。` : undefined}
-        />
-      </QuestLayout>
+      <TaskPage
+        view={questSidebarView}
+        statusFilter={questStatusFilter}
+        categoryFilter={questCategoryFilter}
+        navigationMessage={
+          questNavigationHint?.type === "crew"
+            ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。`
+            : questNavigationHint?.type === "unavailable"
+              ? `任务导航目标不可用：${questNavigationHint.label}`
+              : undefined
+        }
+        crew={crew}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
+        gameTimeLabel={gameTimeLabel}
+        logs={logs}
+        onStatusFilterChange={setQuestStatusFilter}
+        onCategoryFilterChange={setQuestCategoryFilter}
+        onSelectedQuestIdChange={setSelectedQuestId}
+        onNavigate={handleQuestSidebarNavigate}
+        onOpenControl={openControlOverview}
+        onOpenMap={() => openMap("control")}
+        onStartCall={startCall}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
+      />
     );
   }
 
   if (page === "call") {
     return (
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <CallPage
-          call={currentCall}
-          crew={crew}
-          tiles={tiles}
-          activeCalls={gameState.active_calls}
-          elapsedGameSeconds={elapsedGameSeconds}
-          gameTimeLabel={gameTimeLabel}
-          gameState={gameState}
-          onDecision={handleDecision}
-          onConfirmMove={confirmMove}
-          onClearMoveTarget={clearMoveTarget}
-          onSelectMoveTarget={selectMoveTarget}
-          onOpenMap={() => openMap("call")}
-          onEndCall={endCall}
-          onOpenStation={() => setPage("station")}
-        />
-      </QuestLayout>
+      <CallPage
+        call={currentCall}
+        crew={crew}
+        tiles={tiles}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        gameTimeLabel={gameTimeLabel}
+        gameState={gameState}
+        logs={logs}
+        onDecision={handleDecision}
+        onConfirmMove={confirmMove}
+        onClearMoveTarget={clearMoveTarget}
+        onOpenMap={() => openMap("call")}
+        onOpenControl={openControlOverview}
+        onOpenTask={openStation}
+        onStartCall={startCall}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
+      />
     );
   }
 
   if (page === "map") {
     return (
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <MapPage
-          tiles={tiles}
-          map={map}
-          crew={crew}
-          crewActions={gameState.crew_actions}
-          activeCalls={gameState.active_calls}
-          eventLogs={gameState.event_logs}
-          elapsedGameSeconds={elapsedGameSeconds}
-          gameTimeLabel={gameTimeLabel}
-          returnTarget={mapReturnTarget}
-          moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
-          selectedMoveTargetId={currentCall?.selectedTargetTileId}
-          initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
-          onSelectMoveTarget={selectMoveTarget}
-          onReturn={returnFromMap}
-        />
-      </QuestLayout>
+      <MapPage
+        tiles={tiles}
+        crew={crew}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        gameTimeLabel={gameTimeLabel}
+        returnTarget={mapReturnTarget}
+        moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
+        initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+        onOpenControl={openControlOverview}
+        onOpenTask={openStation}
+        onReturnFromMap={returnFromMap}
+        onSelectMoveTarget={selectMoveTarget}
+        onStartCall={startCall}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
+        logs={logs}
+      />
+    );
+  }
+
+  if (page === "crew") {
+    return (
+      <CrewConsolePage
+        crew={crew}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
+        eventLogs={gameState.event_logs}
+        logs={logs}
+        gameTimeLabel={gameTimeLabel}
+        selectedCrewId={crewConsoleView.crewId}
+        mode={crewConsoleView.mode}
+        onOpenControl={openControlOverview}
+        onOpenTask={openStation}
+        onOpenMap={() => openMap("control")}
+        onStartCall={startCall}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
+      />
     );
   }
 
   return (
     <>
-      <QuestLayout sidebar={questSidebar} collapsed={questSidebarCollapsed}>
-        <ControlCenter
-          crew={crew}
-          logs={logs}
-          eventLogs={gameState.event_logs}
-          objectives={gameState.objectives}
-          resources={resources}
-          gameTimeLabel={gameTimeLabel}
-          onOpenStation={openStation}
-          onOpenMap={() => openMap("control")}
-          onOpenDebug={() => setDebugOpen(true)}
-          onAppendLog={appendLog}
-          map={map}
-          mobileStatus={mobileStatusCard}
-        />
-      </QuestLayout>
+      <ControlCenter
+        crew={crew}
+        logs={logs}
+        eventLogs={gameState.event_logs}
+        objectives={gameState.objectives}
+        resources={resources}
+        gameTimeLabel={gameTimeLabel}
+        onOpenStation={openStation}
+        onOpenMap={() => openMap("control")}
+        onStartCall={startCall}
+        map={map}
+        mobileStatus={mobileStatusCard}
+        onShowCrewStatus={openCrewStatusPage}
+        onShowCrewInventory={openCrewInventoryPage}
+      />
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
@@ -916,15 +968,6 @@ function App() {
 }
 
 export default App;
-
-function QuestLayout({ children, sidebar, collapsed }: { children: ReactNode; sidebar: ReactNode; collapsed: boolean }) {
-  return (
-    <div className={`quest-layout ${collapsed ? "quest-layout-collapsed" : ""}`}>
-      <main className="quest-layout-main">{children}</main>
-      {sidebar}
-    </div>
-  );
-}
 
 function createInitialGameState(): GameState {
   const saved = loadGameSave<SavedGameState>(isCompatibleGameSaveState);
@@ -1510,7 +1553,7 @@ function readStringArray(value: unknown): string[] {
 }
 
 function findCandidateObject(tileId: string, verb: string, map: GameMapState | undefined): MapObjectDefinition | undefined {
-  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  const configTile = defaultMapTileById.get(tileId);
   if (!configTile) {
     return undefined;
   }
@@ -1681,7 +1724,7 @@ function findLocationStoryActionSelection(
   actionId: string,
 ): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
   const member = state.crew.find((item) => item.id === crewId);
-  const tile = member ? state.tiles.find((item) => item.id === member.currentTile) : undefined;
+  const tile = member ? createRuntimeTileView(state, member.currentTile) : undefined;
   if (!member || !tile) {
     return undefined;
   }
@@ -1854,7 +1897,7 @@ function createLocationStoryActionTriggerContext(
 }
 
 function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {
-  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  const configTile = defaultMapTileById.get(tileId);
   if (!configTile) {
     return [];
   }
@@ -1865,7 +1908,7 @@ function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefini
 }
 
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
-  const tile = state.tiles.find((item) => item.id === tileId);
+  const tile = createRuntimeTileView(state, tileId);
   return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile, state.map)) : [];
 }
 
@@ -1916,7 +1959,7 @@ export function toEventEngineState(state: GameState): GraphRunnerGameState {
     ...state,
     elapsed_game_seconds: state.elapsedGameSeconds,
     crew: Object.fromEntries(state.crew.map((member) => [member.id, toCrewState(member, state.crew_actions)])),
-    tiles: Object.fromEntries(state.tiles.map((tile) => [tile.id, toTileState(tile, state.map)])),
+    tiles: toEventTileStates(state),
     resources: numericResources(state.resources),
     inventories: {
       ...state.inventories,
@@ -2042,6 +2085,7 @@ function compareCrewActionRecency(left: CrewActionState, right: CrewActionState)
 
 function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameState) {
   const baseInventory = eventState.inventories.base;
+  const runtimeTileOverlays = Object.entries(eventState.tiles).filter(([, tile]) => tile.danger_tags.length > 0 || tile.event_marks.length > 0);
 
   return {
     crew: state.crew.map((member) => {
@@ -2059,21 +2103,32 @@ function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameSt
         ...(crewInventory ? { inventory: toGameInventoryEntries(crewInventory.items) } : {}),
       };
     }),
-    tiles: state.tiles.map((tile) => {
-      const runtimeTile = eventState.tiles[tile.id];
-      if (!runtimeTile) {
-        return tile;
-      }
-
-      return {
-        ...tile,
-        dangerTags: mergeStringLists(tile.dangerTags ?? [], runtimeTile.danger_tags),
-        eventMarks: mergeEventMarks(tile.eventMarks ?? [], runtimeTile.event_marks),
-      };
-    }),
+    tiles: runtimeTileOverlays.length > 0 ? mergeRuntimeTileOverlays(state.tiles, Object.fromEntries(runtimeTileOverlays)) : state.tiles,
     baseInventory: baseInventory ? toGameInventoryEntries(baseInventory.items) : state.baseInventory,
     resources: baseInventory ? toResourceSummary(state.resources, baseInventory.resources) : state.resources,
   };
+}
+
+function mergeRuntimeTileOverlays(tiles: MapTile[], runtimeTiles: Record<Id, TileState>) {
+  let changed = false;
+  const nextTiles = tiles.map((tile) => {
+    const runtimeTile = runtimeTiles[tile.id];
+    if (!runtimeTile) {
+      return tile;
+    }
+
+    const nextDangerTags = mergeStringLists(tile.dangerTags ?? [], runtimeTile.danger_tags);
+    const nextEventMarks = mergeEventMarks(tile.eventMarks ?? [], runtimeTile.event_marks);
+    const nextTile = {
+      ...tile,
+      dangerTags: nextDangerTags,
+      eventMarks: nextEventMarks,
+    };
+    changed = changed || nextDangerTags !== tile.dangerTags || nextEventMarks !== tile.eventMarks;
+    return nextTile;
+  });
+
+  return changed ? nextTiles : tiles;
 }
 
 function toGameInventoryEntries(items: InventoryState["items"]): GameState["baseInventory"] {
@@ -2157,6 +2212,71 @@ function toTileState(tile: MapTile, map: GameMapState): TileState {
     buildings: [],
     event_marks: tile.eventMarks ?? [],
     history_keys: [],
+  };
+}
+
+function toEventTileStates(state: GameState): Record<Id, TileState> {
+  const tileIds = collectEventTileIds(state);
+
+  const entries: Array<[string, TileState]> = [];
+  for (const tileId of tileIds) {
+    const tile = createRuntimeTileView(state, tileId);
+    if (tile) {
+      entries.push([tileId, toTileState(tile, state.map)]);
+    }
+  }
+
+  return Object.fromEntries(entries);
+}
+
+function collectEventTileIds(state: GameState) {
+  const tileIds = new Set<string>(Object.keys(state.map.tilesById));
+
+  for (const member of state.crew) {
+    tileIds.add(member.currentTile);
+  }
+
+  for (const event of Object.values(state.active_events)) {
+    if (event.primary_tile_id) {
+      tileIds.add(event.primary_tile_id);
+    }
+  }
+
+  for (const action of Object.values(state.crew_actions)) {
+    if (action.from_tile_id) {
+      tileIds.add(action.from_tile_id);
+    }
+    if (action.to_tile_id) {
+      tileIds.add(action.to_tile_id);
+    }
+    if (action.target_tile_id) {
+      tileIds.add(action.target_tile_id);
+    }
+    for (const tileId of action.path_tile_ids ?? []) {
+      tileIds.add(tileId);
+    }
+  }
+
+  return tileIds;
+}
+
+function createRuntimeTileView(state: GameState, tileId: string): MapTile | undefined {
+  const configTile = defaultMapTileById.get(tileId);
+  if (!configTile) {
+    return undefined;
+  }
+
+  const runtimeTile = state.map.tilesById[tileId];
+  const discovered = state.map.discoveredTileIds.includes(tileId) || Boolean(runtimeTile?.discovered);
+  return {
+    id: configTile.id,
+    coord: getTileLocationLabel(defaultMapConfig, configTile.id),
+    row: configTile.row,
+    col: configTile.col,
+    terrain: configTile.terrain,
+    crew: runtimeTile?.crew ?? state.crew.filter((member) => member.currentTile === tileId && !member.unavailable).map((member) => member.id),
+    status: runtimeTile?.status ?? (discovered ? "已发现" : "未探索"),
+    investigated: Boolean(runtimeTile?.investigated),
   };
 }
 
@@ -2254,7 +2374,7 @@ function inferTileDangerTags(tile: MapTile, map: GameMapState) {
     return tile.dangerTags;
   }
 
-  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const configTile = defaultMapTileById.get(tile.id);
   const runtimeTile = map.tilesById[tile.id];
   const activeSpecialStateIds = new Set(runtimeTile?.activeSpecialStateIds ?? configTile?.specialStates.filter((state) => state.startsActive).map((state) => state.id) ?? []);
   const configDangerTags =
@@ -2269,7 +2389,7 @@ function inferTileDangerTags(tile: MapTile, map: GameMapState) {
 }
 
 function getConfigTileObjects(tile: Pick<MapTile, "id">): MapObjectDefinition[] {
-  const configTile = defaultMapConfig.tiles.find((item) => item.id === tile.id);
+  const configTile = defaultMapTileById.get(tile.id);
   return (
     configTile?.objectIds
       .map((objectId) => mapObjectDefinitionById.get(objectId))
@@ -2288,7 +2408,7 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
     return fresh;
   }
 
-  const discoveredTileIds = Array.isArray(map.discoveredTileIds) ? map.discoveredTileIds.filter((id) => defaultMapConfig.tiles.some((tile) => tile.id === id)) : fresh.discoveredTileIds;
+  const discoveredTileIds = Array.isArray(map.discoveredTileIds) ? map.discoveredTileIds.filter((id) => defaultMapTileById.has(id)) : fresh.discoveredTileIds;
   return {
     configId: defaultMapConfig.id,
     configVersion: defaultMapConfig.version,
@@ -2303,11 +2423,28 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
 }
 
 function syncMapCrew(map: GameMapState, crew: CrewMember[]): GameMapState {
-  const tilesById = { ...map.tilesById };
-  for (const tile of defaultMapConfig.tiles) {
-    tilesById[tile.id] = {
-      ...tilesById[tile.id],
-      crew: crew.filter((member) => member.currentTile === tile.id && !member.unavailable).map((member) => member.id),
+  const tilesById: GameMapState["tilesById"] = {};
+
+  for (const [tileId, state] of Object.entries(map.tilesById)) {
+    if (!state) {
+      continue;
+    }
+
+    const { crew: _crew, ...tileStateWithoutCrew } = state;
+    if (Object.keys(tileStateWithoutCrew).length > 0) {
+      tilesById[tileId] = tileStateWithoutCrew;
+    }
+  }
+
+  for (const member of crew) {
+    if (member.unavailable) {
+      continue;
+    }
+
+    const currentTileState = tilesById[member.currentTile] ?? {};
+    tilesById[member.currentTile] = {
+      ...currentTileState,
+      crew: [...(currentTileState.crew ?? []), member.id],
     };
   }
 
@@ -2315,7 +2452,7 @@ function syncMapCrew(map: GameMapState, crew: CrewMember[]): GameMapState {
 }
 
 function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
-  const configTile = defaultMapConfig.tiles.find((tile) => tile.id === tileId);
+  const configTile = defaultMapTileById.get(tileId);
   if (!configTile) {
     return map;
   }
@@ -2399,7 +2536,7 @@ function buildMobileViewModel(state: GameState, elapsedGameSeconds: number) {
   const contacts = state.crew.map((member) => ({ id: member.id, name: member.name, role: member.role, status: member.status }));
   const threads = state.crew.map((member) => {
     const call = activeCalls.find((item) => item.crew_id === member.id);
-    const tile = state.tiles.find((item) => item.id === member.currentTile);
+    const tile = createRuntimeTileView(state, member.currentTile);
     const callView = tile ? buildCallView({ member, tile, gameState: state }) : null;
     return {
       id: `crew:${member.id}`,

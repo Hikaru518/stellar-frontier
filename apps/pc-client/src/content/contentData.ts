@@ -55,6 +55,11 @@ const questModules = import.meta.glob("../../../../content/quests/*.json", {
   import: "default",
 }) as Record<string, QuestsContent>;
 
+const radarModules = import.meta.glob("../../../../content/maps/radar/*.json", {
+  eager: true,
+  import: "default",
+}) as Record<string, RadarContentDefinition>;
+
 const eventManifestContent = eventManifest as EventManifestContent;
 const eventManifestDomains = eventManifestContent.domains;
 
@@ -175,22 +180,59 @@ export interface MapSpecialStateDefinition {
   durationGameSeconds?: number;
 }
 
-export interface MapVisualCellDefinition {
-  tilesetId: string;
-  tileIndex: number;
+export type RadarToneKey = "g" | "d" | "c" | "a" | "w" | "s" | "r" | string;
+
+export interface RadarWorldDefinition {
+  width: number;
+  height: number;
+  origin: {
+    x: number;
+    y: number;
+  };
 }
 
-export interface MapVisualLayerDefinition {
+export interface RadarSymbolDefinition {
+  glyph: string;
+  tone: RadarToneKey;
+}
+
+export type RadarRegionShapeDefinition =
+  | { type: "circle"; x: number; y: number; radius: number }
+  | { type: "box"; x1: number; y1: number; x2: number; y2: number };
+
+export interface RadarRegionDefinition {
   id: string;
-  name: string;
-  visible: boolean;
-  locked: boolean;
-  opacity: number;
-  cells: Record<string, MapVisualCellDefinition>;
+  label: string;
+  priority: number;
+  shape: RadarRegionShapeDefinition;
+  tone: RadarToneKey;
 }
 
-export interface MapVisualDefinition {
-  layers: MapVisualLayerDefinition[];
+export interface RadarTraceDefinition {
+  layerNotice: string;
+  controlMode: string;
+  callMode: string;
+  worldLine: string;
+  jsonLine: string;
+  emptyLine: string;
+}
+
+export interface RadarDefinition {
+  world: RadarWorldDefinition;
+  glyphRows: string[];
+  toneRows: string[];
+  palette: Record<RadarToneKey, string>;
+  symbols: {
+    crew: RadarSymbolDefinition;
+    focus: RadarSymbolDefinition;
+  };
+  trace: RadarTraceDefinition;
+  regions: RadarRegionDefinition[];
+}
+
+export interface RadarContentDefinition extends RadarDefinition {
+  $schema?: string;
+  mapId: string;
 }
 
 export interface MapTileDefinition {
@@ -206,7 +248,7 @@ export interface MapTileDefinition {
   specialStates: MapSpecialStateDefinition[];
 }
 
-export interface MapConfigDefinition {
+export interface MapConfigJsonDefinition {
   $schema?: string;
   id: string;
   name: string;
@@ -217,8 +259,12 @@ export interface MapConfigDefinition {
   };
   originTileId: string;
   initialDiscoveredTileIds: string[];
+  radarPath: string;
   tiles: MapTileDefinition[];
-  visual?: MapVisualDefinition;
+}
+
+export interface MapConfigDefinition extends MapConfigJsonDefinition {
+  radar: RadarDefinition;
 }
 
 export type QuestCategory = "main" | "side";
@@ -311,7 +357,7 @@ export const eventContentLibrary: EventContentLibrary = {
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
 
-export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigDefinition);
+export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigJsonDefinition);
 
 export const itemDefinitionById = new Map(itemDefinitions.map((item) => [item.itemId, item]));
 
@@ -329,12 +375,37 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
  * `tile.objectIds` and resolve definitions via `mapObjectDefinitionById`; the
  * old synthesised `tile.objects` projection has been removed.
  */
-function normalizeMapConfig(rawConfig: MapConfigDefinition): MapConfigDefinition {
+function normalizeMapConfig(rawConfig: MapConfigJsonDefinition): MapConfigDefinition {
+  const radarContent = readRadarContent(rawConfig);
   return {
     ...rawConfig,
+    radar: stripRadarContentMetadata(radarContent),
     tiles: rawConfig.tiles.map((tile) => ({
       ...tile,
       objectIds: Array.isArray(tile.objectIds) ? tile.objectIds : [],
     })),
   };
+}
+
+function readRadarContent(mapConfig: MapConfigJsonDefinition): RadarContentDefinition {
+  const modulePath = contentModulePath(mapConfig.radarPath);
+  const radarContent = radarModules[modulePath];
+  if (!radarContent) {
+    throw new Error(`Missing map radar content file listed by ${mapConfig.id}: ${mapConfig.radarPath}`);
+  }
+  if (radarContent.mapId !== mapConfig.id) {
+    throw new Error(`Map radar content ${mapConfig.radarPath} belongs to ${radarContent.mapId}, expected ${mapConfig.id}.`);
+  }
+  return radarContent;
+}
+
+function stripRadarContentMetadata(radarContent: RadarContentDefinition): RadarDefinition {
+  const radar = { ...radarContent } as Partial<RadarContentDefinition>;
+  delete radar.$schema;
+  delete radar.mapId;
+  return radar as RadarDefinition;
+}
+
+function contentModulePath(contentPath: string): string {
+  return `../../../../${contentPath}`;
 }

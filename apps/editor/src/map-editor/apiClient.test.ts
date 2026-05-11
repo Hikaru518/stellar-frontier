@@ -91,7 +91,6 @@ describe("map editor API client", () => {
 function createLibraryResponse(): MapEditorLibraryResponse {
   return {
     maps: [],
-    tileset_registry: { tilesets: [] },
     map_objects: [],
     schemas: {},
   };

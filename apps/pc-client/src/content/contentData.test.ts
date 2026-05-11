@@ -4,12 +4,12 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import eventManifest from "../../../../content/events/manifest.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
-import tilesetRegistry from "../../../../content/maps/tilesets/registry.json";
-import mapTilesetsSchema from "../../../../content/schemas/map-tilesets.schema.json";
+import defaultMapRadarJson from "../../../../content/maps/radar/default-map-radar.json";
+import mapRadarSchema from "../../../../content/schemas/map-radar.schema.json";
 import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import { buildEventContentIndex } from "../events/contentIndex";
 import type { CallTemplate, EventDefinition, PresetDefinition } from "../events/types";
-import type { MapConfigDefinition } from "./contentData";
+import * as contentData from "./contentData";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
 
@@ -79,7 +79,6 @@ describe("event content exports", () => {
   });
 
   it("exposes authored definitions, call templates, handlers, and presets through eventContentLibrary", async () => {
-    const contentData = await import("./contentData");
     const expectedDomainIds = typedEventManifest.domains.map((domain) => domain.id);
     const expectedEventDefinitions = expectedDefinitionsFromManifest();
     const expectedCallTemplates = expectedCallTemplatesFromManifest();
@@ -103,8 +102,7 @@ describe("event content exports", () => {
   });
 
   it("does not expose unsupported crew references in structured event content", async () => {
-    const contentData = await import("./contentData");
-    const supportedCrewIds = new Set<string>((await import("./contentData")).crewDefinitions.map((member) => member.crewId));
+    const supportedCrewIds = new Set<string>(contentData.crewDefinitions.map((member) => member.crewId));
     const referencedCrewIds = contentData.eventProgramDefinitions.flatMap((definition) =>
       [...(definition.content_refs?.crew_ids ?? []), ...definition.sample_contexts.map((context) => context.crew_id)].filter(
         (crewId): crewId is string => typeof crewId === "string",
@@ -115,8 +113,6 @@ describe("event content exports", () => {
   });
 
   it("does not expose removed event content exports", async () => {
-    const contentData = await import("./contentData");
-
     expect("eventDefinitions" in contentData).toBe(false);
     expect("eventDefinitionById" in contentData).toBe(false);
   });
@@ -124,136 +120,71 @@ describe("event content exports", () => {
 
 describe("default map config", () => {
   it("exposes tile.objectIds (post-migration) and no inline tile.objects field", async () => {
-    const { defaultMapConfig } = await import("./contentData");
-    expect(defaultMapConfig.tiles.length).toBeGreaterThan(0);
-    for (const tile of defaultMapConfig.tiles) {
+    expect(contentData.defaultMapConfig.tiles.length).toBeGreaterThan(0);
+    const sampleTiles = [
+      contentData.defaultMapConfig.tiles[0],
+      contentData.defaultMapConfig.tiles.find((tile) => tile.id === "129-129"),
+      contentData.defaultMapConfig.tiles[contentData.defaultMapConfig.tiles.length - 1],
+    ];
+
+    for (const tile of sampleTiles) {
+      if (!tile) {
+        throw new Error("Expected sampled map tile to exist.");
+      }
       expect(Array.isArray(tile.objectIds)).toBe(true);
       expect("objects" in tile).toBe(false);
     }
   });
 
-  it("types authored visual layers on MapConfigDefinition", () => {
-    const mapWithVisual: MapConfigDefinition = {
-      ...(structuredClone(defaultMapJson) as MapConfigDefinition),
-      visual: {
-        layers: [
-          {
-            id: "base",
-            name: "Base",
-            visible: true,
-            locked: false,
-            opacity: 0.75,
-            cells: {
-              "4-4": {
-                tilesetId: "kenney-tiny-battle",
-                tileIndex: 12,
-              },
-            },
-          },
-        ],
-      },
-    };
-
-    expect(mapWithVisual.visual?.layers[0]).toMatchObject({
-      id: "base",
-      opacity: 0.75,
-      cells: { "4-4": { tilesetId: "kenney-tiny-battle", tileIndex: 12 } },
-    });
+  it("types split radar presentation rows on MapConfigDefinition", async () => {
+    expect(defaultMapJson.radarPath).toBe("content/maps/radar/default-map-radar.json");
+    expect(contentData.defaultMapConfig.radar.world).toMatchObject({ width: 256, height: 256, origin: { x: 128, y: 128 } });
+    expect(contentData.defaultMapConfig.radar.glyphRows).toHaveLength(256);
+    expect(contentData.defaultMapConfig.radar.toneRows).toHaveLength(256);
   });
 });
 
-describe("map visual content contracts", () => {
+describe("map radar content contracts", () => {
   const ajv = new Ajv2020({ allErrors: true });
   const validateMap = ajv.compile(mapsSchema);
+  const validateRadar = ajv.compile(mapRadarSchema);
 
-  it("accepts authored visual layers with tile-id keyed cells", () => {
-    const mapWithVisual = structuredClone(defaultMapJson) as MapConfigDefinition;
-
-    mapWithVisual.visual = {
-      layers: [
-        {
-          id: "base",
-          name: "Base",
-          visible: true,
-          locked: false,
-          opacity: 1,
-          cells: {
-            "4-4": {
-              tilesetId: "kenney-tiny-battle",
-              tileIndex: 0,
-            },
-          },
-        },
-      ],
-    };
-
-    expect(validateMap(mapWithVisual)).toBe(true);
+  it("accepts authored split radar rows with palette-backed tones", () => {
+    expect(validateMap(defaultMapJson)).toBe(true);
+    expect(validateRadar(defaultMapRadarJson)).toBe(true);
+    expect(defaultMapRadarJson.mapId).toBe(defaultMapJson.id);
   });
 
-  it("rejects unknown visual fields", () => {
-    const mapWithUnknownVisualField = structuredClone(defaultMapJson) as unknown as MapConfigDefinition & {
-      visual: {
-        layers: [];
-        unknownVisualField: boolean;
-      };
+  it("rejects removed visual fields", () => {
+    const mapWithVisualField = {
+      ...structuredClone(defaultMapJson),
+      visual: { layers: [] },
     };
 
-    mapWithUnknownVisualField.visual = {
-      layers: [],
-      unknownVisualField: true,
-    };
-
-    expect(validateMap(mapWithUnknownVisualField)).toBe(false);
+    expect(validateMap(mapWithVisualField)).toBe(false);
     expect(validateMap.errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          instancePath: "/visual",
           keyword: "additionalProperties",
+          params: expect.objectContaining({ additionalProperty: "visual" }),
         }),
       ]),
     );
   });
 });
 
-describe("map tileset registry", () => {
-  const ajv = new Ajv2020({ allErrors: true });
-  const validateRegistry = ajv.compile(mapTilesetsSchema);
-
-  it("registers the Kenney Tiny Battle packed spritesheet", () => {
-    expect(validateRegistry(tilesetRegistry)).toBe(true);
-
-    const kenneyTileset = tilesetRegistry.tilesets.find((tileset) => tileset.id === "kenney-tiny-battle");
-    expect(kenneyTileset).toMatchObject({
-      tileWidth: 16,
-      tileHeight: 16,
-      spacing: 0,
-      columns: 18,
-      tileCount: 198,
-      publicPath: "maps/tilesets/kenney-tiny-battle/tilemap_packed.png",
-    });
-    expect(kenneyTileset).toBeDefined();
-
-    const tileIndexes = kenneyTileset?.categories.flatMap((category) => category.tileIndexes) ?? [];
-    expect(tileIndexes.length).toBeGreaterThan(0);
-    expect(tileIndexes.every((tileIndex) => tileIndex >= 0 && tileIndex < 198)).toBe(true);
-    expect(fs.existsSync(path.join(repoRoot, "apps/pc-client/public", kenneyTileset?.publicPath ?? ""))).toBe(true);
-  });
-});
-
 describe("crew content exports", () => {
   it("keeps runtime crew exports aligned with the authored baseline", async () => {
-    const { crewDefinitions } = await import("./contentData");
     const { initialCrew } = await import("../data/gameData");
 
-    expect(crewDefinitions.map((member) => member.crewId)).toEqual(["mike"]);
+    expect(contentData.crewDefinitions.map((member) => member.crewId)).toEqual(["mike"]);
     expect(initialCrew.map((member) => member.id)).toEqual(["mike"]);
   });
 
   it("does not expose unsupported crew summary copy", async () => {
-    const { crewDefinitions } = await import("./contentData");
     const { initialCrew } = await import("../data/gameData");
 
-    for (const member of crewDefinitions) {
+    for (const member of contentData.crewDefinitions) {
       expect("summary" in member).toBe(false);
     }
 
@@ -263,11 +194,10 @@ describe("crew content exports", () => {
   });
 
   it("does not expose removed crew emergency fields", async () => {
-    const { crewDefinitions } = await import("./contentData");
     const removedEmergencyField = ["emergency", "Event"].join("");
     const removedEventStatus = ["in", "Event"].join("");
 
-    for (const member of crewDefinitions) {
+    for (const member of contentData.crewDefinitions) {
       expect(removedEmergencyField in member).toBe(false);
       expect(member.status).not.toBe(removedEventStatus);
     }

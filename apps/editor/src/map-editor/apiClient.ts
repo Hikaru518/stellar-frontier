@@ -8,29 +8,8 @@ type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 export interface MapEditorLibraryMap {
   id: string;
   file_path: string;
+  radar_file_path: string;
   data: MapEditorDraft;
-}
-
-export interface MapEditorTilesetCategory {
-  id: string;
-  name: string;
-  tileIndexes: number[];
-}
-
-export interface MapEditorTileset {
-  id: string;
-  name: string;
-  assetPath: string;
-  publicPath?: string;
-  tileWidth: number;
-  tileHeight: number;
-  columns: number;
-  tileCount: number;
-  categories?: MapEditorTilesetCategory[];
-}
-
-export interface MapEditorTilesetRegistry {
-  tilesets: MapEditorTileset[];
 }
 
 export interface MapEditorMapObject {
@@ -42,7 +21,6 @@ export interface MapEditorMapObject {
 
 export interface MapEditorLibraryResponse {
   maps: MapEditorLibraryMap[];
-  tileset_registry: MapEditorTilesetRegistry;
   map_objects: MapEditorMapObject[];
   schemas: Record<string, unknown>;
 }
@@ -52,10 +30,8 @@ export interface MapValidationIssue {
   code: string;
   message: string;
   target?: {
-    kind: "map" | "tile" | "layer" | "cell" | "tileset";
+    kind: "map" | "tile" | "radar";
     tileId?: string;
-    layerId?: string;
-    tilesetId?: string;
     field?: string;
   };
   path?: string;
@@ -70,6 +46,7 @@ export interface ValidateMapResponse {
 export interface SaveMapResponse {
   saved: boolean;
   file_path?: string;
+  radar_file_path?: string;
   errors?: MapValidationIssue[];
   warnings?: MapValidationIssue[];
 }

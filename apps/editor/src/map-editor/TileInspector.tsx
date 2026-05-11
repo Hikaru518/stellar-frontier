@@ -40,6 +40,8 @@ export default function TileInspector({ draft, selectedTileId, mapObjects, onCom
   });
 
   const tile = selectedTileId ? draft.tiles.find((candidate) => candidate.id === selectedTileId) : null;
+  const radarGlyph = tile ? draft.radar.glyphRows[tile.row - 1]?.[tile.col - 1] ?? "." : ".";
+  const radarTone = tile ? draft.radar.toneRows[tile.row - 1]?.[tile.col - 1] ?? "g" : "g";
 
   if (!tile) {
     return (
@@ -88,6 +90,31 @@ export default function TileInspector({ draft, selectedTileId, mapObjects, onCom
           </select>
         </label>
       </div>
+
+      <fieldset>
+        <legend>Radar cell</legend>
+        <div className="tile-inspector-two-column">
+          <label>
+            Glyph
+            <input
+              aria-label="Radar glyph"
+              maxLength={1}
+              value={radarGlyph}
+              onChange={(event) => onCommand({ type: "radar/updateCell", tileId: tile.id, glyph: event.target.value.slice(0, 1) })}
+            />
+          </label>
+          <label>
+            Tone
+            <select value={radarTone} onChange={(event) => onCommand({ type: "radar/updateCell", tileId: tile.id, tone: event.target.value })}>
+              {Object.keys(draft.radar.palette).map((tone) => (
+                <option key={tone} value={tone}>
+                  {tone}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </fieldset>
 
       <fieldset>
         <legend>Environment</legend>

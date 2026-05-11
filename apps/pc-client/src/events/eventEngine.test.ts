@@ -110,7 +110,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "4-4",
+        tile_id: "129-129",
         action_id: "act_survey_crash_site",
         payload: { action_type: "survey" },
       },
@@ -131,7 +131,7 @@ describe("event engine trigger intake", () => {
 
     const quest = selected.state.quest_state?.quests.regroup_after_crash;
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["4-4"]?.revealedObjectIds).toEqual(["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]);
+    expect(selected.state.map?.tilesById?.["129-129"]?.revealedObjectIds).toEqual(["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]);
     expect(quest?.todos.survey_crash_site).toMatchObject({ status: "completed", completed_at: 245 });
     expect(quest?.current_node_id).toBe("repair_targets_revealed");
     expect(quest?.status).toBe("incomplete");
@@ -171,7 +171,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "4-4",
+        tile_id: "129-129",
         action_id: "repair:mike:iafs_generator:0",
         payload: { action_type: "repair", object_id: "iafs_generator", repair_result: "success" },
       },
@@ -504,14 +504,14 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
       mike: {
         ...crew("mike"),
         display_name: "Mike",
-        tile_id: "4-4",
+        tile_id: "129-129",
         inventory_id: "inv_mike",
       },
     },
     tiles: {
-      "4-4": {
-        id: "4-4",
-        coordinates: { x: 4, y: 4 },
+      "129-129": {
+        id: "129-129",
+        coordinates: { x: 129, y: 129 },
         terrain_type: "crash_site",
         tags: ["iafs", "crash_site"],
         danger_tags: [],
@@ -528,7 +528,7 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
     },
     map: {
       tilesById: {
-        "4-4": { revealedObjectIds: [] },
+        "129-129": { revealedObjectIds: [] },
       },
       mapObjects: {},
     },

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createInitialMapEditorState, createMapEditorDraft, createVisualLayer } from "./mapEditorModel";
+import { createInitialMapEditorState, createMapEditorDraft } from "./mapEditorModel";
 
 describe("mapEditorModel", () => {
-  it("creates a map draft with full gameplay tiles and centered discovery", () => {
+  it("creates a map draft with explicit gameplay tiles and radar rows", () => {
     const draft = createMapEditorDraft({ id: "test-map", name: "Test Map", rows: 3, cols: 5 });
 
     expect(draft.tiles).toHaveLength(15);
@@ -25,38 +25,21 @@ describe("mapEditorModel", () => {
     ]);
     expect(draft.originTileId).toBe("2-3");
     expect(draft.initialDiscoveredTileIds).toEqual(["2-3"]);
-    expect(draft.tiles[0]).toMatchObject({
-      areaName: "区域 1-1",
-      terrain: "平原",
-      weather: "晴朗",
-      objectIds: [],
-      specialStates: [],
-    });
-    expect(draft.tiles[0]?.environment).toEqual({
-      temperatureCelsius: 20,
-      humidityPercent: 40,
-      magneticFieldMicroTesla: 50,
-      radiationLevel: "none",
-      toxicityLevel: "none",
-      atmosphericPressureKpa: 101,
-    });
-    expect(draft.visual.layers).toEqual([]);
+    expect(draft.radarPath).toBe("content/maps/radar/test-map-radar.json");
+    expect(draft.radar.world).toEqual({ width: 5, height: 3, origin: { x: 2, y: 1 } });
+    expect(draft.radar.glyphRows).toEqual([".....", ".....", "....."]);
+    expect(draft.radar.toneRows).toEqual(["ggggg", "ggggg", "ggggg"]);
+    expect(draft.radar.trace.jsonLine).toContain("content/maps/radar/test-map-radar.json");
   });
 
-  it("uses the first visual layer as the initial active layer", () => {
+  it("normalizes existing map content that has no radar field", () => {
     const draft = createMapEditorDraft({ id: "test-map", name: "Test Map", rows: 1, cols: 1 });
-    draft.visual.layers = [createVisualLayer("base", "Base")];
-
-    expect(createInitialMapEditorState(draft).activeLayerId).toBe("base");
-  });
-
-  it("normalizes existing map content that has no visual field", () => {
-    const draft = createMapEditorDraft({ id: "test-map", name: "Test Map", rows: 1, cols: 1 });
-    delete (draft as Partial<typeof draft>).visual;
+    delete (draft as Partial<typeof draft>).radar;
 
     const state = createInitialMapEditorState(draft);
 
-    expect(state.activeLayerId).toBeNull();
-    expect(state.draft.visual.layers).toEqual([]);
+    expect(state.draft.radarPath).toBe("content/maps/radar/test-map-radar.json");
+    expect(state.draft.radar.glyphRows).toEqual(["."]);
+    expect(state.draft.radar.toneRows).toEqual(["g"]);
   });
 });

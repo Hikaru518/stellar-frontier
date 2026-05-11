@@ -5,6 +5,9 @@ export { expect, type Page };
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.clock.install();
+    await page.addInitScript(() => {
+      window.localStorage.setItem("stellar-frontier-e2e-disable-animation", "1");
+    });
     await use(page);
   },
 });
@@ -12,10 +15,13 @@ export const test = base.extend({
 export const GAME_SAVE_KEY = "stellar-frontier-save-v2";
 export const CRASH_SITE_OBJECT_IDS = ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"];
 
-const GAME_SAVE_VERSION = 2;
+const GAME_SAVE_VERSION = 3;
 const GAME_SAVE_SCHEMA_VERSION = "event-program-model-v1";
 const MAP_CONFIG_ID = "default-map";
-const MAP_CONFIG_VERSION = 2;
+const MAP_CONFIG_VERSION = 3;
+const MAP_ROWS = 256;
+const MAP_COLS = 256;
+const MAP_ORIGIN_TILE_ID = "129-129";
 
 const initialResources = {
   energy: 620,
@@ -93,7 +99,7 @@ export async function startNormalMikeCall(page: Page) {
 }
 
 export function mikeCard(page: Page) {
-  return page.getByRole("heading", { name: "Mike，神秘幸存者" }).locator("xpath=ancestor::article[1]");
+  return page.locator("article.console-crew-card").filter({ hasText: "Mike" }).first();
 }
 
 export function objectSection(page: Page, name: string) {
@@ -101,9 +107,22 @@ export function objectSection(page: Page, name: string) {
 }
 
 export async function selectMapTile(page: Page, tileId: string) {
-  const tile = page.locator(`.phaser-map-fallback-tile[data-tile-id="${tileId}"]`);
-  await tile.focus();
-  await page.keyboard.press("Enter");
+  const match = /^(\d+)-(\d+)$/.exec(tileId);
+  expect(match).not.toBeNull();
+  const row = Number(match?.[1]);
+  const col = Number(match?.[2]);
+  const stage = page.locator(".console-ascii-map-stage");
+  await expect(stage).toBeVisible();
+  const box = await stage.boundingBox();
+  expect(box).not.toBeNull();
+
+  await stage.click({
+    position: {
+      x: clamp(((col - 1 + 0.5) / MAP_COLS) * (box?.width ?? 1), 1, Math.max(1, (box?.width ?? 1) - 1)),
+      y: clamp(((row - 1) / MAP_ROWS) * (box?.height ?? 1), 1, Math.max(1, (box?.height ?? 1) - 1)),
+    },
+  });
+  await expect(stage).toHaveAttribute("data-focus-tile-id", tileId);
 }
 
 export async function setDebugTimeMultiplier(page: Page, multiplierLabel: "1x" | "2x" | "4x") {
@@ -112,7 +131,7 @@ export async function setDebugTimeMultiplier(page: Page, multiplierLabel: "1x" |
   await page.getByRole("button", { name: "关闭" }).click();
 }
 
-export function idleMike(currentTile = "4-4", overrides: Record<string, unknown> = {}) {
+export function idleMike(currentTile = MAP_ORIGIN_TILE_ID, overrides: Record<string, unknown> = {}) {
   return {
     id: "mike",
     currentTile,
@@ -130,6 +149,9 @@ export function createCompatibleMap(overrides: Record<string, unknown> = {}) {
   return {
     configId: MAP_CONFIG_ID,
     configVersion: MAP_CONFIG_VERSION,
+    rows: MAP_ROWS,
+    cols: MAP_COLS,
+    originTileId: MAP_ORIGIN_TILE_ID,
     ...overrides,
   };
 }
@@ -137,7 +159,7 @@ export function createCompatibleMap(overrides: Record<string, unknown> = {}) {
 export function createRevealedCrashSiteMap() {
   return createCompatibleMap({
     tilesById: {
-      "4-4": {
+      [MAP_ORIGIN_TILE_ID]: {
         discovered: true,
         investigated: true,
         revealedObjectIds: CRASH_SITE_OBJECT_IDS,
@@ -202,4 +224,8 @@ function createInitialQuestStateForE2e() {
     },
     updated_quest_ids: [],
   };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }

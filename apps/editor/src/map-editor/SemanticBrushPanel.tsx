@@ -89,6 +89,42 @@ export default function SemanticBrushPanel({
         </button>
       </div>
 
+      <div className="tile-inspector-two-column">
+        <label>
+          Radar glyph
+          <input
+            aria-label="Radar glyph brush"
+            maxLength={1}
+            value={activeBrush?.kind === "radarGlyph" ? activeBrush.glyph : ""}
+            onChange={(event) => {
+              const glyph = event.target.value.slice(0, 1);
+              if (glyph) {
+                onActiveBrushChange({ kind: "radarGlyph", glyph });
+              }
+            }}
+          />
+        </label>
+        <label>
+          Radar tone
+          <select
+            aria-label="Radar tone brush"
+            value={activeBrush?.kind === "radarTone" ? activeBrush.tone : ""}
+            onChange={(event) => {
+              if (event.target.value) {
+                onActiveBrushChange({ kind: "radarTone", tone: event.target.value });
+              }
+            }}
+          >
+            <option value="">Choose tone</option>
+            {Object.keys(draft.radar.palette).map((tone) => (
+              <option key={tone} value={tone}>
+                {tone}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <div className="semantic-brush-actions">
         <button type="button" onClick={() => selectedTileId && onCommand({ type: "gameplay/setOrigin", tileId: selectedTileId })} disabled={!selectedTileId}>
           Set selected origin
@@ -127,6 +163,12 @@ function formatBrush(brush: SemanticBrush | null): string {
   }
   if (brush.kind === "discovered") {
     return brush.discovered ? "initial discovered: on" : "initial discovered: off";
+  }
+  if (brush.kind === "radarGlyph") {
+    return `radar glyph: ${brush.glyph}`;
+  }
+  if (brush.kind === "radarTone") {
+    return `radar tone: ${brush.tone}`;
   }
   return "origin";
 }
