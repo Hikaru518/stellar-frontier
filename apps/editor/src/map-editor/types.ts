@@ -76,6 +76,8 @@ export interface MapFeatureDefinition {
   actions?: FeatureActionDefinition[];
 }
 
+export type MapFeatureFootprintBrushMode = "add" | "erase";
+
 export type MapFeaturePatch = Partial<
   Pick<
     MapFeatureDefinition,
@@ -229,6 +231,12 @@ export type MapEditorCommand =
       type: "feature/update";
       featureId: string;
       patch: MapFeaturePatch;
+    }
+  | {
+      type: "feature/applyFootprintBrush";
+      featureId: string;
+      mode: MapFeatureFootprintBrushMode;
+      tileIds: string[];
     }
   | {
       type: "feature/delete";

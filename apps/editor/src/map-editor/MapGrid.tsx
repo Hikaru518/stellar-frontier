@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { parseTileId } from "./mapEditorModel";
-import type { MapEditorDraft, MapTileDefinition } from "./types";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { getFeaturesForTile, parseTileId } from "./mapEditorModel";
+import type { MapEditorDraft, MapFeatureDefinition, MapTileDefinition } from "./types";
 
 const VIEW_ROWS = 25;
 const VIEW_COLS = 25;
@@ -8,8 +8,10 @@ const VIEW_COLS = 25;
 interface MapGridProps {
   draft: MapEditorDraft;
   selectedTileId: string | null;
+  selectedFeatureId: string | null;
   gameplayOverlay: boolean;
   onSelectTile: (tileId: string) => void;
+  onTileClick: (tileId: string) => void;
   onTilePointerDown: (tileId: string) => void;
   onTilePointerEnter: (tileId: string) => void;
   onTilePointerUp: (tileId: string) => void;
@@ -18,13 +20,17 @@ interface MapGridProps {
 export default function MapGrid({
   draft,
   selectedTileId,
+  selectedFeatureId,
   gameplayOverlay,
   onSelectTile,
+  onTileClick,
   onTilePointerDown,
   onTilePointerEnter,
   onTilePointerUp,
 }: MapGridProps) {
-  const [isPointerDown, setIsPointerDown] = useState(false);
+  const isPointerDownRef = useRef(false);
+  const lastPointerTileIdRef = useRef<string | null>(null);
+  const suppressNextClickRef = useRef(false);
   const [anchor, setAnchor] = useState(() => getInitialAnchor(draft, selectedTileId));
   const tileById = useMemo(() => new Map(draft.tiles.map((tile) => [tile.id, tile])), [draft.tiles]);
 
@@ -73,40 +79,52 @@ export default function MapGrid({
         className="map-grid-viewport"
         aria-label={`${draft.name} grid preview`}
         style={{ "--map-cols": Math.min(VIEW_COLS, draft.size.cols - anchor.col + 1) } as CSSProperties}
-        onPointerLeave={() => setIsPointerDown(false)}
+        onPointerLeave={() => finishTileStroke()}
       >
-        {visibleTiles.map((tile) => (
-          <button
-            key={tile.id}
-            type="button"
-            className={getTileClassName(draft, tile, selectedTileId)}
-            title={`${tile.id} · ${tile.areaName}`}
-            aria-label={`Select tile ${tile.id}`}
-            aria-pressed={selectedTileId === tile.id}
-            onClick={() => onSelectTile(tile.id)}
-            onPointerDown={(event) => {
-              if (event.button !== 0 && event.pointerType === "mouse") {
-                return;
-              }
-              setIsPointerDown(true);
-              event.currentTarget.setPointerCapture?.(event.pointerId);
-              onTilePointerDown(tile.id);
-            }}
-            onPointerEnter={() => {
-              if (isPointerDown) {
-                onTilePointerEnter(tile.id);
-              }
-            }}
-            onPointerUp={(event) => {
-              setIsPointerDown(false);
-              event.currentTarget.releasePointerCapture?.(event.pointerId);
-              onTilePointerUp(tile.id);
-            }}
-          >
-            {gameplayOverlay ? <GameplayOverlay draft={draft} tile={tile} /> : <RadarCell draft={draft} tile={tile} />}
-            <span className="map-grid-cell-label">{formatTileLabel(tile)}</span>
-          </button>
-        ))}
+        {visibleTiles.map((tile) => {
+          const tileFeatures = getFeaturesForTile(draft, tile.id);
+          return (
+            <button
+              key={tile.id}
+              type="button"
+              className={getTileClassName(draft, tile, selectedTileId, selectedFeatureId, tileFeatures)}
+              title={formatTileTitle(tile, tileFeatures)}
+              aria-label={`Select tile ${tile.id}`}
+              aria-pressed={selectedTileId === tile.id}
+              onClick={() => {
+                if (suppressNextClickRef.current) {
+                  suppressNextClickRef.current = false;
+                  return;
+                }
+                onTileClick(tile.id);
+              }}
+              onPointerDown={(event) => {
+                if (event.button !== 0 && event.pointerType === "mouse") {
+                  return;
+                }
+                isPointerDownRef.current = true;
+                lastPointerTileIdRef.current = tile.id;
+                suppressNextClickRef.current = true;
+                onTilePointerDown(tile.id);
+              }}
+              onPointerEnter={() => {
+                if (isPointerDownRef.current) {
+                  lastPointerTileIdRef.current = tile.id;
+                  onTilePointerEnter(tile.id);
+                }
+              }}
+              onPointerUp={() => finishTileStroke(tile.id)}
+            >
+              {gameplayOverlay ? <GameplayOverlay draft={draft} tile={tile} /> : <RadarCell draft={draft} tile={tile} />}
+              {tileFeatures.length > 0 ? (
+                <span className="map-grid-feature-count" aria-hidden="true">
+                  F{tileFeatures.length}
+                </span>
+              ) : null}
+              <span className="map-grid-cell-label">{formatTileLabel(tile)}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -116,6 +134,22 @@ export default function MapGrid({
       row: clamp(current.row + rowDelta, 1, Math.max(1, draft.size.rows - VIEW_ROWS + 1)),
       col: clamp(current.col + colDelta, 1, Math.max(1, draft.size.cols - VIEW_COLS + 1)),
     }));
+  }
+
+  function finishTileStroke(tileId?: string) {
+    if (!isPointerDownRef.current) {
+      return;
+    }
+
+    const finalTileId = tileId ?? lastPointerTileIdRef.current;
+    isPointerDownRef.current = false;
+    lastPointerTileIdRef.current = null;
+    window.setTimeout(() => {
+      suppressNextClickRef.current = false;
+    }, 0);
+    if (finalTileId) {
+      onTilePointerUp(finalTileId);
+    }
   }
 }
 
@@ -149,7 +183,13 @@ function GameplayOverlay({ draft, tile }: { draft: MapEditorDraft; tile: MapTile
   );
 }
 
-function getTileClassName(draft: MapEditorDraft, tile: MapTileDefinition, selectedTileId: string | null): string {
+function getTileClassName(
+  draft: MapEditorDraft,
+  tile: MapTileDefinition,
+  selectedTileId: string | null,
+  selectedFeatureId: string | null,
+  tileFeatures: MapFeatureDefinition[],
+): string {
   const classNames = ["map-grid-tile"];
   if (tile.id === draft.originTileId) {
     classNames.push("map-grid-tile-origin");
@@ -160,7 +200,20 @@ function getTileClassName(draft: MapEditorDraft, tile: MapTileDefinition, select
   if (selectedTileId === tile.id) {
     classNames.push("map-grid-tile-selected");
   }
+  if (selectedFeatureId && tileFeatures.some((feature) => feature.id === selectedFeatureId)) {
+    classNames.push("map-grid-tile-feature-footprint");
+  }
+  if (tileFeatures.length > 1) {
+    classNames.push("map-grid-tile-feature-overlap");
+  } else if (tileFeatures.length === 1) {
+    classNames.push("map-grid-tile-feature");
+  }
   return classNames.join(" ");
+}
+
+function formatTileTitle(tile: MapTileDefinition, tileFeatures: MapFeatureDefinition[]): string {
+  const featureSummary = tileFeatures.length > 0 ? ` · Features: ${tileFeatures.map((feature) => feature.name).join(", ")}` : "";
+  return `${tile.id} · ${tile.areaName}${featureSummary}`;
 }
 
 function formatTileLabel(tile: MapTileDefinition): string {

@@ -1,4 +1,11 @@
-import type { FeatureActionDefinition, MapEditorCommand, MapEditorDraft, MapFeatureDefinition, MapFeatureVisibility } from "./types";
+import type {
+  FeatureActionDefinition,
+  MapEditorCommand,
+  MapEditorDraft,
+  MapFeatureDefinition,
+  MapFeatureFootprintBrushMode,
+  MapFeatureVisibility,
+} from "./types";
 
 const FEATURE_VISIBILITY_OPTIONS: MapFeatureVisibility[] = ["always", "onDiscovered", "onInvestigated", "hidden"];
 const FEATURE_ACTION_TONES = ["neutral", "muted", "accent", "danger", "success"];
@@ -7,6 +14,8 @@ interface FeatureInspectorProps {
   draft: MapEditorDraft;
   selectedTileId: string | null;
   selectedFeatureId: string | null;
+  footprintBrushMode: MapFeatureFootprintBrushMode;
+  onFootprintBrushModeChange: (mode: MapFeatureFootprintBrushMode) => void;
   onSelectFeature: (featureId: string | null) => void;
   onCommand: (command: MapEditorCommand) => void;
 }
@@ -15,6 +24,8 @@ export default function FeatureInspector({
   draft,
   selectedTileId,
   selectedFeatureId,
+  footprintBrushMode,
+  onFootprintBrushModeChange,
   onSelectFeature,
   onCommand,
 }: FeatureInspectorProps) {
@@ -53,7 +64,14 @@ export default function FeatureInspector({
       </ul>
 
       {selectedFeature ? (
-        <FeatureEditor feature={selectedFeature} kindOptions={kindOptions} onUpdate={updateFeature} onDelete={deleteFeature} />
+        <FeatureEditor
+          feature={selectedFeature}
+          kindOptions={kindOptions}
+          footprintBrushMode={footprintBrushMode}
+          onFootprintBrushModeChange={onFootprintBrushModeChange}
+          onUpdate={updateFeature}
+          onDelete={deleteFeature}
+        />
       ) : (
         <p className="muted-text">No feature selected.</p>
       )}
@@ -79,11 +97,15 @@ export default function FeatureInspector({
 function FeatureEditor({
   feature,
   kindOptions,
+  footprintBrushMode,
+  onFootprintBrushModeChange,
   onUpdate,
   onDelete,
 }: {
   feature: MapFeatureDefinition;
   kindOptions: string[];
+  footprintBrushMode: MapFeatureFootprintBrushMode;
+  onFootprintBrushModeChange: (mode: MapFeatureFootprintBrushMode) => void;
   onUpdate: (featureId: string, patch: Extract<MapEditorCommand, { type: "feature/update" }>["patch"]) => void;
   onDelete: (featureId: string) => void;
 }) {
@@ -168,6 +190,18 @@ function FeatureEditor({
           <dd>{formatFootprint(feature)}</dd>
         </div>
       </dl>
+
+      <fieldset>
+        <legend>Footprint brush</legend>
+        <div className="feature-footprint-actions" role="group" aria-label="Footprint brush mode">
+          <button type="button" aria-pressed={footprintBrushMode === "add"} onClick={() => onFootprintBrushModeChange("add")}>
+            Add tiles
+          </button>
+          <button type="button" aria-pressed={footprintBrushMode === "erase"} onClick={() => onFootprintBrushModeChange("erase")}>
+            Erase tiles
+          </button>
+        </div>
+      </fieldset>
 
       <label className="feature-inspector-checkbox">
         <input

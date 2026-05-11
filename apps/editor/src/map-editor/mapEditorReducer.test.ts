@@ -177,6 +177,56 @@ describe("mapEditorReducer", () => {
 
     expect(state.draft.features.some((feature) => feature.id === "test_feature")).toBe(false);
   });
+
+  it("adds and erases feature footprint tiles as one history entry per stroke", () => {
+    let state = mapEditorReducer(createState(), {
+      type: "feature/create",
+      feature: {
+        id: "test_feature",
+        name: "Test Feature",
+        kind: "feature",
+        priority: 10,
+        visibility: "onDiscovered",
+        footprint: {
+          type: "row_spans",
+          spans: [{ row: 1, colStart: 1, colEnd: 1 }],
+        },
+      },
+    });
+    const historyAfterCreate = state.history.past.length;
+
+    state = mapEditorReducer(state, {
+      type: "feature/applyFootprintBrush",
+      featureId: "test_feature",
+      mode: "add",
+      tileIds: ["1-2", "2-1", "2-2"],
+    });
+
+    expect(state.draft.features[0]?.footprint.spans).toEqual([
+      { row: 1, colStart: 1, colEnd: 2 },
+      { row: 2, colStart: 1, colEnd: 2 },
+    ]);
+    expect(state.history.past).toHaveLength(historyAfterCreate + 1);
+
+    state = mapEditorReducer(state, {
+      type: "feature/applyFootprintBrush",
+      featureId: "test_feature",
+      mode: "erase",
+      tileIds: ["1-1", "2-1"],
+    });
+
+    expect(state.draft.features[0]?.footprint.spans).toEqual([
+      { row: 1, colStart: 2, colEnd: 2 },
+      { row: 2, colStart: 2, colEnd: 2 },
+    ]);
+    expect(state.history.past).toHaveLength(historyAfterCreate + 2);
+
+    const undoneState = mapEditorReducer(state, { type: "history/undo" });
+    expect(undoneState.draft.features[0]?.footprint.spans).toEqual([
+      { row: 1, colStart: 1, colEnd: 2 },
+      { row: 2, colStart: 1, colEnd: 2 },
+    ]);
+  });
 });
 
 function createState(): MapEditorState {

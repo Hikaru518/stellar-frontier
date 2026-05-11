@@ -40,7 +40,7 @@ source:
 | 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | completed | 1 |
 | 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | completed | 1 |
 | 16 | TASK-016 | Editor Feature list 与 inspector | completed | 1 |
-| 17 | TASK-017 | Editor footprint brush 与重叠预览 | pending | 0 |
+| 17 | TASK-017 | Editor footprint brush 与重叠预览 | completed | 1 |
 | 18 | TASK-018 | 移除 legacy tile area/object gameplay source | pending | 0 |
 | 19 | TASK-019 | 补齐 e2e 与最终验证 | pending | 0 |
 
@@ -282,3 +282,19 @@ source:
 - 质量检查:
   - `apps/editor` lint: passed
   - `npm run editor:test`: passed, 45 files / 238 tests
+
+### TASK-017: Editor footprint brush 与重叠预览
+- 状态: completed
+- 开始时间: 2026-05-12 03:55
+- 完成时间: 2026-05-12 04:11
+- 尝试次数: 1
+- 尝试记录:
+  - 尝试 1: 子 agent 写入实现后未正常返回；父层关闭该 agent，复核并完成质量检查。
+- developer summary:
+  - MapGrid 支持显示选中 Feature footprint 和多 Feature 重叠标记。
+  - Map Editor 在选中 Feature 后支持 add/erase footprint brush，pointer drag stroke 统一在 pointer-up 时提交为一条 history。
+  - 新增 footprint tile helper：查询 tile 上 Feature、展开/压缩 `row_spans` footprint。
+  - 选中 tile 时侧栏显示该 tile 的重叠 Feature 列表，并可直接切换选中 Feature。
+- 质量检查:
+  - `apps/editor` lint: passed
+  - `npm run editor:test`: passed, 46 files / 243 tests

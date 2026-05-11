@@ -1,6 +1,12 @@
-import { parseTileId } from "./mapEditorModel";
+import {
+  createFeatureFootprintFromTileIds,
+  getFeatureFootprintTileIds,
+  isTileInsideDraft,
+  parseTileId,
+} from "./mapEditorModel";
 import type {
   FeatureFootprint,
+  MapFeatureFootprintBrushMode,
   MapEditorCommand,
   MapEditorDraft,
   MapEditorState,
@@ -30,6 +36,8 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
       return createFeature(state, command.feature);
     case "feature/update":
       return updateFeature(state, command.featureId, command.patch);
+    case "feature/applyFootprintBrush":
+      return applyFeatureFootprintBrush(state, command.featureId, command.tileIds, command.mode);
     case "feature/delete":
       return deleteFeature(state, command.featureId);
     case "history/undo":
@@ -183,6 +191,52 @@ function updateFeature(state: MapEditorState, featureId: string, patch: MapFeatu
   });
 }
 
+function applyFeatureFootprintBrush(
+  state: MapEditorState,
+  featureId: string,
+  tileIds: string[],
+  mode: MapFeatureFootprintBrushMode,
+): MapEditorState {
+  const featureIndex = state.draft.features.findIndex((feature) => feature.id === featureId);
+  const currentFeature = state.draft.features[featureIndex];
+  if (featureIndex < 0 || !currentFeature) {
+    return state;
+  }
+
+  const strokeTileIds = Array.from(new Set(tileIds.filter((tileId) => isTileInsideDraft(state.draft, tileId))));
+  if (strokeTileIds.length === 0) {
+    return state;
+  }
+
+  const nextTileIds = new Set(getFeatureFootprintTileIds(state.draft, currentFeature));
+  for (const tileId of strokeTileIds) {
+    if (mode === "erase") {
+      nextTileIds.delete(tileId);
+    } else {
+      nextTileIds.add(tileId);
+    }
+  }
+
+  if (nextTileIds.size === 0) {
+    return state;
+  }
+
+  const nextFootprint = createFeatureFootprintFromTileIds(state.draft, Array.from(nextTileIds));
+  if (areFootprintsEqual(currentFeature.footprint, nextFootprint)) {
+    return state;
+  }
+
+  const nextFeature = normalizeFeatureForDraft(state.draft, { ...currentFeature, footprint: nextFootprint });
+  if (!nextFeature) {
+    return state;
+  }
+
+  return commitDraftChange(state, {
+    ...state.draft,
+    features: state.draft.features.map((feature, index) => (index === featureIndex ? nextFeature : feature)),
+  });
+}
+
 function deleteFeature(state: MapEditorState, featureId: string): MapEditorState {
   if (!state.draft.features.some((feature) => feature.id === featureId)) {
     return state;
@@ -297,7 +351,7 @@ function normalizeFeatureFootprint(draft: MapEditorDraft, footprint: FeatureFoot
     };
   });
 
-  return spans.length > 0 ? { type: "row_spans", spans } : createDefaultFeatureFootprint(draft);
+  return spans.length > 0 ? createFeatureFootprintFromTileIds(draft, spans.flatMap((span) => spanToTileIds(span))) : createDefaultFeatureFootprint(draft);
 }
 
 function createDefaultFeatureFootprint(draft: MapEditorDraft): FeatureFootprint {
@@ -397,4 +451,16 @@ function areTilesEqual(left: MapTileDefinition, right: MapTileDefinition): boole
 
 function areFeaturesEqual(left: MapFeatureDefinition, right: MapFeatureDefinition): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function areFootprintsEqual(left: FeatureFootprint, right: FeatureFootprint): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function spanToTileIds(span: FeatureFootprint["spans"][number]): string[] {
+  const tileIds: string[] = [];
+  for (let col = span.colStart; col <= span.colEnd; col += 1) {
+    tileIds.push(`${span.row}-${col}`);
+  }
+  return tileIds;
 }

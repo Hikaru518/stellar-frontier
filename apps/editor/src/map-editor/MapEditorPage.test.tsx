@@ -73,6 +73,59 @@ describe("MapEditorPage", () => {
     expect(screen.getByLabelText("Tile gameplay inspector")).toHaveTextContent("水");
   });
 
+  it("shows selected tile feature overlaps and applies selected feature footprint brush", async () => {
+    const draft = createMapEditorDraft({ id: "default-map", name: "Default Map", rows: 2, cols: 2 });
+    draft.features = [
+      {
+        id: "feature-a",
+        name: "Feature A",
+        kind: "feature",
+        priority: 10,
+        visibility: "onDiscovered",
+        footprint: { type: "row_spans", spans: [{ row: 1, colStart: 1, colEnd: 1 }] },
+      },
+      {
+        id: "feature-b",
+        name: "Feature B",
+        kind: "feature",
+        priority: 20,
+        visibility: "onDiscovered",
+        footprint: { type: "row_spans", spans: [{ row: 1, colStart: 1, colEnd: 1 }] },
+      },
+    ];
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [
+          {
+            id: "default-map",
+            file_path: "content/maps/default-map.json",
+            radar_file_path: draft.radarPath,
+            data: draft,
+          },
+        ],
+      }),
+    );
+
+    render(<MapEditorPage loadLibrary={loadLibrary} />);
+
+    await screen.findByRole("heading", { name: "Default Map" });
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Select tile 1-1" }), { button: 0, pointerType: "mouse" });
+    fireEvent.pointerUp(screen.getByRole("button", { name: "Select tile 1-1" }));
+
+    const overlaps = screen.getByLabelText("Selected tile feature overlaps");
+    expect(within(overlaps).getByText("2 features")).toBeInTheDocument();
+    fireEvent.click(within(overlaps).getByRole("button", { name: "Select overlapping feature feature-a" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Select tile 2-2" }));
+
+    expect(screen.getByLabelText("Selected tile feature overlaps")).toHaveTextContent("Feature A");
+
+    fireEvent.click(screen.getByRole("button", { name: "Erase tiles" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select tile 2-2" }));
+
+    expect(screen.getByLabelText("Selected tile feature overlaps")).not.toHaveTextContent("Feature A");
+  });
+
   it("shows the helper startup hint when loading fails", async () => {
     const loadLibrary = vi.fn(async () =>
       Promise.reject(

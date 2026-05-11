@@ -88,6 +88,7 @@ function InspectorHarness() {
     createInitialMapEditorState(createMapEditorDraft({ id: "test-map", name: "Test Map", rows: 2, cols: 2 })),
   );
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+  const [footprintBrushMode, setFootprintBrushMode] = useState<"add" | "erase">("add");
 
   return (
     <>
@@ -95,6 +96,8 @@ function InspectorHarness() {
         draft={state.draft}
         selectedTileId="2-2"
         selectedFeatureId={selectedFeatureId}
+        footprintBrushMode={footprintBrushMode}
+        onFootprintBrushModeChange={setFootprintBrushMode}
         onSelectFeature={setSelectedFeatureId}
         onCommand={dispatch}
       />

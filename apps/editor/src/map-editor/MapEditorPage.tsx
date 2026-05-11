@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapEditorApiError, HELPER_START_COMMAND, loadMapEditorLibrary, saveMapDraft, validateMapDraft } from "./apiClient";
-import { createInitialMapEditorState, normalizeMapEditorDraft } from "./mapEditorModel";
+import { createInitialMapEditorState, getFeaturesForTile, normalizeMapEditorDraft } from "./mapEditorModel";
 import { mapEditorReducer } from "./mapEditorReducer";
 import FeatureInspector from "./FeatureInspector";
 import MapFilePanel from "./MapFilePanel";
@@ -10,7 +10,7 @@ import TileInspector from "./TileInspector";
 import Toolbar, { type MapEditorTool } from "./Toolbar";
 import ValidationPanel, { getIssueTileId } from "./ValidationPanel";
 import type { MapEditorLibraryMap, MapEditorLibraryResponse, MapValidationIssue, SaveMapResponse, ValidateMapResponse } from "./apiClient";
-import type { MapEditorCommand, MapEditorDraft, MapEditorState, SemanticBrush } from "./types";
+import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapFeatureDefinition, MapFeatureFootprintBrushMode, SemanticBrush } from "./types";
 
 type LoadLibrary = () => Promise<MapEditorLibraryResponse>;
 type ValidateMap = (input: { filePath?: string | null; data: MapEditorDraft }) => Promise<ValidateMapResponse>;
@@ -36,6 +36,7 @@ export default function MapEditorPage({
   const [savedDraft, setSavedDraft] = useState<MapEditorDraft | null>(null);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+  const [featureFootprintBrushMode, setFeatureFootprintBrushMode] = useState<MapFeatureFootprintBrushMode>("add");
   const [activeTool, setActiveTool] = useState<MapEditorTool>("select");
   const [activeSemanticBrush, setActiveSemanticBrush] = useState<SemanticBrush | null>(null);
   const [gameplayOverlay, setGameplayOverlay] = useState(false);
@@ -224,6 +225,8 @@ export default function MapEditorPage({
           activeMapFilePath={activeMapFilePath}
           editorState={editorState}
           selectedTileId={selectedTileId}
+          selectedFeatureId={selectedFeatureId}
+          featureFootprintBrushMode={featureFootprintBrushMode}
           activeTool={activeTool}
           activeSemanticBrush={activeSemanticBrush}
           gameplayOverlay={gameplayOverlay}
@@ -243,10 +246,12 @@ export default function MapEditorPage({
           editorState={editorState}
           selectedTileId={selectedTileId}
           selectedFeatureId={selectedFeatureId}
+          featureFootprintBrushMode={featureFootprintBrushMode}
           activeSemanticBrush={activeSemanticBrush}
           gameplayOverlay={gameplayOverlay}
           validationIssues={validationIssues}
           onActiveSemanticBrushChange={changeSemanticBrush}
+          onFeatureFootprintBrushModeChange={setFeatureFootprintBrushMode}
           onGameplayOverlayChange={setGameplayOverlay}
           onSelectFeature={setSelectedFeatureId}
           onIssueSelect={handleIssueSelect}
@@ -298,6 +303,8 @@ function MapCanvasShell({
   activeMapFilePath,
   editorState,
   selectedTileId,
+  selectedFeatureId,
+  featureFootprintBrushMode,
   activeTool,
   activeSemanticBrush,
   gameplayOverlay,
@@ -314,6 +321,8 @@ function MapCanvasShell({
   activeMapFilePath: string | null;
   editorState: MapEditorState | null;
   selectedTileId: string | null;
+  selectedFeatureId: string | null;
+  featureFootprintBrushMode: MapFeatureFootprintBrushMode;
   activeTool: MapEditorTool;
   activeSemanticBrush: SemanticBrush | null;
   gameplayOverlay: boolean;
@@ -327,6 +336,12 @@ function MapCanvasShell({
   onSave: () => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
+  const featureStrokeRef = useRef<{
+    featureId: string;
+    mode: MapFeatureFootprintBrushMode;
+    tileIds: Set<string>;
+  } | null>(null);
+
   if (!editorState) {
     return (
       <section className="map-canvas-shell" aria-label="Map editor workspace">
@@ -390,17 +405,48 @@ function MapCanvasShell({
       <MapGrid
         draft={state.draft}
         selectedTileId={selectedTileId}
+        selectedFeatureId={selectedFeatureId}
         gameplayOverlay={gameplayOverlay}
         onSelectTile={onSelectTile}
+        onTileClick={handleTileClick}
         onTilePointerDown={handleTilePointerDown}
         onTilePointerEnter={handleTilePointerEnter}
-        onTilePointerUp={() => undefined}
+        onTilePointerUp={handleTilePointerUp}
       />
     </section>
   );
 
   function handleTilePointerDown(tileId: string) {
     onSelectTile(tileId);
+    if (selectedFeatureId && activeTool === "select") {
+      featureStrokeRef.current = {
+        featureId: selectedFeatureId,
+        mode: featureFootprintBrushMode,
+        tileIds: new Set([tileId]),
+      };
+      onNotice(null);
+      return;
+    }
+
+    if (activeSemanticBrush) {
+      onCommand({ type: "gameplay/applySemanticBrush", tileId, brush: activeSemanticBrush });
+      onNotice(`Applied ${formatSemanticBrush(activeSemanticBrush)} to ${tileId}.`);
+    }
+  }
+
+  function handleTileClick(tileId: string) {
+    onSelectTile(tileId);
+    if (selectedFeatureId && activeTool === "select") {
+      onCommand({
+        type: "feature/applyFootprintBrush",
+        featureId: selectedFeatureId,
+        mode: featureFootprintBrushMode,
+        tileIds: [tileId],
+      });
+      onNotice(`${featureFootprintBrushMode === "erase" ? "Erased" : "Added"} 1 footprint tile for ${selectedFeatureId}.`);
+      return;
+    }
+
     if (activeSemanticBrush) {
       onCommand({ type: "gameplay/applySemanticBrush", tileId, brush: activeSemanticBrush });
       onNotice(`Applied ${formatSemanticBrush(activeSemanticBrush)} to ${tileId}.`);
@@ -408,9 +454,31 @@ function MapCanvasShell({
   }
 
   function handleTilePointerEnter(tileId: string) {
+    if (featureStrokeRef.current) {
+      featureStrokeRef.current.tileIds.add(tileId);
+      return;
+    }
+
     if (activeSemanticBrush) {
       onCommand({ type: "gameplay/applySemanticBrush", tileId, brush: activeSemanticBrush });
     }
+  }
+
+  function handleTilePointerUp(tileId: string) {
+    const stroke = featureStrokeRef.current;
+    if (!stroke) {
+      return;
+    }
+
+    stroke.tileIds.add(tileId);
+    featureStrokeRef.current = null;
+    onCommand({
+      type: "feature/applyFootprintBrush",
+      featureId: stroke.featureId,
+      mode: stroke.mode,
+      tileIds: Array.from(stroke.tileIds),
+    });
+    onNotice(`${stroke.mode === "erase" ? "Erased" : "Added"} ${formatCount(stroke.tileIds.size, "footprint tile")} for ${stroke.featureId}.`);
   }
 }
 
@@ -419,10 +487,12 @@ function MapSummaryPanel({
   editorState,
   selectedTileId,
   selectedFeatureId,
+  featureFootprintBrushMode,
   activeSemanticBrush,
   gameplayOverlay,
   validationIssues,
   onActiveSemanticBrushChange,
+  onFeatureFootprintBrushModeChange,
   onGameplayOverlayChange,
   onSelectFeature,
   onIssueSelect,
@@ -432,10 +502,12 @@ function MapSummaryPanel({
   editorState: MapEditorState | null;
   selectedTileId: string | null;
   selectedFeatureId: string | null;
+  featureFootprintBrushMode: MapFeatureFootprintBrushMode;
   activeSemanticBrush: SemanticBrush | null;
   gameplayOverlay: boolean;
   validationIssues: { errors: MapValidationIssue[]; warnings: MapValidationIssue[] };
   onActiveSemanticBrushChange: (brush: SemanticBrush | null) => void;
+  onFeatureFootprintBrushModeChange: (mode: MapFeatureFootprintBrushMode) => void;
   onGameplayOverlayChange: (enabled: boolean) => void;
   onSelectFeature: (featureId: string | null) => void;
   onIssueSelect: (issue: MapValidationIssue) => void;
@@ -454,6 +526,7 @@ function MapSummaryPanel({
 
   const { draft } = editorState;
   const selectedTile = selectedTileId ? draft.tiles.find((tile) => tile.id === selectedTileId) : null;
+  const selectedTileFeatures = selectedTileId ? getFeaturesForTile(draft, selectedTileId) : [];
   return (
     <aside className="map-summary-panel" aria-label="Map editor summary">
       <section className="map-summary-card">
@@ -488,6 +561,7 @@ function MapSummaryPanel({
             <dd>{selectedTile ? `${selectedTile.id} · ${selectedTile.areaName}` : "None"}</dd>
           </div>
         </dl>
+        <FeatureOverlapList features={selectedTileFeatures} selectedFeatureId={selectedFeatureId} onSelectFeature={onSelectFeature} />
       </section>
 
       <section className="map-summary-card">
@@ -517,6 +591,8 @@ function MapSummaryPanel({
         draft={draft}
         selectedTileId={selectedTileId}
         selectedFeatureId={selectedFeatureId}
+        footprintBrushMode={featureFootprintBrushMode}
+        onFootprintBrushModeChange={onFeatureFootprintBrushModeChange}
         onSelectFeature={onSelectFeature}
         onCommand={onCommand}
       />
@@ -529,6 +605,46 @@ function MapSummaryPanel({
         onIssueSelect={onIssueSelect}
       />
     </aside>
+  );
+}
+
+function FeatureOverlapList({
+  features,
+  selectedFeatureId,
+  onSelectFeature,
+}: {
+  features: MapFeatureDefinition[];
+  selectedFeatureId: string | null;
+  onSelectFeature: (featureId: string | null) => void;
+}) {
+  return (
+    <div className="tile-feature-overlaps" aria-label="Selected tile feature overlaps">
+      <div className="map-panel-subheading">
+        <h4>Feature overlaps</h4>
+        <span className={features.length > 1 ? "status-tag status-warning" : "status-tag status-muted"}>{formatCount(features.length, "feature")}</span>
+      </div>
+      {features.length === 0 ? <p className="muted-text">No feature footprint on this tile.</p> : null}
+      {features.length > 0 ? (
+        <ul className="tile-feature-overlap-list">
+          {features.map((feature) => (
+            <li key={feature.id}>
+              <button
+                type="button"
+                className={feature.id === selectedFeatureId ? "tile-feature-overlap-row tile-feature-overlap-row-selected" : "tile-feature-overlap-row"}
+                aria-label={`Select overlapping feature ${feature.id}`}
+                aria-pressed={feature.id === selectedFeatureId}
+                onClick={() => onSelectFeature(feature.id)}
+              >
+                <span>{feature.name}</span>
+                <span>
+                  <code>{feature.id}</code> · {feature.kind}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
