@@ -39,7 +39,7 @@ source:
 | 13 | TASK-013 | CallPage 展示 Feature 目标文案与按钮 | completed | 1 |
 | 14 | TASK-014 | 迁移 IAFS 事件和 action 内容到 feature_id | completed | 1 |
 | 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | completed | 1 |
-| 16 | TASK-016 | Editor Feature list 与 inspector | pending | 0 |
+| 16 | TASK-016 | Editor Feature list 与 inspector | completed | 1 |
 | 17 | TASK-017 | Editor footprint brush 与重叠预览 | pending | 0 |
 | 18 | TASK-018 | 移除 legacy tile area/object gameplay source | pending | 0 |
 | 19 | TASK-019 | 补齐 e2e 与最终验证 | pending | 0 |
@@ -266,3 +266,19 @@ source:
   - `npm run validate:content`: passed
   - `apps/editor` lint: passed
   - `npm run editor:test`: passed, 44 files / 234 tests
+
+### TASK-016: Editor Feature list 与 inspector
+- 状态: completed
+- 开始时间: 2026-05-12 03:36
+- 完成时间: 2026-05-12 03:54
+- 尝试次数: 1
+- 尝试记录:
+  - 尝试 1: 子 agent 写入实现后未正常返回；父层关闭该 agent，补齐 tags/actions 基础字段编辑并完成质量检查。
+- developer summary:
+  - Map Editor 侧栏新增 Feature list / Feature inspector，支持创建、选择、删除 Feature。
+  - Feature 创建会锚定当前选中 tile，生成非空 `row_spans` footprint。
+  - Inspector 支持编辑 name、kind、priority、visibility、tags、investigatable、status options、initial status 和 action 基础字段。
+  - reducer 新增 `feature/create`、`feature/update`、`feature/delete` 命令，并纳入 undo/redo 历史。
+- 质量检查:
+  - `apps/editor` lint: passed
+  - `npm run editor:test`: passed, 45 files / 238 tests

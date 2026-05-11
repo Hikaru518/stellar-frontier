@@ -980,7 +980,8 @@ p {
 
 .map-preview-toggle button,
 .semantic-brush-actions button,
-.tile-inspector button {
+.tile-inspector button,
+.feature-inspector button {
   min-height: 30px;
   padding: 4px 8px;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
@@ -1157,6 +1158,7 @@ p {
 
 .semantic-brush-panel,
 .tile-inspector,
+.feature-inspector,
 .validation-panel {
   display: grid;
   gap: 8px;
@@ -1166,13 +1168,15 @@ p {
 }
 
 .tile-inspector,
-.semantic-brush-panel {
+.semantic-brush-panel,
+.feature-inspector {
   display: grid;
   gap: 7px;
 }
 
 .tile-inspector label,
-.semantic-brush-panel label {
+.semantic-brush-panel label,
+.feature-inspector label {
   display: grid;
   gap: 4px;
   color: #46505a;
@@ -1183,7 +1187,9 @@ p {
 .tile-inspector select,
 .tile-inspector input,
 .semantic-brush-panel input,
-.semantic-brush-panel select {
+.semantic-brush-panel select,
+.feature-inspector input,
+.feature-inspector select {
   min-width: 0;
   border: 1px solid #77736b;
   background: #f7f4ec;
@@ -1191,14 +1197,21 @@ p {
   color: #171a1c;
 }
 
-.tile-inspector fieldset {
+.feature-inspector input[aria-invalid="true"] {
+  border-color: #8a3d1a;
+  background: #fff3ec;
+}
+
+.tile-inspector fieldset,
+.feature-inspector fieldset {
   display: grid;
   gap: 7px;
   border: 1px solid #d0b69b;
   padding: 8px;
 }
 
-.tile-inspector legend {
+.tile-inspector legend,
+.feature-inspector legend {
   color: #46505a;
   font-size: 12px;
   font-weight: 700;
@@ -1213,9 +1226,73 @@ p {
 .tile-inspector-checkbox-list,
 .tile-inspector-special-list,
 .tile-inspector-special-form,
+.feature-list,
+.feature-editor,
+.feature-action-list,
+.feature-status-errors,
 .semantic-brush-actions {
   display: grid;
   gap: 6px;
+}
+
+.feature-list,
+.feature-status-errors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature-list-row {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  padding: 7px;
+  text-align: left;
+}
+
+.feature-list-row-selected {
+  border-color: #24384f;
+  background: #dbe3e9;
+  font-weight: 700;
+}
+
+.feature-list-title {
+  overflow-wrap: anywhere;
+}
+
+.feature-list-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
+.feature-editor {
+  border-top: 1px solid #d0b69b;
+  padding-top: 8px;
+}
+
+.feature-inspector-checkbox {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.feature-status-errors {
+  border: 1px solid #8a3d1a;
+  background: #fff3ec;
+  padding: 7px 7px 7px 22px;
+  color: #7a2f14;
+  font-size: 12px;
+}
+
+.feature-delete-button {
+  justify-self: start;
+}
+
+.feature-action-card {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .tile-inspector-checkbox-list label {

@@ -97,6 +97,86 @@ describe("mapEditorReducer", () => {
     expect(state.draft.initialDiscoveredTileIds).not.toContain("1-2");
     expect(state.draft.initialDiscoveredTileIds).toContain(state.draft.originTileId);
   });
+
+  it("creates, edits, and deletes map features", () => {
+    let state = mapEditorReducer(createState(), {
+      type: "feature/create",
+      feature: {
+        id: "test_feature",
+        name: "Test Feature",
+        kind: "feature",
+        priority: 10,
+        visibility: "onDiscovered",
+        footprint: {
+          type: "row_spans",
+          spans: [{ row: 1, colStart: 1, colEnd: 1 }],
+        },
+      },
+    });
+
+    expect(state.draft.features).toHaveLength(1);
+    expect(state.draft.features[0]?.footprint.spans).toEqual([{ row: 1, colStart: 1, colEnd: 1 }]);
+
+    state = mapEditorReducer(state, {
+      type: "feature/update",
+      featureId: "test_feature",
+      patch: {
+        name: "Generator",
+        kind: "facility:power_system",
+        priority: 42,
+        visibility: "hidden",
+      },
+    });
+
+    expect(state.draft.features[0]).toMatchObject({
+      id: "test_feature",
+      name: "Generator",
+      kind: "facility:power_system",
+      priority: 42,
+      visibility: "hidden",
+    });
+
+    state = mapEditorReducer(state, {
+      type: "feature/update",
+      featureId: "test_feature",
+      patch: {
+        investigatable: true,
+        status_options: ["damaged", "repaired"],
+        initial_status: "damaged",
+        actions: [
+          {
+            id: "test_feature:inspect",
+            category: "feature",
+            label: "Inspect",
+            tone: "accent",
+            conditions: [],
+            event_id: "test_feature_inspect",
+          },
+        ],
+      },
+    });
+
+    expect(state.draft.features[0]).toMatchObject({
+      investigatable: true,
+      status_options: ["damaged", "repaired"],
+      initial_status: "damaged",
+      actions: [
+        expect.objectContaining({
+          id: "test_feature:inspect",
+          label: "Inspect",
+          tone: "accent",
+          event_id: "test_feature_inspect",
+        }),
+      ],
+    });
+
+    state = mapEditorReducer(state, {
+      type: "feature/delete",
+      featureId: "test_feature",
+    });
+
+    expect(state.draft.features.some((feature) => feature.id === "test_feature")).toBe(false);
+  });
 });
 
 function createState(): MapEditorState {

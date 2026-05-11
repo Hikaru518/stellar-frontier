@@ -76,6 +76,13 @@ export interface MapFeatureDefinition {
   actions?: FeatureActionDefinition[];
 }
 
+export type MapFeaturePatch = Partial<
+  Pick<
+    MapFeatureDefinition,
+    "name" | "description" | "kind" | "priority" | "tags" | "visibility" | "investigatable" | "status_options" | "initial_status" | "actions"
+  >
+>;
+
 export interface RadarWorldDefinition {
   width: number;
   height: number;
@@ -213,6 +220,19 @@ export type MapEditorCommand =
       tileId: string;
       glyph?: string;
       tone?: string;
+    }
+  | {
+      type: "feature/create";
+      feature: MapFeatureDefinition;
+    }
+  | {
+      type: "feature/update";
+      featureId: string;
+      patch: MapFeaturePatch;
+    }
+  | {
+      type: "feature/delete";
+      featureId: string;
     }
   | {
       type: "history/undo";

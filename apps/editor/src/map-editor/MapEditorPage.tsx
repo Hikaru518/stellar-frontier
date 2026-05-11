@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MapEditorApiError, HELPER_START_COMMAND, loadMapEditorLibrary, saveMapDraft, validateMapDraft } from "./apiClient";
 import { createInitialMapEditorState, normalizeMapEditorDraft } from "./mapEditorModel";
 import { mapEditorReducer } from "./mapEditorReducer";
+import FeatureInspector from "./FeatureInspector";
 import MapFilePanel from "./MapFilePanel";
 import MapGrid from "./MapGrid";
 import SemanticBrushPanel from "./SemanticBrushPanel";
@@ -34,6 +35,7 @@ export default function MapEditorPage({
   const [activeMapFilePath, setActiveMapFilePath] = useState<string | null>(null);
   const [savedDraft, setSavedDraft] = useState<MapEditorDraft | null>(null);
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<MapEditorTool>("select");
   const [activeSemanticBrush, setActiveSemanticBrush] = useState<SemanticBrush | null>(null);
   const [gameplayOverlay, setGameplayOverlay] = useState(false);
@@ -81,6 +83,16 @@ export default function MapEditorPage({
     };
   }, [loadLibrary]);
 
+  useEffect(() => {
+    if (!selectedFeatureId) {
+      return;
+    }
+
+    if (!editorState || !editorState.draft.features.some((feature) => feature.id === selectedFeatureId)) {
+      setSelectedFeatureId(null);
+    }
+  }, [editorState, selectedFeatureId]);
+
   function selectMap(mapId: string) {
     const map = library?.maps.find((candidate) => candidate.id === mapId);
     if (!map) {
@@ -93,6 +105,7 @@ export default function MapEditorPage({
     setActiveMapFilePath(map.file_path);
     setSavedDraft(nextState.draft);
     setSelectedTileId(nextState.draft.originTileId);
+    setSelectedFeatureId(null);
     setValidationIssues({ errors: [], warnings: [] });
     setNotice(null);
   }
@@ -104,6 +117,7 @@ export default function MapEditorPage({
     setActiveMapFilePath(null);
     setSavedDraft(null);
     setSelectedTileId(draft.originTileId);
+    setSelectedFeatureId(null);
     setValidationIssues({ errors: [], warnings: [] });
     setNotice(null);
   }
@@ -228,11 +242,13 @@ export default function MapEditorPage({
           library={library}
           editorState={editorState}
           selectedTileId={selectedTileId}
+          selectedFeatureId={selectedFeatureId}
           activeSemanticBrush={activeSemanticBrush}
           gameplayOverlay={gameplayOverlay}
           validationIssues={validationIssues}
           onActiveSemanticBrushChange={changeSemanticBrush}
           onGameplayOverlayChange={setGameplayOverlay}
+          onSelectFeature={setSelectedFeatureId}
           onIssueSelect={handleIssueSelect}
           onCommand={dispatch}
         />
@@ -402,22 +418,26 @@ function MapSummaryPanel({
   library,
   editorState,
   selectedTileId,
+  selectedFeatureId,
   activeSemanticBrush,
   gameplayOverlay,
   validationIssues,
   onActiveSemanticBrushChange,
   onGameplayOverlayChange,
+  onSelectFeature,
   onIssueSelect,
   onCommand,
 }: {
   library: MapEditorLibraryResponse;
   editorState: MapEditorState | null;
   selectedTileId: string | null;
+  selectedFeatureId: string | null;
   activeSemanticBrush: SemanticBrush | null;
   gameplayOverlay: boolean;
   validationIssues: { errors: MapValidationIssue[]; warnings: MapValidationIssue[] };
   onActiveSemanticBrushChange: (brush: SemanticBrush | null) => void;
   onGameplayOverlayChange: (enabled: boolean) => void;
+  onSelectFeature: (featureId: string | null) => void;
   onIssueSelect: (issue: MapValidationIssue) => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
@@ -490,6 +510,14 @@ function MapSummaryPanel({
         selectedTileId={selectedTileId}
         activeBrush={activeSemanticBrush}
         onActiveBrushChange={onActiveSemanticBrushChange}
+        onCommand={onCommand}
+      />
+
+      <FeatureInspector
+        draft={draft}
+        selectedTileId={selectedTileId}
+        selectedFeatureId={selectedFeatureId}
+        onSelectFeature={onSelectFeature}
         onCommand={onCommand}
       />
 
