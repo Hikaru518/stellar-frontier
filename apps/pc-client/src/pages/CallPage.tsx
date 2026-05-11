@@ -3,7 +3,7 @@ import { buildCallView, type CallActionTargetView, type CallFeatureContextView }
 import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
-import type { ActionOption, CallContext, CrewId, CrewMember, GameState, MapTile, SystemLog } from "../data/gameData";
+import type { ActionOption, CallContext, CrewId, CrewMember, GameMapState, GameState, MapTile, SystemLog } from "../data/gameData";
 import type { RuntimeCall } from "../events/types";
 import { getTileLocationLabel } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
@@ -99,7 +99,7 @@ export function CallPage({
       return null;
     }
 
-    const currentLocation = getTileLocationLabel(defaultMapConfig, member.currentTile);
+    const currentLocation = getTileLocationLabel(defaultMapConfig, member.currentTile, gameState.map);
     if (call.runtimeCallId) {
       if (!runtimeCall || !isRuntimeCallActive(runtimeCall, elapsedGameSeconds)) {
         return {
@@ -225,7 +225,7 @@ export function CallPage({
                       {item.canCommunicate ? "在线" : "失联"}
                     </span>
                   </div>
-                  <p>{getTileLocationLabel(defaultMapConfig, item.currentTile)}</p>
+                  <p>{getTileLocationLabel(defaultMapConfig, item.currentTile, gameState.map)}</p>
                   <p>{actionView.statusText}</p>
                   <p>{actionView.blockingReason ?? actionView.timingText}</p>
                 </div>
@@ -267,6 +267,7 @@ export function CallPage({
           {call.selectingMoveTarget && !callView.isRuntime ? (
             <MoveConfirmPanel
               member={member}
+              map={gameState.map}
               targetTile={selectedMoveTarget}
               preview={movePreview}
               callClosed={callClosed}
@@ -431,6 +432,7 @@ function formatFeatureContextStatus(feature: CallFeatureContextView) {
 
 function MoveConfirmPanel({
   member,
+  map,
   targetTile,
   preview,
   callClosed,
@@ -439,6 +441,7 @@ function MoveConfirmPanel({
   onClearMoveTarget,
 }: {
   member: CrewMember;
+  map: GameMapState;
   targetTile: MapTile | undefined;
   preview: ReturnType<typeof createMovePreview> | null;
   callClosed: boolean;
@@ -464,15 +467,15 @@ function MoveConfirmPanel({
       <dl className="compact-fields">
         <div>
           <dt>起点</dt>
-          <dd>{getTileLocationLabel(defaultMapConfig, member.currentTile)}</dd>
+          <dd>{getTileLocationLabel(defaultMapConfig, member.currentTile, map)}</dd>
         </div>
         <div>
           <dt>目标</dt>
-          <dd>{formatMoveTargetLabel(targetTile)}</dd>
+          <dd>{formatMoveTargetLabel(targetTile, map)}</dd>
         </div>
         <div>
           <dt>路线</dt>
-          <dd>{preview.canMove ? formatVisibleMoveRoute(preview) : preview.reason}</dd>
+          <dd>{preview.canMove ? formatVisibleMoveRoute(preview, map) : preview.reason}</dd>
         </div>
         <div>
           <dt>预计耗时</dt>
@@ -483,7 +486,7 @@ function MoveConfirmPanel({
       <p className="muted-text">确认后才会下达移动指令。抵达目标地块后，{member.name} 将原地待命。</p>
       <div className="move-confirm-actions">
         <button type="button" className="primary-button" onClick={onConfirmMove} disabled={!preview.canMove || callClosed}>
-          确认请求 {member.name} 前往 {formatMoveTargetShortLabel(targetTile)}
+          确认请求 {member.name} 前往 {formatMoveTargetShortLabel(targetTile, map)}
         </button>
         <button type="button" className="secondary-button" onClick={onOpenMap} disabled={callClosed}>
           重新选择
@@ -609,22 +612,22 @@ function frameLine(text: string, innerWidth: number) {
   return `|${text.padEnd(innerWidth, " ")}|`;
 }
 
-function formatMoveTargetLabel(tile: MapTile | undefined) {
+function formatMoveTargetLabel(tile: MapTile | undefined, map: GameMapState) {
   if (!tile) {
     return "未知目标";
   }
 
-  return `${getTileLocationLabel(defaultMapConfig, tile.id)} / 地形：${tile.terrain}`;
+  return `${getTileLocationLabel(defaultMapConfig, tile.id, map)} / 地形：${tile.terrain}`;
 }
 
-function formatMoveTargetShortLabel(tile: MapTile | undefined) {
-  return tile ? getTileLocationLabel(defaultMapConfig, tile.id) : "未知目标";
+function formatMoveTargetShortLabel(tile: MapTile | undefined, map: GameMapState) {
+  return tile ? getTileLocationLabel(defaultMapConfig, tile.id, map) : "未知目标";
 }
 
-function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMovePreview>>) {
+function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMovePreview>>, map: GameMapState) {
   return preview.steps
     .map((step) => {
-      return `${getTileLocationLabel(defaultMapConfig, step.tileId)} ${step.terrain}`;
+      return `${getTileLocationLabel(defaultMapConfig, step.tileId, map)} ${step.terrain}`;
     })
     .join(" -> ");
 }

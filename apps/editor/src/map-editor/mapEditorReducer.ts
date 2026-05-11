@@ -52,7 +52,7 @@ export function mapEditorReducer(state: MapEditorState, command: MapEditorComman
 function updateGameplayTile(
   state: MapEditorState,
   tileId: string,
-  patch: Partial<Pick<MapTileDefinition, "areaName" | "terrain" | "weather" | "environment" | "objectIds" | "specialStates">>,
+  patch: Partial<Pick<MapTileDefinition, "terrain" | "weather" | "environment" | "specialStates">>,
 ): MapEditorState {
   const tileIndex = state.draft.tiles.findIndex((tile) => tile.id === tileId);
   if (tileIndex < 0) {
@@ -67,15 +67,9 @@ function updateGameplayTile(
   const nextTile: MapTileDefinition = {
     ...currentTile,
     ...patch,
-    areaName: patch.areaName === undefined ? currentTile.areaName : patch.areaName.trim(),
     environment: patch.environment ? { ...currentTile.environment, ...patch.environment } : currentTile.environment,
-    objectIds: patch.objectIds ? Array.from(new Set(patch.objectIds)) : currentTile.objectIds,
     specialStates: patch.specialStates ? patch.specialStates.map((stateDefinition) => ({ ...stateDefinition })) : currentTile.specialStates,
   };
-
-  if (nextTile.areaName.length === 0) {
-    nextTile.areaName = currentTile.areaName;
-  }
 
   if (areTilesEqual(currentTile, nextTile)) {
     return state;

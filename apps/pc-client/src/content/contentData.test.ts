@@ -193,7 +193,12 @@ describe("default map config", () => {
     expect(investigatableFeature.actions[0].category).toBe("feature");
   });
 
-  it("exposes tile.objectIds (post-migration) and no inline tile.objects field", async () => {
+  it("does not expose legacy tile area/object gameplay fields", async () => {
+    const tileSchema = (mapsSchema as { $defs: { tile: { required: string[]; properties: Record<string, unknown> } } }).$defs.tile;
+    expect(tileSchema.required).not.toEqual(expect.arrayContaining(["areaName", "objectIds"]));
+    expect(tileSchema.properties).not.toHaveProperty("areaName");
+    expect(tileSchema.properties).not.toHaveProperty("objectIds");
+
     expect(contentData.defaultMapConfig.tiles.length).toBeGreaterThan(0);
     const sampleTiles = [
       contentData.defaultMapConfig.tiles[0],
@@ -205,7 +210,8 @@ describe("default map config", () => {
       if (!tile) {
         throw new Error("Expected sampled map tile to exist.");
       }
-      expect(Array.isArray(tile.objectIds)).toBe(true);
+      expect("areaName" in tile).toBe(false);
+      expect("objectIds" in tile).toBe(false);
       expect("objects" in tile).toBe(false);
     }
   });

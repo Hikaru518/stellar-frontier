@@ -52,9 +52,17 @@ export function normalizeMapEditorDraft(draft: MapEditorDraft): MapEditorDraft {
   return {
     ...draft,
     radarPath,
+    tiles: draft.tiles.map(normalizeTile),
     features: Array.isArray(draft.features) ? draft.features : [],
     radar: normalizeRadar(draft.radar, rows, cols, draft.originTileId, radarPath),
   };
+}
+
+function normalizeTile(tile: MapTileDefinition): MapTileDefinition {
+  const tileWithoutLegacy = { ...tile } as MapTileDefinition & { areaName?: unknown; objectIds?: unknown };
+  delete tileWithoutLegacy.areaName;
+  delete tileWithoutLegacy.objectIds;
+  return tileWithoutLegacy;
 }
 
 export function getTileId(row: number, col: number): string {
@@ -182,11 +190,9 @@ function createGameplayTiles(rows: number, cols: number): MapTileDefinition[] {
         id: getTileId(row, col),
         row,
         col,
-        areaName: `区域 ${row}-${col}`,
         terrain: DEFAULT_TERRAIN,
         weather: DEFAULT_WEATHER,
         environment: createDefaultEnvironment(),
-        objectIds: [],
         specialStates: [],
       });
     }

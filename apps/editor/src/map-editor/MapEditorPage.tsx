@@ -242,7 +242,6 @@ export default function MapEditorPage({
         />
 
         <MapSummaryPanel
-          library={library}
           editorState={editorState}
           selectedTileId={selectedTileId}
           selectedFeatureId={selectedFeatureId}
@@ -483,7 +482,6 @@ function MapCanvasShell({
 }
 
 function MapSummaryPanel({
-  library,
   editorState,
   selectedTileId,
   selectedFeatureId,
@@ -498,7 +496,6 @@ function MapSummaryPanel({
   onIssueSelect,
   onCommand,
 }: {
-  library: MapEditorLibraryResponse;
   editorState: MapEditorState | null;
   selectedTileId: string | null;
   selectedFeatureId: string | null;
@@ -558,7 +555,7 @@ function MapSummaryPanel({
           </div>
           <div>
             <dt>Selected</dt>
-            <dd>{selectedTile ? `${selectedTile.id} · ${selectedTile.areaName}` : "None"}</dd>
+            <dd>{selectedTile ? selectedTile.id : "None"}</dd>
           </div>
         </dl>
         <FeatureOverlapList features={selectedTileFeatures} selectedFeatureId={selectedFeatureId} onSelectFeature={onSelectFeature} />
@@ -597,7 +594,7 @@ function MapSummaryPanel({
         onCommand={onCommand}
       />
 
-      <TileInspector draft={draft} selectedTileId={selectedTileId} mapObjects={library.map_objects} onCommand={onCommand} />
+      <TileInspector draft={draft} selectedTileId={selectedTileId} onCommand={onCommand} />
 
       <ValidationPanel
         errors={validationIssues.errors}

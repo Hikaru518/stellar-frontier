@@ -336,62 +336,8 @@ function getInvestigatableFeatures(tile: MapTile, gameState: GameState): MapFeat
 }
 
 function getRevealedObjectIds(tile: MapTile, gameState: GameState): string[] {
-  // Reveal logic mirrors `mapSystem.ts` — `revealedObjectIds[]` is the
-  // authoritative runtime list, plus the `onDiscovered` / `onInvestigated`
-  // visibility shortcuts based on the tile's discovery / investigation state.
   const runtimeTile = gameState.map.tilesById?.[tile.id];
-  const runtimeIds = new Set<string>(runtimeTile?.revealedObjectIds ?? []);
-  const isDiscovered = Boolean(
-    (tile as MapTile & { discovered?: boolean }).discovered ||
-      runtimeTile?.discovered ||
-      gameState.map.discoveredTileIds.includes(tile.id),
-  );
-  const isInvestigated = Boolean(tile.investigated || runtimeTile?.investigated);
-
-  // We need the tile's static `objectIds` list to know which non-runtime-explicit
-  // objects the visibility shortcuts apply to. The `MapTile` runtime view does
-  // not carry it; we look it up via the by-id index, walking each candidate
-  // definition. Visibility checks are done individually below.
-  const visible: string[] = [];
-
-  // Build the candidate id list. Universal definition table is the only source
-  // of truth for object existence — but the tile is what scopes "what could be
-  // here". We rely on `runtimeTile?.revealedObjectIds` (always populated for
-  // explicit reveals) plus the static `objectIds` list when available.
-  const tileWithObjectIds = tile as MapTile & { objectIds?: string[] };
-  const staticObjectIds = tileWithObjectIds.objectIds ?? lookupStaticObjectIds(tile.id);
-
-  for (const objectId of staticObjectIds) {
-    const def = mapObjectDefinitionById.get(objectId);
-    if (!def) {
-      continue;
-    }
-    if (
-      runtimeIds.has(objectId) ||
-      (def.visibility === "onDiscovered" && isDiscovered) ||
-      (def.visibility === "onInvestigated" && isInvestigated)
-    ) {
-      visible.push(objectId);
-    }
-  }
-
-  // Anything in `revealedObjectIds` that isn't already counted (e.g. a hidden
-  // object explicitly revealed by an event effect) is added at the end.
-  for (const objectId of runtimeIds) {
-    if (!visible.includes(objectId)) {
-      visible.push(objectId);
-    }
-  }
-
-  return visible;
-}
-
-let staticObjectIdsByTile: Map<string, string[]> | null = null;
-function lookupStaticObjectIds(tileId: string): string[] {
-  if (!staticObjectIdsByTile) {
-    staticObjectIdsByTile = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile.objectIds]));
-  }
-  return staticObjectIdsByTile.get(tileId) ?? [];
+  return Array.from(new Set(runtimeTile?.revealedObjectIds ?? []));
 }
 
 function findRuntimeCallForMember(member: CrewMember, gameState: GameState) {

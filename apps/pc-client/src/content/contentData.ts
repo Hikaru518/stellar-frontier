@@ -316,12 +316,9 @@ export interface MapTileDefinition {
   id: string;
   row: number;
   col: number;
-  areaName: string;
   terrain: string;
   weather: string;
   environment: MapEnvironmentDefinition;
-  /** Identifiers into `mapObjectDefinitionById` (the only authoritative pointer to map-object content). */
-  objectIds: string[];
   specialStates: MapSpecialStateDefinition[];
 }
 
@@ -448,22 +445,23 @@ export function formatInventory(entries: Array<{ itemId: string; quantity: numbe
   });
 }
 
-/**
- * Defensive normalization of the migrated map JSON: ensures every tile has an
- * `objectIds` array (defaulting to `[]`). All consumers should now read
- * `tile.objectIds` and resolve definitions via `mapObjectDefinitionById`; the
- * old synthesised `tile.objects` projection has been removed.
- */
 function normalizeMapConfig(rawConfig: MapConfigJsonDefinition): MapConfigDefinition {
   const radarContent = readRadarContent(rawConfig);
   return {
     ...rawConfig,
     features: Array.isArray(rawConfig.features) ? rawConfig.features : [],
     radar: stripRadarContentMetadata(radarContent),
-    tiles: rawConfig.tiles.map((tile) => ({
-      ...tile,
-      objectIds: Array.isArray(tile.objectIds) ? tile.objectIds : [],
-    })),
+    tiles: rawConfig.tiles.map(normalizeMapTile),
+  };
+}
+
+function normalizeMapTile(tile: MapTileDefinition): MapTileDefinition {
+  const tileWithoutLegacy = { ...tile } as MapTileDefinition & { areaName?: unknown; objectIds?: unknown };
+  delete tileWithoutLegacy.areaName;
+  delete tileWithoutLegacy.objectIds;
+  return {
+    ...tileWithoutLegacy,
+    specialStates: Array.isArray(tile.specialStates) ? tile.specialStates : [],
   };
 }
 

@@ -37,7 +37,7 @@ import {
   type WorldFlag,
 } from "./events/types";
 import { canMoveToTile, getFeatureRuntimeStatus, getTileLocationLabel } from "./mapSystem";
-import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
+import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, getVisibleFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
@@ -1080,8 +1080,8 @@ function isSavedBaselineCompatible(saved: SavedGameState) {
   return saved.map.configId === defaultMapConfig.id && saved.map.configVersion === defaultMapConfig.version;
 }
 
-function getMoveTargetSelectionLabel(_map: GameMapState, tileId: string) {
-  return getTileLocationLabel(defaultMapConfig, tileId);
+function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
+  return getTileLocationLabel(defaultMapConfig, tileId, map);
 }
 
 function createStandbyCrewAction(state: GameState, crewId: CrewId, occurredAt: number): GameState {
@@ -1591,26 +1591,6 @@ function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-function findCandidateObject(tileId: string, verb: string, map: GameMapState | undefined): MapObjectDefinition | undefined {
-  const configTile = defaultMapTileById.get(tileId);
-  if (!configTile) {
-    return undefined;
-  }
-  for (const objectId of configTile.objectIds) {
-    const definition = mapObjectDefinitionById.get(objectId);
-    if (!definition) {
-      continue;
-    }
-    if (!isObjectVisible(tileId, definition, map)) {
-      continue;
-    }
-    if (definition.actions.some((action) => action.id === `${objectId}:${verb}`)) {
-      return definition;
-    }
-  }
-  return undefined;
-}
-
 function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: GameMapState | undefined) {
   if (!map) {
     return true;
@@ -1914,6 +1894,11 @@ function getTopInvestigatableFeatures(state: GameState, tileId: string): MapFeat
   return selectTopInvestigatableFeatures(getInvestigatableFeaturesAtTile(defaultMapConfig, index, state.map, tileId));
 }
 
+function getVisibleFeaturesForTile(map: GameMapState, tileId: string): MapFeatureDefinition[] {
+  const index = buildFeatureTileIndex(defaultMapConfig);
+  return getVisibleFeaturesAtTile(defaultMapConfig, index, map, tileId);
+}
+
 function isRepairSelectionRepaired(state: GameState, selection: LocationStoryActionSelection): boolean {
   if (selection.feature) {
     return getFeatureRuntimeStatus(state.map, selection.feature) === "repaired";
@@ -2031,19 +2016,14 @@ function createLocationStoryActionTriggerContext(
 }
 
 function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {
-  const configTile = defaultMapTileById.get(tileId);
-  if (!configTile) {
-    return [];
-  }
-
-  return configTile.objectIds
+  return Array.from(new Set(state.map.tilesById[tileId]?.revealedObjectIds ?? []))
     .map((objectId) => mapObjectDefinitionById.get(objectId))
     .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)));
 }
 
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
   const tile = createRuntimeTileView(state, tileId);
-  return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile, state.map)) : [];
+  return tile ? mergeTags(inferTileTags(tile, state.map), inferTileDangerTags(tile, state.map)) : [];
 }
 
 function actionVerb(actionId: string): string {
@@ -2335,14 +2315,14 @@ function toTileState(tile: MapTile, map: GameMapState): TileState {
       y: tile.row,
     },
     terrain_type: tile.terrain,
-    tags: inferTileTags(tile),
+    tags: inferTileTags(tile, map),
     danger_tags: inferTileDangerTags(tile, map),
     discovery_state: tile.investigated ? "mapped" : "known",
     survey_state: tile.investigated ? "surveyed" : "unsurveyed",
     visibility: "visible",
     current_crew_ids: tile.crew,
     resource_nodes: [],
-    site_objects: getConfigTileObjects(tile).map((object) => ({ id: object.id, object_type: object.kind, tags: object.tags ?? [] })),
+    site_objects: [],
     buildings: [],
     event_marks: tile.eventMarks ?? [],
     history_keys: [],
@@ -2404,7 +2384,7 @@ function createRuntimeTileView(state: GameState, tileId: string): MapTile | unde
   const discovered = state.map.discoveredTileIds.includes(tileId) || Boolean(runtimeTile?.discovered);
   return {
     id: configTile.id,
-    coord: getTileLocationLabel(defaultMapConfig, configTile.id),
+    coord: getTileLocationLabel(defaultMapConfig, configTile.id, state.map),
     row: configTile.row,
     col: configTile.col,
     terrain: configTile.terrain,
@@ -2478,11 +2458,11 @@ function crewInventoryId(crewId: CrewId) {
   return `crew:${crewId}`;
 }
 
-function inferTileTags(tile: MapTile) {
-  const configObjects = getConfigTileObjects(tile);
-  const text = [tile.terrain, tile.status, ...configObjects.flatMap((object) => [object.name, object.kind, ...(object.tags ?? [])])].join(" ");
+function inferTileTags(tile: MapTile, map: GameMapState) {
+  const features = getVisibleFeaturesForTile(map, tile.id);
+  const text = [tile.terrain, tile.status, ...features.flatMap((feature) => [feature.name, feature.kind, ...(feature.tags ?? [])])].join(" ");
   const explicitTags = "tags" in tile && Array.isArray(tile.tags) ? tile.tags.filter((tag): tag is string => typeof tag === "string") : [];
-  const tags = new Set<string>([...explicitTags, ...configObjects.flatMap((object) => object.tags ?? [])]);
+  const tags = new Set<string>([...explicitTags, ...features.flatMap((feature) => feature.tags ?? [])]);
 
   if (/森林|木材|野生动物/.test(text)) {
     tags.add("forest");
@@ -2520,15 +2500,6 @@ function inferTileDangerTags(tile: MapTile, map: GameMapState) {
       }) ?? [];
 
   return configDangerTags;
-}
-
-function getConfigTileObjects(tile: Pick<MapTile, "id">): MapObjectDefinition[] {
-  const configTile = defaultMapTileById.get(tile.id);
-  return (
-    configTile?.objectIds
-      .map((objectId) => mapObjectDefinitionById.get(objectId))
-      .filter((object): object is MapObjectDefinition => Boolean(object)) ?? []
-  );
 }
 
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {
@@ -2588,7 +2559,6 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
     featuresById: { ...(fresh.featuresById ?? {}), ...migratedFeatureStates, ...savedFeatureStates },
     discoveredTileIds,
     investigationReportsById: map.investigationReportsById ?? {},
-    mapObjects: { ...(fresh.mapObjects ?? {}), ...(map.mapObjects ?? {}) },
   };
 }
 
@@ -2637,13 +2607,6 @@ function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
       [tileId]: {
         ...previous,
         discovered: true,
-        revealedObjectIds: addUnique(
-          previous.revealedObjectIds ?? [],
-          ...configTile.objectIds.flatMap((objectId) => {
-            const def = mapObjectDefinitionById.get(objectId);
-            return def && def.visibility === "onDiscovered" ? [objectId] : [];
-          }),
-        ),
         revealedSpecialStateIds: addUnique(
           previous.revealedSpecialStateIds ?? [],
           ...configTile.specialStates.filter((state) => state.visibility === "onDiscovered" && (previous.activeSpecialStateIds ?? []).includes(state.id)).map((state) => state.id),

@@ -1,6 +1,7 @@
-import type { FeatureRuntimeState, MapConfigDefinition, MapFeatureDefinition, MapTileDefinition } from "./content/contentData";
-import { mapObjectDefinitionById, type MapObjectDefinition, type RuntimeMapObjectsState } from "./content/mapObjects";
+import type { FeatureRuntimeState, MapConfigDefinition, MapFeatureDefinition } from "./content/contentData";
+import type { RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport } from "./data/gameData";
+import { buildFeatureTileIndex, getFeaturesAtTile, getVisibleFeaturesAtTile, type TileFeatureIndex } from "./mapFeatureSystem";
 
 export interface TileCoord {
   row: number;
@@ -65,18 +66,19 @@ export function getDisplayCoord(tile: TileCoord, origin: TileCoord): DisplayCoor
   };
 }
 
-export function getTileAreaName(config: MapConfigDefinition, tileId: string) {
-  return getTile(config, tileId)?.areaName;
+export function getTileAreaName(config: MapConfigDefinition, tileId: string, map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">) {
+  return getTileFeatureLabel(config, tileId, map);
 }
 
-export function getTileLocationLabel(config: MapConfigDefinition, tileId: string) {
+export function getTileLocationLabel(config: MapConfigDefinition, tileId: string, map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">) {
   const tile = getTile(config, tileId);
   const origin = getOrigin(config);
   if (!tile || !origin) {
     return tileId;
   }
 
-  return `${tile.areaName} ${formatDisplayCoord(getDisplayCoord(tile, origin))}`;
+  const label = getTileFeatureLabel(config, tileId, map) ?? tileId;
+  return `${label} ${formatDisplayCoord(getDisplayCoord(tile, origin))}`;
 }
 
 export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeMapState, tileId: string) {
@@ -107,30 +109,33 @@ export function getFeatureRuntimeState(
   };
 }
 
-/**
- * Look up the {@link MapObjectDefinition}s referenced by a tile's `objectIds`.
- *
- * The tile config carries only `string[]` ids — definitions live in
- * `content/map-objects/*.json` and are indexed by `mapObjectDefinitionById`.
- * Unknown ids are skipped silently (with a `console.warn`) so a stale tile
- * reference cannot crash the map view; the migration script + JSON Schema
- * enforce referential integrity at content build time.
- */
-export function resolveTileObjects(tile: MapTileDefinition): MapObjectDefinition[] {
-  const result: MapObjectDefinition[] = [];
-  for (const objectId of tile.objectIds) {
-    const definition = mapObjectDefinitionById.get(objectId);
-    if (!definition) {
-      console.warn(`[mapSystem] tile ${tile.id} references unknown objectId ${objectId}`);
-      continue;
-    }
-    result.push(definition);
-  }
-  return result;
-}
-
 function getTile(config: MapConfigDefinition, tileId: string) {
   return config.tiles.find((tile) => tile.id === tileId);
+}
+
+const featureIndexCache = new WeakMap<MapConfigDefinition, TileFeatureIndex>();
+
+function getTileFeatureLabel(
+  config: MapConfigDefinition,
+  tileId: string,
+  map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">,
+): string | undefined {
+  const index = getFeatureIndex(config);
+  const features = map
+    ? getVisibleFeaturesAtTile(config, index, map, tileId)
+    : getFeaturesAtTile(config, index, tileId).filter((feature) => feature.visibility !== "hidden");
+  return features[0]?.name;
+}
+
+function getFeatureIndex(config: MapConfigDefinition): TileFeatureIndex {
+  const cached = featureIndexCache.get(config);
+  if (cached) {
+    return cached;
+  }
+
+  const index = buildFeatureTileIndex(config);
+  featureIndexCache.set(config, index);
+  return index;
 }
 
 function getOrigin(config: MapConfigDefinition) {

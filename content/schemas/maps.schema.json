@@ -132,43 +132,6 @@
         }
       }
     },
-    "mapObject": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "kind", "name", "visibility"],
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/id"
-        },
-        "kind": {
-          "type": "string",
-          "enum": ["resourceNode", "structure", "signal", "hazard", "facility", "ruin", "landmark"]
-        },
-        "name": {
-          "$ref": "#/$defs/localizedText"
-        },
-        "description": {
-          "$ref": "#/$defs/localizedText"
-        },
-        "visibility": {
-          "type": "string",
-          "enum": ["onDiscovered", "onInvestigated"]
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/tag"
-          }
-        },
-        "candidateActions": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["move", "survey", "gather", "build", "standby", "extract", "scan"]
-          }
-        }
-      }
-    },
     "specialState": {
       "type": "object",
       "additionalProperties": false,
@@ -418,7 +381,7 @@
     "tile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "row", "col", "areaName", "terrain", "weather", "environment", "objectIds", "specialStates"],
+      "required": ["id", "row", "col", "terrain", "weather", "environment", "specialStates"],
       "properties": {
         "id": {
           "$ref": "#/$defs/tileId"
@@ -431,9 +394,6 @@
           "type": "integer",
           "minimum": 1
         },
-        "areaName": {
-          "$ref": "#/$defs/localizedText"
-        },
         "terrain": {
           "type": "string",
           "enum": ["平原", "水", "森林 / 山", "山", "丘陵", "旧医疗前哨", "坠落广播塔", "沙漠", "裂谷", "高地", "荒原"]
@@ -444,13 +404,6 @@
         },
         "environment": {
           "$ref": "#/$defs/environment"
-        },
-        "objectIds": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/id"
-          },
-          "uniqueItems": true
         },
         "specialStates": {
           "type": "array",

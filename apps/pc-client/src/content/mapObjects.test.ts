@@ -115,7 +115,7 @@ describe("mapObjects content", () => {
       "132-130",
     ];
 
-    expect(crashTile?.objectIds).toEqual([]);
+    expect(crashTile).not.toHaveProperty("objectIds");
     expect(defaultMapJson.features?.map((feature) => feature.id)).toEqual(expect.arrayContaining([...crashSiteObjectIds]));
 
     for (const tileId of ringTileIds) {
@@ -167,7 +167,6 @@ describe("mapObjects content", () => {
             id: "1-1",
             row: 1,
             col: 1,
-            areaName: "Landing Zone",
             terrain: "平原",
             weather: "晴朗",
             environment: {
@@ -176,7 +175,6 @@ describe("mapObjects content", () => {
               magneticFieldMicroTesla: 40,
               radiationLevel: "low",
             },
-            objectIds: [],
             specialStates: [
               {
                 id: "removed_danger",

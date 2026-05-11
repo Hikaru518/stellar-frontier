@@ -419,11 +419,11 @@ function validateReferences(data, maps, mapRadars) {
     }
   }
 
-  const { ids: knownObjectIds, hasError: catalogFailed } = collectMapObjectIds();
+  const { hasError: catalogFailed } = collectMapObjectIds();
   hasError = catalogFailed || hasError;
   for (const [dataPath, map] of Object.entries(maps)) {
     hasError =
-      validateMap(map, knownObjectIds, {
+      validateMap(map, {
         requireDefaultSize: dataPath === "content/maps/default-map.json",
         dataPath,
         mapRadars,
@@ -560,12 +560,11 @@ function collectMapObjectIds() {
   return { ids, hasError };
 }
 
-function validateMap(map, knownObjectIds, options) {
+function validateMap(map, options) {
   let hasError = false;
   const { rows, cols } = map.size;
   const tileIds = new Set();
   const tileById = new Map();
-  const referencedObjectIds = new Map();
   const initialDiscoveredTileIds = new Set(map.initialDiscoveredTileIds);
 
   if (options.requireDefaultSize && (rows !== 256 || cols !== 256)) {
@@ -591,20 +590,6 @@ function validateMap(map, knownObjectIds, options) {
 
     if (tile.row < 1 || tile.row > rows || tile.col < 1 || tile.col > cols) {
       hasError = report(`Map tile coordinate out of bounds: ${tile.id} (${tile.row},${tile.col}) for ${rows} x ${cols}`) || hasError;
-    }
-
-    for (const objectId of tile.objectIds) {
-      if (!knownObjectIds.has(objectId)) {
-        hasError = report(`Unknown objectId in tile ${tile.id}: ${objectId}`) || hasError;
-      }
-      const previousTileId = referencedObjectIds.get(objectId);
-      if (previousTileId !== undefined) {
-        hasError = report(
-          `Map object ${objectId} referenced by multiple tiles: ${previousTileId}, ${tile.id}`,
-        ) || hasError;
-      } else {
-        referencedObjectIds.set(objectId, tile.id);
-      }
     }
 
     const specialStateIds = new Set();

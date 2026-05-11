@@ -62,10 +62,10 @@ describe("minimal content baseline", () => {
       "131-130",
     ]);
     expect(defaultMapConfig.tiles).toHaveLength(65536);
-    expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")?.objectIds).toEqual([]);
+    expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")).not.toHaveProperty("objectIds");
     expect(defaultMapConfig.radar.glyphRows).toHaveLength(256);
     expect(defaultMapConfig.radar.toneRows).toHaveLength(256);
-    expect(defaultMapConfig.tiles.find((tile) => tile.id === "130-130")?.objectIds).toEqual([]);
+    expect(defaultMapConfig.tiles.find((tile) => tile.id === "130-130")).not.toHaveProperty("areaName");
     expect(defaultMapConfig.tiles.every((tile) => tile.specialStates.length === 0)).toBe(true);
 
     const scatteredSupplies = defaultMapConfig.features.find((feature) => feature.id === "iafs_scattered_supplies");

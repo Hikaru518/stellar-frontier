@@ -4,7 +4,6 @@ import { defaultMapConfig } from "./content/contentData";
 import {
   canMoveToTile,
   getDisplayCoord,
-  getTileAreaName,
   getTileId,
   getTileLocationLabel,
   parseTileId,
@@ -33,10 +32,9 @@ describe("mapSystem", () => {
     expect(getDisplayCoord({ row: 3, col: 5 }, { row: 1, col: 1 })).toEqual({ displayX: 4, displayY: -2 });
   });
 
-  it("uses the authored map area names and origin-relative location labels", () => {
-    expect(getTileAreaName(defaultMapConfig, "126-126")).toBe("起点");
-    expect(getTileLocationLabel(defaultMapConfig, "126-126")).toBe("起点 (-3,3)");
-    expect(getTileLocationLabel(defaultMapConfig, "128-128")).toBe("坠毁西北坡 (-1,1)");
+  it("uses feature labels or tile ids with origin-relative location labels", () => {
+    expect(getTileLocationLabel(defaultMapConfig, "126-126")).toBe("126-126 (-3,3)");
+    expect(getTileLocationLabel(defaultMapConfig, "128-128")).toBe("IAFS坠毁点 (-1,1)");
     expect(getTileLocationLabel(defaultMapConfig, "129-129")).toBe("IAFS坠毁点 (0,0)");
   });
 

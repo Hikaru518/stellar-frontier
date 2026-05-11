@@ -28,11 +28,9 @@ export interface MapTileDefinition {
   id: string;
   row: number;
   col: number;
-  areaName: string;
   terrain: string;
   weather: string;
   environment: MapEnvironmentDefinition;
-  objectIds: string[];
   specialStates: MapSpecialStateDefinition[];
 }
 
@@ -201,7 +199,7 @@ export type MapEditorCommand =
   | {
       type: "gameplay/updateTile";
       tileId: string;
-      patch: Partial<Pick<MapTileDefinition, "areaName" | "terrain" | "weather" | "environment" | "objectIds" | "specialStates">>;
+      patch: Partial<Pick<MapTileDefinition, "terrain" | "weather" | "environment" | "specialStates">>;
     }
   | {
       type: "gameplay/setOrigin";

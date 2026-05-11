@@ -694,7 +694,7 @@ function getViewport(center: FocusCoord, zoom: number) {
   };
 }
 
-function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
+function getRadarFocusLabel(_coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
   if (visibleFeatures.length === 1) {
     return visibleFeatures[0].name;
   }
@@ -703,22 +703,7 @@ function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefin
     return `${visibleFeatures[0].name} +${visibleFeatures.length - 1}`;
   }
 
-  if (tile && tile.areaName !== "未命名区域") {
-    return tile.areaName;
-  }
-
-  const region = [...RADAR.regions]
-    .sort((left, right) => right.priority - left.priority)
-    .find((entry) => isInsideRegion(coord, entry.shape));
-  return region?.label ?? tile?.areaName ?? "未命名区域";
-}
-
-function isInsideRegion(coord: FocusCoord, shape: (typeof RADAR.regions)[number]["shape"]) {
-  if (shape.type === "circle") {
-    return distance(coord.x, coord.y, shape.x, shape.y) <= shape.radius;
-  }
-
-  return coord.x >= shape.x1 && coord.x <= shape.x2 && coord.y >= shape.y1 && coord.y <= shape.y2;
+  return tile?.id ?? "未命名区域";
 }
 
 function formatDisplayCoord(coord: FocusCoord) {

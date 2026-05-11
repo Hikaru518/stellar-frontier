@@ -168,7 +168,6 @@ function RadarCell({ draft, tile }: { draft: MapEditorDraft; tile: MapTileDefini
 
 function GameplayOverlay({ draft, tile }: { draft: MapEditorDraft; tile: MapTileDefinition }) {
   const flags = [
-    tile.objectIds.length > 0 ? "OBJ" : null,
     tile.specialStates.length > 0 ? "SP" : null,
     tile.id === draft.originTileId ? "ORIGIN" : null,
     draft.initialDiscoveredTileIds.includes(tile.id) ? "DISC" : null,
@@ -213,7 +212,7 @@ function getTileClassName(
 
 function formatTileTitle(tile: MapTileDefinition, tileFeatures: MapFeatureDefinition[]): string {
   const featureSummary = tileFeatures.length > 0 ? ` · Features: ${tileFeatures.map((feature) => feature.name).join(", ")}` : "";
-  return `${tile.id} · ${tile.areaName}${featureSummary}`;
+  return `${tile.id}${featureSummary}`;
 }
 
 function formatTileLabel(tile: MapTileDefinition): string {

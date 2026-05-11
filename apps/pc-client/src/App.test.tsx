@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App, { dispatchTimedLocalAction, mergeEventRuntimeState, resolvePhoneRuntimeCallCrewId, toEventEngineState, validatePhoneMessageEnvelope } from "./App";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { crewDefinitions, defaultMapConfig, eventContentLibrary, eventProgramDefinitions, itemDefinitions, questDefinitions, type MapFeatureDefinition } from "./content/contentData";
-import { mapObjectDefinitionById } from "./content/mapObjects";
 import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type CrewMember, type GameState, type GameMapState } from "./data/gameData";
 import { evaluateCondition } from "./events/conditions";
 import { executeEffects } from "./events/effects";
@@ -175,10 +174,11 @@ describe("App", () => {
     });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
     expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "129-129", location: "IAFS坠毁点 (0,0)" });
-    expect(saved.map.mapObjects).toMatchObject({
-      iafs_generator: { status_enum: "damaged" },
-      iafs_life_support: { status_enum: "damaged" },
-      iafs_shuttle_core: { status_enum: "damaged" },
+    expect(saved.map.mapObjects).toBeUndefined();
+    expect(saved.map.featuresById).toMatchObject({
+      iafs_generator: { status: "damaged" },
+      iafs_life_support: { status: "damaged" },
+      iafs_shuttle_core: { status: "damaged" },
     });
     expect(Object.keys(saved.quest_state.quests)).toEqual(questDefinitions.map((quest) => quest.id));
     expect(saved.active_events["iafs_opening_mike_crash_call:0"]).toMatchObject({
@@ -222,6 +222,7 @@ describe("App", () => {
         },
       },
     });
+    expect((saved?.map as { mapObjects?: unknown } | undefined)?.mapObjects).toBeUndefined();
   });
 
   it("restores and normalizes quest state from compatible saves", () => {
@@ -889,17 +890,6 @@ function startAmyBeastEmergencyFromSurvey() {
   fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 }
 
-function findTileWithObjectTag(tag: string, filters: { visibility?: string } = {}) {
-  const tile = defaultMapConfig.tiles.find((item) =>
-    item.objectIds.some((objectId) => {
-      const object = mapObjectDefinitionById.get(objectId);
-      return Boolean(object?.tags?.includes(tag) && (!filters.visibility || object.visibility === filters.visibility));
-    }),
-  );
-  expect(tile).toBeDefined();
-  return tile!;
-}
-
 function createMapWithDiscoveredTiles(...tileIds: string[]) {
   const map = createInitialMapState();
   for (const tileId of tileIds) {
@@ -1013,16 +1003,6 @@ function createCallPageGameState(member: CrewMember, map: GameMapState): GameSta
     world_flags: {},
     rng_state: null,
   }) as unknown as GameState;
-}
-
-function createMapWithHiddenObject(tileId: string, objectId: string) {
-  const map = createMapWithDiscoveredTiles(tileId);
-  map.tilesById[tileId] = {
-    ...map.tilesById[tileId],
-    investigated: false,
-    revealedObjectIds: (map.tilesById[tileId]?.revealedObjectIds ?? []).filter((id) => id !== objectId),
-  };
-  return map;
 }
 
 function createCompatibleSavedGameState(state: Record<string, unknown>) {

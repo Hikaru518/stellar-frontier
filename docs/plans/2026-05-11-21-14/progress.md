@@ -41,7 +41,7 @@ source:
 | 15 | TASK-015 | Editor helper、types 与 validation 支持 Feature | completed | 1 |
 | 16 | TASK-016 | Editor Feature list 与 inspector | completed | 1 |
 | 17 | TASK-017 | Editor footprint brush 与重叠预览 | completed | 1 |
-| 18 | TASK-018 | 移除 legacy tile area/object gameplay source | pending | 0 |
+| 18 | TASK-018 | 移除 legacy tile area/object gameplay source | completed | 1 |
 | 19 | TASK-019 | 补齐 e2e 与最终验证 | pending | 0 |
 
 状态值：`pending` | `in_progress` | `completed` | `failed`
@@ -298,3 +298,26 @@ source:
 - 质量检查:
   - `apps/editor` lint: passed
   - `npm run editor:test`: passed, 46 files / 243 tests
+
+### TASK-018: 移除 legacy tile area/object gameplay source
+- 状态: completed
+- 开始时间: 2026-05-12 04:12
+- 完成时间: 2026-05-12 04:34
+- 尝试次数: 1
+- 尝试记录:
+  - 尝试 1: 子 agent 写入实现后未正常返回；父层关闭该 agent，收紧新存档 `mapObjects` 初始化并完成质量检查。
+- developer summary:
+  - `maps.schema.json` 的 tile 字段移除 `areaName/objectIds`，`default-map.json` 的 65536 个 tile 同步删除 legacy 字段。
+  - PC loader 和 Editor draft normalization 会剥离旧 tile `areaName/objectIds`；TileInspector 不再编辑 area/object。
+  - PC location label 改为 Feature 查询优先，缺失时回退 tile id；MapPage focus label 同步改为 Feature/tile id。
+  - 新存档不再初始化 `map.mapObjects`；旧存档 `mapObjects.status_enum` 只在 normalize 阶段迁移到同 id Feature runtime state。
+  - 移除 PC gameplay 代码对 `tile.objectIds` 的静态运行时依赖，legacy revealed object fallback 不再来自 tile config。
+- 质量检查:
+  - `npm run validate:content`: passed
+  - `apps/pc-client` lint: passed
+  - `apps/pc-client` test: passed, 48 files / 392 tests
+  - `apps/editor` lint: passed
+  - `npm run editor:test`: passed, 46 files / 243 tests
+  - `git diff --check`: passed
+  - `rg '"areaName"|"objectIds"' content/maps/default-map.json`: no matches
+  - `rg 'tile\\.objectIds|defaultMapConfig\\.tiles.*objectIds|staticObjectIds|lookupStaticObjectIds|resolveTileObjects' apps/pc-client/src`: no runtime matches

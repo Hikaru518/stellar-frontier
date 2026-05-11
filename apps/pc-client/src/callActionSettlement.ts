@@ -109,7 +109,7 @@ function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
 
   const tileId = ctx.action.targetTile ?? ctx.member.currentTile;
   const tile = ctx.tile;
-  const objects = getTileObjectsForTile(tile);
+  const objects = getTileObjectsForTile(tile, ctx.map);
   const revealedObjects = objects.filter((object) => object.visibility === "onInvestigated");
   const revealedObjectIds = revealedObjects.map((object) => object.id);
   const previous = ctx.map.tilesById[tileId] ?? {};
@@ -336,16 +336,12 @@ function findTile(tiles: MapTile[], tileId: string | undefined): TileWithContent
   };
 }
 
-function getTileObjectsForTile(tile: TileWithContent | undefined): MapObjectDefinition[] {
+function getTileObjectsForTile(tile: TileWithContent | undefined, map: GameMapState): MapObjectDefinition[] {
   if (!tile) {
     return [];
   }
 
-  const configTile = defaultMapConfig.tiles.find((configItem) => configItem.id === tile.id);
-  if (!configTile) {
-    return [];
-  }
-  return configTile.objectIds
+  return Array.from(new Set(map.tilesById[tile.id]?.revealedObjectIds ?? []))
     .map((id) => mapObjectDefinitionById.get(id))
     .filter((definition): definition is MapObjectDefinition => Boolean(definition));
 }
