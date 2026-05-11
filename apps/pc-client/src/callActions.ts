@@ -106,6 +106,8 @@ function formatObjectStatus(status: string | undefined): string {
       return "已损坏";
     case "repaired":
       return "正常";
+    case "unsearched":
+      return "未搜寻";
     default:
       return status ?? "";
   }

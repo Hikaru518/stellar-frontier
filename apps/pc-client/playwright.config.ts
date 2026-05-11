@@ -11,7 +11,11 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "VITE_DISABLE_YUAN_TERMINAL=true vite --host 127.0.0.1",
+    command: "vite --host 127.0.0.1",
+    env: {
+      ...process.env,
+      VITE_DISABLE_YUAN_TERMINAL: "true",
+    },
     url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
   },

@@ -10,9 +10,9 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "NODE_NO_WARNINGS=1 PLAYWRIGHT_BROWSERS_PATH=../../common/temp/playwright-browsers playwright test",
+    "test:e2e": "node scripts/run-playwright.mjs test",
     "test:e2e:ui": "playwright test --ui",
-    "install:browsers": "PLAYWRIGHT_BROWSERS_PATH=../../common/temp/playwright-browsers playwright install --with-deps chromium"
+    "install:browsers": "node scripts/run-playwright.mjs install --with-deps chromium"
   },
   "dependencies": {
     "@stellar-frontier/dual-device": "workspace:*",

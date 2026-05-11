@@ -205,6 +205,89 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
+  it("reveals the authored scattered supplies object after surveying tile 5-5", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredSuppliesState(90),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(90),
+        trigger_type: "action_complete",
+        source: "crew_action",
+        crew_id: "mike",
+        tile_id: "5-5",
+        action_id: "act_survey_supplies",
+        payload: { action_type: "survey" },
+      },
+    });
+    const callId = started.event?.active_call_id ?? "";
+
+    expect(started.errors).toEqual([]);
+    expect(started.event?.event_definition_id).toBe("iafs_scattered_supplies_survey_reveal");
+    expect(started.state.active_calls[callId]?.rendered_lines.map((line) => line.text).join(" ")).toContain("散落的物资");
+
+    const selected = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "ack",
+      occurred_at: 95,
+    });
+
+    expect(selected.errors).toEqual([]);
+    expect(selected.state.map?.tilesById?.["5-5"]?.revealedObjectIds).toEqual(["iafs_scattered_supplies"]);
+  });
+
+  it.each([
+    {
+      occurredAt: 120,
+      expectedNode: "full_report",
+      expectedText: "一套维修套件、一包应急食物，还有一把破冰镐",
+      expectedItems: [
+        { item_id: "repair_kit", quantity: 1 },
+        { item_id: "emergency_food", quantity: 1 },
+        { item_id: "ice_pick", quantity: 1 },
+      ],
+    },
+    {
+      occurredAt: 240,
+      expectedNode: "late_report",
+      expectedText: "看来我们晚来了一步，有不少东西被风吹走了",
+      expectedItems: [{ item_id: "ice_pick", quantity: 1 }],
+    },
+  ])("branches scattered supplies search results by elapsed time %#", ({ occurredAt, expectedNode, expectedText, expectedItems }) => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+
+    const result = processTrigger({
+      state: createAuthoredSuppliesState(occurredAt),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(occurredAt),
+        trigger_type: "action_complete",
+        source: "call",
+        crew_id: "mike",
+        tile_id: "5-5",
+        action_id: "iafs_scattered_supplies:search",
+        event_definition_id: "iafs_scattered_supplies_search",
+        payload: {
+          action_type: "search",
+          action_def_id: "iafs_scattered_supplies:search",
+          object_id: "iafs_scattered_supplies",
+        },
+      },
+    });
+    const callId = result.event?.active_call_id ?? "";
+
+    expect(result.errors).toEqual([]);
+    expect(result.event?.event_definition_id).toBe("iafs_scattered_supplies_search");
+    expect(result.event?.current_node_id).toBe(expectedNode);
+    expect(result.state.active_calls[callId]?.rendered_lines.map((line) => line.text).join(" ")).toContain(expectedText);
+    expect(result.state.inventories.inv_mike.items).toEqual(expectedItems);
+    expect(result.state.world_flags.iafs_scattered_supplies_searched).toMatchObject({ value: true });
+  });
+
   it("queues a success callback and records repair quest progress when authored repair actions complete", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
@@ -641,6 +724,49 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
       mapObjects: {},
     },
     quest_state: createInitialQuestState(questDefinitions, 0),
+  };
+}
+
+function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGameState {
+  const state = createAuthoredCrashSiteState();
+  const suppliesTile = {
+    ...state.tiles["4-4"],
+    id: "5-5",
+    coordinates: { x: 5, y: 5 },
+    terrain_type: "south_pass",
+    tags: ["iafs", "supplies"],
+    current_crew_ids: ["mike"],
+  };
+
+  return {
+    ...state,
+    elapsed_game_seconds: elapsedGameSeconds,
+    crew: {
+      ...state.crew,
+      mike: {
+        ...state.crew.mike,
+        tile_id: "5-5",
+      },
+    },
+    tiles: {
+      ...state.tiles,
+      "5-5": suppliesTile,
+    },
+    map: {
+      ...state.map,
+      tilesById: {
+        ...state.map?.tilesById,
+        "5-5": { revealedObjectIds: [] },
+      },
+      mapObjects: {
+        ...state.map?.mapObjects,
+        iafs_scattered_supplies: { id: "iafs_scattered_supplies", status_enum: "unsearched" },
+      },
+    },
+    inventories: {
+      ...state.inventories,
+      inv_mike: { id: "inv_mike", owner_type: "crew", owner_id: "mike", items: [], resources: {} },
+    },
   };
 }
 
