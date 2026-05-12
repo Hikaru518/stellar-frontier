@@ -22,7 +22,7 @@ export type CallType = "normal" | "emergency";
 
 export type MapReturnTarget = "control" | "call";
 
-export type ActionType = "move" | "gather" | "build" | "survey" | "repair" | "standby" | "event";
+export type ActionType = "move" | "gather" | "build" | "survey" | "repair" | "standby" | "extract" | "event";
 
 export type ActionStatus = "pending" | "inProgress" | "completed" | "interrupted" | "failed";
 

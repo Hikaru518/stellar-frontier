@@ -623,6 +623,7 @@ describe("App", () => {
       vi.advanceTimersByTime(15000);
     });
 
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
     expect(screen.getByText(/这里还有几套能辨认出来的关键设施/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "标记这些可用设施。" }));
 
@@ -805,9 +806,11 @@ describe("App", () => {
         activeCalls={{}}
         elapsedGameSeconds={0}
         gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+        hasQuestUpdates={false}
         gameState={gameState}
         logs={initialLogs}
         onDecision={vi.fn()}
+        onEndCall={vi.fn()}
         onConfirmMove={vi.fn()}
         onClearMoveTarget={vi.fn()}
         onOpenMap={vi.fn()}

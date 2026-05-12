@@ -38,6 +38,11 @@ export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
 type FocusCoord = { x: number; y: number };
 type RenderTone = string;
 
+export interface MapViewportState {
+  zoom: number;
+  center: { x: number; y: number };
+}
+
 interface MapDebugBackgroundCell extends FocusCoord {
   tileId: string;
   featureOrder: number;
@@ -83,9 +88,12 @@ interface MapPageProps {
   activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
+  hasQuestUpdates?: boolean;
   returnTarget: MapReturnTarget;
   moveSelectionCrewId?: CrewId | null;
   initialSelectedTileId?: string;
+  viewportState?: MapViewportState | null;
+  onViewportStateChange?: (state: MapViewportState) => void;
   layerVisibility: MapLayerVisibility;
   onLayerVisibilityChange: (visibility: MapLayerVisibility) => void;
   onOpenControl: () => void;
@@ -106,9 +114,12 @@ export function MapPage({
   activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
+  hasQuestUpdates = false,
   returnTarget,
   moveSelectionCrewId,
   initialSelectedTileId,
+  viewportState,
+  onViewportStateChange,
   layerVisibility,
   onLayerVisibilityChange,
   onOpenControl,
@@ -125,8 +136,8 @@ export function MapPage({
   const initialFocus = useMemo(() => focusFromTileId(initialSelectedTileId), [initialSelectedTileId]);
   const [focusCoord, setFocusCoord] = useState<FocusCoord>(initialFocus);
   const [traceLines, setTraceLines] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(1);
-  const [center, setCenter] = useState<FocusCoord>(initialFocus);
+  const [zoom, setZoom] = useState(() => clamp(viewportState?.zoom ?? 1, MIN_ZOOM, MAX_ZOOM));
+  const [center, setCenter] = useState<FocusCoord>(() => clampCoord(viewportState?.center ?? initialFocus));
   const [dragging, setDragging] = useState(false);
   const showRenderLayer = layerVisibility.render;
   const showFunctionalLayer = layerVisibility.functional;
@@ -194,6 +205,10 @@ export function MapPage({
     const line = `[FOCUS] ${focusDisplayCoord} / ${focusLabel}`;
     setTraceLines((current) => (current[0] === line ? current : [line, ...current].slice(0, 10)));
   }, [focusDisplayCoord, focusLabel]);
+
+  useEffect(() => {
+    onViewportStateChange?.({ zoom, center });
+  }, [center, onViewportStateChange, zoom]);
 
   function pushTrace(line: string) {
     setTraceLines((current) => [line, ...current].slice(0, 10));
@@ -644,7 +659,7 @@ export function MapPage({
       ]}
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
-        { id: "task", label: "任务", meta: "task", onClick: onOpenTask },
+        { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
         { id: "map", label: "地图", meta: "map", active: true },
       ]}
       crewPanel={

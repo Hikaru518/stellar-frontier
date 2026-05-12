@@ -104,14 +104,14 @@ describe("crewSystem", () => {
       crew_id: "mike",
       type: "move",
       path_tile_ids: ["1-2", "1-3"],
-      ends_at: 150,
+      ends_at: 40,
     });
 
-    const afterFirstStep = advanceCrewMoveAction(started.member, started.action, tiles, [], 60);
+    const afterFirstStep = advanceCrewMoveAction(started.member, started.action, tiles, [], 15);
     expect(afterFirstStep.member.currentTile).toBe("1-2");
     expect(afterFirstStep.arrived).toBe(false);
 
-    const arrived = advanceCrewMoveAction(afterFirstStep.member, afterFirstStep.action, tiles, afterFirstStep.logs, 150);
+    const arrived = advanceCrewMoveAction(afterFirstStep.member, afterFirstStep.action, tiles, afterFirstStep.logs, 40);
     expect(arrived.member.currentTile).toBe("1-3");
     expect(arrived.arrived).toBe(true);
   });
@@ -124,8 +124,8 @@ describe("crewSystem", () => {
     const healthyPreview = createMovePreview(healthy, "1-3", tiles);
     const woundedPreview = createMovePreview(wounded, "1-3", tiles);
 
-    expect(healthyPreview.steps.map((step) => step.durationSeconds)).toEqual([60, 90]);
-    expect(woundedPreview.steps.map((step) => step.durationSeconds)).toEqual([90, 135]);
+    expect(healthyPreview.steps.map((step) => step.durationSeconds)).toEqual([15, 25]);
+    expect(woundedPreview.steps.map((step) => step.durationSeconds)).toEqual([23, 38]);
 
     const member = {
       ...crewMember("1-1"),

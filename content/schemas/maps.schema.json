@@ -229,7 +229,7 @@
         }
       }
     },
-    "featureLocalAction": {
+    "featureTimedRepairLocalAction": {
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "duration_seconds", "success_effects", "failure_effects"],
@@ -255,6 +255,48 @@
           }
         }
       }
+    },
+    "featureTimedActionLocalAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "action_type", "duration_seconds"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "timed_action"
+        },
+        "action_type": {
+          "type": "string",
+          "enum": ["gather", "build", "extract"]
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "handler": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status_text": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "completion_status": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "completion_log": {
+          "$ref": "#/$defs/localizedText"
+        }
+      }
+    },
+    "featureLocalAction": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/featureTimedRepairLocalAction"
+        },
+        {
+          "$ref": "#/$defs/featureTimedActionLocalAction"
+        }
+      ]
     },
     "featureActionDef": {
       "type": "object",

@@ -32,6 +32,7 @@ interface GameConsoleNavItem {
   label: string;
   meta?: string;
   active?: boolean;
+  attention?: boolean;
   onClick?: () => void;
 }
 
@@ -158,7 +159,10 @@ export function GameConsoleLayout({
                   className={`console-nav-button ${item.active ? "console-nav-button-active" : ""}`}
                   onClick={item.onClick}
                 >
-                  <span className="console-nav-label">{item.label}</span>
+                  <span className="console-nav-label">
+                    {item.label}
+                    {item.attention ? <span className="console-nav-attention" aria-label="有更新">*</span> : null}
+                  </span>
                   {item.meta ? <span className="console-nav-meta">{item.meta}</span> : null}
                 </button>
               ))}

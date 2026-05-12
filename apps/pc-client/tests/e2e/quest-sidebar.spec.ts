@@ -1,4 +1,4 @@
-import { createCompatibleMap, expect, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
+import { answerMikeIncomingCall, createCompatibleMap, expect, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -56,6 +56,7 @@ test("completes a quest todo through the crash-site event and preserves it after
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "调查当前区域" }).click();
   await page.clock.runFor(45_000);
+  await answerMikeIncomingCall(page);
   await expect(
     page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。").first(),
   ).toBeVisible();

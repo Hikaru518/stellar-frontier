@@ -9,7 +9,8 @@ test("opens basic normal-call actions for the current 麦克 baseline", async ({
   await expect(page.getByText("基础行动")).toBeVisible();
   await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
   await expect(page.getByRole("button", { name: "移动到指定区域" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "原地待命" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "原地待命" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "结束通话" })).toBeVisible();
 });
 
 test("opens the call map submenu and returns to the active 麦克 call", async ({ page }) => {

@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { FieldList, GameConsoleLayout, Modal } from "../components/Layout";
-import { type CrewId, type CrewMember, type GameMapState, type InvestigationReport, type ResourceSummary, type SystemLog } from "../data/gameData";
+import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
+import { defaultMapConfig } from "../content/contentData";
+import { type CrewId, type CrewMember, type GameMapState, type InvestigationReport, type MapTile, type ResourceSummary, type SystemLog } from "../data/gameData";
 import { formatGameTime } from "../timeSystem";
-import type { EventLog, Objective } from "../events/types";
+import { getTileLocationLabel } from "../mapSystem";
+import type { CrewActionState, EventLog, Objective, RuntimeCall } from "../events/types";
 import type { PcMobileStatusCard } from "../App";
 
 interface ControlCenterProps {
@@ -12,7 +15,12 @@ interface ControlCenterProps {
   objectives: Record<string, Objective>;
   resources: ResourceSummary;
   map: GameMapState;
+  crewActions: Record<string, CrewActionState>;
+  activeCalls: Record<string, RuntimeCall>;
+  elapsedGameSeconds: number;
+  tiles: MapTile[];
   gameTimeLabel: string;
+  hasQuestUpdates: boolean;
   onOpenStation: () => void;
   onOpenMap: () => void;
   onStartCall: (crewId: CrewMember["id"]) => void;
@@ -29,7 +37,12 @@ export function ControlCenter({
   objectives,
   resources,
   map,
+  crewActions,
+  activeCalls,
+  elapsedGameSeconds,
+  tiles,
   gameTimeLabel,
+  hasQuestUpdates,
   onOpenStation,
   onOpenMap,
   onStartCall,
@@ -50,9 +63,21 @@ export function ControlCenter({
     .slice(0, 3);
   const objectiveList = Object.values(objectives).sort((left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
   const latestLog = logs[logs.length - 1];
+  const crewActionViews = Object.fromEntries(
+    crew.map((member) => [
+      member.id,
+      deriveCrewActionViewModel({
+        member,
+        crewActions,
+        activeCalls,
+        elapsedGameSeconds,
+        tiles,
+      }),
+    ]),
+  ) as Record<CrewId, CrewActionViewModel>;
   const navItems = [
     { id: "control", label: "控制台", meta: "main", active: true },
-    { id: "task", label: "任务", meta: "task", onClick: onOpenStation },
+    { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenStation },
     { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
   ];
   return (
@@ -71,6 +96,8 @@ export function ControlCenter({
         crewPanel={
           <CrewLinkPanel
             crew={crew}
+            map={map}
+            crewActionViews={crewActionViews}
             incomingCrewIds={new Set(incomingCrew.map((member) => member.id))}
             onStartCall={onStartCall}
             onOpenDetail={onShowCrewStatus}
@@ -162,12 +189,16 @@ export function ControlCenter({
 
 function CrewLinkPanel({
   crew,
+  map,
+  crewActionViews,
   incomingCrewIds,
   onStartCall,
   onOpenDetail,
   onOpenInventory,
 }: {
   crew: CrewMember[];
+  map: GameMapState;
+  crewActionViews: Record<CrewId, CrewActionViewModel>;
   incomingCrewIds: Set<CrewMember["id"]>;
   onStartCall: (crewId: CrewMember["id"]) => void;
   onOpenDetail: (crewId: CrewMember["id"]) => void;
@@ -176,9 +207,7 @@ function CrewLinkPanel({
   return (
     <div className="console-crew-stack">
       {crew.map((member) => {
-        const inventorySummary = member.inventory.length
-          ? member.inventory.map((entry) => `${entry.itemId} x${entry.quantity}`).join(" / ")
-          : "未记录携带物。";
+        const actionView = crewActionViews[member.id];
         return (
           <article key={member.id} className={`console-crew-card ${incomingCrewIds.has(member.id) ? "console-crew-card-alert" : ""}`}>
             <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -190,9 +219,9 @@ function CrewLinkPanel({
                   {member.canCommunicate ? "在线" : "失联"}
                 </span>
               </div>
-              <p>{member.status}</p>
-              <p>位置：{member.location}</p>
-              <p>背包：{inventorySummary}</p>
+              <p>{getTileLocationLabel(defaultMapConfig, member.currentTile, map)}</p>
+              <p>{actionView.statusText}</p>
+              <p>{actionView.blockingReason ?? actionView.timingText}</p>
             </div>
             <div className="console-crew-actions">
               <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => onOpenDetail(member.id)}>

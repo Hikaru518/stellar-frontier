@@ -18,6 +18,7 @@ interface CrewConsolePageProps {
   eventLogs: EventLog[];
   logs: SystemLog[];
   gameTimeLabel: string;
+  hasQuestUpdates: boolean;
   selectedCrewId: CrewId | null;
   mode: CrewConsoleMode;
   onOpenControl: () => void;
@@ -37,6 +38,7 @@ export function CrewConsolePage({
   eventLogs,
   logs,
   gameTimeLabel,
+  hasQuestUpdates,
   selectedCrewId,
   mode,
   onOpenControl,
@@ -79,7 +81,7 @@ export function CrewConsolePage({
       ]}
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
-        { id: "task", label: "任务", meta: "task", onClick: onOpenTask },
+        { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
         { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
       ]}
       crewPanel={

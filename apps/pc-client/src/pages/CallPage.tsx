@@ -37,9 +37,11 @@ interface CallPageProps {
   activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
+  hasQuestUpdates: boolean;
   gameState: GameState;
   logs: SystemLog[];
   onDecision: (actionId: string) => void;
+  onEndCall: () => void;
   onConfirmMove: () => void;
   onClearMoveTarget: () => void;
   onOpenMap: () => void;
@@ -57,9 +59,11 @@ export function CallPage({
   activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
+  hasQuestUpdates,
   gameState,
   logs,
   onDecision,
+  onEndCall,
   onConfirmMove,
   onClearMoveTarget,
   onOpenMap,
@@ -162,7 +166,7 @@ export function CallPage({
         gameTimeLabel={gameTimeLabel}
         navItems={[
           { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
-          { id: "task", label: "任务", meta: "task", onClick: onOpenTask },
+          { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
           { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
         ]}
         crewPanel={<div className="console-crew-stack" />}
@@ -204,7 +208,7 @@ export function CallPage({
       ]}
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
-        { id: "task", label: "任务", meta: "task", onClick: onOpenTask },
+        { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
         { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
       ]}
       crewPanel={
@@ -263,6 +267,10 @@ export function CallPage({
           <div className="console-column-header">
             <span>call controls</span>
           </div>
+
+          <button type="button" className="choice-button choice-muted" onClick={onEndCall}>
+            <span>结束通话</span>
+          </button>
 
           {call.selectingMoveTarget && !callView.isRuntime ? (
             <MoveConfirmPanel

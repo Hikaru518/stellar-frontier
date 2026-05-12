@@ -69,6 +69,7 @@ const actionHandlers: Partial<Record<string, ActionHandler>> = {
   build: settleGenericCompletion,
   extract: settleGenericCompletion,
   repair: settleRepair,
+  timed_generic: settleGenericCompletion,
 };
 
 export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
@@ -225,9 +226,11 @@ function settleGather(ctx: HandlerContext): ActionSettlementPatch {
 }
 
 function settleGenericCompletion(ctx: HandlerContext): ActionSettlementPatch {
+  const statusText = stringParam(ctx.action.params.completion_status) ?? "行动完成，待命中。";
+  const logText = stringParam(ctx.action.params.completion_log) ?? `${ctx.member.name} 的行动已完成。`;
   const member = {
     ...ctx.member,
-    status: "行动完成，待命中。",
+    status: statusText,
     statusTone: "neutral" as Tone,
     activeAction: undefined,
   };
@@ -235,7 +238,7 @@ function settleGenericCompletion(ctx: HandlerContext): ActionSettlementPatch {
   return createPatch({
     ...ctx,
     member,
-    logs: appendLogEntry(ctx.logs, `${ctx.member.name} 的行动已完成。`, "neutral", ctx.occurredAt),
+    logs: appendLogEntry(ctx.logs, logText, "neutral", ctx.occurredAt),
     triggerContexts: [createActionCompleteTrigger(ctx, ctx.object ? [ctx.object] : [])],
   });
 }

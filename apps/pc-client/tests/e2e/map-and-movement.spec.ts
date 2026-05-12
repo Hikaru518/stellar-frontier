@@ -141,7 +141,7 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
   const confirmMoveButton = page.getByRole("button", { name: /确认请求 麦克 前往 IAFS坠毁点 \(1,0\)/ });
   await expect(confirmMoveButton).toBeVisible();
   await confirmMoveButton.click();
-  await expect(page.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
 
   await page.clock.runFor(61_000);
   await page.waitForFunction((key) => {
@@ -149,6 +149,7 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
     return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "129-130";
   }, GAME_SAVE_KEY);
 
+  await startNormalMikeCall(page);
   await expect(page.getByText(/地点：IAFS坠毁点 \(1,0\)/)).toBeVisible();
 
   await page.getByRole("button", { name: /地图/ }).click();

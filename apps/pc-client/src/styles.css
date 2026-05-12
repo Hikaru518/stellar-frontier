@@ -1709,6 +1709,12 @@ blockquote {
   box-shadow: 0 0 10px rgba(120, 255, 154, 0.74);
 }
 
+.console-nav-attention {
+  margin-left: 2px;
+  color: #ff4e63;
+  text-shadow: 0 0 9px rgba(255, 78, 99, 0.8);
+}
+
 .console-nav-meta {
   color: #a98a63;
   font-size: 9px;

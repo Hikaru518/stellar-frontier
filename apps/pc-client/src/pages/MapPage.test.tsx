@@ -143,7 +143,7 @@ describe("MapPage", () => {
     expect(readout.getByText("背景")).toBeInTheDocument();
   });
 
-  it("lists every visible feature at a tile and separates background from investigatable hits", () => {
+  it("shows the moved 2x2 scattered supplies footprint", () => {
     const map = createInitialMapState();
     map.featuresById = {
       ...map.featuresById,
@@ -151,15 +151,15 @@ describe("MapPage", () => {
     };
     renderMapPage({ map });
 
-    focusMapTile("130-130");
+    focusMapTile("133-134");
 
     const readout = within(screen.getByLabelText("Feature 命中结果"));
-    expect(readout.getByText("IAFS坠毁点")).toBeInTheDocument();
-    expect(readout.getByText("南侧通道")).toBeInTheDocument();
     expect(readout.getByText("散落的物资")).toBeInTheDocument();
-    expect(readout.getByText("背景")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
-    expect(screen.getAllByText("南侧通道").length).toBeGreaterThan(0);
+    expect(readout.queryByText("背景")).not.toBeInTheDocument();
+
+    focusMapTile("134-135");
+    expect(within(screen.getByLabelText("Feature 命中结果")).getByText("散落的物资")).toBeInTheDocument();
   });
 
   it("keeps tile terrain and weather readout for blank tiles without visible features", () => {
