@@ -36,9 +36,16 @@ export default function FeatureInspector({
     <section className="map-summary-card feature-inspector" aria-label="Feature inspector">
       <div className="map-panel-subheading">
         <h3>Features</h3>
-        <button type="button" onClick={addFeature}>
-          Add feature
-        </button>
+        <div className="map-panel-subheading-actions">
+          {selectedFeature ? (
+            <button type="button" onClick={() => onSelectFeature(null)}>
+              Clear feature selection
+            </button>
+          ) : null}
+          <button type="button" onClick={addFeature}>
+            Add feature
+          </button>
+        </div>
       </div>
 
       <ul className="feature-list" aria-label="Feature list">

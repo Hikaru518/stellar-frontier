@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { MapEditorApiError, HELPER_START_COMMAND, loadMapEditorLibrary, saveMapDraft, validateMapDraft } from "./apiClient";
-import { createInitialMapEditorState, getFeaturesForTile, normalizeMapEditorDraft } from "./mapEditorModel";
+import { createInitialMapEditorState, normalizeMapEditorDraft } from "./mapEditorModel";
 import { mapEditorReducer } from "./mapEditorReducer";
 import FeatureInspector from "./FeatureInspector";
 import MapFilePanel from "./MapFilePanel";
-import MapGrid from "./MapGrid";
+import MapGrid, { type MapBaseLayerMode } from "./MapGrid";
 import SemanticBrushPanel from "./SemanticBrushPanel";
+import TileDetailPanel from "./TileDetailPanel";
 import TileInspector from "./TileInspector";
 import Toolbar, { type MapEditorTool } from "./Toolbar";
 import ValidationPanel, { getIssueTileId } from "./ValidationPanel";
 import type { MapEditorLibraryMap, MapEditorLibraryResponse, MapValidationIssue, SaveMapResponse, ValidateMapResponse } from "./apiClient";
-import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapFeatureDefinition, MapFeatureFootprintBrushMode, SemanticBrush } from "./types";
+import type { MapEditorCommand, MapEditorDraft, MapEditorState, MapFeatureFootprintBrushMode, SemanticBrush } from "./types";
 
 type LoadLibrary = () => Promise<MapEditorLibraryResponse>;
 type ValidateMap = (input: { filePath?: string | null; data: MapEditorDraft }) => Promise<ValidateMapResponse>;
@@ -39,7 +40,8 @@ export default function MapEditorPage({
   const [featureFootprintBrushMode, setFeatureFootprintBrushMode] = useState<MapFeatureFootprintBrushMode>("add");
   const [activeTool, setActiveTool] = useState<MapEditorTool>("select");
   const [activeSemanticBrush, setActiveSemanticBrush] = useState<SemanticBrush | null>(null);
-  const [gameplayOverlay, setGameplayOverlay] = useState(false);
+  const [baseLayerMode, setBaseLayerMode] = useState<MapBaseLayerMode>("radar");
+  const [featureOverlay, setFeatureOverlay] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<{ errors: MapValidationIssue[]; warnings: MapValidationIssue[] }>({
     errors: [],
@@ -229,14 +231,16 @@ export default function MapEditorPage({
           featureFootprintBrushMode={featureFootprintBrushMode}
           activeTool={activeTool}
           activeSemanticBrush={activeSemanticBrush}
-          gameplayOverlay={gameplayOverlay}
+          baseLayerMode={baseLayerMode}
+          featureOverlay={featureOverlay}
           notice={notice}
           dirty={isDirty}
           saving={saveState !== "idle"}
           onSelectTile={setSelectedTileId}
           onToolChange={changeTool}
           onNotice={setNotice}
-          onGameplayOverlayChange={setGameplayOverlay}
+          onBaseLayerModeChange={setBaseLayerMode}
+          onFeatureOverlayChange={setFeatureOverlay}
           onSave={handleSave}
           onCommand={dispatch}
         />
@@ -247,11 +251,13 @@ export default function MapEditorPage({
           selectedFeatureId={selectedFeatureId}
           featureFootprintBrushMode={featureFootprintBrushMode}
           activeSemanticBrush={activeSemanticBrush}
-          gameplayOverlay={gameplayOverlay}
+          baseLayerMode={baseLayerMode}
+          featureOverlay={featureOverlay}
           validationIssues={validationIssues}
           onActiveSemanticBrushChange={changeSemanticBrush}
           onFeatureFootprintBrushModeChange={setFeatureFootprintBrushMode}
-          onGameplayOverlayChange={setGameplayOverlay}
+          onBaseLayerModeChange={setBaseLayerMode}
+          onFeatureOverlayChange={setFeatureOverlay}
           onSelectFeature={setSelectedFeatureId}
           onIssueSelect={handleIssueSelect}
           onCommand={dispatch}
@@ -306,14 +312,16 @@ function MapCanvasShell({
   featureFootprintBrushMode,
   activeTool,
   activeSemanticBrush,
-  gameplayOverlay,
+  baseLayerMode,
+  featureOverlay,
   notice,
   dirty,
   saving,
   onSelectTile,
   onToolChange,
   onNotice,
-  onGameplayOverlayChange,
+  onBaseLayerModeChange,
+  onFeatureOverlayChange,
   onSave,
   onCommand,
 }: {
@@ -324,14 +332,16 @@ function MapCanvasShell({
   featureFootprintBrushMode: MapFeatureFootprintBrushMode;
   activeTool: MapEditorTool;
   activeSemanticBrush: SemanticBrush | null;
-  gameplayOverlay: boolean;
+  baseLayerMode: MapBaseLayerMode;
+  featureOverlay: boolean;
   notice: string | null;
   dirty: boolean;
   saving: boolean;
   onSelectTile: (tileId: string) => void;
   onToolChange: (tool: MapEditorTool) => void;
   onNotice: (message: string | null) => void;
-  onGameplayOverlayChange: (enabled: boolean) => void;
+  onBaseLayerModeChange: (mode: MapBaseLayerMode) => void;
+  onFeatureOverlayChange: (enabled: boolean) => void;
   onSave: () => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
@@ -372,27 +382,51 @@ function MapCanvasShell({
         onSave={onSave}
       />
 
-      <div className="map-preview-toggle" role="group" aria-label="Preview mode">
-        <button
-          type="button"
-          aria-pressed={!gameplayOverlay}
-          onClick={() => {
-            onGameplayOverlayChange(false);
-            onNotice(null);
-          }}
-        >
-          Radar
-        </button>
-        <button
-          type="button"
-          aria-pressed={gameplayOverlay}
-          onClick={() => {
-            onGameplayOverlayChange(true);
-            onNotice(null);
-          }}
-        >
-          Gameplay Overlay
-        </button>
+      <div className="map-layer-controls">
+        <div className="map-preview-toggle" role="group" aria-label="Base layer toggle">
+          <button
+            type="button"
+            aria-pressed={baseLayerMode === "none"}
+            onClick={() => {
+              onBaseLayerModeChange("none");
+              onNotice(null);
+            }}
+          >
+            None
+          </button>
+          <button
+            type="button"
+            aria-pressed={baseLayerMode === "radar"}
+            onClick={() => {
+              onBaseLayerModeChange("radar");
+              onNotice(null);
+            }}
+          >
+            Radar
+          </button>
+          <button
+            type="button"
+            aria-pressed={baseLayerMode === "gameplay"}
+            onClick={() => {
+              onBaseLayerModeChange("gameplay");
+              onNotice(null);
+            }}
+          >
+            Gameplay
+          </button>
+        </div>
+        <div className="map-overlay-toggle" role="group" aria-label="Feature overlay toggle">
+          <button
+            type="button"
+            aria-pressed={featureOverlay}
+            onClick={() => {
+              onFeatureOverlayChange(!featureOverlay);
+              onNotice(null);
+            }}
+          >
+            Feature Overlay
+          </button>
+        </div>
       </div>
 
       {notice ? (
@@ -405,7 +439,9 @@ function MapCanvasShell({
         draft={state.draft}
         selectedTileId={selectedTileId}
         selectedFeatureId={selectedFeatureId}
-        gameplayOverlay={gameplayOverlay}
+        baseLayerMode={baseLayerMode}
+        featureOverlay={featureOverlay}
+        interactionMode={activeTool === "select" && !selectedFeatureId && !activeSemanticBrush ? "pan" : "paint"}
         onSelectTile={onSelectTile}
         onTileClick={handleTileClick}
         onTilePointerDown={handleTilePointerDown}
@@ -487,11 +523,13 @@ function MapSummaryPanel({
   selectedFeatureId,
   featureFootprintBrushMode,
   activeSemanticBrush,
-  gameplayOverlay,
+  baseLayerMode,
+  featureOverlay,
   validationIssues,
   onActiveSemanticBrushChange,
   onFeatureFootprintBrushModeChange,
-  onGameplayOverlayChange,
+  onBaseLayerModeChange,
+  onFeatureOverlayChange,
   onSelectFeature,
   onIssueSelect,
   onCommand,
@@ -501,11 +539,13 @@ function MapSummaryPanel({
   selectedFeatureId: string | null;
   featureFootprintBrushMode: MapFeatureFootprintBrushMode;
   activeSemanticBrush: SemanticBrush | null;
-  gameplayOverlay: boolean;
+  baseLayerMode: MapBaseLayerMode;
+  featureOverlay: boolean;
   validationIssues: { errors: MapValidationIssue[]; warnings: MapValidationIssue[] };
   onActiveSemanticBrushChange: (brush: SemanticBrush | null) => void;
   onFeatureFootprintBrushModeChange: (mode: MapFeatureFootprintBrushMode) => void;
-  onGameplayOverlayChange: (enabled: boolean) => void;
+  onBaseLayerModeChange: (mode: MapBaseLayerMode) => void;
+  onFeatureOverlayChange: (enabled: boolean) => void;
   onSelectFeature: (featureId: string | null) => void;
   onIssueSelect: (issue: MapValidationIssue) => void;
   onCommand: (command: MapEditorCommand) => void;
@@ -523,7 +563,6 @@ function MapSummaryPanel({
 
   const { draft } = editorState;
   const selectedTile = selectedTileId ? draft.tiles.find((tile) => tile.id === selectedTileId) : null;
-  const selectedTileFeatures = selectedTileId ? getFeaturesForTile(draft, selectedTileId) : [];
   return (
     <aside className="map-summary-panel" aria-label="Map editor summary">
       <section className="map-summary-card">
@@ -558,31 +597,32 @@ function MapSummaryPanel({
             <dd>{selectedTile ? selectedTile.id : "None"}</dd>
           </div>
         </dl>
-        <FeatureOverlapList features={selectedTileFeatures} selectedFeatureId={selectedFeatureId} onSelectFeature={onSelectFeature} />
       </section>
 
       <section className="map-summary-card">
         <div className="map-panel-subheading">
           <h3>Preview</h3>
-          <span className="status-tag status-muted">{gameplayOverlay ? "Gameplay Overlay" : "Radar"}</span>
+          <span className="status-tag status-muted">{formatBaseLayerMode(baseLayerMode)}</span>
         </div>
-        <div className="map-preview-toggle" role="group" aria-label="Gameplay overlay toggle">
-          <button type="button" aria-pressed={!gameplayOverlay} onClick={() => onGameplayOverlayChange(false)}>
+        <div className="map-preview-toggle" role="group" aria-label="Base layer toggle">
+          <button type="button" aria-pressed={baseLayerMode === "none"} onClick={() => onBaseLayerModeChange("none")}>
+            None
+          </button>
+          <button type="button" aria-pressed={baseLayerMode === "radar"} onClick={() => onBaseLayerModeChange("radar")}>
             Radar
           </button>
-          <button type="button" aria-pressed={gameplayOverlay} onClick={() => onGameplayOverlayChange(true)}>
-            Gameplay Overlay
+          <button type="button" aria-pressed={baseLayerMode === "gameplay"} onClick={() => onBaseLayerModeChange("gameplay")}>
+            Gameplay
+          </button>
+        </div>
+        <div className="map-overlay-toggle" role="group" aria-label="Feature overlay toggle">
+          <button type="button" aria-pressed={featureOverlay} onClick={() => onFeatureOverlayChange(!featureOverlay)}>
+            Feature Overlay
           </button>
         </div>
       </section>
 
-      <SemanticBrushPanel
-        draft={draft}
-        selectedTileId={selectedTileId}
-        activeBrush={activeSemanticBrush}
-        onActiveBrushChange={onActiveSemanticBrushChange}
-        onCommand={onCommand}
-      />
+      <TileDetailPanel draft={draft} selectedTileId={selectedTileId} selectedFeatureId={selectedFeatureId} onSelectFeature={onSelectFeature} />
 
       <FeatureInspector
         draft={draft}
@@ -596,6 +636,14 @@ function MapSummaryPanel({
 
       <TileInspector draft={draft} selectedTileId={selectedTileId} onCommand={onCommand} />
 
+      <SemanticBrushPanel
+        draft={draft}
+        selectedTileId={selectedTileId}
+        activeBrush={activeSemanticBrush}
+        onActiveBrushChange={onActiveSemanticBrushChange}
+        onCommand={onCommand}
+      />
+
       <ValidationPanel
         errors={validationIssues.errors}
         warnings={validationIssues.warnings}
@@ -605,52 +653,22 @@ function MapSummaryPanel({
   );
 }
 
-function FeatureOverlapList({
-  features,
-  selectedFeatureId,
-  onSelectFeature,
-}: {
-  features: MapFeatureDefinition[];
-  selectedFeatureId: string | null;
-  onSelectFeature: (featureId: string | null) => void;
-}) {
-  return (
-    <div className="tile-feature-overlaps" aria-label="Selected tile feature overlaps">
-      <div className="map-panel-subheading">
-        <h4>Feature overlaps</h4>
-        <span className={features.length > 1 ? "status-tag status-warning" : "status-tag status-muted"}>{formatCount(features.length, "feature")}</span>
-      </div>
-      {features.length === 0 ? <p className="muted-text">No feature footprint on this tile.</p> : null}
-      {features.length > 0 ? (
-        <ul className="tile-feature-overlap-list">
-          {features.map((feature) => (
-            <li key={feature.id}>
-              <button
-                type="button"
-                className={feature.id === selectedFeatureId ? "tile-feature-overlap-row tile-feature-overlap-row-selected" : "tile-feature-overlap-row"}
-                aria-label={`Select overlapping feature ${feature.id}`}
-                aria-pressed={feature.id === selectedFeatureId}
-                onClick={() => onSelectFeature(feature.id)}
-              >
-                <span>{feature.name}</span>
-                <span>
-                  <code>{feature.id}</code> · {feature.kind}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 function toDraft(data: MapEditorDraft): MapEditorDraft {
   return normalizeMapEditorDraft(data);
 }
 
 function formatCount(count: number, singular: string): string {
   return `${count} ${count === 1 ? singular : `${singular}s`}`;
+}
+
+function formatBaseLayerMode(mode: MapBaseLayerMode): string {
+  if (mode === "none") {
+    return "None";
+  }
+  if (mode === "gameplay") {
+    return "Gameplay";
+  }
+  return "Radar";
 }
 
 function isHelperUnavailable(error: Error | null): boolean {

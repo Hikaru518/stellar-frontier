@@ -807,7 +807,9 @@ p {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 340px);
   gap: 10px;
-  min-height: calc(100vh - 190px);
+  height: clamp(560px, calc(100vh - 250px), 980px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .map-file-panel,
@@ -817,6 +819,13 @@ p {
   border: 1px solid #77736b;
   background: #f1eee6;
   padding: 10px;
+}
+
+.map-file-panel,
+.map-summary-panel {
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .map-panel-heading,
@@ -854,6 +863,7 @@ p {
 }
 
 .map-panel-subheading,
+.map-panel-subheading-actions,
 .map-toolbar-actions,
 .map-tool-segment {
   display: flex;
@@ -864,6 +874,10 @@ p {
 
 .map-panel-subheading {
   justify-content: space-between;
+}
+
+.map-panel-subheading-actions {
+  justify-content: flex-end;
 }
 
 .map-panel-subheading h4 {
@@ -949,6 +963,8 @@ p {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 8px;
+  height: 100%;
+  overflow: hidden;
 }
 
 .map-toolbar-actions {
@@ -963,6 +979,7 @@ p {
 
 .map-tool-segment button[aria-pressed="true"],
 .map-preview-toggle button[aria-pressed="true"],
+.map-overlay-toggle button[aria-pressed="true"],
 .semantic-brush-actions button[aria-pressed="true"],
 .feature-footprint-actions button[aria-pressed="true"] {
   border-color: #24384f;
@@ -970,8 +987,17 @@ p {
   box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.18);
 }
 
-.map-preview-toggle {
+.map-layer-controls {
   grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.map-preview-toggle,
+.map-overlay-toggle {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -980,6 +1006,7 @@ p {
 }
 
 .map-preview-toggle button,
+.map-overlay-toggle button,
 .semantic-brush-actions button,
 .tile-inspector button,
 .feature-inspector button {
@@ -1004,8 +1031,10 @@ p {
 .map-grid-shell {
   grid-row: 4;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
+  overflow: hidden;
 }
 
 .map-grid-window-controls {
@@ -1025,12 +1054,13 @@ p {
 
 .map-grid-viewport {
   display: grid;
-  grid-template-columns: repeat(var(--map-cols), minmax(34px, 1fr));
-  align-content: start;
+  grid-template-columns: repeat(var(--map-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--map-rows), minmax(0, 1fr));
   gap: 0;
-  min-height: 360px;
-  max-height: calc(100vh - 275px);
-  overflow: auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: contain;
   border: 1px dashed #b45b13;
   background:
     linear-gradient(rgba(36, 56, 79, 0.08) 1px, transparent 1px),
@@ -1038,6 +1068,19 @@ p {
     #f7f4ec;
   background-size: 24px 24px;
   padding: 10px;
+  touch-action: none;
+}
+
+.map-grid-viewport-pan {
+  cursor: grab;
+}
+
+.map-grid-viewport-pan:active {
+  cursor: grabbing;
+}
+
+.map-grid-viewport-paint {
+  cursor: crosshair;
 }
 
 .map-grid-radar-cell {
@@ -1055,9 +1098,8 @@ p {
 .map-grid-tile {
   position: relative;
   display: block;
-  min-width: 34px;
-  min-height: 34px;
-  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
   border: 0;
   background: rgba(232, 229, 219, 0.78);
   color: #46505a;
@@ -1066,6 +1108,10 @@ p {
   overflow: hidden;
   padding: 0;
   text-align: center;
+}
+
+.map-grid-tile-base-none {
+  background: rgba(247, 244, 236, 0.16);
 }
 
 .map-grid-tile::before {
@@ -1077,8 +1123,16 @@ p {
   content: "";
 }
 
+.map-grid-tile-base-none::before {
+  box-shadow: inset 0 0 0 1px rgba(36, 56, 79, 0.1);
+}
+
 .map-grid-tile:hover {
   background: rgba(232, 229, 219, 0.78);
+}
+
+.map-grid-tile-base-none:hover {
+  background: rgba(232, 229, 219, 0.34);
 }
 
 .map-grid-tile:hover::before,
@@ -1090,8 +1144,16 @@ p {
   box-shadow: inset 0 0 0 1px rgba(47, 111, 68, 0.72);
 }
 
+.map-grid-tile-base-none.map-grid-tile-feature {
+  background: rgba(207, 228, 211, 0.26);
+}
+
 .map-grid-tile-feature-footprint::before {
   box-shadow: inset 0 0 0 2px rgba(36, 56, 79, 0.82);
+}
+
+.map-grid-tile-base-none.map-grid-tile-feature-footprint {
+  background: rgba(219, 227, 233, 0.32);
 }
 
 .map-grid-tile-feature-overlap::before {
@@ -1100,10 +1162,26 @@ p {
     inset 0 0 0 4px rgba(248, 241, 232, 0.72);
 }
 
+.map-grid-tile-base-none.map-grid-tile-feature-overlap {
+  background: rgba(248, 241, 232, 0.42);
+}
+
+.map-grid-tile-feature-muted::before {
+  box-shadow: inset 0 0 0 1px rgba(47, 111, 68, 0.22);
+}
+
+.map-grid-tile-base-none.map-grid-tile-feature-muted {
+  background: rgba(207, 228, 211, 0.1);
+}
+
 .map-grid-tile-origin {
   background: #f8f1e8;
   color: #171a1c;
   font-weight: 700;
+}
+
+.map-grid-tile-base-none.map-grid-tile-origin {
+  background: rgba(248, 241, 232, 0.24);
 }
 
 .map-grid-tile-origin::before {
@@ -1198,6 +1276,7 @@ p {
 .semantic-brush-panel,
 .tile-inspector,
 .feature-inspector,
+.tile-detail-panel,
 .validation-panel {
   display: grid;
   gap: 8px;
@@ -1208,7 +1287,8 @@ p {
 
 .tile-inspector,
 .semantic-brush-panel,
-.feature-inspector {
+.feature-inspector,
+.tile-detail-panel {
   display: grid;
   gap: 7px;
 }
@@ -1271,6 +1351,9 @@ p {
 .feature-action-list,
 .feature-status-errors,
 .tile-feature-overlap-list,
+.tile-detail-feature-list,
+.tile-detail-action-list,
+.tile-detail-actions,
 .semantic-brush-actions {
   display: grid;
   gap: 6px;
@@ -1278,7 +1361,9 @@ p {
 
 .feature-list,
 .feature-status-errors,
-.tile-feature-overlap-list {
+.tile-feature-overlap-list,
+.tile-detail-feature-list,
+.tile-detail-action-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1367,6 +1452,40 @@ p {
   border-color: #24384f;
   background: #dbe3e9;
   font-weight: 700;
+}
+
+.tile-detail-feature-list > li {
+  display: grid;
+  gap: 6px;
+}
+
+.tile-detail-feature-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d0b69b;
+  background: rgba(247, 244, 236, 0.5);
+  padding: 7px;
+}
+
+.tile-detail-description {
+  margin: 0;
+  color: #46505a;
+  font-size: 12px;
+}
+
+.tile-detail-action-list li {
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(119, 115, 107, 0.55);
+  background: rgba(255, 255, 255, 0.24);
+  padding: 6px;
+}
+
+.tile-detail-action-list span,
+.tile-detail-action-list code {
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
 }
 
 .tile-inspector-checkbox-list label {
