@@ -146,6 +146,29 @@ describe("App", () => {
     expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
   });
 
+  it("opens the global debug toolbox from the floating entry", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "[DEBUG]" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Debug toolbox / 作弊菜单" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "1x" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "2x" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "4x" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "8x" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "重置存档" })).toBeInTheDocument();
+  });
+
+  it("keeps the debug entry available after page navigation", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+
+    expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "[DEBUG]" })).toBeInTheDocument();
+  });
+
   it("creates a blank-world save on first load", () => {
     render(<App />);
 

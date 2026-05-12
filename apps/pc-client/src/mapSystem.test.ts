@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultMapConfig } from "./content/contentData";
 import {
   canMoveToTile,
+  formatMapObjectStatus,
   getDisplayCoord,
   getTileId,
   getTileLocationLabel,
@@ -44,5 +45,11 @@ describe("mapSystem", () => {
     expect(canMoveToTile(defaultMapConfig, map, "129-129")).toBe(true);
     expect(canMoveToTile(defaultMapConfig, map, "256-256")).toBe(true);
     expect(canMoveToTile(defaultMapConfig, map, "257-257")).toBe(false);
+  });
+
+  it("formats known map object statuses for display", () => {
+    expect(formatMapObjectStatus("damaged")).toBe("已损坏");
+    expect(formatMapObjectStatus("repaired")).toBe("正常");
+    expect(formatMapObjectStatus("unsearched")).toBe("未搜寻");
   });
 });

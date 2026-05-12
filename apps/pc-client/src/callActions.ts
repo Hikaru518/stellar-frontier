@@ -6,7 +6,7 @@ import { evaluateCondition } from "./events/conditions";
 import type { Condition, CrewActionState, RuntimeCall } from "./events/types";
 import type { CrewMember, GameState, MapTile } from "./data/gameData";
 import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
-import { getFeatureRuntimeStatus } from "./mapSystem";
+import { formatMapObjectStatus, getFeatureRuntimeStatus } from "./mapSystem";
 
 export interface CallActionGroup {
   title: string;
@@ -144,31 +144,14 @@ export function buildCallView({ member, tile, gameState }: BuildCallViewArgs): {
 
 function formatFeatureGroupTitle(feature: MapFeatureDefinition, gameState: GameState): string {
   const status = getFeatureRuntimeStatus(gameState.map, feature);
-  const statusLabel = formatObjectStatus(status);
+  const statusLabel = formatMapObjectStatus(status);
   return statusLabel ? `${feature.name}（${statusLabel}）` : feature.name;
 }
 
 function formatObjectGroupTitle(object: MapObjectDefinition, gameState: GameState): string {
   const status = gameState.map.mapObjects?.[object.id]?.status_enum ?? object.initial_status;
-  const statusLabel = formatObjectStatus(status);
+  const statusLabel = formatMapObjectStatus(status);
   return statusLabel ? `${object.name}（${statusLabel}）` : object.name;
-}
-
-function formatObjectStatus(status: string | undefined): string {
-  switch (status) {
-    case "damaged":
-      return "已损坏";
-    case "repaired":
-      return "正常";
-    case "available":
-      return "可调查";
-    case "investigated":
-      return "已调查";
-    case "unsearched":
-      return "未搜寻";
-    default:
-      return status ?? "";
-  }
 }
 
 function collectCandidates(
@@ -289,7 +272,7 @@ function toActionTargetView(
 ): CallActionTargetView | undefined {
   if (feature) {
     const status = getFeatureRuntimeStatus(gameState.map, feature);
-    const statusLabel = formatObjectStatus(status);
+    const statusLabel = formatMapObjectStatus(status);
     return {
       kind: "feature",
       id: feature.id,
@@ -300,7 +283,7 @@ function toActionTargetView(
   }
   if (object) {
     const status = gameState.map.mapObjects?.[object.id]?.status_enum ?? object.initial_status;
-    const statusLabel = formatObjectStatus(status);
+    const statusLabel = formatMapObjectStatus(status);
     return {
       kind: "object",
       id: object.id,
@@ -318,7 +301,7 @@ function toFeatureContextView(
   isActionTarget: boolean,
 ): CallFeatureContextView {
   const status = getFeatureRuntimeStatus(gameState.map, feature);
-  const statusLabel = formatObjectStatus(status);
+  const statusLabel = formatMapObjectStatus(status);
   return {
     kind: "feature",
     id: feature.id,

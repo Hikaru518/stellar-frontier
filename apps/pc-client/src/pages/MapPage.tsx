@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GameConsoleLayout } from "../components/Layout";
+import { FieldList, GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig, type MapFeatureDefinition, type MapTileDefinition } from "../content/contentData";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
-import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
+import { deriveCrewActionViewModel, isTilePassable, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
 import { buildFeatureTileIndex, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
-import { parseTileId } from "../mapSystem";
+import { formatMapObjectStatus, isMapObjectVisibleOnTile, parseTileId, resolveTileObjects, resolveVisibleTileObjects } from "../mapSystem";
 
 const CELL_W = 8;
 const CELL_H = 10;
@@ -13,9 +13,21 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const RADAR = defaultMapConfig.radar;
 const RADAR_WORLD = RADAR.world;
+const MAP_DEBUG_SYMBOLS = {
+  blocked: "X",
+  passable: ".",
+  object: "O",
+} as const;
 
 type FocusCoord = { x: number; y: number };
 type RenderTone = string;
+
+interface MapDebugPoint extends FocusCoord {
+  tileId: string;
+  kind: "blocked" | "object";
+  symbol: string;
+  allObjectsRevealed?: boolean;
+}
 
 interface RenderGlitch {
   x: number;
@@ -77,9 +89,11 @@ export function MapPage({
   const [dragging, setDragging] = useState(false);
   const [showRenderLayer, setShowRenderLayer] = useState(true);
   const [showFunctionalLayer, setShowFunctionalLayer] = useState(true);
+  const [showDebugLayer, setShowDebugLayer] = useState(false);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const debugCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);
   const configTileById = useMemo(() => new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile])), []);
   const featureTileIndex = useMemo(() => buildFeatureTileIndex(defaultMapConfig), []);
@@ -94,7 +108,14 @@ export function MapPage({
   const investigatableFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable === true), [visibleFocusFeatures]);
   const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile, visibleFocusFeatures), [focusCoord, focusConfigTile, visibleFocusFeatures]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
+  const focusObjectDefinitions = useMemo(() => (focusConfigTile ? resolveTileObjects(focusConfigTile) : []), [focusConfigTile]);
+  const visibleFocusObjects = useMemo(() => (focusConfigTile ? resolveVisibleTileObjects(focusConfigTile, map) : []), [focusConfigTile, map]);
+  const hiddenFocusObjectCount = useMemo(
+    () => (focusConfigTile ? focusObjectDefinitions.filter((definition) => !isMapObjectVisibleOnTile(focusConfigTile.id, definition, map)).length : 0),
+    [focusConfigTile, focusObjectDefinitions, map],
+  );
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
+  const mapDebugPoints = useMemo(() => getMapDebugPoints(tiles, map), [map, tiles]);
 
   const crewActionViews = useMemo(
     () =>
@@ -372,6 +393,69 @@ export function MapPage({
     };
   }, [focusCoord, showFunctionalLayer, viewport]);
 
+  useEffect(() => {
+    if (!showDebugLayer) {
+      return undefined;
+    }
+
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
+      return undefined;
+    }
+
+    if (!(debugCanvasRef.current instanceof HTMLCanvasElement)) {
+      return undefined;
+    }
+    const canvasEl = debugCanvasRef.current;
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) {
+      return undefined;
+    }
+    const context: CanvasRenderingContext2D = ctx;
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+    function resize() {
+      const rect = canvasEl.getBoundingClientRect();
+      canvasEl.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvasEl.height = Math.max(1, Math.floor(rect.height * dpr));
+      drawDebugLayer();
+    }
+
+    function drawDebugLayer() {
+      const width = canvasEl.width / dpr;
+      const height = canvasEl.height / dpr;
+      const cellW = width / viewport.width;
+      const cellH = height / viewport.height;
+      const fontSize = clamp(Math.min(cellW, cellH) * 0.92, 7, 14);
+
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.font = `${fontSize}px "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+
+      for (const point of mapDebugPoints) {
+        if (!isCoordInsideViewport(point, viewport)) {
+          continue;
+        }
+
+        const sx = (point.x - viewport.left) * cellW;
+        const sy = (point.y - viewport.top) * cellH;
+        context.fillStyle = getDebugPointFill(point);
+        context.fillRect(sx, sy, Math.max(1, cellW), Math.max(1, cellH));
+        context.fillStyle = getDebugPointTextColor(point);
+        context.fillText(point.symbol, sx + cellW / 2, sy + cellH / 2);
+      }
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    return () => {
+      window.removeEventListener("resize", resize);
+    };
+  }, [mapDebugPoints, showDebugLayer, viewport]);
+
   return (
     <GameConsoleLayout
       title="卫星雷达地图"
@@ -424,44 +508,20 @@ export function MapPage({
         </div>
       }
       rightPanel={
-        <section className="console-side-panel">
-          <div className="console-column-header">
-            <span>map trace</span>
-          </div>
-          <div className="console-map-trace">
-            <p className="console-map-trace-lead">
-              {RADAR.trace.layerNotice}
-            </p>
-            <div className="console-layer-toggle-list">
-              <button
-                type="button"
-                className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
-                onClick={() => {
-                  setShowRenderLayer((value) => !value);
-                  pushTrace(`[LAYER] render ${showRenderLayer ? "OFF" : "ON"}`);
-                }}
-              >
-                显示渲染层
-              </button>
-              <button
-                type="button"
-                className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
-                onClick={() => {
-                  setShowFunctionalLayer((value) => !value);
-                  pushTrace(`[LAYER] function ${showFunctionalLayer ? "OFF" : "ON"}`);
-                }}
-              >
-                显示功能层
-              </button>
+        <div className="console-right-stack">
+          <section className="console-side-panel">
+            <div className="console-column-header">
+              <span>地图详情</span>
             </div>
-            <p className="console-map-trace-lead">
-              {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
-            </p>
-            <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
-            <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
-            <p className="console-map-trace-line">
-              [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
-            </p>
+            <FieldList
+              rows={[
+                ["区块", focusTileId],
+                ["坐标", focusDisplayCoord],
+                ["区域", focusLabel],
+                ["地形", focusConfigTile?.terrain ?? "未知地形"],
+                ["天气", focusConfigTile?.weather ?? "未知天气"],
+              ]}
+            />
             {visibleFocusFeatures.length ? (
               <div className="console-map-feature-readout" aria-label="Feature 命中结果">
                 {backgroundFocusFeatures.length ? <FeatureHitGroup label="背景" features={backgroundFocusFeatures} /> : null}
@@ -470,36 +530,102 @@ export function MapPage({
             ) : (
               <p className="console-map-trace-line">[FEATURE] 无可见 Feature</p>
             )}
-            {returnTarget === "call" ? (
-              <div className="console-map-return-actions">
-                {moveSelectionMember ? (
-                  <button
-                    type="button"
-                    className="console-crew-button"
-                    onClick={() => {
-                      pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
-                      onSelectMoveTarget(focusTileId);
-                    }}
-                  >
-                    标记当前坐标
-                  </button>
-                ) : null}
-                <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
-                  返回当前通话
+            <div className="console-map-trace" aria-label="当前可见地图对象">
+              <p className="console-map-trace-lead">地图对象</p>
+              {visibleFocusObjects.map(({ definition, runtime }) => (
+                <p key={definition.id} className="console-map-trace-line">
+                  {formatMapObjectLabel(definition.name, formatMapObjectStatus(runtime?.status_enum ?? definition.initial_status))}
+                </p>
+              ))}
+              {hiddenFocusObjectCount > 0 ? <p className="console-map-trace-line">未知信号</p> : null}
+              {!visibleFocusObjects.length && hiddenFocusObjectCount === 0 ? (
+                <p className="console-map-trace-line">无当前可见对象</p>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="console-side-panel">
+            <div className="console-column-header">
+              <span>map trace</span>
+            </div>
+            <div className="console-map-trace">
+              <p className="console-map-trace-lead">
+                {RADAR.trace.layerNotice}
+              </p>
+              <div className="console-layer-toggle-list">
+                <button
+                  type="button"
+                  className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => {
+                    setShowRenderLayer((value) => !value);
+                    pushTrace(`[LAYER] render ${showRenderLayer ? "OFF" : "ON"}`);
+                  }}
+                >
+                  显示渲染层
+                </button>
+                <button
+                  type="button"
+                  className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => {
+                    setShowFunctionalLayer((value) => !value);
+                    pushTrace(`[LAYER] function ${showFunctionalLayer ? "OFF" : "ON"}`);
+                  }}
+                >
+                  显示功能层
+                </button>
+                <button
+                  type="button"
+                  className={`console-layer-toggle ${showDebugLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => {
+                    setShowDebugLayer((value) => !value);
+                    pushTrace(`[LAYER] debug ${showDebugLayer ? "OFF" : "ON"}`);
+                  }}
+                >
+                  显示调试层
                 </button>
               </div>
-            ) : null}
-            {traceLines.length ? (
-              traceLines.map((line, index) => (
-                <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
-                  {line}
-                </p>
-              ))
-            ) : (
-              <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
-            )}
-          </div>
-        </section>
+              <p className="console-map-trace-lead">
+                {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
+              </p>
+              <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
+              <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
+              <p className="console-map-trace-line">
+                [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
+              </p>
+              <p className="console-map-trace-line">
+                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.object}=object / yellow hidden / white revealed
+              </p>
+              {returnTarget === "call" ? (
+                <div className="console-map-return-actions">
+                  {moveSelectionMember ? (
+                    <button
+                      type="button"
+                      className="console-crew-button"
+                      onClick={() => {
+                        pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
+                        onSelectMoveTarget(focusTileId);
+                      }}
+                    >
+                      标记当前坐标
+                    </button>
+                  ) : null}
+                  <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
+                    返回当前通话
+                  </button>
+                </div>
+              ) : null}
+              {traceLines.length ? (
+                traceLines.map((line, index) => (
+                  <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
+              )}
+            </div>
+          </section>
+        </div>
       }
       bottomBar={
         <div className="console-bottom-strip">
@@ -512,7 +638,7 @@ export function MapPage({
         <div className="console-screen-header">
           <span>crt situation map</span>
           <strong>卫星雷达地图 / retro lofi field</strong>
-          <span>render + function / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
+          <span>render + function + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
         </div>
 
         <div
@@ -538,10 +664,17 @@ export function MapPage({
             </div>
           ) : null}
 
+          {showDebugLayer ? (
+            <div className="console-retro-map-debug-layer" aria-hidden="true">
+              <canvas ref={debugCanvasRef} className="console-retro-map-debug-canvas" />
+            </div>
+          ) : null}
+
           <div className="console-ascii-map-readout">
             <span>focus {focusDisplayCoord}</span>
             <span>render {showRenderLayer ? "ON" : "OFF"}</span>
             <span>function {showFunctionalLayer ? "ON" : "OFF"}</span>
+            <span>debug {showDebugLayer ? "ON" : "OFF"}</span>
           </div>
         </div>
       </div>
@@ -582,6 +715,70 @@ function getFeatureStatusForReadout(feature: MapFeatureDefinition, map: Pick<Gam
 
 function makeRenderBuffer<T>(rows: number, cols: number, fill: T) {
   return Array.from({ length: rows }, () => Array<T>(cols).fill(fill));
+}
+
+function getMapDebugPoints(tiles: MapTile[], map: GameMapState): MapDebugPoint[] {
+  const blockedPoints = tiles.flatMap((tile) => {
+    const coord = parseTileId(tile.id);
+    if (!coord) {
+      return [];
+    }
+
+    const blocked = !isTilePassable(tile);
+    if (!blocked) {
+      return [];
+    }
+
+    return [
+      {
+        tileId: tile.id,
+        x: coord.col - 1,
+        y: coord.row - 1,
+        kind: "blocked" as const,
+        symbol: MAP_DEBUG_SYMBOLS.blocked,
+      },
+    ];
+  });
+
+  const objectPoints = defaultMapConfig.tiles.flatMap((tile) => {
+    const definitions = resolveTileObjects(tile);
+    if (!definitions.length) {
+      return [];
+    }
+    const coord = parseTileId(tile.id);
+    if (!coord) {
+      return [];
+    }
+
+    return [
+      {
+        tileId: tile.id,
+        x: coord.col - 1,
+        y: coord.row - 1,
+        kind: "object" as const,
+        symbol: MAP_DEBUG_SYMBOLS.object,
+        allObjectsRevealed: definitions.every((definition) => isMapObjectVisibleOnTile(tile.id, definition, map)),
+      },
+    ];
+  });
+
+  return [...blockedPoints, ...objectPoints];
+}
+
+function getDebugPointFill(point: MapDebugPoint) {
+  if (point.kind === "blocked") {
+    return "rgba(255, 91, 86, 0.18)";
+  }
+
+  return point.allObjectsRevealed ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 215, 88, 0.18)";
+}
+
+function getDebugPointTextColor(point: MapDebugPoint) {
+  if (point.kind === "blocked") {
+    return "rgba(255, 141, 133, 0.96)";
+  }
+
+  return point.allObjectsRevealed ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 215, 88, 0.96)";
 }
 
 function applyRenderGlitch(
@@ -694,7 +891,7 @@ function getViewport(center: FocusCoord, zoom: number) {
   };
 }
 
-function getRadarFocusLabel(_coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
+function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
   if (visibleFeatures.length === 1) {
     return visibleFeatures[0].name;
   }
@@ -703,7 +900,22 @@ function getRadarFocusLabel(_coord: FocusCoord, tile: MapTileDefinition | undefi
     return `${visibleFeatures[0].name} +${visibleFeatures.length - 1}`;
   }
 
-  return tile?.id ?? "未命名区域";
+  const region = [...RADAR.regions]
+    .sort((left, right) => right.priority - left.priority)
+    .find((entry) => isInsideRegion(coord, entry.shape));
+  return region?.label ?? tile?.id ?? "未命名区域";
+}
+
+function formatMapObjectLabel(name: string, statusLabel: string) {
+  return statusLabel ? `${name}（${statusLabel}）` : name;
+}
+
+function isInsideRegion(coord: FocusCoord, shape: (typeof RADAR.regions)[number]["shape"]) {
+  if (shape.type === "circle") {
+    return distance(coord.x, coord.y, shape.x, shape.y) <= shape.radius;
+  }
+
+  return coord.x >= shape.x1 && coord.x <= shape.x2 && coord.y >= shape.y1 && coord.y <= shape.y2;
 }
 
 function formatDisplayCoord(coord: FocusCoord) {
@@ -732,6 +944,10 @@ function clampCoord(coord: FocusCoord): FocusCoord {
     x: clamp(coord.x, 0, RADAR_WORLD.width - 1),
     y: clamp(coord.y, 0, RADAR_WORLD.height - 1),
   };
+}
+
+function isCoordInsideViewport(coord: FocusCoord, viewport: ReturnType<typeof getViewport>) {
+  return coord.x >= viewport.left && coord.x <= viewport.left + viewport.width && coord.y >= viewport.top && coord.y <= viewport.top + viewport.height;
 }
 
 function clamp(value: number, min: number, max: number) {

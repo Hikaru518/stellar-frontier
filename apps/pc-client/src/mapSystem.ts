@@ -1,5 +1,5 @@
-import type { FeatureRuntimeState, MapConfigDefinition, MapFeatureDefinition } from "./content/contentData";
-import type { RuntimeMapObjectsState } from "./content/mapObjects";
+import type { FeatureRuntimeState, MapConfigDefinition, MapFeatureDefinition, MapTileDefinition } from "./content/contentData";
+import { mapObjectDefinitionById, type MapObjectDefinition, type MapObjectRuntime, type RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport } from "./data/gameData";
 import { buildFeatureTileIndex, getFeaturesAtTile, getVisibleFeaturesAtTile, type TileFeatureIndex } from "./mapFeatureSystem";
 
@@ -44,6 +44,11 @@ export interface RuntimeMapState {
    * runtime paths that are removed in later feature tasks.
    */
   mapObjects?: RuntimeMapObjectsState;
+}
+
+export interface VisibleTileObject {
+  definition: MapObjectDefinition;
+  runtime?: MapObjectRuntime;
 }
 
 export function getTileId(row: number, col: number) {
@@ -109,6 +114,67 @@ export function getFeatureRuntimeState(
   };
 }
 
+export function resolveTileObjects(tile: MapTileDefinition): MapObjectDefinition[] {
+  const result: MapObjectDefinition[] = [];
+  for (const objectId of getLegacyTileObjectIds(tile)) {
+    const definition = mapObjectDefinitionById.get(objectId);
+    if (!definition) {
+      console.warn(`[mapSystem] tile ${tile.id} references unknown objectId ${objectId}`);
+      continue;
+    }
+    result.push(definition);
+  }
+  return result;
+}
+
+export function isMapObjectVisibleOnTile(tileId: string, definition: MapObjectDefinition, map: RuntimeMapState | undefined) {
+  if (!map) {
+    return true;
+  }
+
+  const runtimeTile = map.tilesById[tileId];
+  return (
+    definition.visibility === "onDiscovered" ||
+    runtimeTile?.revealedObjectIds?.includes(definition.id) ||
+    (definition.visibility === "onInvestigated" && runtimeTile?.investigated)
+  );
+}
+
+export function resolveVisibleTileObjects(tile: MapTileDefinition, map: RuntimeMapState | undefined): VisibleTileObject[] {
+  const definitionsById = new Map(resolveTileObjects(tile).map((definition) => [definition.id, definition]));
+  const runtimeTile = map?.tilesById[tile.id];
+  for (const objectId of runtimeTile?.revealedObjectIds ?? []) {
+    const definition = mapObjectDefinitionById.get(objectId);
+    if (definition) {
+      definitionsById.set(definition.id, definition);
+    }
+  }
+
+  return [...definitionsById.values()]
+    .filter((definition) => isMapObjectVisibleOnTile(tile.id, definition, map))
+    .map((definition) => ({
+      definition,
+      runtime: map?.mapObjects?.[definition.id],
+    }));
+}
+
+export function formatMapObjectStatus(status: string | undefined): string {
+  switch (status) {
+    case "damaged":
+      return "已损坏";
+    case "repaired":
+      return "正常";
+    case "available":
+      return "可调查";
+    case "investigated":
+      return "已调查";
+    case "unsearched":
+      return "未搜寻";
+    default:
+      return status ?? "";
+  }
+}
+
 function getTile(config: MapConfigDefinition, tileId: string) {
   return config.tiles.find((tile) => tile.id === tileId);
 }
@@ -136,6 +202,11 @@ function getFeatureIndex(config: MapConfigDefinition): TileFeatureIndex {
   const index = buildFeatureTileIndex(config);
   featureIndexCache.set(config, index);
   return index;
+}
+
+function getLegacyTileObjectIds(tile: MapTileDefinition): string[] {
+  const legacyTile = tile as MapTileDefinition & { objectIds?: unknown };
+  return Array.isArray(legacyTile.objectIds) ? legacyTile.objectIds.filter((objectId): objectId is string => typeof objectId === "string") : [];
 }
 
 function getOrigin(config: MapConfigDefinition) {

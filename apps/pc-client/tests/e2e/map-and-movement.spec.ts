@@ -24,7 +24,12 @@ test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) =
   const stage = page.locator(".console-ascii-map-stage");
   await expect(stage).toBeVisible();
   await expect(stage).toHaveAttribute("data-focus-tile-id", "129-129");
-  await expect(page.getByText("render + function / 256 x 256")).toBeVisible();
+  await expect(page.getByText("render + function + debug / 256 x 256")).toBeVisible();
+  await expect(page.getByText("debug OFF", { exact: true })).toBeVisible();
+  await expect(stage.locator(".console-retro-map-debug-canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "显示调试层" }).click();
+  await expect(page.getByText("debug ON", { exact: true })).toBeVisible();
+  await expect(stage.locator(".console-retro-map-debug-canvas")).toHaveCount(1);
   await expect(page.getByText("[JSON] radar glyph/tone/regions loaded from content/maps/radar/default-map-radar.json")).toBeVisible();
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
   await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
@@ -186,8 +191,9 @@ test("moves a seeded crew action along intermediate route steps", async ({ page 
 test("keeps the console radar stable while accelerated game time completes a move", async ({ page }) => {
   const consoleFailures: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") {
-      consoleFailures.push(message.text());
+    const text = message.text();
+    if (message.type() === "error" && !isExpectedLocalYuanHostNoise(text)) {
+      consoleFailures.push(text);
     }
   });
   page.on("pageerror", (error) => consoleFailures.push(error.message));
@@ -228,3 +234,10 @@ test("keeps the console radar stable while accelerated game time completes a mov
   }, GAME_SAVE_KEY);
   expect(consoleFailures).toEqual([]);
 });
+
+function isExpectedLocalYuanHostNoise(message: string) {
+  return (
+    message.includes("WebSocket connection to 'ws://127.0.0.1:8888/") ||
+    message.includes("WebSocketConnectionError undefined")
+  );
+}

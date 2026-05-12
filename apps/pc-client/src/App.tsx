@@ -20,7 +20,7 @@ import {
   type QuestNavigationEntry,
 } from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
-import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition } from "./content/mapObjects";
+import type { ActionDef, MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -36,7 +36,7 @@ import {
   type TriggerContext,
   type WorldFlag,
 } from "./events/types";
-import { canMoveToTile, getFeatureRuntimeStatus, getTileLocationLabel } from "./mapSystem";
+import { canMoveToTile, getFeatureRuntimeStatus, getTileLocationLabel, resolveVisibleTileObjects } from "./mapSystem";
 import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, getVisibleFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
 import {
   createBaseInventoryFromResources,
@@ -839,124 +839,124 @@ function App() {
     );
   }
 
-  if (page === "ending") {
-    return (
-      <EndingPage
-        completedAtLabel={completedAtLabel}
-        gameTimeLabel={gameTimeLabel}
-        onResetGame={resetGame}
-        onReturnControl={() => setPage("control")}
-      />
-    );
-  }
+  const pageContent = (() => {
+    if (page === "ending") {
+      return (
+        <EndingPage
+          completedAtLabel={completedAtLabel}
+          gameTimeLabel={gameTimeLabel}
+          onResetGame={resetGame}
+          onReturnControl={() => setPage("control")}
+        />
+      );
+    }
 
-  if (page === "station") {
-    return (
-      <TaskPage
-        view={questSidebarView}
-        statusFilter={questStatusFilter}
-        categoryFilter={questCategoryFilter}
-        navigationMessage={
-          questNavigationHint?.type === "crew"
-            ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。`
-            : questNavigationHint?.type === "unavailable"
-              ? `任务导航目标不可用：${questNavigationHint.label}`
-              : undefined
-        }
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        tiles={tiles}
-        gameTimeLabel={gameTimeLabel}
-        logs={logs}
-        onStatusFilterChange={setQuestStatusFilter}
-        onCategoryFilterChange={setQuestCategoryFilter}
-        onSelectedQuestIdChange={setSelectedQuestId}
-        onNavigate={handleQuestSidebarNavigate}
-        onOpenControl={openControlOverview}
-        onOpenMap={() => openMap("control")}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-      />
-    );
-  }
+    if (page === "station") {
+      return (
+        <TaskPage
+          view={questSidebarView}
+          statusFilter={questStatusFilter}
+          categoryFilter={questCategoryFilter}
+          navigationMessage={
+            questNavigationHint?.type === "crew"
+              ? `任务导航：已定位 ${crew.find((member) => member.id === questNavigationHint.crewId)?.name ?? questNavigationHint.crewId}，需手动点击通话。`
+              : questNavigationHint?.type === "unavailable"
+                ? `任务导航目标不可用：${questNavigationHint.label}`
+                : undefined
+          }
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          tiles={tiles}
+          gameTimeLabel={gameTimeLabel}
+          logs={logs}
+          onStatusFilterChange={setQuestStatusFilter}
+          onCategoryFilterChange={setQuestCategoryFilter}
+          onSelectedQuestIdChange={setSelectedQuestId}
+          onNavigate={handleQuestSidebarNavigate}
+          onOpenControl={openControlOverview}
+          onOpenMap={() => openMap("control")}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+        />
+      );
+    }
 
-  if (page === "call") {
-    return (
-      <CallPage
-        call={currentCall}
-        crew={crew}
-        tiles={tiles}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        gameTimeLabel={gameTimeLabel}
-        gameState={gameState}
-        logs={logs}
-        onDecision={handleDecision}
-        onConfirmMove={confirmMove}
-        onClearMoveTarget={clearMoveTarget}
-        onOpenMap={() => openMap("call")}
-        onOpenControl={openControlOverview}
-        onOpenTask={openStation}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-      />
-    );
-  }
+    if (page === "call") {
+      return (
+        <CallPage
+          call={currentCall}
+          crew={crew}
+          tiles={tiles}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          gameTimeLabel={gameTimeLabel}
+          gameState={gameState}
+          logs={logs}
+          onDecision={handleDecision}
+          onConfirmMove={confirmMove}
+          onClearMoveTarget={clearMoveTarget}
+          onOpenMap={() => openMap("call")}
+          onOpenControl={openControlOverview}
+          onOpenTask={openStation}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+        />
+      );
+    }
 
-  if (page === "map") {
-    return (
-      <MapPage
-        tiles={tiles}
-        map={gameState.map}
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        gameTimeLabel={gameTimeLabel}
-        returnTarget={mapReturnTarget}
-        moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
-        initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
-        onOpenControl={openControlOverview}
-        onOpenTask={openStation}
-        onReturnFromMap={returnFromMap}
-        onSelectMoveTarget={selectMoveTarget}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-        logs={logs}
-      />
-    );
-  }
+    if (page === "map") {
+      return (
+        <MapPage
+          tiles={tiles}
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          gameTimeLabel={gameTimeLabel}
+          returnTarget={mapReturnTarget}
+          moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
+          initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+          map={gameState.map}
+          onOpenControl={openControlOverview}
+          onOpenTask={openStation}
+          onReturnFromMap={returnFromMap}
+          onSelectMoveTarget={selectMoveTarget}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+          logs={logs}
+        />
+      );
+    }
 
-  if (page === "crew") {
-    return (
-      <CrewConsolePage
-        crew={crew}
-        crewActions={gameState.crew_actions}
-        activeCalls={gameState.active_calls}
-        elapsedGameSeconds={elapsedGameSeconds}
-        tiles={tiles}
-        eventLogs={gameState.event_logs}
-        logs={logs}
-        gameTimeLabel={gameTimeLabel}
-        selectedCrewId={crewConsoleView.crewId}
-        mode={crewConsoleView.mode}
-        onOpenControl={openControlOverview}
-        onOpenTask={openStation}
-        onOpenMap={() => openMap("control")}
-        onStartCall={startCall}
-        onShowCrewStatus={openCrewStatusPage}
-        onShowCrewInventory={openCrewInventoryPage}
-      />
-    );
-  }
+    if (page === "crew") {
+      return (
+        <CrewConsolePage
+          crew={crew}
+          crewActions={gameState.crew_actions}
+          activeCalls={gameState.active_calls}
+          elapsedGameSeconds={elapsedGameSeconds}
+          tiles={tiles}
+          eventLogs={gameState.event_logs}
+          logs={logs}
+          gameTimeLabel={gameTimeLabel}
+          selectedCrewId={crewConsoleView.crewId}
+          mode={crewConsoleView.mode}
+          onOpenControl={openControlOverview}
+          onOpenTask={openStation}
+          onOpenMap={() => openMap("control")}
+          onStartCall={startCall}
+          onShowCrewStatus={openCrewStatusPage}
+          onShowCrewInventory={openCrewInventoryPage}
+        />
+      );
+    }
 
-  return (
-    <>
+    return (
       <ControlCenter
         crew={crew}
         logs={logs}
@@ -973,6 +973,15 @@ function App() {
         onShowCrewStatus={openCrewStatusPage}
         onShowCrewInventory={openCrewInventoryPage}
       />
+    );
+  })();
+
+  return (
+    <>
+      {pageContent}
+      <button type="button" className="debug-floating-button" onClick={() => setDebugOpen(true)}>
+        [DEBUG]
+      </button>
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
@@ -1591,19 +1600,6 @@ function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-function isObjectVisible(tileId: string, definition: MapObjectDefinition, map: GameMapState | undefined) {
-  if (!map) {
-    return true;
-  }
-
-  const runtimeTile = map.tilesById[tileId];
-  return (
-    definition.visibility === "onDiscovered" ||
-    runtimeTile?.revealedObjectIds?.includes(definition.id) ||
-    (definition.visibility === "onInvestigated" && runtimeTile?.investigated)
-  );
-}
-
 /**
  * 对前/后两份 event_logs 做 id 集合差集，对每条新增 EventLog 写一条
  * `event.resolved`。R2（design §13）：用 EventLog.id 集合做差集，绝不能用
@@ -2016,9 +2012,12 @@ function createLocationStoryActionTriggerContext(
 }
 
 function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefinition[] {
-  return Array.from(new Set(state.map.tilesById[tileId]?.revealedObjectIds ?? []))
-    .map((objectId) => mapObjectDefinitionById.get(objectId))
-    .filter((definition): definition is MapObjectDefinition => Boolean(definition && isObjectVisible(tileId, definition, state.map)));
+  const configTile = defaultMapTileById.get(tileId);
+  if (!configTile) {
+    return [];
+  }
+
+  return resolveVisibleTileObjects(configTile, state.map).map(({ definition }) => definition);
 }
 
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
