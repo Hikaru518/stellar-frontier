@@ -4,7 +4,7 @@ import { ControlCenter } from "./pages/ControlCenter";
 import { CrewConsolePage, type CrewConsoleMode } from "./pages/CrewConsolePage";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
-import { MapPage } from "./pages/MapPage";
+import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage, type MapLayerVisibility } from "./pages/MapPage";
 import { TaskPage } from "./pages/TaskPage";
 import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
@@ -158,6 +158,7 @@ function App() {
   const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
   const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
   const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
+  const [mapLayerVisibility, setMapLayerVisibility] = useState<MapLayerVisibility>(DEFAULT_MAP_LAYER_VISIBILITY);
   const [crewConsoleView, setCrewConsoleView] = useState<{ mode: CrewConsoleMode; crewId: CrewId | null }>({
     mode: "status",
     crewId: null,
@@ -920,6 +921,8 @@ function App() {
           returnTarget={mapReturnTarget}
           moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
           initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+          layerVisibility={mapLayerVisibility}
+          onLayerVisibilityChange={setMapLayerVisibility}
           map={gameState.map}
           onOpenControl={openControlOverview}
           onOpenTask={openStation}

@@ -21,6 +21,20 @@ const MAP_DEBUG_SYMBOLS = {
 const MAP_DEBUG_BACKGROUND_START = { r: 69, g: 174, b: 255 };
 const MAP_DEBUG_BACKGROUND_END = { r: 255, g: 219, b: 82 };
 
+export interface MapLayerVisibility {
+  render: boolean;
+  functional: boolean;
+  crew: boolean;
+  debug: boolean;
+}
+
+export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
+  render: true,
+  functional: true,
+  crew: false,
+  debug: false,
+};
+
 type FocusCoord = { x: number; y: number };
 type RenderTone = string;
 
@@ -47,6 +61,11 @@ interface MapDebugLayerData {
   blocked: MapDebugBlockedCell[];
 }
 
+interface MapCrewMarker extends FocusCoord {
+  tileId: string;
+  label: string;
+}
+
 interface RenderGlitch {
   x: number;
   y: number;
@@ -67,6 +86,8 @@ interface MapPageProps {
   returnTarget: MapReturnTarget;
   moveSelectionCrewId?: CrewId | null;
   initialSelectedTileId?: string;
+  layerVisibility: MapLayerVisibility;
+  onLayerVisibilityChange: (visibility: MapLayerVisibility) => void;
   onOpenControl: () => void;
   onOpenTask: () => void;
   onReturnFromMap: () => void;
@@ -88,6 +109,8 @@ export function MapPage({
   returnTarget,
   moveSelectionCrewId,
   initialSelectedTileId,
+  layerVisibility,
+  onLayerVisibilityChange,
   onOpenControl,
   onOpenTask,
   onReturnFromMap,
@@ -105,17 +128,18 @@ export function MapPage({
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<FocusCoord>(initialFocus);
   const [dragging, setDragging] = useState(false);
-  const [showRenderLayer, setShowRenderLayer] = useState(true);
-  const [showFunctionalLayer, setShowFunctionalLayer] = useState(true);
-  const [showDebugLayer, setShowDebugLayer] = useState(false);
+  const showRenderLayer = layerVisibility.render;
+  const showFunctionalLayer = layerVisibility.functional;
+  const showCrewLayer = layerVisibility.crew;
+  const showDebugLayer = layerVisibility.debug;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const crewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const debugCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);
   const configTileById = useMemo(() => new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile])), []);
   const featureTileIndex = useMemo(() => buildFeatureTileIndex(defaultMapConfig), []);
-  const crewWorldCoords = useMemo(() => new Map(crew.map((member) => [member.id, radarCoordFromTileId(member.currentTile)])), [crew]);
   const focusTileId = useMemo(() => tileIdFromRadarCoord(focusCoord), [focusCoord]);
   const focusConfigTile = configTileById.get(focusTileId);
   const visibleFocusFeatures = useMemo(
@@ -128,6 +152,7 @@ export function MapPage({
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
   const mapDebugData = useMemo(() => getMapDebugData(tiles, map), [map, tiles]);
+  const crewMarkers = useMemo(() => getMapCrewMarkers(crew), [crew]);
 
   const crewActionViews = useMemo(
     () =>
@@ -153,6 +178,12 @@ export function MapPage({
 
   function pushTrace(line: string) {
     setTraceLines((current) => [line, ...current].slice(0, 10));
+  }
+
+  function toggleLayer(layer: keyof MapLayerVisibility, traceName: string) {
+    const nextValue = !layerVisibility[layer];
+    onLayerVisibilityChange({ ...layerVisibility, [layer]: nextValue });
+    pushTrace(`[LAYER] ${traceName} ${nextValue ? "ON" : "OFF"}`);
   }
 
   function handleOpenCrewStatus(member: CrewMember) {
@@ -294,7 +325,7 @@ export function MapPage({
         for (let col = 0; col < cols; col += 1) {
           const worldX = Math.floor(viewport.left + (col / cols) * viewport.width);
           const worldY = Math.floor(viewport.top + (row / rows) * viewport.height);
-          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord, crewWorldCoords);
+          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord);
           chars[row][col] = char;
           tones[row][col] = tone;
         }
@@ -329,7 +360,7 @@ export function MapPage({
       window.cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
     };
-  }, [crewWorldCoords, focusCoord, showRenderLayer, viewport]);
+  }, [focusCoord, showRenderLayer, viewport]);
 
   useEffect(() => {
     if (!showFunctionalLayer) {
@@ -404,6 +435,90 @@ export function MapPage({
       window.removeEventListener("resize", resize);
     };
   }, [focusCoord, showFunctionalLayer, viewport]);
+
+  useEffect(() => {
+    if (!showCrewLayer) {
+      return undefined;
+    }
+
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
+      return undefined;
+    }
+
+    if (!(crewCanvasRef.current instanceof HTMLCanvasElement)) {
+      return undefined;
+    }
+    const canvasEl = crewCanvasRef.current;
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) {
+      return undefined;
+    }
+    const context: CanvasRenderingContext2D = ctx;
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+    function resize() {
+      const rect = canvasEl.getBoundingClientRect();
+      canvasEl.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvasEl.height = Math.max(1, Math.floor(rect.height * dpr));
+      drawCrewLayer();
+    }
+
+    function drawCrewLayer() {
+      const width = canvasEl.width / dpr;
+      const height = canvasEl.height / dpr;
+      const cellW = width / viewport.width;
+      const cellH = height / viewport.height;
+      const markerRadius = clamp(Math.min(cellW, cellH) * 1.8, 5, 14);
+      const fontSize = clamp(markerRadius * 1.25, 8, 14);
+
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.font = `${fontSize}px "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace`;
+      context.textAlign = "left";
+      context.textBaseline = "middle";
+
+      for (const marker of crewMarkers) {
+        if (!isCoordInsideViewport(marker, viewport)) {
+          continue;
+        }
+
+        const sx = (marker.x - viewport.left) * cellW + cellW / 2;
+        const sy = (marker.y - viewport.top) * cellH + cellH / 2;
+        const labelX = sx + markerRadius + 5;
+        const labelWidth = context.measureText(marker.label).width;
+
+        context.fillStyle = "rgba(64, 255, 202, 0.18)";
+        context.beginPath();
+        context.arc(sx, sy, markerRadius + 2, 0, Math.PI * 2);
+        context.fill();
+
+        context.strokeStyle = "rgba(64, 255, 202, 0.92)";
+        context.lineWidth = 1;
+        context.beginPath();
+        context.arc(sx, sy, markerRadius, 0, Math.PI * 2);
+        context.stroke();
+        context.beginPath();
+        context.moveTo(sx - markerRadius - 4, sy);
+        context.lineTo(sx + markerRadius + 4, sy);
+        context.moveTo(sx, sy - markerRadius - 4);
+        context.lineTo(sx, sy + markerRadius + 4);
+        context.stroke();
+
+        context.fillStyle = "rgba(11, 20, 18, 0.76)";
+        context.fillRect(labelX - 3, sy - fontSize * 0.74, labelWidth + 6, fontSize * 1.48);
+        context.fillStyle = "rgba(208, 255, 236, 0.96)";
+        context.fillText(marker.label, labelX, sy);
+      }
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    return () => {
+      window.removeEventListener("resize", resize);
+    };
+  }, [crewMarkers, showCrewLayer, viewport]);
 
   useEffect(() => {
     if (!showDebugLayer) {
@@ -585,30 +700,28 @@ export function MapPage({
                 <button
                   type="button"
                   className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => {
-                    setShowRenderLayer((value) => !value);
-                    pushTrace(`[LAYER] render ${showRenderLayer ? "OFF" : "ON"}`);
-                  }}
+                  onClick={() => toggleLayer("render", "render")}
                 >
                   显示渲染层
                 </button>
                 <button
                   type="button"
                   className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => {
-                    setShowFunctionalLayer((value) => !value);
-                    pushTrace(`[LAYER] function ${showFunctionalLayer ? "OFF" : "ON"}`);
-                  }}
+                  onClick={() => toggleLayer("functional", "function")}
                 >
                   显示功能层
                 </button>
                 <button
                   type="button"
+                  className={`console-layer-toggle ${showCrewLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => toggleLayer("crew", "crew")}
+                >
+                  显示队员层
+                </button>
+                <button
+                  type="button"
                   className={`console-layer-toggle ${showDebugLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => {
-                    setShowDebugLayer((value) => !value);
-                    pushTrace(`[LAYER] debug ${showDebugLayer ? "OFF" : "ON"}`);
-                  }}
+                  onClick={() => toggleLayer("debug", "debug")}
                 >
                   显示调试层
                 </button>
@@ -627,6 +740,7 @@ export function MapPage({
               <p className="console-map-trace-line">
                 [DEBUG] bg blue-&gt;yellow / orange=unrevealed / white=revealed
               </p>
+              <p className="console-map-trace-line">[CREW] cyan marker=当前队员位置 / label=姓名或同格人数</p>
               {returnTarget === "call" ? (
                 <div className="console-map-return-actions">
                   {moveSelectionMember ? (
@@ -670,7 +784,7 @@ export function MapPage({
         <div className="console-screen-header">
           <span>crt situation map</span>
           <strong>卫星雷达地图 / retro lofi field</strong>
-          <span>render + function + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
+          <span>render + function + crew + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
         </div>
 
         <div
@@ -696,6 +810,12 @@ export function MapPage({
             </div>
           ) : null}
 
+          {showCrewLayer ? (
+            <div className="console-retro-map-crew-layer" aria-hidden="true">
+              <canvas ref={crewCanvasRef} className="console-retro-map-crew-canvas" />
+            </div>
+          ) : null}
+
           {showDebugLayer ? (
             <div className="console-retro-map-debug-layer" aria-hidden="true">
               <canvas ref={debugCanvasRef} className="console-retro-map-debug-canvas" />
@@ -706,6 +826,7 @@ export function MapPage({
             <span>focus {focusDisplayCoord}</span>
             <span>render {showRenderLayer ? "ON" : "OFF"}</span>
             <span>function {showFunctionalLayer ? "ON" : "OFF"}</span>
+            <span>crew {showCrewLayer ? "ON" : "OFF"}</span>
             <span>debug {showDebugLayer ? "ON" : "OFF"}</span>
           </div>
         </div>
@@ -755,6 +876,30 @@ function getMapDebugData(tiles: MapTile[], map: Pick<GameMapState, "featuresById
     investigatables: getMapDebugInvestigatableCells(map),
     blocked: getMapDebugBlockedCells(tiles),
   };
+}
+
+function getMapCrewMarkers(crew: CrewMember[]): MapCrewMarker[] {
+  const membersByTileId = new Map<string, CrewMember[]>();
+  for (const member of crew) {
+    const members = membersByTileId.get(member.currentTile) ?? [];
+    members.push(member);
+    membersByTileId.set(member.currentTile, members);
+  }
+
+  return [...membersByTileId.entries()].flatMap(([tileId, members]) => {
+    const firstMember = members[0];
+    if (!firstMember || !parseTileId(tileId)) {
+      return [];
+    }
+
+    return [
+      {
+        tileId,
+        ...radarCoordFromTileId(tileId),
+        label: members.length === 1 ? firstMember.name : `${members.length}人 ${members.map((member) => member.name).join("/")}`,
+      },
+    ];
+  });
 }
 
 function getMapDebugBackgroundCells(): MapDebugBackgroundCell[] {
@@ -948,13 +1093,7 @@ function spawnRenderGlitch(glitches: RenderGlitch[], rows: number, cols: number,
   }
 }
 
-function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorldCoords: Map<CrewId, FocusCoord>) {
-  for (const coord of crewWorldCoords.values()) {
-    if (distance(x, y, coord.x, coord.y) <= 1.2) {
-      return { char: RADAR.symbols.crew.glyph, tone: RADAR.symbols.crew.tone as RenderTone };
-    }
-  }
-
+function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord) {
   if (x === focusCoord.x && y === focusCoord.y) {
     return { char: RADAR.symbols.focus.glyph, tone: RADAR.symbols.focus.tone as RenderTone };
   }
@@ -1020,10 +1159,6 @@ function isCoordInsideViewport(coord: FocusCoord, viewport: ReturnType<typeof ge
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function distance(x: number, y: number, tx: number, ty: number) {
-  return Math.hypot(x - tx, y - ty);
 }
 
 function isE2eAnimationDisabled() {

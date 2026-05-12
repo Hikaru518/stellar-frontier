@@ -169,6 +169,26 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "[DEBUG]" })).toBeInTheDocument();
   });
 
+  it("keeps map layer visibility after leaving and reopening the map", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+    expect(screen.getByText("crew OFF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示队员层" }));
+    fireEvent.click(screen.getByRole("button", { name: "显示渲染层" }));
+    expect(screen.getByText("crew ON")).toBeInTheDocument();
+    expect(screen.getByText("render OFF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /控制台/ }));
+    expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+    expect(screen.getByText("crew ON")).toBeInTheDocument();
+    expect(screen.getByText("render OFF")).toBeInTheDocument();
+    expect(screen.getByText("debug OFF")).toBeInTheDocument();
+  });
+
   it("creates a blank-world save on first load", () => {
     render(<App />);
 

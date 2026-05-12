@@ -2036,7 +2036,7 @@ blockquote {
   top: 10px;
   left: 12px;
   right: 12px;
-  z-index: 4;
+  z-index: 5;
   display: flex;
   gap: 16px;
   justify-content: space-between;
@@ -2047,6 +2047,7 @@ blockquote {
 
 .console-retro-map-render-layer,
 .console-retro-map-function-layer,
+.console-retro-map-crew-layer,
 .console-retro-map-debug-layer {
   position: absolute;
   inset: 0;
@@ -2071,7 +2072,12 @@ blockquote {
   z-index: 3;
 }
 
+.console-retro-map-crew-layer {
+  z-index: 4;
+}
+
 .console-retro-map-function-canvas,
+.console-retro-map-crew-canvas,
 .console-retro-map-debug-canvas {
   display: block;
   width: 100%;

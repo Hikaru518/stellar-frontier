@@ -24,7 +24,12 @@ test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) =
   const stage = page.locator(".console-ascii-map-stage");
   await expect(stage).toBeVisible();
   await expect(stage).toHaveAttribute("data-focus-tile-id", "129-129");
-  await expect(page.getByText("render + function + debug / 256 x 256")).toBeVisible();
+  await expect(page.getByText("render + function + crew + debug / 256 x 256")).toBeVisible();
+  await expect(page.getByText("crew OFF", { exact: true })).toBeVisible();
+  await expect(stage.locator(".console-retro-map-crew-canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "显示队员层" }).click();
+  await expect(page.getByText("crew ON", { exact: true })).toBeVisible();
+  await expect(stage.locator(".console-retro-map-crew-canvas")).toHaveCount(1);
   await expect(page.getByText("debug OFF", { exact: true })).toBeVisible();
   await expect(stage.locator(".console-retro-map-debug-canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "显示调试层" }).click();

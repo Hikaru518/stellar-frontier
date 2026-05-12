@@ -1,9 +1,9 @@
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialMapState, initialCrew, initialLogs, initialTiles } from "../data/gameData";
-import { MapPage } from "./MapPage";
+import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage } from "./MapPage";
 
 describe("MapPage", () => {
   it("renders a single interactive ascii map surface after the header", () => {
@@ -11,7 +11,7 @@ describe("MapPage", () => {
 
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
     expect(screen.getByLabelText("ASCII 地图")).toBeInTheDocument();
-    expect(screen.getByText("render + function + debug / 256 x 256")).toBeInTheDocument();
+    expect(screen.getByText("render + function + crew + debug / 256 x 256")).toBeInTheDocument();
   });
 
   it("does not render the old quest sidebar UI", () => {
@@ -87,6 +87,17 @@ describe("MapPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "显示调试层" }));
 
     expect(screen.getByText("debug ON")).toBeInTheDocument();
+  });
+
+  it("keeps the map crew layer off by default and toggles it on demand", () => {
+    renderMapPage();
+
+    expect(screen.getByText("crew OFF")).toBeInTheDocument();
+    expect(screen.getByText(/\[CREW\] cyan marker=当前队员位置/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示队员层" }));
+
+    expect(screen.getByText("crew ON")).toBeInTheDocument();
   });
 
   it("shows selected tile details in the right panel", () => {
@@ -195,7 +206,7 @@ function focusMapTile(tileId: string) {
 
 function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) {
   return render(
-    <MapPage
+    <StatefulMapPage
       tiles={initialTiles}
       crew={initialCrew}
       crewActions={{}}
@@ -204,6 +215,8 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
       returnTarget="control"
       map={createInitialMapState()}
+      layerVisibility={DEFAULT_MAP_LAYER_VISIBILITY}
+      onLayerVisibilityChange={vi.fn()}
       onOpenControl={vi.fn()}
       onOpenTask={vi.fn()}
       onReturnFromMap={vi.fn()}
@@ -215,6 +228,11 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       {...overrides}
     />
   );
+}
+
+function StatefulMapPage(props: ComponentProps<typeof MapPage>) {
+  const [layerVisibility, setLayerVisibility] = useState(props.layerVisibility);
+  return <MapPage {...props} layerVisibility={layerVisibility} onLayerVisibilityChange={setLayerVisibility} />;
 }
 
 function createMapWithRevealedOriginObjects(revealedObjectIds: string[]) {
