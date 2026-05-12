@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/map-ascii-asset.schema.json",
+  "id": "iafs_crash_hull",
+  "type": "building",
+  "width": 12,
+  "height": 5,
+  "palette": "default-map-radar",
+  "fps": 1,
+  "frames": [
+    [
+      "   __/\\__   ",
+      " _/======\\_ ",
+      "/_==_==_==_\\",
+      "  /_||_\\    ",
+      "  '----'    "
+    ]
+  ],
+  "defaultTone": "s"
+}

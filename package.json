@@ -22,6 +22,8 @@
     "test": "node common/scripts/install-run-rush.js test",
     "test:e2e": "node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client",
     "validate:content": "node common/scripts/install-run-rush.js validate-content",
+    "ascii:sync-map": "node scripts/sync-ascii-map.mjs",
+    "ascii:sync-map:dry-run": "node scripts/sync-ascii-map.mjs --dry-run",
     "rush:list": "node common/scripts/install-run-rush.js list"
   }
 }

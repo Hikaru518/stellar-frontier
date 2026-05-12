@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/map-ascii-asset.schema.json",
+  "id": "scavenger_tower",
+  "type": "building",
+  "width": 8,
+  "height": 5,
+  "palette": "default-map-radar",
+  "fps": 1,
+  "frames": [
+    [
+      "   /\\   ",
+      "  /##\\  ",
+      " /####\\ ",
+      "   ||   ",
+      "  /||\\  "
+    ]
+  ],
+  "defaultTone": "a"
+}

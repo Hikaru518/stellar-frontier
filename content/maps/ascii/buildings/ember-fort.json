@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/map-ascii-asset.schema.json",
+  "id": "ember_fort",
+  "type": "building",
+  "width": 10,
+  "height": 5,
+  "palette": "default-map-radar",
+  "fps": 1,
+  "frames": [
+    [
+      "  /^^^^\\  ",
+      " /######\\ ",
+      "|##[]##|  ",
+      "|######|  ",
+      " \\_[]_/   "
+    ]
+  ],
+  "defaultTone": "a"
+}

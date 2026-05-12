@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../schemas/map-ascii-asset.schema.json",
+  "id": "symbol_focus",
+  "type": "symbol",
+  "width": 1,
+  "height": 1,
+  "palette": "default-map-radar",
+  "fps": 1,
+  "frames": [
+    [
+      "X"
+    ]
+  ],
+  "defaultTone": "s"
+}

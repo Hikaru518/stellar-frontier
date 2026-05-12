@@ -21,6 +21,8 @@ const mapSchemaPath = "content/schemas/maps.schema.json";
 const mapDataPaths = listJsonFiles("content/maps");
 const mapRadarSchemaPath = "content/schemas/map-radar.schema.json";
 const mapRadarDataPaths = listJsonFiles("content/maps/radar");
+const mapAsciiAssetSchemaPath = "content/schemas/map-ascii-asset.schema.json";
+const mapAsciiAssetDataPaths = listJsonFilesRecursive("content/maps/ascii");
 
 const contentAssetGroups = [
   {
@@ -72,6 +74,7 @@ const schemaPaths = new Set([
   questSchemaPath,
   mapSchemaPath,
   mapRadarSchemaPath,
+  mapAsciiAssetSchemaPath,
   ...contentAssetGroups.map(({ schemaPath }) => schemaPath),
   ...eventSchemaPaths,
 ]);
@@ -84,6 +87,7 @@ const loaded = Object.fromEntries(contentFilePairs.map(([dataPath]) => [dataPath
 const loadedQuests = Object.fromEntries(questDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
 const loadedMaps = Object.fromEntries(mapDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
 const loadedMapRadars = Object.fromEntries(mapRadarDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
+const loadedMapAsciiAssets = Object.fromEntries(mapAsciiAssetDataPaths.map((dataPath) => [dataPath, readJson(dataPath)]));
 
 let failed = false;
 let eventSchemaFailed = false;
@@ -108,6 +112,10 @@ for (const [dataPath, mapData] of Object.entries(loadedMaps)) {
 
 for (const [dataPath, radarData] of Object.entries(loadedMapRadars)) {
   failed = validateJsonFile(dataPath, mapRadarSchemaPath, radarData) || failed;
+}
+
+for (const [dataPath, assetData] of Object.entries(loadedMapAsciiAssets)) {
+  failed = validateJsonFile(dataPath, mapAsciiAssetSchemaPath, assetData) || failed;
 }
 
 for (const { directoryPath, schemaPath } of eventAssetGroups) {
@@ -136,7 +144,7 @@ if (!eventSchemaFailed) {
   failed = validateEventProgramReferences() || failed;
 }
 
-failed = validateReferences(loaded, loadedMaps, loadedMapRadars) || failed;
+failed = validateReferences(loaded, loadedMaps, loadedMapRadars, loadedMapAsciiAssets) || failed;
 failed = validateQuestContentReferences(loadedQuests, loaded, loadedMaps) || failed;
 failed = validateQuestProgressEffectReferences(loadedQuests) || failed;
 
@@ -161,6 +169,24 @@ function listJsonFiles(relativeDirectory) {
     .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
     .map((entry) => path.posix.join(relativeDirectory, entry.name))
     .sort();
+}
+
+function listJsonFilesRecursive(relativeDirectory) {
+  const directory = path.join(root, relativeDirectory);
+  if (!fs.existsSync(directory)) {
+    return [];
+  }
+
+  const results = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.posix.join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...listJsonFilesRecursive(entryPath));
+    } else if (entry.isFile() && entry.name.endsWith(".json")) {
+      results.push(entryPath);
+    }
+  }
+  return results.sort();
 }
 
 function validateJsonFile(dataPath, schemaPath, data = readJson(dataPath)) {
@@ -388,7 +414,7 @@ function escapeJsonPointer(value) {
   return String(value).replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
-function validateReferences(data, maps, mapRadars) {
+function validateReferences(data, maps, mapRadars, mapAsciiAssets) {
   let hasError = false;
   const crew = data["content/crew/crew.json"].crew;
   const items = data["content/items/items.json"].items;
@@ -427,6 +453,7 @@ function validateReferences(data, maps, mapRadars) {
         requireDefaultSize: dataPath === "content/maps/default-map.json",
         dataPath,
         mapRadars,
+        mapAsciiAssets,
       }) || hasError;
   }
 
@@ -635,6 +662,7 @@ function validateMap(map, options) {
       mapId: map.id,
       rows,
       cols,
+      mapAsciiAssets: options.mapAsciiAssets,
     }) || hasError;
   }
 
@@ -812,7 +840,7 @@ function reportMapFeatureIssue({ dataPath, mapId, featureId }, field, message) {
   return report(`${message} in map ${mapId} feature ${featureId} field ${field} at ${dataPath}`);
 }
 
-function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols }) {
+function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols, mapAsciiAssets }) {
   let hasError = false;
   if (!radar) {
     return report(`Map radar definition is required: ${dataPath}`);
@@ -832,11 +860,19 @@ function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols }) {
     hasError = report(`Map radar origin is out of bounds in ${radarPath}`) || hasError;
   }
 
-  hasError = validateRadarRows(radar.glyphRows, "glyphRows", radarPath, rows, cols) || hasError;
-  hasError = validateRadarRows(radar.toneRows, "toneRows", radarPath, rows, cols) || hasError;
+  const asciiAssetsById = buildMapAsciiAssetIndex(mapAsciiAssets);
+  const baseAsset = radar.baseLayer?.assetId ? asciiAssetsById.get(radar.baseLayer.assetId) : null;
+  if (radar.baseLayer?.assetId && !baseAsset) {
+    hasError = report(`Unknown radar baseLayer assetId in ${radarPath}: ${radar.baseLayer.assetId}`) || hasError;
+  }
+
+  const glyphRows = radar.glyphRows ?? baseAsset?.frames?.[0];
+  const toneRows = radar.toneRows ?? baseAsset?.toneFrames?.[0] ?? (glyphRows ? glyphRows.map((row) => "g".repeat(row.length)) : undefined);
+  hasError = validateRadarRows(glyphRows, "glyphRows/baseLayer", radarPath, rows, cols) || hasError;
+  hasError = validateRadarRows(toneRows, "toneRows/baseLayer", radarPath, rows, cols) || hasError;
 
   const toneKeys = new Set(Object.keys(radar.palette ?? {}));
-  for (const [rowIndex, row] of (Array.isArray(radar.toneRows) ? radar.toneRows : []).entries()) {
+  for (const [rowIndex, row] of (Array.isArray(toneRows) ? toneRows : []).entries()) {
     for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
       const tone = row[colIndex];
       if (!toneKeys.has(tone)) {
@@ -846,7 +882,15 @@ function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols }) {
   }
 
   for (const [symbolId, symbol] of Object.entries(radar.symbols ?? {})) {
-    if (!toneKeys.has(symbol?.tone)) {
+    if (symbol?.assetId) {
+      const asset = asciiAssetsById.get(symbol.assetId);
+      if (!asset) {
+        hasError = report(`Unknown radar symbol assetId in ${radarPath}/symbols/${symbolId}: ${symbol.assetId}`) || hasError;
+      } else {
+        hasError = validateRadarAssetFrame(asset, { dataPath: radarPath, context: `symbols/${symbolId}` }) || hasError;
+        hasError = validateRadarAssetTone(asset, toneKeys, `${radarPath}/symbols/${symbolId}`) || hasError;
+      }
+    } else if (!toneKeys.has(symbol?.tone)) {
       hasError = report(`Unknown radar symbol tone in ${radarPath}/symbols/${symbolId}: ${symbol?.tone}`) || hasError;
     }
   }
@@ -862,6 +906,90 @@ function validateRadar(radar, { dataPath, radarPath, mapId, rows, cols }) {
     hasError = validateRadarRegionBounds(radar, region, radarPath) || hasError;
   }
 
+  hasError = validateRadarRenderLayers(radar, { radarPath, toneKeys, asciiAssetsById }) || hasError;
+
+  return hasError;
+}
+
+function buildMapAsciiAssetIndex(mapAsciiAssets) {
+  return new Map(Object.values(mapAsciiAssets).map((asset) => [asset.id, asset]));
+}
+
+function validateRadarRenderLayers(radar, { radarPath, toneKeys, asciiAssetsById }) {
+  let hasError = false;
+  const layerIds = new Set();
+
+  for (const layer of radar.renderLayers ?? []) {
+    if (!addUnique(layerIds, layer.id)) {
+      hasError = report(`Duplicate radar render layer id in ${radarPath}: ${layer.id}`) || hasError;
+    }
+
+    const itemIds = new Set();
+    for (const item of layer.items ?? []) {
+      if (!addUnique(itemIds, item.id)) {
+        hasError = report(`Duplicate radar render item id in ${radarPath}/renderLayers/${layer.id}: ${item.id}`) || hasError;
+      }
+
+      const asset = item.assetId ? asciiAssetsById.get(item.assetId) : null;
+      if (item.assetId && !asset) {
+        hasError = report(`Unknown radar render item assetId in ${radarPath}/renderLayers/${layer.id}/${item.id}: ${item.assetId}`) || hasError;
+      }
+      if (asset) {
+        hasError = validateRadarAssetFrame(asset, { dataPath: radarPath, context: `renderLayers/${layer.id}/${item.id}` }) || hasError;
+        hasError = validateRadarAssetTone(asset, toneKeys, `${radarPath}/renderLayers/${layer.id}/${item.id}`) || hasError;
+      }
+      if (item.tone && !toneKeys.has(item.tone)) {
+        hasError = report(`Unknown radar render item tone in ${radarPath}/renderLayers/${layer.id}/${item.id}: ${item.tone}`) || hasError;
+      }
+    }
+  }
+
+  return hasError;
+}
+
+function validateRadarAssetFrame(asset, { dataPath, context }) {
+  let hasError = false;
+  const frame = asset.frames?.[0];
+  if (!Array.isArray(frame) || frame.length !== asset.height) {
+    return report(`ASCII asset frame height mismatch at ${dataPath}/${context}: ${asset.id}`);
+  }
+
+  for (const [index, row] of frame.entries()) {
+    if (typeof row !== "string" || row.length !== asset.width) {
+      hasError = report(`ASCII asset frame row width mismatch at ${dataPath}/${context}/${asset.id}/frames/0/${index}`) || hasError;
+    }
+  }
+
+  for (const [frameIndex, toneFrame] of (asset.toneFrames ?? []).entries()) {
+    if (!Array.isArray(toneFrame) || toneFrame.length !== asset.height) {
+      hasError = report(`ASCII asset tone frame height mismatch at ${dataPath}/${context}/${asset.id}/toneFrames/${frameIndex}`) || hasError;
+      continue;
+    }
+    for (const [rowIndex, row] of toneFrame.entries()) {
+      if (typeof row !== "string" || row.length !== asset.width) {
+        hasError = report(`ASCII asset tone frame row width mismatch at ${dataPath}/${context}/${asset.id}/toneFrames/${frameIndex}/${rowIndex}`) || hasError;
+      }
+    }
+  }
+
+  return hasError;
+}
+
+function validateRadarAssetTone(asset, toneKeys, contextPath) {
+  let hasError = false;
+  if (asset.defaultTone && !toneKeys.has(asset.defaultTone)) {
+    hasError = report(`Unknown ASCII asset defaultTone at ${contextPath}: ${asset.defaultTone}`) || hasError;
+  }
+  for (const [frameIndex, toneFrame] of (asset.toneFrames ?? []).entries()) {
+    for (const [rowIndex, row] of toneFrame.entries()) {
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const tone = row[colIndex];
+        if (!toneKeys.has(tone)) {
+          hasError = report(`Unknown ASCII asset tone at ${contextPath}/toneFrames/${frameIndex}/${rowIndex}/${colIndex}: ${tone}`) || hasError;
+        }
+      }
+    }
+  }
   return hasError;
 }
 

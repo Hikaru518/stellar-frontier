@@ -93,8 +93,9 @@ export interface RadarWorldDefinition {
 }
 
 export interface RadarSymbolDefinition {
-  glyph: string;
-  tone: string;
+  glyph?: string;
+  tone?: string;
+  assetId?: string;
 }
 
 export type RadarRegionShapeDefinition =
@@ -118,10 +119,30 @@ export interface RadarTraceDefinition {
   emptyLine: string;
 }
 
+export interface RadarRenderItemDefinition {
+  id: string;
+  x: number;
+  y: number;
+  assetId?: string;
+  tone?: string;
+  glyphRows?: string[];
+  toneRows?: string[];
+}
+
+export interface RadarRenderLayerDefinition {
+  id: string;
+  name: string;
+  visible: boolean;
+  items: RadarRenderItemDefinition[];
+}
+
 export interface RadarDefinition {
   world: RadarWorldDefinition;
   glyphRows: string[];
   toneRows: string[];
+  baseLayer?: {
+    assetId: string;
+  };
   palette: Record<string, string>;
   symbols: {
     crew: RadarSymbolDefinition;
@@ -129,6 +150,7 @@ export interface RadarDefinition {
   };
   trace: RadarTraceDefinition;
   regions: RadarRegionDefinition[];
+  renderLayers?: RadarRenderLayerDefinition[];
 }
 
 export interface MapEditorDraft {

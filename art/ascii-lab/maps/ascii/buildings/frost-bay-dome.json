@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/map-ascii-asset.schema.json",
+  "id": "frost_bay_dome",
+  "type": "building",
+  "width": 10,
+  "height": 5,
+  "palette": "default-map-radar",
+  "fps": 1,
+  "frames": [
+    [
+      " ~~~[]~~~ ",
+      " ~~[==]~~ ",
+      "~ /____\\ ~",
+      "  |____|  ",
+      " ~~    ~~ "
+    ]
+  ],
+  "defaultTone": "c"
+}

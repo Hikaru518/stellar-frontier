@@ -60,6 +60,11 @@ const radarModules = import.meta.glob("../../../../content/maps/radar/*.json", {
   import: "default",
 }) as Record<string, RadarContentDefinition>;
 
+const radarAsciiAssetModules = import.meta.glob("../../../../content/maps/ascii/**/*.json", {
+  eager: true,
+  import: "default",
+}) as Record<string, RadarAsciiAssetDefinition>;
+
 const eventManifestContent = eventManifest as EventManifestContent;
 const eventManifestDomains = eventManifestContent.domains;
 
@@ -271,6 +276,7 @@ export interface RadarWorldDefinition {
 export interface RadarSymbolDefinition {
   glyph: string;
   tone: RadarToneKey;
+  assetId?: string;
 }
 
 export type RadarRegionShapeDefinition =
@@ -294,10 +300,28 @@ export interface RadarTraceDefinition {
   emptyLine: string;
 }
 
+export interface RadarRenderItemDefinition {
+  id: string;
+  x: number;
+  y: number;
+  assetId?: string;
+  tone?: RadarToneKey;
+  glyphRows: string[];
+  toneRows?: string[];
+}
+
+export interface RadarRenderLayerDefinition {
+  id: string;
+  name: string;
+  visible: boolean;
+  items: RadarRenderItemDefinition[];
+}
+
 export interface RadarDefinition {
   world: RadarWorldDefinition;
   glyphRows: string[];
   toneRows: string[];
+  baseLayer?: RadarAssetReferenceDefinition;
   palette: Record<RadarToneKey, string>;
   symbols: {
     crew: RadarSymbolDefinition;
@@ -305,11 +329,30 @@ export interface RadarDefinition {
   };
   trace: RadarTraceDefinition;
   regions: RadarRegionDefinition[];
+  renderLayers?: RadarRenderLayerDefinition[];
 }
 
 export interface RadarContentDefinition extends RadarDefinition {
   $schema?: string;
   mapId: string;
+}
+
+export interface RadarAssetReferenceDefinition {
+  assetId: string;
+}
+
+export interface RadarAsciiAssetDefinition {
+  $schema?: string;
+  id: string;
+  type: "map" | "building" | "symbol";
+  width: number;
+  height: number;
+  palette: string;
+  fps: number;
+  frames: string[][];
+  toneFrames?: string[][];
+  defaultTone?: RadarToneKey;
+  notes?: string;
 }
 
 export interface MapTileDefinition {
@@ -432,6 +475,7 @@ export const eventContentLibrary: EventContentLibrary = {
 
 export const crewDefinitions = crewContent.crew as unknown as CrewDefinition[];
 export const itemDefinitions = itemsContent.items as unknown as ItemDefinition[];
+const radarAsciiAssetById = new Map(Object.values(radarAsciiAssetModules).map((asset) => [asset.id, asset]));
 
 export const defaultMapConfig: MapConfigDefinition = normalizeMapConfig(defaultMapJson as unknown as MapConfigJsonDefinition);
 
@@ -478,10 +522,74 @@ function readRadarContent(mapConfig: MapConfigJsonDefinition): RadarContentDefin
 }
 
 function stripRadarContentMetadata(radarContent: RadarContentDefinition): RadarDefinition {
-  const radar = { ...radarContent } as Partial<RadarContentDefinition>;
+  const radar = resolveRadarAsciiAssets(radarContent);
   delete radar.$schema;
   delete radar.mapId;
   return radar as RadarDefinition;
+}
+
+function resolveRadarAsciiAssets(radarContent: RadarContentDefinition): Partial<RadarContentDefinition> {
+  const baseAsset = radarContent.baseLayer?.assetId ? readRadarAsciiAsset(radarContent.baseLayer.assetId) : null;
+  const glyphRows = radarContent.glyphRows ?? baseAsset?.frames[0] ?? [];
+  const toneRows = radarContent.toneRows ?? baseAsset?.toneFrames?.[0] ?? fillToneRows(glyphRows, baseAsset?.defaultTone ?? "g");
+
+  return {
+    ...radarContent,
+    glyphRows,
+    toneRows,
+    symbols: {
+      crew: resolveRadarSymbol(radarContent.symbols.crew),
+      focus: resolveRadarSymbol(radarContent.symbols.focus),
+    },
+    renderLayers: radarContent.renderLayers?.map((layer) => ({
+      ...layer,
+      items: layer.items.map(resolveRadarRenderItem),
+    })),
+  };
+}
+
+function resolveRadarSymbol(symbol: RadarSymbolDefinition | RadarAssetReferenceDefinition): RadarSymbolDefinition {
+  if ("glyph" in symbol && "tone" in symbol) {
+    return symbol;
+  }
+
+  const asset = readRadarAsciiAsset(symbol.assetId);
+  const glyph = asset.frames[0]?.[0]?.[0];
+  if (!glyph) {
+    throw new Error(`Radar symbol asset ${symbol.assetId} must contain at least one glyph.`);
+  }
+
+  return {
+    assetId: symbol.assetId,
+    glyph,
+    tone: asset.defaultTone ?? asset.toneFrames?.[0]?.[0]?.[0] ?? "g",
+  };
+}
+
+function resolveRadarRenderItem(item: RadarRenderItemDefinition): RadarRenderItemDefinition {
+  if (!item.assetId) {
+    return item;
+  }
+
+  const asset = readRadarAsciiAsset(item.assetId);
+  return {
+    ...item,
+    glyphRows: item.glyphRows ?? asset.frames[0] ?? [],
+    toneRows: item.toneRows ?? asset.toneFrames?.[0],
+    tone: item.tone ?? asset.defaultTone,
+  };
+}
+
+function readRadarAsciiAsset(assetId: string): RadarAsciiAssetDefinition {
+  const asset = radarAsciiAssetById.get(assetId);
+  if (!asset) {
+    throw new Error(`Missing map ASCII asset: ${assetId}`);
+  }
+  return asset;
+}
+
+function fillToneRows(glyphRows: string[], tone: RadarToneKey): string[] {
+  return glyphRows.map((row) => tone.repeat(row.length));
 }
 
 function contentModulePath(contentPath: string): string {

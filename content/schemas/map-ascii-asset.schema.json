@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stellar-frontier.local/schemas/map-ascii-asset.schema.json",
+  "title": "Stellar Frontier Map ASCII Asset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "width", "height", "palette", "fps", "frames"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["map", "building", "symbol"]
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "palette": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "defaultTone": {
+      "type": "string",
+      "pattern": "^[a-z]$"
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/asciiFrame"
+      }
+    },
+    "toneFrames": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/asciiFrame"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "asciiFrame": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

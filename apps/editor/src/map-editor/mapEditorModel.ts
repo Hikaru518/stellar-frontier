@@ -232,6 +232,7 @@ function createDefaultRadar(rows: number, cols: number, originTileId: string, ra
       emptyLine: "[MAP] WAITING FOR FIELD INPUT",
     },
     regions: [],
+    renderLayers: [],
   };
 }
 
@@ -263,6 +264,7 @@ function normalizeRadar(radar: MapEditorDraft["radar"] | undefined, rows: number
       ...radar.trace,
     },
     regions: Array.isArray(radar.regions) ? radar.regions : [],
+    renderLayers: Array.isArray(radar.renderLayers) ? radar.renderLayers : fallback.renderLayers,
   };
 }
 

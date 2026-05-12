@@ -282,7 +282,7 @@ export function MapPage({
         for (let col = 0; col < cols; col += 1) {
           const worldX = Math.floor(viewport.left + (col / cols) * viewport.width);
           const worldY = Math.floor(viewport.top + (row / rows) * viewport.height);
-          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord, crewWorldCoords);
+          const { char, tone } = sampleCompositedRadarCell(worldX, worldY, focusCoord, crewWorldCoords);
           chars[row][col] = char;
           tones[row][col] = tone;
         }
@@ -857,7 +857,10 @@ function spawnRenderGlitch(glitches: RenderGlitch[], rows: number, cols: number,
   }
 }
 
-function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorldCoords: Map<CrewId, FocusCoord>) {
+function sampleCompositedRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorldCoords: Map<CrewId, FocusCoord>) {
+  const baseCell = sampleRadarBaseCell(x, y);
+  const artCell = sampleRadarRenderLayers(x, y, baseCell);
+
   for (const coord of crewWorldCoords.values()) {
     if (distance(x, y, coord.x, coord.y) <= 1.2) {
       return { char: RADAR.symbols.crew.glyph, tone: RADAR.symbols.crew.tone as RenderTone };
@@ -868,6 +871,10 @@ function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorld
     return { char: RADAR.symbols.focus.glyph, tone: RADAR.symbols.focus.tone as RenderTone };
   }
 
+  return artCell;
+}
+
+function sampleRadarBaseCell(x: number, y: number) {
   if (x < 0 || y < 0 || x >= RADAR_WORLD.width || y >= RADAR_WORLD.height) {
     return { char: " ", tone: "g" as RenderTone };
   }
@@ -878,6 +885,36 @@ function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorld
     char: row[x] ?? " ",
     tone: (toneRow[x] ?? "g") as RenderTone,
   };
+}
+
+function sampleRadarRenderLayers(x: number, y: number, baseCell: { char: string; tone: RenderTone }) {
+  let char = baseCell.char;
+  let tone = baseCell.tone;
+
+  for (const layer of RADAR.renderLayers ?? []) {
+    if (!layer.visible) {
+      continue;
+    }
+
+    for (const item of layer.items) {
+      const localX = x - item.x;
+      const localY = y - item.y;
+      if (localX < 0 || localY < 0) {
+        continue;
+      }
+
+      const row = item.glyphRows[localY];
+      const nextChar = row?.[localX];
+      if (!nextChar || nextChar === " ") {
+        continue;
+      }
+
+      char = nextChar;
+      tone = (item.toneRows?.[localY]?.[localX] ?? item.tone ?? tone) as RenderTone;
+    }
+  }
+
+  return { char, tone };
 }
 
 function getViewport(center: FocusCoord, zoom: number) {

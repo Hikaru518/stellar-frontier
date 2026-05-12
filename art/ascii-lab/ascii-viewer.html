@@ -27,6 +27,7 @@
     html,
     body {
       margin: 0;
+      height: 100%;
       min-height: 100%;
       background:
         radial-gradient(circle at 50% 14%, rgba(240, 166, 77, 0.12), transparent 34%),
@@ -36,26 +37,194 @@
     }
 
     body {
-      padding: 16px;
+      height: 100vh;
+      overflow: hidden;
     }
 
     .app {
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+      margin: 0;
+      border: 2px solid #a66b33;
+      background:
+        linear-gradient(rgba(255, 191, 101, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 191, 101, 0.04) 1px, transparent 1px),
+        radial-gradient(circle at 50% 16%, rgba(240, 166, 77, 0.12), transparent 34%),
+        linear-gradient(135deg, #201610 0%, #17130f 48%, #0e1110 100%);
+      background-size: 28px 28px, 28px 28px, auto, auto;
+      box-shadow: 0 18px 50px rgba(21, 13, 9, 0.35);
+      padding: 14px;
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
-      gap: 14px;
-      min-height: calc(100svh - 32px);
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      overflow: hidden;
     }
 
-    .panel {
-      border: 2px solid var(--line);
+    .app::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 30;
       background:
-        radial-gradient(circle, rgba(240, 166, 77, 0.06) 1px, transparent 1px),
-        var(--panel);
-      background-size: 8px 8px;
-      box-shadow:
-        0 0 0 1px rgba(0, 0, 0, 0.42) inset,
-        0 14px 30px rgba(0, 0, 0, 0.26);
-      padding: 14px;
+        repeating-linear-gradient(0deg, rgba(231, 208, 164, 0.05) 0 1px, transparent 1px 4px),
+        radial-gradient(circle at center, transparent 66%, rgba(0, 0, 0, 0.28));
+      mix-blend-mode: screen;
+    }
+
+    .game-console-topbar,
+    .game-console-bottom {
+      border: 1px solid #a66b33;
+      background: rgba(62, 45, 30, 0.88);
+    }
+
+    .game-console-topbar {
+      display: grid;
+      grid-template-columns: minmax(240px, 0.62fr) minmax(0, 1.38fr);
+      gap: 14px;
+      align-items: start;
+      min-height: 78px;
+      padding: 12px 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 204, 126, 0.06), transparent 60%),
+        #30261c;
+    }
+
+    .game-console-main {
+      display: grid;
+      grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(300px, 340px);
+      gap: 14px;
+      min-height: 0;
+      height: 100%;
+      align-items: stretch;
+    }
+
+    .game-console-left,
+    .game-console-right {
+      display: grid;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .game-console-left {
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .game-console-right {
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .game-console-center,
+    .console-column-panel,
+    .console-side-panel {
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid #a66b33;
+      background: rgba(49, 38, 27, 0.9);
+    }
+
+    .console-column-panel,
+    .console-side-panel {
+      padding: 10px 12px 12px;
+      overflow: hidden;
+    }
+
+    .console-column-panel-scroll,
+    .console-side-panel-scroll {
+      overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(240, 166, 77, 0.72) rgba(24, 19, 15, 0.96);
+    }
+
+    .console-column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(166, 107, 51, 0.55);
+      padding-bottom: 8px;
+      color: #a98a63;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .game-console-titleblock h1 {
+      margin: 5px 0 6px;
+      color: #f2ac49;
+      font-size: 32px;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(240, 166, 77, 0.28);
+    }
+
+    .game-console-kicker,
+    .console-status-summary {
+      margin: 0;
+      color: #a98a63;
+      font-size: 12px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .game-console-status-cluster {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 160px;
+      align-items: start;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .game-console-status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(88px, 1fr));
+      gap: 8px;
+    }
+
+    .console-status-card {
+      display: grid;
+      gap: 4px;
+      min-width: 96px;
+      border: 1px solid #7b5127;
+      background: #15120e;
+      padding: 8px 10px;
+    }
+
+    .console-status-card span {
+      color: #a98a63;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .console-status-card strong {
+      color: #f2ead8;
+      font-size: 14px;
+    }
+
+    .console-scope-box {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .console-scope-fake {
+      height: 44px;
+      border: 1px solid rgba(155, 106, 59, 0.34);
+      background:
+        linear-gradient(90deg, transparent 0 9%, rgba(124, 255, 156, 0.24) 10% 11%, transparent 12% 100%),
+        radial-gradient(circle, rgba(21, 23, 19, 0.18) 1px, transparent 1px),
+        #15120e;
+      background-size: auto, 5px 5px, auto;
+    }
+
+    .console-scope-readout {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      color: #74a6a6;
+      font-size: 10px;
+      text-transform: uppercase;
     }
 
     h1,
@@ -100,6 +269,113 @@
     .button-list {
       display: grid;
       gap: 8px;
+    }
+
+    .console-display-case {
+      height: 100%;
+      min-height: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 204, 126, 0.06), transparent 42%),
+        #241d16;
+      padding: 15px;
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.42) inset,
+        0 16px 34px rgba(0, 0, 0, 0.28);
+    }
+
+    .console-display-bezel {
+      height: 100%;
+      min-height: 0;
+      border: 18px solid #4a4439;
+      border-radius: 14px 14px 10px 10px;
+      background: #071109;
+      box-shadow:
+        0 0 0 2px #2c2924 inset,
+        0 0 36px rgba(0, 0, 0, 0.52) inset,
+        0 18px 38px rgba(0, 0, 0, 0.32);
+      overflow: hidden;
+    }
+
+    .console-display-screen {
+      position: relative;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 46% 38%, rgba(114, 215, 255, 0.07), transparent 34%),
+        radial-gradient(circle at 58% 64%, rgba(255, 184, 90, 0.06), transparent 28%),
+        linear-gradient(180deg, #102515, #071109);
+      box-shadow: inset 0 0 42px rgba(0, 0, 0, 0.55);
+      padding: 18px 22px;
+      --glitch-shift: 0px;
+      --glitch-band: 46%;
+      --glitch-opacity: 0;
+    }
+
+    .console-display-screen::before,
+    .console-display-screen::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .console-display-screen::before {
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.16)),
+        repeating-linear-gradient(0deg, rgba(246, 240, 195, 0.055) 0 1px, transparent 1px 4px);
+      mix-blend-mode: screen;
+    }
+
+    .console-display-screen::after {
+      background:
+        linear-gradient(
+          180deg,
+          transparent calc(var(--glitch-band) - 6%),
+          rgba(246, 240, 195, calc(var(--glitch-opacity) * 0.18)) calc(var(--glitch-band) - 2%),
+          rgba(255, 121, 176, calc(var(--glitch-opacity) * 0.12)) var(--glitch-band),
+          rgba(0, 0, 0, calc(var(--glitch-opacity) * 0.34)) calc(var(--glitch-band) + 5%),
+          transparent calc(var(--glitch-band) + 10%)
+        ),
+        radial-gradient(circle at center, transparent 66%, rgba(0, 0, 0, 0.34));
+    }
+
+    .console-display-screen[data-glitch="on"] {
+      filter: contrast(1.06) saturate(1.08);
+    }
+
+    .console-display-screen[data-glitch="on"] .ascii-line:nth-child(odd) {
+      transform: translateX(var(--glitch-shift));
+    }
+
+    .console-display-screen[data-glitch="on"] .ascii-line:nth-child(3n) {
+      transform: translateX(calc(var(--glitch-shift) * -0.6));
+    }
+
+    .console-screen-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100%;
+      gap: 18px;
+      color: #7dffb1;
+      text-shadow: 0 0 8px rgba(125, 255, 177, 0.3);
+    }
+
+    .console-screen-header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      color: #b7945e;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .console-screen-header strong {
+      color: #7dffb1;
+      font-size: 14px;
     }
 
     button,
@@ -158,6 +434,93 @@
       margin-top: 4px;
     }
 
+    .placement-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .placement-list {
+      display: grid;
+      gap: 6px;
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid rgba(155, 106, 59, 0.34);
+      background: #15110d;
+      padding: 8px;
+    }
+
+    .placement-button {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid rgba(155, 106, 59, 0.4);
+      background: #19130f;
+      color: var(--ink);
+      padding: 7px 8px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .placement-button:hover,
+    .placement-button-active {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: #241a13;
+    }
+
+    .placement-button span,
+    .placement-button small {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .placement-button small {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .placement-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .placement-field {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .placement-field input,
+    .placement-field select {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid rgba(155, 106, 59, 0.5);
+      background: #15110d;
+      color: var(--ink);
+      padding: 6px 8px;
+    }
+
+    .nudge-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .nudge-grid .mini-button:nth-child(1) {
+      grid-column: 2;
+    }
+
+    .nudge-grid .mini-button:nth-child(2) {
+      grid-column: 1;
+    }
+
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -171,6 +534,29 @@
       justify-content: center;
     }
 
+    .toggle-label {
+      display: inline-grid;
+      grid-auto-flow: column;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      border: 1px solid rgba(155, 106, 59, 0.56);
+      background: #19130f;
+      color: var(--ink);
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    .toggle-label:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: #241a13;
+    }
+
+    .toggle-label input {
+      accent-color: var(--amber);
+    }
+
     .viewer {
       display: grid;
       grid-template-rows: auto auto 1fr;
@@ -181,12 +567,19 @@
     .screen-wrap {
       position: relative;
       min-height: 0;
-      border: 2px solid var(--line);
+      height: 100%;
+      border: 1px solid rgba(125, 255, 177, 0.14);
       background:
-        linear-gradient(180deg, rgba(124, 255, 156, 0.06), transparent),
-        #0a130d;
-      padding: 14px;
-      overflow: auto;
+        radial-gradient(circle at 50% 50%, rgba(116, 166, 166, 0.11), transparent 42%),
+        #10110d;
+      overflow: hidden;
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .screen-wrap.is-dragging {
+      cursor: grabbing;
     }
 
     .screen-wrap::before {
@@ -202,21 +595,42 @@
     .ascii-screen {
       position: relative;
       z-index: 1;
-      display: inline-block;
-      min-width: 100%;
+      display: grid;
+      min-width: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0;
       color: var(--green);
       white-space: pre;
       line-height: 1;
-      font-size: 14px;
+      font-size: 12px;
       text-shadow: 0 0 7px rgba(124, 255, 156, 0.36);
+      align-content: start;
     }
 
     .ascii-screen.is-portrait {
-      font-size: 18px;
+      font-size: 12px;
     }
 
     .ascii-line {
-      min-height: 1em;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 8px;
+      justify-content: stretch;
+      min-height: 10px;
+      height: 10px;
+      line-height: 10px;
+    }
+
+    .ascii-line span {
+      display: block;
+      width: 8px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .ascii-char-space {
+      opacity: 0.24;
     }
 
     .phosphor { color: var(--green); text-shadow: 0 0 7px rgba(124, 255, 156, 0.36); }
@@ -226,9 +640,16 @@
     .blue { color: var(--blue); text-shadow: 0 0 7px rgba(108, 143, 255, 0.32); }
     .rose { color: var(--rose); text-shadow: 0 0 7px rgba(255, 121, 176, 0.32); }
     .cream { color: var(--cream); text-shadow: 0 0 7px rgba(246, 240, 195, 0.26); }
+    .tone-g { color: #9bbf74; text-shadow: 0 0 7px rgba(155, 191, 116, 0.28); }
+    .tone-d { color: #8f7a5d; text-shadow: 0 0 5px rgba(143, 122, 93, 0.22); }
+    .tone-c { color: #74a6a6; text-shadow: 0 0 7px rgba(116, 166, 166, 0.28); }
+    .tone-a { color: #f0a64d; text-shadow: 0 0 7px rgba(240, 166, 77, 0.32); }
+    .tone-w { color: #e7d0a4; text-shadow: 0 0 7px rgba(231, 208, 164, 0.26); }
+    .tone-s { color: #7dffb1; text-shadow: 0 0 8px rgba(125, 255, 177, 0.36); }
+    .tone-r { color: #ff6b5f; text-shadow: 0 0 8px rgba(255, 107, 95, 0.36); }
 
     .json-box {
-      max-height: 240px;
+      max-height: 100%;
       overflow: auto;
       border: 1px solid rgba(155, 106, 59, 0.34);
       background: #15110d;
@@ -238,8 +659,103 @@
       line-height: 1.45;
     }
 
-    @media (max-width: 980px) {
+    .library-list {
+      display: grid;
+      gap: 6px;
+      max-height: 100%;
+      overflow: auto;
+      border: 1px solid rgba(155, 106, 59, 0.34);
+      background: #15110d;
+      padding: 8px;
+    }
+
+    .console-bottom-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      min-height: 52px;
+      padding: 10px 14px;
+      color: #a98a63;
+      font-size: 12px;
+      line-height: 1.4;
+      text-transform: uppercase;
+    }
+
+    .console-bottom-strip strong {
+      color: #f0d09f;
+    }
+
+    .library-item {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      border: 1px solid rgba(155, 106, 59, 0.24);
+      background: #19130f;
+      padding: 7px;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .library-item:hover {
+      border-color: rgba(240, 166, 77, 0.72);
+    }
+
+    .library-item input {
+      margin-top: 2px;
+      accent-color: var(--amber);
+    }
+
+    .library-item strong,
+    .library-item span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .library-item strong {
+      color: var(--cream);
+      font-size: 12px;
+    }
+
+    .library-item span {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 3px;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        height: auto;
+        overflow: auto;
+      }
+
       .app {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .game-console-topbar,
+      .game-console-main {
+        grid-template-columns: 1fr;
+      }
+
+      .game-console-status-cluster {
+        grid-template-columns: 1fr;
+      }
+
+      .game-console-status-strip {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+      }
+
+      .console-display-bezel,
+      .console-display-screen {
+        min-height: 560px;
+      }
+
+      .console-screen-header {
         grid-template-columns: 1fr;
       }
     }
@@ -247,72 +763,152 @@
 </head>
 <body>
   <main class="app">
-    <aside class="panel stack">
-      <section>
+    <header class="game-console-topbar">
+      <div class="game-console-titleblock">
+        <p class="game-console-kicker">stellar frontier / ascii lab direction</p>
         <h1>ASCII Viewer</h1>
-        <p class="muted">用来预览 `art/ascii-lab/` 里的地图、事件画面和人物头像 JSON。支持示例载入、文件导入、动画播放和状态切换。</p>
-      </section>
+        <p class="muted">选择项目目录后自动读取 art/ascii-lab/maps。</p>
+      </div>
+      <div class="game-console-status-cluster">
+        <div>
+          <div class="game-console-status-strip">
+            <article class="console-status-card"><span>frame</span><strong id="frameReadout">0 / 0</strong></article>
+            <article class="console-status-card"><span>playback</span><strong id="playReadout">PAUSED</strong></article>
+            <article class="console-status-card"><span>type</span><strong id="metaType">-</strong></article>
+            <article class="console-status-card"><span>size</span><strong id="metaSize">-</strong></article>
+          </div>
+          <p class="console-status-summary" id="metaInfo">载入一个 ASCII JSON 后，这里会显示说明。</p>
+        </div>
+        <div class="console-scope-box" aria-hidden="true">
+          <div class="console-scope-fake"></div>
+          <div class="console-scope-readout">
+            <span>ascii</span>
+            <span>scan</span>
+          </div>
+        </div>
+      </div>
+    </header>
 
-      <section>
-        <h2>Examples</h2>
-        <div class="button-list">
-          <button class="button" id="loadMap" type="button">加载地图模板</button>
-          <button class="button" id="loadEvent" type="button">加载事件模板</button>
-          <button class="button" id="loadPortrait" type="button">加载头像模板</button>
+    <section class="game-console-main">
+      <aside class="game-console-left">
+        <section class="console-column-panel console-column-panel-scroll">
+          <div class="console-column-header">
+            <span>project map files</span>
+          </div>
+          <button class="button" id="scanDirectoryButton" type="button">选择项目目录</button>
+          <div class="toolbar" style="margin: 8px 0 0;">
+            <button class="mini-button" id="openSelectedButton" type="button">打开选中</button>
+            <button class="mini-button" id="clearSelectedButton" type="button">清空选择</button>
+          </div>
+          <p class="muted" id="libraryStatus" style="margin-top: 8px;">尚未选择项目目录。</p>
+          <div class="library-list" id="libraryList" aria-label="ASCII Lab file list"></div>
+        </section>
+      </aside>
+
+      <section class="game-console-center">
+        <div class="console-display-case">
+          <div class="console-display-bezel">
+            <div class="console-display-screen" id="centerDisplayScreen" data-glitch="off">
+              <div class="console-screen-content console-map-screen">
+                <div class="console-screen-header">
+                  <span>crt situation map</span>
+                  <strong>ASCII LAB / game-size preview</strong>
+                  <span id="screenModeReadout">zoom 1.00x / glitch off</span>
+                </div>
+                <section class="screen-wrap" id="screenWrap">
+                  <div class="ascii-screen" id="asciiScreen"></div>
+                </section>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section>
-        <h2>Import</h2>
-        <label class="file-label">
-          <input id="fileInput" type="file" accept=".json,application/json" />
-          打开本地 JSON 文件
-        </label>
-      </section>
+      <aside class="game-console-right">
+        <section class="console-side-panel">
+          <div class="console-column-header">
+            <span>building placement</span>
+          </div>
+          <div class="placement-stack">
+            <div class="placement-list" id="placementList" aria-label="Placed buildings"></div>
+            <div class="placement-form-grid">
+              <label class="placement-field">
+                asset
+                <select id="buildingAssetSelect"></select>
+              </label>
+              <label class="placement-field">
+                tone
+                <select id="placementToneSelect">
+                  <option value="">asset</option>
+                  <option value="g">g</option>
+                  <option value="d">d</option>
+                  <option value="c">c</option>
+                  <option value="a">a</option>
+                  <option value="w">w</option>
+                  <option value="s">s</option>
+                  <option value="r">r</option>
+                </select>
+              </label>
+              <label class="placement-field">
+                x
+                <input id="placementXInput" type="number" step="1" />
+              </label>
+              <label class="placement-field">
+                y
+                <input id="placementYInput" type="number" step="1" />
+              </label>
+            </div>
+            <div class="nudge-grid">
+              <button class="mini-button" type="button" data-nudge="0,-1">^</button>
+              <button class="mini-button" type="button" data-nudge="-1,0">&lt;</button>
+              <button class="mini-button" type="button" data-nudge="1,0">&gt;</button>
+              <button class="mini-button" type="button" data-nudge="0,1">v</button>
+            </div>
+            <div class="toolbar">
+              <button class="mini-button" id="addBuildingButton" type="button">添加</button>
+              <button class="mini-button" id="removePlacementButton" type="button">移除</button>
+            </div>
+          </div>
+        </section>
 
-      <section>
-        <h2>Asset</h2>
-        <div class="meta-grid">
-          <article class="meta-card"><span class="muted">ID</span><strong id="metaId">-</strong></article>
-          <article class="meta-card"><span class="muted">Type</span><strong id="metaType">-</strong></article>
-          <article class="meta-card"><span class="muted">Size</span><strong id="metaSize">-</strong></article>
-          <article class="meta-card"><span class="muted">Palette</span><strong id="metaPalette">-</strong></article>
-          <article class="meta-card"><span class="muted">Frames</span><strong id="metaFrames">-</strong></article>
-          <article class="meta-card"><span class="muted">FPS</span><strong id="metaFps">-</strong></article>
-        </div>
-      </section>
+        <section class="console-side-panel">
+          <div class="console-column-header">
+            <span>asset</span>
+          </div>
+          <div class="meta-grid">
+            <article class="meta-card"><span class="muted">ID</span><strong id="metaId">-</strong></article>
+            <article class="meta-card"><span class="muted">Palette</span><strong id="metaPalette">-</strong></article>
+            <article class="meta-card"><span class="muted">Frames</span><strong id="metaFrames">-</strong></article>
+            <article class="meta-card"><span class="muted">FPS</span><strong id="metaFps">-</strong></article>
+          </div>
+        </section>
 
-      <section>
-        <h2>Info</h2>
-        <p class="muted" id="metaInfo">载入一个 ASCII JSON 后，这里会显示说明。</p>
-      </section>
-    </aside>
-
-    <section class="panel viewer">
-      <section>
-        <h2>Preview</h2>
-        <div class="toolbar">
-          <button class="mini-button" id="playButton" type="button">播放</button>
-          <button class="mini-button" id="prevFrameButton" type="button">上一帧</button>
-          <button class="mini-button" id="nextFrameButton" type="button">下一帧</button>
-          <select class="mini-button" id="stateSelect" aria-label="portrait state"></select>
-        </div>
-      </section>
-
-      <section class="meta-grid">
-        <article class="meta-card"><span class="muted">Current Frame</span><strong id="frameReadout">0 / 0</strong></article>
-        <article class="meta-card"><span class="muted">Playback</span><strong id="playReadout">PAUSED</strong></article>
-      </section>
-
-      <section class="screen-wrap">
-        <div class="ascii-screen" id="asciiScreen"></div>
-      </section>
-
-      <section>
-        <h2>JSON</h2>
-        <pre class="json-box" id="jsonBox">{}</pre>
-      </section>
+        <section class="console-side-panel console-side-panel-scroll">
+          <div class="console-column-header">
+            <span>json</span>
+          </div>
+          <pre class="json-box" id="jsonBox">{}</pre>
+        </section>
+      </aside>
     </section>
+
+    <footer class="game-console-bottom">
+      <div class="console-bottom-strip">
+        <strong>] CONTROLS:</strong>
+        <button class="mini-button" id="playButton" type="button">播放</button>
+        <button class="mini-button" id="prevFrameButton" type="button">上一帧</button>
+        <button class="mini-button" id="nextFrameButton" type="button">下一帧</button>
+        <select class="mini-button" id="stateSelect" aria-label="portrait state"></select>
+        <label class="toggle-label">
+          <input id="glitchToggle" type="checkbox" />
+          GLITCH
+        </label>
+        <label class="toggle-label">
+          <input id="spaceToggle" type="checkbox" />
+          显示空格
+        </label>
+      </div>
+    </footer>
   </main>
 
   <script>
@@ -446,6 +1042,9 @@
     };
 
     const asciiScreen = document.getElementById("asciiScreen");
+    const screenWrap = document.getElementById("screenWrap");
+    const centerDisplayScreen = document.getElementById("centerDisplayScreen");
+    const screenModeReadout = document.getElementById("screenModeReadout");
     const jsonBox = document.getElementById("jsonBox");
     const frameReadout = document.getElementById("frameReadout");
     const playReadout = document.getElementById("playReadout");
@@ -458,14 +1057,40 @@
     const metaInfo = document.getElementById("metaInfo");
     const stateSelect = document.getElementById("stateSelect");
     const playButton = document.getElementById("playButton");
+    const glitchToggle = document.getElementById("glitchToggle");
+    const spaceToggle = document.getElementById("spaceToggle");
+    const scanDirectoryButton = document.getElementById("scanDirectoryButton");
+    const openSelectedButton = document.getElementById("openSelectedButton");
+    const clearSelectedButton = document.getElementById("clearSelectedButton");
+    const libraryStatus = document.getElementById("libraryStatus");
+    const libraryList = document.getElementById("libraryList");
+    const placementList = document.getElementById("placementList");
+    const buildingAssetSelect = document.getElementById("buildingAssetSelect");
+    const placementToneSelect = document.getElementById("placementToneSelect");
+    const placementXInput = document.getElementById("placementXInput");
+    const placementYInput = document.getElementById("placementYInput");
+    const addBuildingButton = document.getElementById("addBuildingButton");
+    const removePlacementButton = document.getElementById("removePlacementButton");
 
     let currentAsset = null;
+    let libraryFiles = [];
+    let workingRadar = null;
+    let workingAssetsById = new Map();
+    let selectedPlacementIndex = 0;
     let frameIndex = 0;
     let isPlaying = false;
     let timer = null;
+    let glitchTimer = null;
+    let nextGlitchAt = 0;
+    let glitches = [];
     let activeState = "";
+    const PREVIEW_CELL_W = 8;
+    const PREVIEW_CELL_H = 10;
+    let previewZoom = 1;
+    let previewCenter = { x: 0, y: 0 };
+    let previewDrag = null;
 
-    function charTone(char) {
+    function fallbackTone(char) {
       if ("@#".includes(char)) return "phosphor";
       if ("+-=:".includes(char)) return "amber";
       if ("~|/\\[]".includes(char)) return "cyan";
@@ -473,6 +1098,10 @@
       if ("oO".includes(char)) return "cream";
       if (".".includes(char)) return "dim";
       return "phosphor";
+    }
+
+    function toneClass(tone, char) {
+      return tone ? `tone-${tone}` : fallbackTone(char);
     }
 
     function stopPlayback() {
@@ -490,28 +1119,269 @@
       return asset.states[activeState];
     }
 
-    function renderFrame() {
-      if (!currentAsset) return;
-      const frameIds = stateFrames(currentAsset);
+    function activeFrame(asset) {
+      const frameIds = stateFrames(asset);
       const realFrameIndex = frameIds[frameIndex] ?? 0;
-      const frame = currentAsset.frames[realFrameIndex] || [];
+      return {
+        frameIds,
+        realFrameIndex,
+        chars: cloneFrame(asset.frames[realFrameIndex] || []),
+        tones: cloneFrame(asset.toneFrames?.[realFrameIndex] || fillToneFrame(asset.frames[realFrameIndex] || [], asset.defaultTone || "")),
+      };
+    }
+
+    function renderFrame(time = performance.now()) {
+      if (!currentAsset) return;
+      const { frameIds, chars: sourceChars, tones: sourceTones } = activeFrame(currentAsset);
+      const { chars, tones } = sampleViewportFrame(sourceChars, sourceTones);
+      if (glitchToggle.checked) {
+        applyRenderGlitch(chars, tones, time);
+        updateScreenGlitch(time);
+      }
 
       asciiScreen.className = `ascii-screen${currentAsset.type === "portrait" ? " is-portrait" : ""}`;
       asciiScreen.innerHTML = "";
 
-      frame.forEach((line) => {
+      chars.forEach((line, rowIndex) => {
         const row = document.createElement("div");
         row.className = "ascii-line";
-        Array.from(line).forEach((char) => {
+        Array.from(line).forEach((char, charIndex) => {
           const span = document.createElement("span");
-          span.className = charTone(char);
-          span.textContent = char;
+          const tone = tones[rowIndex]?.[charIndex] || "";
+          span.className = `${toneClass(tone, char)}${char === " " && spaceToggle.checked ? " ascii-char-space" : ""}`;
+          span.textContent = char === " " && spaceToggle.checked ? "·" : char;
           row.appendChild(span);
         });
         asciiScreen.appendChild(row);
       });
 
       frameReadout.textContent = `${frameIndex + 1} / ${frameIds.length}`;
+      applyViewportTransform();
+    }
+
+    function sampleViewportFrame(sourceChars, sourceTones) {
+      const rect = screenWrap.getBoundingClientRect();
+      const cols = Math.max(24, Math.floor(rect.width / PREVIEW_CELL_W));
+      const rows = Math.max(18, Math.floor(rect.height / PREVIEW_CELL_H));
+      const viewport = getPreviewViewport();
+      const chars = [];
+      const tones = [];
+
+      for (let row = 0; row < rows; row += 1) {
+        let charLine = "";
+        let toneLine = "";
+        for (let col = 0; col < cols; col += 1) {
+          const sourceX = Math.floor(viewport.left + (col / cols) * viewport.width);
+          const sourceY = Math.floor(viewport.top + (row / rows) * viewport.height);
+          const char = sourceChars[sourceY]?.[sourceX] ?? " ";
+          const tone = sourceTones[sourceY]?.[sourceX] || currentAsset.defaultTone || "";
+          charLine += char;
+          toneLine += tone;
+        }
+        chars.push(charLine);
+        tones.push(toneLine);
+      }
+
+      return { chars, tones };
+    }
+
+    function getPreviewViewport() {
+      const width = Math.max(1, currentAsset?.width || 1);
+      const height = Math.max(1, currentAsset?.height || 1);
+      const viewportWidth = Math.max(1, width / previewZoom);
+      const viewportHeight = Math.max(1, height / previewZoom);
+      const left = clamp(previewCenter.x - viewportWidth / 2, 0, Math.max(0, width - viewportWidth));
+      const top = clamp(previewCenter.y - viewportHeight / 2, 0, Math.max(0, height - viewportHeight));
+      return { left, top, width: Math.min(width, viewportWidth), height: Math.min(height, viewportHeight) };
+    }
+
+    function applyViewportTransform() {
+      screenModeReadout.textContent = `zoom ${previewZoom.toFixed(2)}x / glitch ${glitchToggle.checked ? "on" : "off"}`;
+    }
+
+    function resetViewport() {
+      previewZoom = 1;
+      previewCenter = {
+        x: Math.max(0, (currentAsset?.width || 1) / 2),
+        y: Math.max(0, (currentAsset?.height || 1) / 2),
+      };
+      applyViewportTransform();
+    }
+
+    function clampPreviewCenter() {
+      const width = Math.max(1, currentAsset?.width || 1);
+      const height = Math.max(1, currentAsset?.height || 1);
+      previewCenter = {
+        x: clamp(previewCenter.x, 0, width),
+        y: clamp(previewCenter.y, 0, height),
+      };
+    }
+
+    function updateScreenGlitch(time) {
+      const burst = Math.floor(time / 130) % 7 === 0 || glitches.length > 0;
+      centerDisplayScreen.dataset.glitch = burst ? "on" : "off";
+      centerDisplayScreen.style.setProperty("--glitch-shift", burst ? `${Math.round(Math.sin(time / 76) * 4)}px` : "0px");
+      centerDisplayScreen.style.setProperty("--glitch-band", `${30 + Math.floor((time / 48) % 42)}%`);
+      centerDisplayScreen.style.setProperty("--glitch-opacity", burst ? "1" : "0");
+    }
+
+    function clearScreenGlitch() {
+      centerDisplayScreen.dataset.glitch = "off";
+      centerDisplayScreen.style.setProperty("--glitch-shift", "0px");
+      centerDisplayScreen.style.setProperty("--glitch-band", "46%");
+      centerDisplayScreen.style.setProperty("--glitch-opacity", "0");
+      applyViewportTransform();
+    }
+
+    function cloneFrame(frame) {
+      return frame.map((line) => String(line));
+    }
+
+    function fillToneFrame(frame, tone) {
+      return frame.map((line) => tone.repeat(String(line).length));
+    }
+
+    function createBlankFrame(width, height, fill = " ") {
+      return Array.from({ length: height }, () => fill.repeat(width));
+    }
+
+    function writeChar(row, index, char) {
+      return row.slice(0, index) + char + row.slice(index + 1);
+    }
+
+    function overlayAsset(targetChars, targetTones, asset, x, y, overrideTone = "") {
+      const frame = asset.frames?.[0] || [];
+      const toneFrame = asset.toneFrames?.[0] || fillToneFrame(frame, asset.defaultTone || overrideTone || "");
+      for (let rowIndex = 0; rowIndex < frame.length; rowIndex += 1) {
+        const targetY = y + rowIndex;
+        if (targetY < 0 || targetY >= targetChars.length) continue;
+        const row = frame[rowIndex] || "";
+        for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+          const targetX = x + colIndex;
+          if (targetX < 0 || targetX >= targetChars[targetY].length) continue;
+          const char = row[colIndex];
+          if (!char || char === " ") continue;
+          targetChars[targetY] = writeChar(targetChars[targetY], targetX, char);
+          targetTones[targetY] = writeChar(targetTones[targetY], targetX, overrideTone || toneFrame[rowIndex]?.[colIndex] || asset.defaultTone || targetTones[targetY][targetX] || "");
+        }
+      }
+    }
+
+    function composeRadarAsset(radar, assetsById) {
+      const width = radar.world?.width || 1;
+      const height = radar.world?.height || 1;
+      const baseAsset = radar.baseLayer?.assetId ? assetsById.get(radar.baseLayer.assetId) : null;
+      const chars = cloneFrame(radar.glyphRows || baseAsset?.frames?.[0] || createBlankFrame(width, height, "."));
+      const tones = cloneFrame(radar.toneRows || baseAsset?.toneFrames?.[0] || fillToneFrame(chars, baseAsset?.defaultTone || "g"));
+
+      (radar.renderLayers || []).filter((layer) => layer.visible !== false).forEach((layer) => {
+        (layer.items || []).forEach((item, itemIndex) => {
+          if (item.visible === false) return;
+          const asset = item.assetId ? assetsById.get(item.assetId) : item;
+          if (!asset?.frames && !item.glyphRows) return;
+          const highlightTone = layer.id === "buildings" && itemIndex === selectedPlacementIndex ? "r" : "";
+          overlayAsset(chars, tones, asset.frames ? asset : { ...item, frames: [item.glyphRows] }, item.x || 0, item.y || 0, highlightTone || item.tone || "");
+        });
+      });
+
+      const origin = radar.world?.origin || { x: Math.floor(width / 2), y: Math.floor(height / 2) };
+      const focusAsset = radar.symbols?.focus?.assetId ? assetsById.get(radar.symbols.focus.assetId) : null;
+      const crewAsset = radar.symbols?.crew?.assetId ? assetsById.get(radar.symbols.crew.assetId) : null;
+      if (focusAsset) overlayAsset(chars, tones, focusAsset, origin.x, origin.y, "");
+      if (crewAsset) overlayAsset(chars, tones, crewAsset, Math.min(width - 1, origin.x + 2), origin.y, "");
+
+      return {
+        id: `${radar.mapId || "radar"}_composite_preview`,
+        type: "map",
+        width,
+        height,
+        palette: "default-map-radar",
+        fps: 8,
+        frames: [chars],
+        toneFrames: [tones],
+        notes: `Composite preview: base + ${(radar.renderLayers || []).length} render layer(s). Focus/crew symbols are sampled at origin for preview only.`,
+        source: radar,
+      };
+    }
+
+    function applyRenderGlitch(chars, tones, time) {
+      const rows = chars.length;
+      const cols = chars[0]?.length || 0;
+      if (!rows || !cols) return;
+
+      if (time > nextGlitchAt) {
+        spawnRenderGlitch(rows, cols, time);
+        if (Math.random() > 0.66) spawnRenderGlitch(rows, cols, time);
+        nextGlitchAt = time + 350 + Math.random() * 420;
+      }
+
+      for (let index = glitches.length - 1; index >= 0; index -= 1) {
+        const glitch = glitches[index];
+        const age = time - glitch.start;
+        if (age > glitch.duration) {
+          glitches.splice(index, 1);
+          continue;
+        }
+
+        const strength = 1 - age / glitch.duration;
+        const rowStart = Math.floor(clamp(glitch.y - glitch.radius, 0, rows - 1));
+        const rowEnd = Math.floor(clamp(glitch.y + glitch.radius, 0, rows - 1));
+
+        for (let row = rowStart; row <= rowEnd; row += 1) {
+          if (Math.random() > 0.44) continue;
+          const sourceChars = chars[row];
+          const sourceTones = tones[row];
+          const shift = Math.floor(glitch.kick * strength + (Math.random() - 0.5) * glitch.radius * 0.45);
+          let nextChars = "";
+          let nextTones = "";
+          for (let col = 0; col < cols; col += 1) {
+            const sourceCol = col - shift;
+            nextChars += sourceCol >= 0 && sourceCol < cols ? sourceChars[sourceCol] : chars[row][col];
+            nextTones += sourceCol >= 0 && sourceCol < cols ? sourceTones[sourceCol] : tones[row][col];
+          }
+          chars[row] = nextChars;
+          tones[row] = nextTones;
+        }
+
+        for (let block = 0; block < 5; block += 1) {
+          const blockX = Math.floor(clamp(glitch.x + (Math.random() - 0.5) * glitch.radius, 0, Math.max(0, cols - 8)));
+          const blockY = Math.floor(clamp(glitch.y + (Math.random() - 0.5) * glitch.radius, 0, Math.max(0, rows - 2)));
+          const blockW = 3 + Math.floor(Math.random() * 9);
+          for (let col = 0; col < blockW && blockX + col < cols; col += 1) {
+            chars[blockY] = writeChar(chars[blockY], blockX + col, Math.random() > 0.38 ? "#" : "@");
+            tones[blockY] = writeChar(tones[blockY], blockX + col, Math.random() > 0.55 ? "r" : "a");
+          }
+        }
+      }
+    }
+
+    function spawnRenderGlitch(rows, cols, time) {
+      glitches.push({
+        x: Math.floor(Math.random() * cols),
+        y: Math.floor(Math.random() * rows),
+        radius: 5 + Math.random() * 14,
+        start: time,
+        duration: 150 + Math.random() * 260,
+        kick: (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 8)),
+      });
+      if (glitches.length > 18) glitches.shift();
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function syncGlitchLoop() {
+      clearInterval(glitchTimer);
+      glitchTimer = null;
+      glitches = [];
+      nextGlitchAt = 0;
+      if (!glitchToggle.checked) {
+        clearScreenGlitch();
+        renderFrame();
+        return;
+      }
+      glitchTimer = window.setInterval(() => renderFrame(performance.now()), 1000 / 12);
     }
 
     function startPlayback() {
@@ -527,47 +1397,439 @@
       }, 1000 / Math.max(1, currentAsset.fps || 1));
     }
 
-    function setAsset(asset) {
-      currentAsset = asset;
+    function setAsset(asset, options = {}) {
+      const { resetView = true } = options;
+      currentAsset = normalizeAsset(asset);
       frameIndex = 0;
       activeState = "";
       stopPlayback();
 
-      metaId.textContent = asset.id || "-";
-      metaType.textContent = asset.type || "-";
-      metaSize.textContent = `${asset.width || "?"} x ${asset.height || "?"}`;
-      metaPalette.textContent = asset.palette || "-";
-      metaFrames.textContent = String(asset.frames?.length || 0);
-      metaFps.textContent = String(asset.fps || 0);
-      metaInfo.textContent = asset.notes || asset.caption || asset.meta || "无额外说明。";
-      jsonBox.textContent = JSON.stringify(asset, null, 2);
+      metaId.textContent = currentAsset.id || "-";
+      metaType.textContent = currentAsset.type || "-";
+      metaSize.textContent = `${currentAsset.width || "?"} x ${currentAsset.height || "?"}`;
+      metaPalette.textContent = currentAsset.palette || "-";
+      metaFrames.textContent = String(currentAsset.frames?.length || 0);
+      metaFps.textContent = String(currentAsset.fps || 0);
+      metaInfo.textContent = currentAsset.notes || currentAsset.caption || currentAsset.meta || "无额外说明。";
+      jsonBox.textContent = JSON.stringify(currentAsset.source || currentAsset, null, 2);
 
       stateSelect.innerHTML = "";
       const baseOption = document.createElement("option");
       baseOption.value = "";
       baseOption.textContent = "默认序列";
       stateSelect.appendChild(baseOption);
-      Object.keys(asset.states || {}).forEach((key) => {
+      Object.keys(currentAsset.states || {}).forEach((key) => {
         const option = document.createElement("option");
         option.value = key;
         option.textContent = key;
         stateSelect.appendChild(option);
       });
 
+      if (resetView) {
+        resetViewport();
+      }
       renderFrame();
     }
 
-    document.getElementById("loadMap").addEventListener("click", () => setAsset(structuredClone(examples.map)));
-    document.getElementById("loadEvent").addEventListener("click", () => setAsset(structuredClone(examples.event)));
-    document.getElementById("loadPortrait").addEventListener("click", () => setAsset(structuredClone(examples.portrait)));
+    function normalizeAsset(asset) {
+      if (asset.mapId && asset.world) {
+        return composeRadarAsset(asset, new Map());
+      }
 
-    document.getElementById("fileInput").addEventListener("change", async (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      const text = await file.text();
-      const asset = JSON.parse(text);
-      setAsset(asset);
+      const frames = Array.isArray(asset.frames) ? asset.frames : [[]];
+      const width = asset.width || Math.max(1, ...frames[0].map((line) => String(line).length));
+      const height = asset.height || frames[0].length || 1;
+      return {
+        ...asset,
+        width,
+        height,
+        fps: asset.fps || 1,
+        frames: frames.map((frame) => normalizeFrame(frame, width, height, " ")),
+        toneFrames: asset.toneFrames?.map((frame) => normalizeFrame(frame, width, height, asset.defaultTone || "")),
+      };
+    }
+
+    function normalizeFrame(frame, width, height, fill) {
+      return Array.from({ length: height }, (_, index) => {
+        const row = String(frame[index] || "");
+        return (row + fill.repeat(width)).slice(0, width);
+      });
+    }
+
+    function assetKind(asset) {
+      if (asset.mapId && asset.world) return "radar";
+      return asset.type || "asset";
+    }
+
+    function assetTitle(file) {
+      return file.asset.id || file.asset.mapId || file.name || file.path;
+    }
+
+    function openAssetCollection(assets) {
+      if (!assets.length) {
+        metaInfo.textContent = "请选择至少一个 JSON 文件。";
+        return;
+      }
+
+      const radar = assets.find((asset) => asset.mapId && asset.world);
+      if (!radar) {
+        if (assets.length === 1) {
+          workingRadar = null;
+          workingAssetsById = new Map();
+          setAsset(assets[0]);
+          renderPlacementEditor();
+          return;
+        }
+        metaInfo.textContent = "多文件合成需要至少包含一个 radar JSON。";
+        return;
+      }
+
+      const assetsById = new Map();
+      assets.filter((asset) => asset.id && asset.frames).forEach((asset) => {
+        assetsById.set(asset.id, normalizeAsset(asset));
+      });
+
+      workingRadar = structuredClone(radar);
+      workingAssetsById = assetsById;
+      selectedPlacementIndex = 0;
+      refreshComposite({ resetView: true });
+      renderPlacementEditor();
+    }
+
+    function autoOpenMapFiles() {
+      const assets = libraryFiles.filter((file) => file.asset && !file.error).map((file) => file.asset);
+      const radar = assets.find((asset) => asset.mapId && asset.world);
+      const base = assets.find((asset) => asset.id === radar?.baseLayer?.assetId);
+      const buildings = assets.filter((asset) => asset.type === "building");
+      if (!radar || !base || !buildings.length) {
+        metaInfo.textContent = "没有找到完整的 radar/base/building 地图素材。";
+        return;
+      }
+      openAssetCollection(assets);
+      libraryStatus.textContent = `已自动加载 ${buildings.length} 个 building asset。`;
+    }
+
+    function refreshComposite(options = {}) {
+      if (!workingRadar) return;
+      setAsset(composeRadarAsset(workingRadar, workingAssetsById), options);
+      jsonBox.textContent = JSON.stringify(workingRadar, null, 2);
+    }
+
+    function getBuildingsLayer() {
+      if (!workingRadar) return null;
+      workingRadar.renderLayers ||= [];
+      let layer = workingRadar.renderLayers.find((item) => item.id === "buildings");
+      if (!layer) {
+        layer = { id: "buildings", name: "建筑层", visible: true, items: [] };
+        workingRadar.renderLayers.push(layer);
+      }
+      layer.items ||= [];
+      return layer;
+    }
+
+    function getBuildingAssets() {
+      return Array.from(workingAssetsById.values()).filter((asset) => asset.type === "building");
+    }
+
+    function selectedPlacement() {
+      const layer = getBuildingsLayer();
+      return layer?.items?.[selectedPlacementIndex] || null;
+    }
+
+    function renderPlacementEditor() {
+      const layer = getBuildingsLayer();
+      const items = layer?.items || [];
+      const assets = getBuildingAssets();
+
+      placementList.innerHTML = "";
+      if (!items.length) {
+        const empty = document.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "尚未放置 building。";
+        placementList.appendChild(empty);
+      }
+
+      items.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `placement-button ${index === selectedPlacementIndex ? "placement-button-active" : ""}`;
+        button.innerHTML = `<span>${item.id || item.assetId || "building"}</span><small>${item.assetId || "-"} @ ${item.x || 0},${item.y || 0}</small>`;
+        button.addEventListener("click", () => {
+          selectedPlacementIndex = index;
+          renderPlacementEditor();
+          refreshComposite({ resetView: false });
+        });
+        placementList.appendChild(button);
+      });
+
+      buildingAssetSelect.innerHTML = "";
+      assets.forEach((asset) => {
+        const option = document.createElement("option");
+        option.value = asset.id;
+        option.textContent = asset.id;
+        buildingAssetSelect.appendChild(option);
+      });
+
+      const selected = selectedPlacement();
+      const hasSelected = Boolean(selected);
+      placementXInput.disabled = !hasSelected;
+      placementYInput.disabled = !hasSelected;
+      placementToneSelect.disabled = !hasSelected;
+      buildingAssetSelect.disabled = !assets.length;
+      removePlacementButton.disabled = !hasSelected;
+      addBuildingButton.disabled = !workingRadar || !assets.length;
+      if (selected) {
+        buildingAssetSelect.value = selected.assetId || assets[0]?.id || "";
+        placementXInput.value = String(selected.x || 0);
+        placementYInput.value = String(selected.y || 0);
+        placementToneSelect.value = selected.tone || "";
+      } else {
+        placementXInput.value = "";
+        placementYInput.value = "";
+        placementToneSelect.value = "";
+      }
+    }
+
+    function updateSelectedPlacement(patch) {
+      const selected = selectedPlacement();
+      if (!selected) return;
+      Object.assign(selected, patch);
+      renderPlacementEditor();
+      refreshComposite({ resetView: false });
+    }
+
+    async function getDirectoryHandleByPath(rootHandle, segments) {
+      let current = rootHandle;
+      for (const segment of segments) {
+        current = await current.getDirectoryHandle(segment);
+      }
+      return current;
+    }
+
+    async function collectJsonFilesFromDirectory(directoryHandle, prefix = "") {
+      const files = [];
+      for await (const [name, handle] of directoryHandle.entries()) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (handle.kind === "directory") {
+          files.push(...await collectJsonFilesFromDirectory(handle, path));
+          continue;
+        }
+        if (handle.kind !== "file" || !name.endsWith(".json")) continue;
+
+        const file = await handle.getFile();
+        try {
+          files.push({
+            name,
+            path,
+            asset: JSON.parse(await file.text()),
+          });
+        } catch (error) {
+          files.push({
+            name,
+            path,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      return files.sort((left, right) => left.path.localeCompare(right.path));
+    }
+
+    function renderLibraryList() {
+      libraryList.innerHTML = "";
+      if (!libraryFiles.length) {
+        libraryStatus.textContent = "没有找到 JSON 文件。";
+        return;
+      }
+
+      libraryFiles.forEach((file, index) => {
+        const label = document.createElement("label");
+        label.className = "library-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.index = String(index);
+        checkbox.disabled = Boolean(file.error);
+
+        const text = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = file.error ? file.path : assetTitle(file);
+        const detail = document.createElement("span");
+        detail.textContent = file.error ? `JSON parse error: ${file.error}` : `${assetKind(file.asset)} · ${file.path}`;
+
+        text.appendChild(title);
+        text.appendChild(detail);
+        label.appendChild(checkbox);
+        label.appendChild(text);
+        libraryList.appendChild(label);
+      });
+
+      const validCount = libraryFiles.filter((file) => !file.error).length;
+      libraryStatus.textContent = `找到 ${validCount} 个可打开 JSON 文件。`;
+    }
+
+    scanDirectoryButton.addEventListener("click", async () => {
+      if (!window.showDirectoryPicker) {
+        libraryStatus.textContent = "当前浏览器不支持项目目录扫描。";
+        return;
+      }
+
+      try {
+        const projectHandle = await window.showDirectoryPicker({ mode: "read" });
+        libraryStatus.textContent = "正在定位 art/ascii-lab/maps...";
+        const mapsHandle = await getDirectoryHandleByPath(projectHandle, ["art", "ascii-lab", "maps"]);
+        libraryStatus.textContent = "正在扫描地图 JSON 文件...";
+        libraryFiles = await collectJsonFilesFromDirectory(mapsHandle);
+        renderLibraryList();
+        autoOpenMapFiles();
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          libraryStatus.textContent = "已取消项目目录选择。";
+          return;
+        }
+        if (error instanceof DOMException && error.name === "NotFoundError") {
+          libraryStatus.textContent = "没有找到 art/ascii-lab/maps，请确认选择的是项目根目录。";
+          return;
+        }
+        libraryStatus.textContent = error instanceof Error ? error.message : String(error);
+      }
     });
+
+    openSelectedButton.addEventListener("click", () => {
+      const selected = Array.from(libraryList.querySelectorAll("input[type='checkbox']:checked"))
+        .map((checkbox) => libraryFiles[Number(checkbox.dataset.index)])
+        .filter((file) => file && !file.error)
+        .map((file) => file.asset);
+      openAssetCollection(selected);
+    });
+
+    clearSelectedButton.addEventListener("click", () => {
+      libraryList.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+    });
+
+    buildingAssetSelect.addEventListener("change", () => {
+      const selected = selectedPlacement();
+      if (!selected) return;
+      selected.assetId = buildingAssetSelect.value;
+      selected.id = buildingAssetSelect.value;
+      renderPlacementEditor();
+      refreshComposite({ resetView: false });
+    });
+
+    placementXInput.addEventListener("input", () => {
+      updateSelectedPlacement({ x: Number(placementXInput.value) || 0 });
+    });
+
+    placementYInput.addEventListener("input", () => {
+      updateSelectedPlacement({ y: Number(placementYInput.value) || 0 });
+    });
+
+    placementToneSelect.addEventListener("change", () => {
+      const tone = placementToneSelect.value;
+      const selected = selectedPlacement();
+      if (!selected) return;
+      if (tone) selected.tone = tone;
+      else delete selected.tone;
+      renderPlacementEditor();
+      refreshComposite({ resetView: false });
+    });
+
+    document.querySelectorAll("[data-nudge]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const selected = selectedPlacement();
+        if (!selected) return;
+        const [dx, dy] = button.dataset.nudge.split(",").map(Number);
+        updateSelectedPlacement({
+          x: (Number(selected.x) || 0) + dx,
+          y: (Number(selected.y) || 0) + dy,
+        });
+      });
+    });
+
+    addBuildingButton.addEventListener("click", () => {
+      const layer = getBuildingsLayer();
+      const assetId = buildingAssetSelect.value || getBuildingAssets()[0]?.id;
+      if (!layer || !assetId) return;
+      const world = workingRadar?.world || { width: 1, height: 1 };
+      layer.items.push({
+        id: assetId,
+        assetId,
+        x: Math.floor(world.width / 2),
+        y: Math.floor(world.height / 2),
+        tone: workingAssetsById.get(assetId)?.defaultTone || "a",
+      });
+      selectedPlacementIndex = layer.items.length - 1;
+      renderPlacementEditor();
+      refreshComposite({ resetView: false });
+    });
+
+    removePlacementButton.addEventListener("click", () => {
+      const layer = getBuildingsLayer();
+      if (!layer?.items?.length) return;
+      layer.items.splice(selectedPlacementIndex, 1);
+      selectedPlacementIndex = Math.max(0, Math.min(selectedPlacementIndex, layer.items.length - 1));
+      renderPlacementEditor();
+      refreshComposite({ resetView: false });
+    });
+
+    screenWrap.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const rect = screenWrap.getBoundingClientRect();
+      const pointX = event.clientX - rect.left;
+      const pointY = event.clientY - rect.top;
+      const viewport = getPreviewViewport();
+      const worldX = viewport.left + (pointX / Math.max(1, rect.width)) * viewport.width;
+      const worldY = viewport.top + (pointY / Math.max(1, rect.height)) * viewport.height;
+      const nextZoom = clamp(previewZoom * (event.deltaY < 0 ? 1.14 : 1 / 1.14), 1, 6);
+      previewZoom = nextZoom;
+      const nextViewportWidth = Math.max(1, (currentAsset?.width || 1) / previewZoom);
+      const nextViewportHeight = Math.max(1, (currentAsset?.height || 1) / previewZoom);
+      previewCenter = {
+        x: worldX + (0.5 - pointX / Math.max(1, rect.width)) * nextViewportWidth,
+        y: worldY + (0.5 - pointY / Math.max(1, rect.height)) * nextViewportHeight,
+      };
+      clampPreviewCenter();
+      renderFrame();
+    }, { passive: false });
+
+    screenWrap.addEventListener("pointerdown", (event) => {
+      previewDrag = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        centerX: previewCenter.x,
+        centerY: previewCenter.y,
+      };
+      screenWrap.classList.add("is-dragging");
+      screenWrap.setPointerCapture(event.pointerId);
+    });
+
+    screenWrap.addEventListener("pointermove", (event) => {
+      if (!previewDrag || previewDrag.pointerId !== event.pointerId) return;
+      const rect = screenWrap.getBoundingClientRect();
+      const viewport = getPreviewViewport();
+      const dx = ((event.clientX - previewDrag.x) / Math.max(1, rect.width)) * viewport.width;
+      const dy = ((event.clientY - previewDrag.y) / Math.max(1, rect.height)) * viewport.height;
+      previewCenter = {
+        x: previewDrag.centerX - dx,
+        y: previewDrag.centerY - dy,
+      };
+      clampPreviewCenter();
+      renderFrame();
+    });
+
+    function endPreviewDrag(event) {
+      if (!previewDrag || previewDrag.pointerId !== event.pointerId) return;
+      previewDrag = null;
+      screenWrap.classList.remove("is-dragging");
+      if (screenWrap.hasPointerCapture(event.pointerId)) {
+        screenWrap.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    screenWrap.addEventListener("pointerup", endPreviewDrag);
+    screenWrap.addEventListener("pointercancel", endPreviewDrag);
 
     document.getElementById("prevFrameButton").addEventListener("click", () => {
       if (!currentAsset) return;
@@ -595,7 +1857,30 @@
       renderFrame();
     });
 
-    setAsset(structuredClone(examples.map));
+    glitchToggle.addEventListener("change", syncGlitchLoop);
+    spaceToggle.addEventListener("change", () => renderFrame());
+    window.addEventListener("resize", () => renderFrame());
+
+    setAsset({
+      id: "ascii_lab_empty_preview",
+      type: "map",
+      width: 48,
+      height: 8,
+      palette: "phosphor",
+      fps: 1,
+      frames: [[
+        "                                                ",
+        "   SELECT ASCII-LAB DIRECTORY                  ",
+        "                                                ",
+        "   CHECK RADAR + ASSET JSON FILES              ",
+        "                                                ",
+        "   OPEN SELECTED TO COMPOSITE                  ",
+        "                                                ",
+        "                                                "
+      ]],
+      notes: "选择项目目录后，viewer 会自动读取 art/ascii-lab/maps；可以从文件列表直接打开单个资产，或勾选 radar 与多个 asset 合成预览。"
+    });
+    renderPlacementEditor();
   </script>
 </body>
 </html>
