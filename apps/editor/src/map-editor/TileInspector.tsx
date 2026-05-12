@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { MapEditorMapObject } from "./apiClient";
 import type {
   MapEditorCommand,
   MapEditorDraft,
@@ -18,7 +17,6 @@ export const VISIBILITY_OPTIONS: MapVisibility[] = ["onDiscovered", "onInvestiga
 interface TileInspectorProps {
   draft: MapEditorDraft;
   selectedTileId: string | null;
-  mapObjects: MapEditorMapObject[];
   onCommand: (command: MapEditorCommand) => void;
 }
 
@@ -30,7 +28,7 @@ interface SpecialStateForm {
   startsActive: boolean;
 }
 
-export default function TileInspector({ draft, selectedTileId, mapObjects, onCommand }: TileInspectorProps) {
+export default function TileInspector({ draft, selectedTileId, onCommand }: TileInspectorProps) {
   const [specialStateForm, setSpecialStateForm] = useState<SpecialStateForm>({
     id: "",
     name: "",
@@ -58,15 +56,6 @@ export default function TileInspector({ draft, selectedTileId, mapObjects, onCom
         <h3>Gameplay Inspector</h3>
         <code>{tile.id}</code>
       </div>
-
-      <label>
-        Area name
-        <input
-          type="text"
-          value={tile.areaName}
-          onChange={(event) => updateTile(tile.id, { areaName: event.target.value })}
-        />
-      </label>
 
       <div className="tile-inspector-two-column">
         <label>
@@ -157,25 +146,6 @@ export default function TileInspector({ draft, selectedTileId, mapObjects, onCom
       </fieldset>
 
       <fieldset>
-        <legend>Objects</legend>
-        <div className="tile-inspector-checkbox-list">
-          {mapObjects.length === 0 ? <p className="muted-text">No map object library loaded.</p> : null}
-          {mapObjects.map((object) => (
-            <label key={object.id}>
-              <input
-                type="checkbox"
-                checked={tile.objectIds.includes(object.id)}
-                onChange={(event) => toggleObject(tile, object.id, event.target.checked)}
-              />
-              <span>
-                {object.name} <code>{object.id}</code>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset>
         <legend>Special states</legend>
         <ul className="tile-inspector-special-list">
           {tile.specialStates.map((state) => (
@@ -245,14 +215,6 @@ export default function TileInspector({ draft, selectedTileId, mapObjects, onCom
 
   function updateTile(tileId: string, patch: Extract<MapEditorCommand, { type: "gameplay/updateTile" }>["patch"]) {
     onCommand({ type: "gameplay/updateTile", tileId, patch });
-  }
-
-  function toggleObject(tileDefinition: MapTileDefinition, objectId: string, checked: boolean) {
-    updateTile(tileDefinition.id, {
-      objectIds: checked
-        ? [...tileDefinition.objectIds, objectId]
-        : tileDefinition.objectIds.filter((candidate) => candidate !== objectId),
-    });
   }
 
   function addSpecialState(tileDefinition: MapTileDefinition) {

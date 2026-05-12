@@ -1,16 +1,19 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App, { dispatchTimedLocalAction, mergeEventRuntimeState, resolvePhoneRuntimeCallCrewId, toEventEngineState, validatePhoneMessageEnvelope } from "./App";
 import { buildEventContentIndex } from "./events/contentIndex";
-import { crewDefinitions, defaultMapConfig, eventContentLibrary, eventProgramDefinitions, itemDefinitions, questDefinitions } from "./content/contentData";
-import { mapObjectDefinitionById } from "./content/mapObjects";
-import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type GameState } from "./data/gameData";
+import { crewDefinitions, defaultMapConfig, eventContentLibrary, eventProgramDefinitions, itemDefinitions, questDefinitions, type MapFeatureDefinition } from "./content/contentData";
+import { createInitialMapState, initialCrew, initialLogs, initialTiles, resources as initialResources, type CrewMember, type GameState, type GameMapState } from "./data/gameData";
 import { evaluateCondition } from "./events/conditions";
 import { executeEffects } from "./events/effects";
 import { processTrigger } from "./events/eventEngine";
 import { createEmptyEventRuntimeState, type CrewActionState, type Effect } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 import { createInitialQuestState, type QuestRuntimeState } from "./questSystem";
+import { CallPage } from "./pages/CallPage";
+import { getTileLocationLabel } from "./mapSystem";
+
+const originalMapFeatures = [...defaultMapConfig.features];
 
 function readSavedState() {
   return JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "null") as Record<string, unknown> | null;
@@ -104,10 +107,35 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function createFeatureRepairCrashSiteState(overrides: Record<string, unknown> = {}) {
+  const base = createSavedCrashSiteState();
+  return {
+    ...base,
+    map: {
+      ...(base.map as Record<string, unknown>),
+      tilesById: {
+        "129-129": {
+          discovered: true,
+          investigated: true,
+          revealedObjectIds: [],
+        },
+      },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+      },
+    },
+    ...overrides,
+  };
+}
+
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    defaultMapConfig.features = originalMapFeatures;
   });
 
   it("renders the control center by default", () => {
@@ -169,10 +197,11 @@ describe("App", () => {
     });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
     expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "129-129", location: "IAFS坠毁点 (0,0)" });
-    expect(saved.map.mapObjects).toMatchObject({
-      iafs_generator: { status_enum: "damaged" },
-      iafs_life_support: { status_enum: "damaged" },
-      iafs_shuttle_core: { status_enum: "damaged" },
+    expect(saved.map.mapObjects).toBeUndefined();
+    expect(saved.map.featuresById).toMatchObject({
+      iafs_generator: { status: "damaged" },
+      iafs_life_support: { status: "damaged" },
+      iafs_shuttle_core: { status: "damaged" },
     });
     expect(Object.keys(saved.quest_state.quests)).toEqual(questDefinitions.map((quest) => quest.id));
     expect(saved.active_events["iafs_opening_mike_crash_call:0"]).toMatchObject({
@@ -186,6 +215,37 @@ describe("App", () => {
       status: "awaiting_choice",
     });
     expect(saved.tiles).toBeUndefined();
+  });
+
+  it("migrates legacy map object status into matching feature runtime state", () => {
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          map: {
+            ...(createSavedCrashSiteState().map as Record<string, unknown>),
+            mapObjects: {
+              iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
+              iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+            },
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    const saved = readSavedState();
+    expect(saved?.map).toMatchObject({
+      featuresById: {
+        iafs_generator: {
+          id: "iafs_generator",
+          status: "repaired",
+        },
+      },
+    });
+    expect((saved?.map as { mapObjects?: unknown } | undefined)?.mapObjects).toBeUndefined();
   });
 
   it("restores and normalizes quest state from compatible saves", () => {
@@ -428,7 +488,7 @@ describe("App", () => {
 
 
   it("dispatches a repair selection into a timed repair crew action", () => {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createFeatureRepairCrashSiteState()));
 
     render(<App />);
 
@@ -438,24 +498,36 @@ describe("App", () => {
 
     const saved = readSavedState();
     expect(saved).not.toBeNull();
-    expect(Object.values((saved?.crew_actions ?? {}) as Record<string, { type: string; action_params?: { object_id?: string } }>)).toEqual(
+    const repairActions = Object.values(
+      (saved?.crew_actions ?? {}) as Record<string, { type: string; action_params?: { object_id?: string; target_feature_id?: string } }>,
+    );
+    expect(repairActions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           type: "repair",
-          action_params: expect.objectContaining({ object_id: "iafs_generator" }),
+          action_params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
         }),
       ]),
     );
-    const savedCrew = (saved?.crew ?? []) as Array<{ status: string; activeAction?: { actionType?: string; targetTile?: string } }>;
+    expect(repairActions[0]?.action_params).not.toHaveProperty("object_id");
+    const savedCrew = (saved?.crew ?? []) as Array<{
+      status: string;
+      activeAction?: { actionType?: string; targetTile?: string; params?: { target_feature_id?: string; object_id?: string } };
+    }>;
     expect(savedCrew[0]).toMatchObject({
       status: "正在维修发电机。",
-      activeAction: expect.objectContaining({ actionType: "repair", targetTile: "129-129" }),
+      activeAction: expect.objectContaining({
+        actionType: "repair",
+        targetTile: "129-129",
+        params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
+      }),
     });
+    expect(savedCrew[0]?.activeAction?.params).not.toHaveProperty("object_id");
     expect(saved?.active_calls).toEqual({});
   });
 
-  it("investigating a damaged crash-site object creates a runtime event call", () => {
-    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+  it("investigating a damaged crash-site feature creates a runtime event call", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createFeatureRepairCrashSiteState()));
 
     render(<App />);
 
@@ -467,17 +539,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
   });
 
-  it("investigating a repaired crash-site object creates a repaired-state runtime event call", () => {
+  it("investigating a repaired crash-site feature creates a repaired-state runtime event call", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(
-        createSavedCrashSiteState({
+        createFeatureRepairCrashSiteState({
           map: {
-            ...(createSavedCrashSiteState().map as Record<string, unknown>),
-            mapObjects: {
-              iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
-              iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-              iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+            ...(createFeatureRepairCrashSiteState().map as Record<string, unknown>),
+            featuresById: {
+              iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
+              iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
             },
           },
         }),
@@ -494,7 +566,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
   });
 
-  it("reveals hidden crash-site objects only after surveying the crash site event", () => {
+  it("reveals hidden crash-site features only after surveying the crash site event", () => {
     vi.useFakeTimers();
     window.localStorage.setItem(
       GAME_SAVE_KEY,
@@ -508,6 +580,11 @@ describe("App", () => {
                 investigated: true,
                 revealedObjectIds: [],
               },
+            },
+            featuresById: {
+              iafs_generator: { id: "iafs_generator", status: "damaged", revealed: false },
+              iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: false },
+              iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: false },
             },
           },
         }),
@@ -531,10 +608,10 @@ describe("App", () => {
 
     const saved = readSavedState();
     expect(saved?.map).toMatchObject({
-      tilesById: {
-        "129-129": {
-          revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
-        },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
       },
     });
   }, 15_000);
@@ -564,7 +641,7 @@ describe("App", () => {
         payload: {
           action_type: "inspect",
           action_def_id: "iafs_generator:inspect",
-          object_id: "iafs_generator",
+          feature_id: "iafs_generator",
           tags: ["iafs", "crash_site", "repair_target", "power_system"],
         },
       },
@@ -576,7 +653,7 @@ describe("App", () => {
 
   it("allows retrying a repair after a failed attempt has cleared the lock", () => {
     const retryResult = dispatchTimedLocalAction(
-      createSavedCrashSiteState({
+      createFeatureRepairCrashSiteState({
         elapsedGameSeconds: 180,
         crew: [
           {
@@ -596,14 +673,16 @@ describe("App", () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: "repair",
-          action_params: expect.objectContaining({ object_id: "iafs_generator" }),
+          action_params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
         }),
       ]),
     );
+    const retryAction = Object.values(retryResult.state.crew_actions).find((action) => action.type === "repair");
+    expect(retryAction?.action_params).not.toHaveProperty("object_id");
   });
 
-  it("rejects repeat repair submissions when the object is already locked or repaired", () => {
-    const lockedResult = dispatchTimedLocalAction(createSavedCrashSiteState({
+  it("rejects repeat repair submissions when the feature is already locked or repaired", () => {
+    const lockedResult = dispatchTimedLocalAction(createFeatureRepairCrashSiteState({
       crew_actions: {
         "repair:amy:iafs_generator:0": {
           id: "repair:amy:iafs_generator:0",
@@ -622,7 +701,7 @@ describe("App", () => {
           ends_at: 180,
           progress_seconds: 0,
           duration_seconds: 180,
-          action_params: { object_id: "iafs_generator" },
+          action_params: { target_feature_id: "iafs_generator" },
           can_interrupt: true,
           interrupt_duration_seconds: 10,
         },
@@ -631,18 +710,102 @@ describe("App", () => {
     expect(lockedResult.accepted).toBe(false);
     expect(lockedResult.reason).toContain("其他队员");
 
-    const repairedResult = dispatchTimedLocalAction(createSavedCrashSiteState({
+    const repairedResult = dispatchTimedLocalAction(createFeatureRepairCrashSiteState({
       map: {
-        ...(createSavedCrashSiteState().map as Record<string, unknown>),
-        mapObjects: {
-          iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
-          iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-          iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+        ...(createFeatureRepairCrashSiteState().map as Record<string, unknown>),
+        featuresById: {
+          iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
         },
       },
     }) as never, "mike", "iafs_generator:repair");
     expect(repairedResult.accepted).toBe(false);
     expect(repairedResult.reason).toContain("已经修复");
+  });
+
+  it("renders one enabled top-feature investigation button and lower-priority feature context", () => {
+    const highFeature = createCallPageFeatureFixture({ id: "__call_page_high_feature__", name: "高优先级目标", priority: 30 });
+    const lowFeature = createCallPageFeatureFixture({ id: "__call_page_low_feature__", name: "低优先级目标", priority: 10 });
+    setCallPageFeatureFixtures([highFeature, lowFeature]);
+    saveFeatureCallState([highFeature, lowFeature]);
+
+    render(<App />);
+
+    openMikeCallFromTask();
+    const highSection = screen.getByRole("heading", { name: /高优先级目标/ }).closest("section");
+    expect(highSection).not.toBeNull();
+    const investigateButton = within(highSection as HTMLElement).getByRole("button", { name: "调查" });
+    expect(investigateButton).toBeEnabled();
+    expect(investigateButton).toHaveTextContent("目标：高优先级目标 / 状态：已损坏");
+    expect(screen.queryByRole("heading", { name: /低优先级目标/ })).toBeNull();
+    expect(screen.getByText("低优先级目标")).toBeInTheDocument();
+    expect(screen.getByText("仅上下文")).toBeInTheDocument();
+  });
+
+  it("renders separate tied top-feature investigation buttons with feature names", () => {
+    const alphaFeature = createCallPageFeatureFixture({ id: "__call_page_alpha_feature__", name: "Alpha目标", priority: 20 });
+    const zetaFeature = createCallPageFeatureFixture({ id: "__call_page_zeta_feature__", name: "Zeta目标", priority: 20 });
+    setCallPageFeatureFixtures([alphaFeature, zetaFeature]);
+    saveFeatureCallState([alphaFeature, zetaFeature]);
+
+    render(<App />);
+
+    openMikeCallFromTask();
+    const alphaSection = screen.getByRole("heading", { name: /Alpha目标/ }).closest("section");
+    const zetaSection = screen.getByRole("heading", { name: /Zeta目标/ }).closest("section");
+    expect(alphaSection).not.toBeNull();
+    expect(zetaSection).not.toBeNull();
+    const alphaButton = within(alphaSection as HTMLElement).getByRole("button", { name: "调查" });
+    const zetaButton = within(zetaSection as HTMLElement).getByRole("button", { name: "调查" });
+    expect(alphaButton).toBeEnabled();
+    expect(alphaButton).toHaveTextContent("目标：Alpha目标 / 状态：已损坏");
+    expect(zetaButton).toBeEnabled();
+    expect(zetaButton).toHaveTextContent("目标：Zeta目标 / 状态：已损坏");
+  });
+
+  it("keeps move confirmation targeted at the selected tile when the tile contains a feature", () => {
+    const targetFeature = createCallPageFeatureFixture({
+      id: "__call_page_move_target_feature__",
+      name: "移动目标设施",
+      priority: 40,
+      tileId: "2-4",
+    });
+    setCallPageFeatureFixtures([targetFeature]);
+    const member = createCallPageCrewMember("mike", "2-3");
+    const map = createMapWithDiscoveredTiles("2-3", "2-4");
+    map.featuresById = {
+      [targetFeature.id]: { id: targetFeature.id, status: "damaged", revealed: true },
+    };
+    const gameState = createCallPageGameState(member, map);
+
+    render(
+      <CallPage
+        call={{ crewId: member.id, type: "normal", settled: false, selectingMoveTarget: true, selectedTargetTileId: "2-4" }}
+        crew={[member]}
+        tiles={initialTiles}
+        activeCalls={{}}
+        elapsedGameSeconds={0}
+        gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+        gameState={gameState}
+        logs={initialLogs}
+        onDecision={vi.fn()}
+        onConfirmMove={vi.fn()}
+        onClearMoveTarget={vi.fn()}
+        onOpenMap={vi.fn()}
+        onOpenControl={vi.fn()}
+        onOpenTask={vi.fn()}
+        onStartCall={vi.fn()}
+        onShowCrewStatus={vi.fn()}
+        onShowCrewInventory={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("移动确认")).toBeInTheDocument();
+    expect(screen.getByText(`${getTileLocationLabel(defaultMapConfig, "2-4")} / 地形：${initialTiles.find((tile) => tile.id === "2-4")!.terrain}`)).toBeInTheDocument();
+    const confirmButton = screen.getByRole("button", { name: /确认请求 麦克 前往/ });
+    expect(confirmButton).toBeEnabled();
+    expect(confirmButton).not.toHaveTextContent(targetFeature.id);
+    expect(confirmButton).not.toHaveTextContent(targetFeature.name);
+    expect(screen.queryByText(targetFeature.name)).toBeNull();
   });
 });
 
@@ -750,17 +913,6 @@ function startAmyBeastEmergencyFromSurvey() {
   fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 }
 
-function findTileWithObjectTag(tag: string, filters: { visibility?: string } = {}) {
-  const tile = defaultMapConfig.tiles.find((item) =>
-    item.objectIds.some((objectId) => {
-      const object = mapObjectDefinitionById.get(objectId);
-      return Boolean(object?.tags?.includes(tag) && (!filters.visibility || object.visibility === filters.visibility));
-    }),
-  );
-  expect(tile).toBeDefined();
-  return tile!;
-}
-
 function createMapWithDiscoveredTiles(...tileIds: string[]) {
   const map = createInitialMapState();
   for (const tileId of tileIds) {
@@ -773,14 +925,107 @@ function createMapWithDiscoveredTiles(...tileIds: string[]) {
   return map;
 }
 
-function createMapWithHiddenObject(tileId: string, objectId: string) {
-  const map = createMapWithDiscoveredTiles(tileId);
-  map.tilesById[tileId] = {
-    ...map.tilesById[tileId],
-    investigated: false,
-    revealedObjectIds: (map.tilesById[tileId]?.revealedObjectIds ?? []).filter((id) => id !== objectId),
+function setCallPageFeatureFixtures(features: MapFeatureDefinition[]): void {
+  defaultMapConfig.features = [...originalMapFeatures, ...features];
+}
+
+function createCallPageFeatureFixture({
+  id,
+  name,
+  priority,
+  tileId = "2-3",
+}: {
+  id: string;
+  name: string;
+  priority: number;
+  tileId?: string;
+}): MapFeatureDefinition {
+  const [row, col] = tileId.split("-").map(Number);
+  return {
+    id,
+    name,
+    kind: "test:feature",
+    priority,
+    visibility: "always",
+    footprint: { type: "row_spans", spans: [{ row, colStart: col, colEnd: col }] },
+    investigatable: true,
+    status_options: ["damaged", "repaired"],
+    initial_status: "damaged",
+    actions: [
+      {
+        id: `${id}:inspect`,
+        category: "feature",
+        label: "调查",
+        tone: "neutral",
+        conditions: [],
+        event_id: `${id}:inspect`,
+      },
+    ],
   };
-  return map;
+}
+
+function createCallPageCrewMember(crewId: "mike" | "simon" | "alice", currentTile: string): CrewMember {
+  const member = initialCrew.find((item) => item.id === crewId);
+  expect(member).toBeDefined();
+  return {
+    ...member!,
+    currentTile,
+    status: "待命中。",
+    statusTone: "neutral",
+    hasIncoming: false,
+    canCommunicate: true,
+    activeAction: undefined,
+  };
+}
+
+function saveFeatureCallState(features: MapFeatureDefinition[]): void {
+  const member = createCallPageCrewMember("mike", "2-3");
+  const map = createMapWithDiscoveredTiles("2-3");
+  map.featuresById = Object.fromEntries(
+    features.map((feature) => [feature.id, { id: feature.id, status: "damaged", revealed: true }]),
+  );
+  window.localStorage.setItem(
+    GAME_SAVE_KEY,
+    JSON.stringify(
+      createCompatibleSavedGameState({
+        elapsedGameSeconds: 0,
+        crew: [member],
+        tiles: initialTiles,
+        map,
+        logs: initialLogs,
+        resources: initialResources,
+        baseInventory: [],
+        crew_actions: {},
+        inventories: {},
+      }),
+    ),
+  );
+}
+
+function openMikeCallFromTask(): void {
+  fireEvent.click(screen.getByRole("button", { name: /任务/ }));
+  fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+}
+
+function createCallPageGameState(member: CrewMember, map: GameMapState): GameState {
+  return createCompatibleSavedGameState({
+    elapsedGameSeconds: 0,
+    crew: [member],
+    tiles: initialTiles,
+    map,
+    logs: initialLogs,
+    resources: initialResources,
+    baseInventory: [],
+    crew_actions: {},
+    inventories: {},
+    active_calls: {},
+    active_events: {},
+    objectives: {},
+    event_logs: [],
+    world_history: {},
+    world_flags: {},
+    rng_state: null,
+  }) as unknown as GameState;
 }
 
 function createCompatibleSavedGameState(state: Record<string, unknown>) {

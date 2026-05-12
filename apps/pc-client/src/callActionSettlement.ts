@@ -1,9 +1,10 @@
-import { defaultMapConfig, type Tone } from "./content/contentData";
+import { defaultMapConfig, type FeatureRuntimeState, type MapFeatureDefinition, type Tone } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition } from "./content/mapObjects";
 import type { CrewMember, GameMapState, MapTile, ResourceSummary, SystemLog } from "./data/gameData";
 import { executeEffects } from "./events/effects";
 import type { Effect } from "./events/types";
 import type { InventoryEntry } from "./inventorySystem";
+import { getFeatureRuntimeState } from "./mapSystem";
 import { addInventoryItem } from "./inventorySystem";
 import { formatGameTime } from "./timeSystem";
 import type { CrewActionState, TriggerContext } from "./events/types";
@@ -14,6 +15,8 @@ interface SettlementRuntimeAction {
   id: string;
   actionType: SettlementRuntimeActionType;
   targetTile?: string | null;
+  targetFeatureId?: string;
+  actionDefId?: string;
   objectId?: string;
   params: Record<string, unknown>;
   handler?: string;
@@ -51,6 +54,7 @@ interface HandlerContext {
   logs: SystemLog[];
   tile?: TileWithContent;
   object?: MapObjectDefinition;
+  feature?: MapFeatureDefinition;
 }
 
 type ActionHandler = (ctx: HandlerContext) => ActionSettlementPatch;
@@ -73,6 +77,7 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
   const handler = actionHandlers[handlerId];
   const tile = findTile(args.tiles, action.targetTile ?? args.member.currentTile);
   const object = action.objectId ? mapObjectDefinitionById.get(action.objectId) : undefined;
+  const feature = action.targetFeatureId ? findFeature(action.targetFeatureId) : undefined;
 
   if (!handler) {
     return createPatch({
@@ -93,13 +98,18 @@ export function settleAction(args: SettleActionArgs): ActionSettlementPatch {
     logs: args.logs,
     tile,
     object,
+    feature,
   });
 }
 
 function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
+  if (ctx.action.targetFeatureId) {
+    return settleFeatureSurvey(ctx, ctx.action.targetFeatureId);
+  }
+
   const tileId = ctx.action.targetTile ?? ctx.member.currentTile;
   const tile = ctx.tile;
-  const objects = getTileObjectsForTile(tile);
+  const objects = getTileObjectsForTile(tile, ctx.map);
   const revealedObjects = objects.filter((object) => object.visibility === "onInvestigated");
   const revealedObjectIds = revealedObjects.map((object) => object.id);
   const previous = ctx.map.tilesById[tileId] ?? {};
@@ -132,6 +142,60 @@ function settleSurvey(ctx: HandlerContext): ActionSettlementPatch {
     map,
     logs: appendLogEntry(ctx.logs, `${ctx.member.name} 完成一轮调查。`, "neutral", ctx.occurredAt),
     triggerContexts: [createActionCompleteTrigger(ctx, getPayloadObjects(ctx, revealedObjects))],
+  });
+}
+
+function settleFeatureSurvey(ctx: HandlerContext, featureId: string): ActionSettlementPatch {
+  const feature = findFeature(featureId);
+  if (!feature) {
+    return createPatch({
+      ...ctx,
+      member: {
+        ...ctx.member,
+        status: "调查失败，待命中。",
+        statusTone: "danger",
+        activeAction: undefined,
+      },
+      logs: appendLogEntry(ctx.logs, `行动完成失败：调查目标 ${featureId} 不存在。`, "danger", ctx.occurredAt),
+      triggerContexts: [],
+    });
+  }
+
+  const tileId = ctx.action.targetTile ?? ctx.member.currentTile;
+  const previousTile = ctx.map.tilesById[tileId] ?? {};
+  const nextFeatureState = createSurveyedFeatureState(ctx, feature);
+  const map = {
+    ...ctx.map,
+    discoveredTileIds: addUnique(ctx.map.discoveredTileIds, tileId),
+    tilesById: {
+      ...ctx.map.tilesById,
+      [tileId]: {
+        ...previousTile,
+        discovered: true,
+        investigated: true,
+        status: "已调查",
+      },
+    },
+    featuresById: {
+      ...(ctx.map.featuresById ?? {}),
+      [feature.id]: nextFeatureState.state,
+    },
+  };
+  const tiles = patchTile(ctx.tiles, tileId, { investigated: true, status: "已调查" });
+  const member = {
+    ...ctx.member,
+    status: "调查完成，待命中。",
+    statusTone: "neutral" as Tone,
+    activeAction: undefined,
+  };
+
+  return createPatch({
+    ...ctx,
+    member,
+    tiles,
+    map,
+    logs: appendLogEntry(ctx.logs, `${ctx.member.name} 完成一轮调查。`, "neutral", ctx.occurredAt),
+    triggerContexts: [createActionCompleteTrigger(ctx, [], createFeatureSurveyPayload(ctx, feature, nextFeatureState.firstInvestigation))],
   });
 }
 
@@ -178,7 +242,11 @@ function settleGenericCompletion(ctx: HandlerContext): ActionSettlementPatch {
 
 function settleRepair(ctx: HandlerContext): ActionSettlementPatch {
   const repairCheck = readRepairSuccessCheck(ctx.action.params.success_check);
-  const repairResult = rollRepairOutcome(repairCheck, ctx.member.attributes.agility) ? "success" : "failure";
+  const repairResult = repairCheck
+    ? (rollRepairOutcome(repairCheck, ctx.member.attributes.agility) ? "success" : "failure")
+    : ctx.action.targetFeatureId
+      ? "success"
+      : "failure";
   const repairEffects = readRepairEffects(
     repairResult === "success" ? ctx.action.params.success_effects : ctx.action.params.failure_effects,
   );
@@ -199,7 +267,12 @@ function settleRepair(ctx: HandlerContext): ActionSettlementPatch {
     member,
     map,
     logs: appendLogEntry(ctx.logs, logText, repairResult === "success" ? "success" : "muted", ctx.occurredAt),
-    triggerContexts: [createActionCompleteTrigger(ctx, ctx.object ? [ctx.object] : [], { repair_result: repairResult })],
+    triggerContexts: [
+      createActionCompleteTrigger(ctx, ctx.object ? [ctx.object] : [], {
+        ...(ctx.action.actionDefId ? { action_def_id: ctx.action.actionDefId } : {}),
+        repair_result: repairResult,
+      }),
+    ],
   });
 }
 
@@ -228,6 +301,8 @@ function normalizeSettlementAction(action: CrewActionState): SettlementRuntimeAc
     id: action.id,
     actionType: action.type as SettlementRuntimeActionType,
     targetTile: action.target_tile_id ?? action.to_tile_id,
+    targetFeatureId: stringParam(action.action_params.target_feature_id),
+    actionDefId: stringParam(action.action_params.action_def_id),
     objectId: stringParam(action.action_params.object_id),
     params: action.action_params,
     handler: stringParam(action.action_params.handler),
@@ -261,16 +336,12 @@ function findTile(tiles: MapTile[], tileId: string | undefined): TileWithContent
   };
 }
 
-function getTileObjectsForTile(tile: TileWithContent | undefined): MapObjectDefinition[] {
+function getTileObjectsForTile(tile: TileWithContent | undefined, map: GameMapState): MapObjectDefinition[] {
   if (!tile) {
     return [];
   }
 
-  const configTile = defaultMapConfig.tiles.find((configItem) => configItem.id === tile.id);
-  if (!configTile) {
-    return [];
-  }
-  return configTile.objectIds
+  return Array.from(new Set(map.tilesById[tile.id]?.revealedObjectIds ?? []))
     .map((id) => mapObjectDefinitionById.get(id))
     .filter((definition): definition is MapObjectDefinition => Boolean(definition));
 }
@@ -283,11 +354,58 @@ function getPayloadObjects(ctx: HandlerContext, fallbackObjects: MapObjectDefini
   return fallbackObjects;
 }
 
+function findFeature(featureId: string): MapFeatureDefinition | undefined {
+  return defaultMapConfig.features.find((feature) => feature.id === featureId);
+}
+
+function createSurveyedFeatureState(
+  ctx: HandlerContext,
+  feature: MapFeatureDefinition,
+): { state: FeatureRuntimeState; firstInvestigation: boolean } {
+  const previousState = getFeatureRuntimeState(ctx.map, feature);
+  const previousHistoryKeys = previousState.historyKeys ?? [];
+  const revealHistoryKey = getFeatureSurveyRevealHistoryKey(feature.id);
+  const firstInvestigation = previousState.investigated !== true && !previousHistoryKeys.includes(revealHistoryKey);
+  const nextHistoryKeys = firstInvestigation ? addUnique(previousHistoryKeys, revealHistoryKey) : previousState.historyKeys;
+  const state: FeatureRuntimeState = {
+    ...previousState,
+    id: feature.id,
+    revealed: true,
+    investigated: true,
+    investigatedAt: previousState.investigatedAt ?? ctx.occurredAt,
+    lastTriggeredAt: firstInvestigation ? ctx.occurredAt : previousState.lastTriggeredAt,
+    ...(nextHistoryKeys ? { historyKeys: nextHistoryKeys } : {}),
+  };
+
+  return { state, firstInvestigation };
+}
+
+function createFeatureSurveyPayload(
+  ctx: HandlerContext,
+  feature: MapFeatureDefinition,
+  firstInvestigation: boolean,
+): Record<string, unknown> {
+  const featureTags = feature.tags ?? [];
+  return {
+    ...(ctx.action.actionDefId ? { action_def_id: ctx.action.actionDefId } : {}),
+    feature_id: feature.id,
+    feature_kind: feature.kind,
+    feature_tags: featureTags,
+    feature_first_investigation: firstInvestigation,
+    tags: mergeTags(getTileTags(ctx.tile), featureTags),
+  };
+}
+
+function getFeatureSurveyRevealHistoryKey(featureId: string): string {
+  return `survey:${featureId}:revealed`;
+}
+
 function createActionCompleteTrigger(
   ctx: HandlerContext,
   objects: MapObjectDefinition[],
   payloadPatch: Record<string, unknown> = {},
 ): TriggerContext {
+  const featureTags = ctx.feature?.tags ?? [];
   return {
     trigger_type: "action_complete",
     occurred_at: ctx.occurredAt,
@@ -298,7 +416,14 @@ function createActionCompleteTrigger(
     payload: {
       action_type: ctx.action.actionType,
       object_id: ctx.object?.id ?? null,
-      tags: mergeTags(getTileTags(ctx.tile), objects.flatMap((object) => object.tags ?? [])),
+      ...(ctx.feature
+        ? {
+            feature_id: ctx.feature.id,
+            feature_kind: ctx.feature.kind,
+            feature_tags: featureTags,
+          }
+        : {}),
+      tags: mergeTags(getTileTags(ctx.tile), objects.flatMap((object) => object.tags ?? []), featureTags),
       ...payloadPatch,
     },
   };
@@ -334,6 +459,7 @@ function applyRepairEffects(ctx: HandlerContext, effects: Effect[]): GameMapStat
       rng_state: null,
       map: {
         tilesById: ctx.map.tilesById,
+        featuresById: ctx.map.featuresById,
         mapObjects: ctx.map.mapObjects,
       },
     },
@@ -350,6 +476,7 @@ function applyRepairEffects(ctx: HandlerContext, effects: Effect[]): GameMapStat
   return {
     ...ctx.map,
     tilesById: result.state.map?.tilesById ?? ctx.map.tilesById,
+    featuresById: result.state.map?.featuresById ?? ctx.map.featuresById,
     mapObjects: result.state.map?.mapObjects ?? ctx.map.mapObjects,
   };
 }
@@ -359,8 +486,12 @@ function rollRepairOutcome(check: RepairSuccessCheck, agility: number) {
   return Math.random() < chance;
 }
 
-function readRepairSuccessCheck(value: unknown): RepairSuccessCheck {
-  const record = isRecord(value) ? value : {};
+function readRepairSuccessCheck(value: unknown): RepairSuccessCheck | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const record = value;
 
   return {
     base: numberParam(record.base),
@@ -383,24 +514,48 @@ function readRepairEffects(value: unknown): Effect[] {
 }
 
 function toRepairEffect(value: unknown, index: number): Effect | undefined {
-  if (!isRecord(value) || value.type !== "set_object_status") {
+  if (!isRecord(value)) {
     return undefined;
   }
 
-  const objectId = stringParam(value.object_id);
   const status = stringParam(value.status);
-  if (!objectId || !status) {
+  if (!status) {
     return undefined;
   }
 
-  return {
-    id: `repair_effect_${index}_${objectId}`,
-    type: "set_object_status",
-    target: { type: "world_flags" },
-    params: { object_id: objectId, status },
-    failure_policy: "fail_event",
-    record_policy: { write_event_log: false, write_world_history: false },
-  };
+  if (value.type === "set_feature_status") {
+    const featureId = stringParam(value.feature_id);
+    if (!featureId) {
+      return undefined;
+    }
+
+    return {
+      id: `repair_effect_${index}_${featureId}`,
+      type: "set_feature_status",
+      target: { type: "world_flags" },
+      params: { feature_id: featureId, status },
+      failure_policy: "fail_event",
+      record_policy: { write_event_log: false, write_world_history: false },
+    };
+  }
+
+  if (value.type === "set_object_status") {
+    const objectId = stringParam(value.object_id);
+    if (!objectId) {
+      return undefined;
+    }
+
+    return {
+      id: `repair_effect_${index}_${objectId}`,
+      type: "set_object_status",
+      target: { type: "world_flags" },
+      params: { object_id: objectId, status },
+      failure_policy: "fail_event",
+      record_policy: { write_event_log: false, write_world_history: false },
+    };
+  }
+
+  return undefined;
 }
 
 function clamp(min: number, max: number, value: number) {

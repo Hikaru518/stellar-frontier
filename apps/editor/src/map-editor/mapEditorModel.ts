@@ -1,8 +1,10 @@
 import type {
   CreateMapDraftInput,
+  FeatureFootprint,
   MapEditorDraft,
   MapEditorState,
   MapEnvironmentDefinition,
+  MapFeatureDefinition,
   MapTileDefinition,
 } from "./types";
 
@@ -27,6 +29,7 @@ export function createMapEditorDraft(input: CreateMapDraftInput): MapEditorDraft
     initialDiscoveredTileIds: [originTileId],
     radarPath,
     tiles: createGameplayTiles(rows, cols),
+    features: [],
     radar: createDefaultRadar(rows, cols, originTileId, radarPath),
   };
 }
@@ -49,8 +52,17 @@ export function normalizeMapEditorDraft(draft: MapEditorDraft): MapEditorDraft {
   return {
     ...draft,
     radarPath,
+    tiles: draft.tiles.map(normalizeTile),
+    features: Array.isArray(draft.features) ? draft.features : [],
     radar: normalizeRadar(draft.radar, rows, cols, draft.originTileId, radarPath),
   };
+}
+
+function normalizeTile(tile: MapTileDefinition): MapTileDefinition {
+  const tileWithoutLegacy = { ...tile } as MapTileDefinition & { areaName?: unknown; objectIds?: unknown };
+  delete tileWithoutLegacy.areaName;
+  delete tileWithoutLegacy.objectIds;
+  return tileWithoutLegacy;
 }
 
 export function getTileId(row: number, col: number): string {
@@ -81,6 +93,95 @@ export function isTileInsideDraft(draft: MapEditorDraft, tileId: string): boolea
   return point.row >= 1 && point.row <= draft.size.rows && point.col >= 1 && point.col <= draft.size.cols;
 }
 
+export function isTileInFeatureFootprint(feature: MapFeatureDefinition, tileId: string): boolean {
+  const point = parseTileId(tileId);
+  if (!point || feature.footprint.type !== "row_spans") {
+    return false;
+  }
+
+  return feature.footprint.spans.some((span) => {
+    const colStart = Math.min(span.colStart, span.colEnd);
+    const colEnd = Math.max(span.colStart, span.colEnd);
+    return span.row === point.row && point.col >= colStart && point.col <= colEnd;
+  });
+}
+
+export function getFeaturesForTile(draft: MapEditorDraft, tileId: string): MapFeatureDefinition[] {
+  if (!isTileInsideDraft(draft, tileId)) {
+    return [];
+  }
+
+  return draft.features
+    .filter((feature) => isTileInFeatureFootprint(feature, tileId))
+    .sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+}
+
+export function getFeatureFootprintTileIds(draft: MapEditorDraft, feature: MapFeatureDefinition): string[] {
+  if (feature.footprint.type !== "row_spans") {
+    return [];
+  }
+
+  const tileIds = new Set<string>();
+  for (const span of feature.footprint.spans) {
+    const row = Math.round(span.row);
+    if (row < 1 || row > draft.size.rows) {
+      continue;
+    }
+
+    const colStart = clampCoordinate(Math.min(span.colStart, span.colEnd), 1, draft.size.cols);
+    const colEnd = clampCoordinate(Math.max(span.colStart, span.colEnd), 1, draft.size.cols);
+    for (let col = colStart; col <= colEnd; col += 1) {
+      tileIds.add(getTileId(row, col));
+    }
+  }
+
+  return Array.from(tileIds).sort(compareTileIds);
+}
+
+export function createFeatureFootprintFromTileIds(draft: MapEditorDraft, tileIds: string[]): FeatureFootprint {
+  const colsByRow = new Map<number, Set<number>>();
+  for (const tileId of tileIds) {
+    const point = parseTileId(tileId);
+    if (!point || point.row < 1 || point.row > draft.size.rows || point.col < 1 || point.col > draft.size.cols) {
+      continue;
+    }
+
+    const cols = colsByRow.get(point.row) ?? new Set<number>();
+    cols.add(point.col);
+    colsByRow.set(point.row, cols);
+  }
+
+  const spans: FeatureFootprint["spans"] = [];
+  for (const row of Array.from(colsByRow.keys()).sort((left, right) => left - right)) {
+    const cols = Array.from(colsByRow.get(row) ?? []).sort((left, right) => left - right);
+    let colStart: number | null = null;
+    let previousCol: number | null = null;
+
+    for (const col of cols) {
+      if (colStart === null || previousCol === null) {
+        colStart = col;
+        previousCol = col;
+        continue;
+      }
+
+      if (col === previousCol + 1) {
+        previousCol = col;
+        continue;
+      }
+
+      spans.push({ row, colStart, colEnd: previousCol });
+      colStart = col;
+      previousCol = col;
+    }
+
+    if (colStart !== null && previousCol !== null) {
+      spans.push({ row, colStart, colEnd: previousCol });
+    }
+  }
+
+  return { type: "row_spans", spans };
+}
+
 function createGameplayTiles(rows: number, cols: number): MapTileDefinition[] {
   const tiles: MapTileDefinition[] = [];
   for (let row = 1; row <= rows; row += 1) {
@@ -89,11 +190,9 @@ function createGameplayTiles(rows: number, cols: number): MapTileDefinition[] {
         id: getTileId(row, col),
         row,
         col,
-        areaName: `区域 ${row}-${col}`,
         terrain: DEFAULT_TERRAIN,
         weather: DEFAULT_WEATHER,
         environment: createDefaultEnvironment(),
-        objectIds: [],
         specialStates: [],
       });
     }
@@ -194,4 +293,18 @@ function assertPositiveInteger(value: number, name: string): number {
     throw new Error(`${name} must be a positive integer`);
   }
   return value;
+}
+
+function compareTileIds(left: string, right: string): number {
+  const leftPoint = parseTileId(left);
+  const rightPoint = parseTileId(right);
+  if (!leftPoint || !rightPoint) {
+    return left.localeCompare(right);
+  }
+
+  return leftPoint.row - rightPoint.row || leftPoint.col - rightPoint.col;
+}
+
+function clampCoordinate(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
 }

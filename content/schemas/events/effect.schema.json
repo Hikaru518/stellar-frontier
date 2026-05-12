@@ -49,7 +49,9 @@
             "add_diary_entry",
             "spawn_event",
             "unlock_event_definition",
-            "handler_effect"
+            "handler_effect",
+            "set_feature_status",
+            "set_feature_revealed"
           ]
         },
         "target": {
@@ -86,6 +88,67 @@
         "handler_type": {
           "type": ["string", "null"],
           "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "set_feature_status"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/set_feature_status_params"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "set_feature_revealed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/set_feature_revealed_params"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "set_feature_status_params": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["feature_id", "status"],
+      "properties": {
+        "feature_id": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "set_feature_revealed_params": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["feature_id", "revealed"],
+      "properties": {
+        "feature_id": {
+          "$ref": "#/$defs/id"
+        },
+        "revealed": {
+          "type": "boolean"
         }
       }
     },

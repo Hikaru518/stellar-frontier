@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
+import Ajv2020 from "ajv/dist/2020.js";
 import handlerRegistryContent from "../../../../../content/events/handler_registry.json";
+import conditionSchema from "../../../../../content/schemas/events/condition.schema.json";
+import effectSchema from "../../../../../content/schemas/events/effect.schema.json";
 import type { EffectType } from "../../../../pc-client/src/events/types";
-import { effectCapabilities, effectHandlerOptions, getEffectCapability } from "./capabilityCatalog";
+import {
+  conditionHandlerOptions,
+  effectCapabilities,
+  effectHandlerOptions,
+  getEffectCapability,
+} from "./capabilityCatalog";
 import { createDefaultEffectTemplate } from "./templates";
 
 const EXPECTED_EFFECT_TYPES = [
@@ -40,6 +48,8 @@ const EXPECTED_EFFECT_TYPES = [
   "spawn_event",
   "unlock_event_definition",
   "handler_effect",
+  "set_feature_status",
+  "set_feature_revealed",
   "set_object_status",
 ] as const satisfies readonly EffectType[];
 
@@ -99,7 +109,93 @@ describe("event effect capability registry", () => {
 
   it("looks up effect capabilities by type", () => {
     expect(getEffectCapability("set_world_flag").template.type).toBe("set_world_flag");
+    expect(getEffectCapability("set_feature_status").template).toMatchObject({
+      type: "set_feature_status",
+      target: { type: "event_tile" },
+      params: { feature_id: "TODO_FEATURE", status: "TODO_STATUS" },
+    });
+    expect(getEffectCapability("set_feature_revealed").template).toMatchObject({
+      type: "set_feature_revealed",
+      target: { type: "event_tile" },
+      params: { feature_id: "TODO_FEATURE", revealed: true },
+    });
     expect(getEffectCapability("set_object_status").template.type).toBe("set_object_status");
+  });
+
+  it("accepts feature condition and effect contracts in event schemas", () => {
+    const ajv = new Ajv2020({ allErrors: true, allowUnionTypes: true });
+    ajv.addSchema(conditionSchema);
+    ajv.addSchema(effectSchema);
+    const validateCondition = ajv.getSchema(conditionSchema.$id);
+    const validateEffect = ajv.getSchema(effectSchema.$id);
+
+    expect(validateCondition).toBeDefined();
+    expect(validateEffect).toBeDefined();
+    expectValid(
+      "feature_status_equals condition",
+      validateCondition?.({
+        type: "handler_condition",
+        handler_type: "feature_status_equals",
+        params: { feature_id: "iafs_generator", status: "damaged" },
+      }),
+      validateCondition?.errors,
+    );
+    expectInvalid(
+      "feature_status_equals condition without status",
+      validateCondition?.({
+        type: "handler_condition",
+        handler_type: "feature_status_equals",
+        params: { feature_id: "iafs_generator" },
+      }),
+    );
+    expectValid(
+      "set_feature_status effect",
+      validateEffect?.(
+        createFeatureEffect("set_feature_status", {
+          feature_id: "iafs_generator",
+          status: "repaired",
+        }),
+      ),
+      validateEffect?.errors,
+    );
+    expectValid(
+      "set_feature_revealed effect",
+      validateEffect?.(
+        createFeatureEffect("set_feature_revealed", {
+          feature_id: "iafs_generator",
+          revealed: true,
+        }),
+      ),
+      validateEffect?.errors,
+    );
+    expectInvalid(
+      "set_feature_revealed effect without boolean revealed",
+      validateEffect?.(
+        createFeatureEffect("set_feature_revealed", {
+          feature_id: "iafs_generator",
+          revealed: "yes",
+        }),
+      ),
+    );
+  });
+
+  it("exposes the feature condition handler with a resolvable params schema ref", () => {
+    const featureConditionHandler = handlerRegistryContent.handlers.find(
+      (handler) => handler.handler_type === "feature_status_equals",
+    );
+    const handlerOption = conditionHandlerOptions.find((option) => option.value === "feature_status_equals");
+
+    expect(featureConditionHandler).toMatchObject({
+      handler_type: "feature_status_equals",
+      kind: "condition",
+      params_schema_ref: "#/$defs/feature_status_equals_params",
+    });
+    expect(handlerOption?.meta).toMatchObject({
+      paramsSchemaRef: "#/$defs/feature_status_equals_params",
+    });
+    expect(resolveJsonPointer(conditionSchema, featureConditionHandler?.params_schema_ref ?? "")).toMatchObject({
+      required: ["feature_id", "status"],
+    });
   });
 
   it("exposes only effect handler entries to handler_effect", () => {
@@ -122,6 +218,53 @@ describe("event effect capability registry", () => {
     expect(intersection(effectHandlerOptions.map((option) => option.value), expectedConditionHandlers)).toEqual([]);
   });
 });
+
+function createFeatureEffect(type: EffectType, params: Record<string, unknown>) {
+  return {
+    id: type,
+    type,
+    target: { type: "event_tile" },
+    params,
+    failure_policy: "fail_event",
+    record_policy: {
+      write_event_log: false,
+      write_world_history: false,
+    },
+  };
+}
+
+function expectValid(label: string, valid: unknown, errors: unknown): void {
+  if (valid !== true) {
+    throw new Error(`${label} should be valid. Errors: ${JSON.stringify(errors)}`);
+  }
+}
+
+function expectInvalid(label: string, valid: unknown): void {
+  if (valid !== false) {
+    throw new Error(`${label} should be invalid.`);
+  }
+}
+
+function resolveJsonPointer(root: unknown, pointer: string): unknown {
+  if (!pointer.startsWith("#/")) {
+    throw new Error(`Expected local JSON pointer, got ${pointer}`);
+  }
+
+  return pointer
+    .slice(2)
+    .split("/")
+    .map((segment) => segment.replace(/~1/g, "/").replace(/~0/g, "~"))
+    .reduce<unknown>((value, segment) => {
+      if (!isRecord(value) || !(segment in value)) {
+        throw new Error(`Unresolved JSON pointer ${pointer}`);
+      }
+      return value[segment];
+    }, root);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
 
 function expectCoverage(label: string, actual: readonly string[], expected: readonly string[]): void {
   const actualSet = new Set(actual);

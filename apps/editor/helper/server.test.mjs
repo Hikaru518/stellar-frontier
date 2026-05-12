@@ -418,8 +418,12 @@ describe("helper server", () => {
 
   it("writes valid map drafts to an allowed content/maps path from /api/map-editor/save", async () => {
     await restartWithTempRepo();
+    const feature = minimalFeature("saved_feature");
     const response = await postJson("/api/map-editor/save", {
-      data: minimalMap("new-map"),
+      data: {
+        ...minimalMap("new-map"),
+        features: [feature],
+      },
     });
 
     expect(response.status).toBe(200);
@@ -434,6 +438,7 @@ describe("helper server", () => {
     expect(saved.id).toBe("new-map");
     expect(saved.radar).toBeUndefined();
     expect(saved.radarPath).toBe("content/maps/radar/new-map-radar.json");
+    expect(saved.features).toEqual([feature]);
     const savedRadar = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/radar/new-map-radar.json"), "utf8"));
     expect(savedRadar).toEqual(expect.objectContaining({ mapId: "new-map", glyphRows: ["."] }));
   });
@@ -672,6 +677,20 @@ function minimalRadarBody() {
       emptyLine: "empty",
     },
     regions: [],
+  };
+}
+
+function minimalFeature(id) {
+  return {
+    id,
+    name: "Test Feature",
+    kind: "site:test",
+    priority: 10,
+    visibility: "onDiscovered",
+    footprint: {
+      type: "row_spans",
+      spans: [{ row: 1, colStart: 1, colEnd: 1 }],
+    },
   };
 }
 

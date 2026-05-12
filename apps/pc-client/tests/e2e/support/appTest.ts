@@ -13,7 +13,7 @@ export const test = base.extend({
 });
 
 export const GAME_SAVE_KEY = "stellar-frontier-save-v2";
-export const CRASH_SITE_OBJECT_IDS = ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"];
+export const CRASH_SITE_FEATURE_IDS = ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"];
 
 const GAME_SAVE_VERSION = 3;
 const GAME_SAVE_SCHEMA_VERSION = "event-program-model-v1";
@@ -125,7 +125,7 @@ export function mikeCard(page: Page) {
   return page.locator("article.console-crew-card").filter({ hasText: "麦克" }).first();
 }
 
-export function objectSection(page: Page, name: string) {
+export function featureSection(page: Page, name: string) {
   return page.getByRole("heading", { name }).locator("xpath=ancestor::section[1]");
 }
 
@@ -185,13 +185,12 @@ export function createRevealedCrashSiteMap() {
       [MAP_ORIGIN_TILE_ID]: {
         discovered: true,
         investigated: true,
-        revealedObjectIds: CRASH_SITE_OBJECT_IDS,
       },
     },
-    mapObjects: {
-      iafs_generator: { id: "iafs_generator", status_enum: "damaged" },
-      iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-      iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+    featuresById: {
+      iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+      iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+      iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
     },
   });
 }

@@ -55,6 +55,12 @@
       "items": {
         "$ref": "#/$defs/tile"
       }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mapFeature"
+      }
     }
   },
   "$defs": {
@@ -74,9 +80,25 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
+    "colonId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*(?::[a-z][a-z0-9_-]*)*$"
+    },
+    "customKind": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(?::[A-Za-z][A-Za-z0-9_-]*)*$"
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "muted", "accent", "danger", "success"]
+    },
     "visibility": {
       "type": "string",
       "enum": ["onDiscovered", "onInvestigated", "hidden"]
+    },
+    "mapFeatureVisibility": {
+      "type": "string",
+      "enum": ["always", "onDiscovered", "onInvestigated", "hidden"]
     },
     "environment": {
       "type": "object",
@@ -107,43 +129,6 @@
         },
         "notes": {
           "$ref": "#/$defs/localizedText"
-        }
-      }
-    },
-    "mapObject": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "kind", "name", "visibility"],
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/id"
-        },
-        "kind": {
-          "type": "string",
-          "enum": ["resourceNode", "structure", "signal", "hazard", "facility", "ruin", "landmark"]
-        },
-        "name": {
-          "$ref": "#/$defs/localizedText"
-        },
-        "description": {
-          "$ref": "#/$defs/localizedText"
-        },
-        "visibility": {
-          "type": "string",
-          "enum": ["onDiscovered", "onInvestigated"]
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/tag"
-          }
-        },
-        "candidateActions": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["move", "survey", "gather", "build", "standby", "extract", "scan"]
-          }
         }
       }
     },
@@ -189,10 +174,214 @@
         }
       }
     },
+    "featureFootprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "spans"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "row_spans"
+        },
+        "spans": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/featureRowSpan"
+          }
+        }
+      }
+    },
+    "featureRowSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "colStart", "colEnd"],
+      "properties": {
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "colStart": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "colEnd": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "featureActionEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "feature_id", "status"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "set_feature_status"
+        },
+        "feature_id": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "featureLocalAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "duration_seconds", "success_effects", "failure_effects"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "timed_repair"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "success_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureActionEffect"
+          }
+        },
+        "failure_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureActionEffect"
+          }
+        }
+      }
+    },
+    "featureActionDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "label", "conditions"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/colonId"
+        },
+        "category": {
+          "type": "string",
+          "const": "feature"
+        },
+        "label": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "tone": {
+          "$ref": "#/$defs/tone"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_when_unavailable": {
+          "type": "string",
+          "enum": ["disabled"]
+        },
+        "unavailable_hint": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "local_action": {
+          "$ref": "#/$defs/featureLocalAction"
+        }
+      }
+    },
+    "mapFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "priority", "visibility", "footprint"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "kind": {
+          "$ref": "#/$defs/customKind"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          }
+        },
+        "visibility": {
+          "$ref": "#/$defs/mapFeatureVisibility"
+        },
+        "footprint": {
+          "$ref": "#/$defs/featureFootprint"
+        },
+        "investigatable": {
+          "type": "boolean"
+        },
+        "status_options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "initial_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/featureActionDef"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["investigatable"],
+            "properties": {
+              "investigatable": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": ["status_options", "initial_status", "actions"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["status_options"] },
+                { "required": ["initial_status"] },
+                { "required": ["actions"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
     "tile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "row", "col", "areaName", "terrain", "weather", "environment", "objectIds", "specialStates"],
+      "required": ["id", "row", "col", "terrain", "weather", "environment", "specialStates"],
       "properties": {
         "id": {
           "$ref": "#/$defs/tileId"
@@ -205,9 +394,6 @@
           "type": "integer",
           "minimum": 1
         },
-        "areaName": {
-          "$ref": "#/$defs/localizedText"
-        },
         "terrain": {
           "type": "string",
           "enum": ["平原", "水", "森林 / 山", "山", "丘陵", "旧医疗前哨", "坠落广播塔", "沙漠", "裂谷", "高地", "荒原"]
@@ -218,13 +404,6 @@
         },
         "environment": {
           "$ref": "#/$defs/environment"
-        },
-        "objectIds": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/id"
-          },
-          "uniqueItems": true
         },
         "specialStates": {
           "type": "array",

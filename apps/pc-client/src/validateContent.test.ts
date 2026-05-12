@@ -36,6 +36,113 @@ describe("validate-content quest references", () => {
   });
 });
 
+describe("validate-content map features", () => {
+  afterEach(() => {
+    while (tempRoots.length > 0) {
+      const root = tempRoots.pop();
+      if (root) {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("accepts legal passive and investigatable map features", () => {
+    const root = createTempContentRoot();
+    const map = readDefaultMap(root);
+    map.features = [passiveFeature("ice_field"), investigatableFeature("iafs_generator")];
+    writeDefaultMap(root, map);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("Content validation passed.");
+  });
+
+  it("rejects duplicate feature ids, invalid status, empty spans, and out-of-bounds spans", () => {
+    const root = createTempContentRoot();
+    const map = readDefaultMap(root);
+    map.features = [
+      passiveFeature("duplicate_feature"),
+      passiveFeature("duplicate_feature", { footprint: { type: "row_spans", spans: [] } }),
+      passiveFeature("outside_feature", { footprint: { type: "row_spans", spans: [{ row: 257, colStart: 1, colEnd: 1 }] } }),
+      investigatableFeature("invalid_status_feature", { initial_status: "missing" }),
+    ];
+    writeDefaultMap(root, map);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("Duplicate feature id in map default-map");
+    expect(result.output).toContain("feature duplicate_feature field id");
+    expect(result.output).toContain("feature duplicate_feature field footprint.spans");
+    expect(result.output).toContain("feature outside_feature field footprint.spans[0]");
+    expect(result.output).toContain("feature invalid_status_feature field initial_status");
+  });
+
+  it("rejects passive features carrying investigatable-only fields", () => {
+    const root = createTempContentRoot();
+    const map = readDefaultMap(root);
+    map.features = [
+      passiveFeature("passive_status_feature", { status_options: ["unknown"], initial_status: "unknown" }),
+      passiveFeature("passive_actions_feature", {
+        actions: [{ id: "passive_actions_feature:inspect", category: "feature", label: "Inspect", conditions: [] }],
+      }),
+    ];
+    writeDefaultMap(root, map);
+
+    const result = runValidator(root);
+
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("feature passive_status_feature field status_options");
+    expect(result.output).toContain("feature passive_actions_feature field actions");
+  });
+});
+
+function createTempContentRoot(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "stellar-content-"));
+  tempRoots.push(root);
+  fs.cpSync(path.join(projectRoot, "content"), path.join(root, "content"), { recursive: true });
+  return root;
+}
+
+function readDefaultMap(root: string) {
+  return JSON.parse(fs.readFileSync(defaultMapPath(root), "utf8"));
+}
+
+function writeDefaultMap(root: string, map: unknown) {
+  fs.writeFileSync(defaultMapPath(root), `${JSON.stringify(map, null, 2)}\n`);
+}
+
+function defaultMapPath(root: string): string {
+  return path.join(root, "content/maps/default-map.json");
+}
+
+function passiveFeature(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name: id,
+    kind: "test:feature",
+    priority: 10,
+    visibility: "always",
+    footprint: {
+      type: "row_spans",
+      spans: [{ row: 129, colStart: 129, colEnd: 130 }],
+    },
+    ...overrides,
+  };
+}
+
+function investigatableFeature(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    ...passiveFeature(id),
+    investigatable: true,
+    status_options: ["unknown", "resolved"],
+    initial_status: "unknown",
+    actions: [{ id: `${id}:inspect`, category: "feature", label: "Inspect", conditions: [] }],
+    ...overrides,
+  };
+}
+
 function runValidator(root: string): { status: number; output: string } {
   try {
     const output = execFileSync("node", [path.join(projectRoot, "scripts/validate-content.mjs")], {

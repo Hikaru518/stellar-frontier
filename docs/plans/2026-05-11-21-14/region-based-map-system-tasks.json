@@ -1,0 +1,560 @@
+{
+  "topic": "region-based-map-system",
+  "created": "2026-05-11",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "添加 MapFeature 类型与 loader 兼容层",
+      "priority": "P0",
+      "depends_on": [],
+      "user_story": null,
+      "description": "在 PC content loader 中引入 MapFeatureDefinition、FeatureFootprint、FeatureRuntimeState 等类型，并让 defaultMapConfig 在旧地图缺少 features 字段时兼容为 []。本任务只建立类型和加载边界，不改变运行时行为，也不移除 tile.areaName/objectIds。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/content/contentData.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/content/contentData.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: defaultMapConfig 暴露 features 数组；旧地图没有 features 字段时返回空数组。",
+        "AC2: TypeScript 类型可以表达非可调查 Feature 和 investigatable Feature 两种形态。",
+        "AC3: 现有地图内容在未新增 features 时仍能通过 PC client 单元测试。"
+      ],
+      "tech_notes": "遵循 ADR-001、ADR-006；本任务保持向后兼容，不修改 content JSON。"
+    },
+    {
+      "id": "TASK-002",
+      "title": "实现 row spans 与 Feature 查询纯函数",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "user_story": "US-001",
+      "description": "新增 mapFeatureSystem 纯函数，支持 row_spans footprint 展开、tile -> Feature index 构建、按 tile 查询 Feature、可见性过滤、可调查过滤和最高优先级候选选择。该模块是 MapPage、CallPage、settlement 和 Editor 后续复用的唯一查询入口。",
+      "files": {
+        "create": [
+          "apps/pc-client/src/mapFeatureSystem.ts"
+        ],
+        "modify": [],
+        "test": [
+          "apps/pc-client/src/mapFeatureSystem.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 给定 row spans footprint，查询任意覆盖 tile 能返回对应 Feature。",
+        "AC2: 多个 Feature 覆盖同一 tile 时，结果按 priority 降序、id 升序稳定排序。",
+        "AC3: 未知 tileId 或空 footprint 查询返回空结果，不抛异常。",
+        "AC4: selectTopInvestigatableFeatures 只返回最高 priority 的 investigatable Feature。"
+      ],
+      "tech_notes": "遵循 ADR-002、ADR-003、ADR-005；索引不得写入 GameState 或 JSON。"
+    },
+    {
+      "id": "TASK-003",
+      "title": "扩展 map schema 与 content validation 支持 Feature",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "user_story": "US-004",
+      "description": "更新 maps schema 和 validate-content，使 map JSON 可以声明 features、row_spans footprint、priority、visibility、自定义 kind 和 investigatable 字段。本阶段 features 可先保持 optional，以便后续内容迁移分步进行。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/schemas/maps.schema.json",
+          "apps/pc-client/scripts/validate-content.mjs"
+        ],
+        "test": [
+          "apps/pc-client/src/content/contentData.test.ts",
+          "apps/pc-client/src/content/mapObjects.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: npm run validate:content 能接受带 features 的合法 map JSON。",
+        "AC2: validate-content 能拒绝出界、空 spans、重复 Feature id 或 initial_status 不在 status_options 中的 Feature。",
+        "AC3: 非 investigatable Feature 携带 status_options/actions 时 validation 报错。"
+      ],
+      "tech_notes": "遵循 ADR-001、ADR-002、ADR-006；暂不移除 tile.areaName/objectIds required。"
+    },
+    {
+      "id": "TASK-004",
+      "title": "为默认地图 seed 初始 Feature 内容",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-003"
+      ],
+      "user_story": "US-001",
+      "description": "在 default-map.json 中添加第一批 features，覆盖 IAFS 坠毁点、南侧通道、发电机、维生装置、穿梭机核心、散落物资等现有内容。此任务暂时保留 legacy tile.areaName/objectIds，降低后续 runtime 迁移风险。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/maps/default-map.json"
+        ],
+        "test": [
+          "apps/pc-client/src/content/contentData.test.ts",
+          "apps/pc-client/src/content/minimalContentBaseline.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: default-map.json 至少包含一个背景 Feature 和一个 investigatable Feature。",
+        "AC2: IAFS 现有四个 map object 都有同 id 或明确可迁移的 Feature 定义。",
+        "AC3: 新增 Feature 的 footprints 均在 256 x 256 地图边界内。"
+      ],
+      "tech_notes": "遵循 ADR-004；本任务只 seed 内容，不改事件和运行时读写路径。"
+    },
+    {
+      "id": "TASK-005",
+      "title": "添加 Runtime featuresById 与旧存档迁移",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-001",
+        "TASK-004"
+      ],
+      "user_story": "US-004",
+      "description": "扩展 RuntimeMapState，初始化 featuresById，并在 save normalize 时把旧存档 mapObjects[id].status_enum 迁移到同 id Feature 的 status。tilesById 继续保留 tile 状态，mapObjects 不再作为新状态源。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/mapSystem.ts",
+          "apps/pc-client/src/data/gameData.ts",
+          "apps/pc-client/src/App.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/data/gameData.test.ts",
+          "apps/pc-client/src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 新游戏为每个 investigatable Feature 初始化 status 为 initial_status。",
+        "AC2: 旧 save 中 mapObjects.iafs_generator.status_enum=repaired 会迁移为 featuresById.iafs_generator.status=repaired。",
+        "AC3: 新 runtime 缺少某个 Feature state 时，读取逻辑能回退到 Feature initial_status。"
+      ],
+      "tech_notes": "遵循 ADR-004；旧 mapObjects 只能在 normalizeSavedMap 中作为 migration input。"
+    },
+    {
+      "id": "TASK-006",
+      "title": "定义 Feature event schema、types 与 handler registry",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-003",
+        "TASK-005"
+      ],
+      "user_story": "US-004",
+      "description": "为事件系统添加 feature_status_equals、set_feature_status、set_feature_revealed 的 schema 和类型声明，并更新 handler registry / editor authoring metadata，使内容可以引用 Feature 状态和揭示效果。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/schemas/events/condition.schema.json",
+          "content/schemas/events/effect.schema.json",
+          "content/events/handler_registry.json",
+          "apps/pc-client/src/events/types.ts",
+          "apps/editor/src/event-editor/authoring/capabilityCatalog.ts"
+        ],
+        "test": [
+          "apps/editor/src/event-editor/authoring/effectRegistry.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: content schema 接受 feature_status_equals condition。",
+        "AC2: content schema 接受 set_feature_status 和 set_feature_revealed effects。",
+        "AC3: handler registry 中 feature handler 的 params_schema_ref 可解析。"
+      ],
+      "tech_notes": "遵循 ADR-004；本任务只定义契约，不实现 runtime condition/effect。"
+    },
+    {
+      "id": "TASK-007",
+      "title": "实现 Feature condition/effect runtime",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-005",
+        "TASK-006"
+      ],
+      "user_story": "US-004",
+      "description": "在事件运行时实现 feature_status_equals、set_feature_status、set_feature_revealed。Feature status 读写 GameState.map.featuresById，不再依赖 mapObjects。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/events/conditions.ts",
+          "apps/pc-client/src/events/effects.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/events/conditions.feature_status_equals.test.ts",
+          "apps/pc-client/src/events/effects.set_feature_status.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: feature_status_equals 在 Feature 当前 status 匹配时返回 true。",
+        "AC2: set_feature_status 只更新目标 Feature status，并保留 revealed/investigated 字段。",
+        "AC3: set_feature_revealed 能把 hidden Feature 标记为可见。",
+        "AC4: 未知 feature_id 不会导致事件运行时崩溃，并产生可测试的失败或警告路径。"
+      ],
+      "tech_notes": "遵循 ADR-004；测试 fixture 不应依赖 mapObjects。"
+    },
+    {
+      "id": "TASK-008",
+      "title": "让 call action 上下文支持 Feature 状态",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-005",
+        "TASK-007"
+      ],
+      "user_story": "US-004",
+      "description": "更新通话行动条件求值上下文，让 Feature inline actions 的 conditions 可以读取 state.map.featuresById，并把当前 tile 命中的 Feature 作为候选上下文传入 call action generation。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/conditions/callActionContext.ts",
+          "apps/pc-client/src/callActions.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/callActions.test.ts",
+          "apps/pc-client/src/callActions.integration.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Feature action 的 feature_status_equals condition 能影响按钮可见/可用状态。",
+        "AC2: 当前 tile 没有 Feature 时，通话基础行动仍能正常生成。",
+        "AC3: 条件失败且 display_when_unavailable=disabled 时，按钮显示 disabled reason。"
+      ],
+      "tech_notes": "遵循 ADR-004、ADR-005；本任务不负责 priority top candidate 过滤。"
+    },
+    {
+      "id": "TASK-009",
+      "title": "生成最高优先级 Feature 调查候选",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-002",
+        "TASK-008"
+      ],
+      "user_story": "US-003",
+      "description": "改造 callActions，使调查当前区域时只暴露当前 tile 上最高 priority 的可调查 Feature。单一候选生成一个调查行动，同优先级多个候选生成多个带 featureId 的行动。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/callActions.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/callActions.test.ts",
+          "apps/pc-client/src/callActions.integration.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 一个最高优先级 Feature 命中时只生成一个调查行动。",
+        "AC2: 两个最高优先级 Feature 并列时生成两个可区分的调查行动。",
+        "AC3: 低优先级 investigatable Feature 不生成调查按钮。",
+        "AC4: 所有 Feature 都不可见时，不生成 Feature 调查行动。"
+      ],
+      "tech_notes": "遵循 ADR-005；低优先级 Feature 作为 UI 上下文展示由后续 UI 任务处理。"
+    },
+    {
+      "id": "TASK-010",
+      "title": "实现 Feature survey 结算与去重",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-005",
+        "TASK-009"
+      ],
+      "user_story": "US-003",
+      "description": "让 survey 行动可以携带 target_feature_id。结算时更新 Feature runtime investigated/revealed/history，而不是按 tile 揭示 objectIds。同一 Feature footprint 内换 tile 调查不应重复触发一次性内容。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/callActionSettlement.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/callActionSettlement.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: target_feature_id 调查完成后 featuresById[featureId].investigated=true。",
+        "AC2: 调查完成 TriggerContext payload 包含 feature_id 和 feature_tags。",
+        "AC3: 同一 Feature 的另一个 tile 再次调查时，不重复产生该 Feature 的一次性 reveal。",
+        "AC4: target_feature_id 未知时，结算返回失败日志或安全 fallback，不崩溃。"
+      ],
+      "tech_notes": "遵循 ADR-004、ADR-005；tile investigated 可以继续记录本次 tile 报告，但不是对象揭示源。"
+    },
+    {
+      "id": "TASK-011",
+      "title": "迁移 Feature local timed action / repair 结算",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-007",
+        "TASK-010"
+      ],
+      "user_story": "US-004",
+      "description": "把当前 object repair/local action 路径迁移为 Feature 目标。开始 repair 时使用 target_feature_id，成功/失败 effects 使用 set_feature_status，完成后触发 feature_id payload。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/App.tsx",
+          "apps/pc-client/src/callActionSettlement.ts"
+        ],
+        "test": [
+          "apps/pc-client/src/App.test.tsx",
+          "apps/pc-client/src/callActions.integration.test.ts",
+          "apps/pc-client/src/callActionSettlement.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: repair action 开始后 crew action action_params.target_feature_id 等于目标 Feature id。",
+        "AC2: repair 成功后目标 Feature status 变为 repaired。",
+        "AC3: repair 进行中时，同一 Feature 的第二个 repair action 被锁定或禁用。",
+        "AC4: 旧 object_id action params 不再是 repair 路径的必需输入。"
+      ],
+      "tech_notes": "遵循 ADR-004；如果保留 object repair helper，只能作为 legacy fallback。"
+    },
+    {
+      "id": "TASK-012",
+      "title": "MapPage 展示 Feature 命中结果",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-002",
+        "TASK-005",
+        "TASK-004"
+      ],
+      "user_story": "US-001",
+      "description": "改造 MapPage 点击 readout：点击坐标仍映射到底层 tileId，同时显示当前 tile 命中的全部可见 Feature，并区分背景 Feature 与可调查 Feature。旧 areaName 只作为迁移期 fallback。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/pages/MapPage.tsx",
+          "apps/pc-client/src/App.tsx",
+          "apps/pc-client/src/styles.css"
+        ],
+        "test": [
+          "apps/pc-client/src/App.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 点击 Feature footprint 后，readout 显示 Feature name 列表和实际 tileId。",
+        "AC2: 一个 tile 命中多个 Feature 时，MapPage 并列显示全部可见 Feature。",
+        "AC3: 点击没有 Feature 的 tile 时，MapPage 仍显示 tileId 和基础地形/天气信息。",
+        "AC4: 从通话进入地图时，标记坐标仍只返回 tileId。"
+      ],
+      "tech_notes": "遵循 ADR-001、ADR-003；MapPage 不直接下达移动或调查指令。"
+    },
+    {
+      "id": "TASK-013",
+      "title": "CallPage 展示 Feature 目标文案与按钮",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-009",
+        "TASK-012"
+      ],
+      "user_story": "US-003",
+      "description": "更新 CallPage 的行动按钮和移动/调查上下文展示，使 Feature 调查行动能显示目标 Feature 名称、状态和禁用原因。移动确认仍显示底层 tile 目标。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/src/pages/CallPage.tsx",
+          "apps/pc-client/src/App.tsx",
+          "apps/pc-client/src/styles.css"
+        ],
+        "test": [
+          "apps/pc-client/src/App.test.tsx",
+          "apps/pc-client/src/callActions.integration.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 单个最高优先级 Feature 时，CallPage 显示一个可执行调查按钮。",
+        "AC2: 多个同优先级 Feature 时，CallPage 显示多个带 Feature 名称的调查按钮。",
+        "AC3: 低优先级 Feature 可作为上下文显示，但不生成按钮。",
+        "AC4: 移动确认仍以 tileId/坐标为目标，不使用 Feature id 作为移动目标。"
+      ],
+      "tech_notes": "遵循 ADR-005；按钮业务来源仍在 callActions，CallPage 只渲染 view model。"
+    },
+    {
+      "id": "TASK-014",
+      "title": "迁移 IAFS 事件和 action 内容到 feature_id",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-007",
+        "TASK-011",
+        "TASK-013"
+      ],
+      "user_story": "US-004",
+      "description": "把 IAFS inspect/repair/search 事件、actions 和 conditions 从 object_id/object_status_equals/set_object_status 迁移到 feature_id/feature_status_equals/set_feature_status。迁移后 IAFS 运行时链路应完全读写 featuresById。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/maps/default-map.json",
+          "content/events/definitions/iafs-inspection.json",
+          "content/map-objects/iafs-crash-site.json"
+        ],
+        "test": [
+          "apps/pc-client/src/content/minimalContentBaseline.test.ts",
+          "apps/pc-client/src/events/eventEngine.test.ts",
+          "apps/pc-client/src/callActions.integration.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: IAFS generator/life_support/shuttle_core repair 成功后写入对应 Feature status。",
+        "AC2: IAFS inspect 事件根据 feature_status_equals 选择 damaged/repaired 文案。",
+        "AC3: 散落物资搜索事件使用 feature_id payload 和 Feature reveal/status，不依赖 tile.objectIds。",
+        "AC4: npm run validate:content 通过。"
+      ],
+      "tech_notes": "遵循 ADR-004；旧 map-objects 文件可以保留为空或 legacy 注释数据，但新事件不得引用 object_status_equals。"
+    },
+    {
+      "id": "TASK-015",
+      "title": "Editor helper、types 与 validation 支持 Feature",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-003",
+        "TASK-004"
+      ],
+      "user_story": "US-005",
+      "description": "更新 Editor 的 map draft 类型、helper load/save 和 helper validation，使 Map Editor 可以读取、校验并保存 features 与 row_spans footprint。此任务不实现可视 UI 编辑，只打通数据和 validation。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/editor/src/map-editor/types.ts",
+          "apps/editor/src/map-editor/mapEditorModel.ts",
+          "apps/editor/helper/mapContentStore.mjs",
+          "apps/editor/helper/mapValidation.mjs"
+        ],
+        "test": [
+          "apps/editor/helper/mapContentStore.test.mjs",
+          "apps/editor/helper/mapValidation.test.mjs"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Editor helper load map 时保留 features 字段。",
+        "AC2: Editor helper save map 时写回 features 字段。",
+        "AC3: helper validation 能报告重复 Feature id、出界 span 和不连续 footprint。",
+        "AC4: 旧地图缺少 features 时 Editor draft 规范化为 features=[]。"
+      ],
+      "tech_notes": "遵循 ADR-002、ADR-007；validation issue target 使用 kind=feature。"
+    },
+    {
+      "id": "TASK-016",
+      "title": "Editor Feature list 与 inspector",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-015"
+      ],
+      "user_story": "US-005",
+      "description": "在 Map Editor 侧边栏新增 Feature list 和 Feature inspector，支持创建、选择、删除 Feature，并编辑 name、kind、priority、visibility、tags、investigatable、status_options、initial_status 和 actions 的基础字段。",
+      "files": {
+        "create": [
+          "apps/editor/src/map-editor/FeatureInspector.tsx"
+        ],
+        "modify": [
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/map-editor/mapEditorReducer.ts",
+          "apps/editor/src/map-editor/types.ts",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/FeatureInspector.test.tsx",
+          "apps/editor/src/map-editor/mapEditorReducer.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: Editor 可以创建一个非空 footprint 的新 Feature 草稿。",
+        "AC2: Editor 可以编辑 Feature name、kind、priority 和 visibility。",
+        "AC3: investigatable=true 时，Inspector 要求 status_options 和 initial_status。",
+        "AC4: 删除 Feature 后，draft.features 中不再包含该 id。"
+      ],
+      "tech_notes": "遵循 ADR-006、ADR-007；kind 使用文本输入或 datalist，不使用硬枚举。"
+    },
+    {
+      "id": "TASK-017",
+      "title": "Editor footprint brush 与重叠预览",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-016"
+      ],
+      "user_story": "US-005",
+      "description": "实现选中 Feature 后的单格/拖拽添加与擦除 footprint。MapGrid 需要显示选中 Feature 覆盖范围，并在选中 tile 时展示该 tile 重叠 Feature。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/editor/src/map-editor/MapGrid.tsx",
+          "apps/editor/src/map-editor/MapEditorPage.tsx",
+          "apps/editor/src/map-editor/mapEditorReducer.ts",
+          "apps/editor/src/map-editor/mapEditorModel.ts",
+          "apps/editor/src/styles.css"
+        ],
+        "test": [
+          "apps/editor/src/map-editor/mapEditorReducer.test.ts",
+          "apps/editor/src/map-editor/MapGrid.test.tsx"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: 选中 Feature 后点击 tile 会把该 tile 加入 footprint。",
+        "AC2: 擦除模式点击 tile 会把该 tile 从 footprint 移除。",
+        "AC3: 拖拽经过多个 tile 时，每个经过 tile 都被加入或擦除。",
+        "AC4: 同一 tile 上多个 Feature 重叠时，Editor 能显示重叠 Feature 列表。"
+      ],
+      "tech_notes": "遵循 ADR-007；每次 pointer stroke 作为一个 history entry。"
+    },
+    {
+      "id": "TASK-018",
+      "title": "移除 legacy tile area/object gameplay source",
+      "priority": "P0",
+      "depends_on": [
+        "TASK-014",
+        "TASK-017"
+      ],
+      "user_story": "US-001",
+      "description": "在所有 PC 和 Editor 代码路径已支持 Feature 后，正式移除 tile.areaName 和 tile.objectIds 的 gameplay source 地位。更新 schema、默认地图、loader、label helper、object 查询和相关测试。legacy mapObjects 只允许留在旧存档迁移逻辑中。",
+      "files": {
+        "create": [],
+        "modify": [
+          "content/schemas/maps.schema.json",
+          "content/maps/default-map.json",
+          "apps/pc-client/src/content/contentData.ts",
+          "apps/pc-client/src/mapSystem.ts",
+          "apps/pc-client/src/data/gameData.ts",
+          "apps/pc-client/src/callActions.ts",
+          "apps/pc-client/src/callActionSettlement.ts",
+          "apps/editor/src/map-editor/TileInspector.tsx"
+        ],
+        "test": [
+          "apps/pc-client/src/content/contentData.test.ts",
+          "apps/pc-client/src/content/minimalContentBaseline.test.ts",
+          "apps/pc-client/src/mapSystem.test.ts",
+          "apps/pc-client/src/callActions.test.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: maps.schema.json 的 tile required 字段不包含 areaName 或 objectIds。",
+        "AC2: default-map.json 的 tiles 不再包含 areaName 或 objectIds。",
+        "AC3: PC runtime 的 location label 来自 Feature 查询或 tileId fallback。",
+        "AC4: rg 在 PC gameplay 代码中找不到新的 tile.objectIds 运行时依赖。",
+        "AC5: npm run validate:content 通过。"
+      ],
+      "tech_notes": "遵循 ADR-001、ADR-004；这是机械 cleanup 任务，应避免引入新玩法行为。"
+    },
+    {
+      "id": "TASK-019",
+      "title": "补齐 e2e 与最终验证",
+      "priority": "P1",
+      "depends_on": [
+        "TASK-018"
+      ],
+      "user_story": "US-001",
+      "description": "补充端到端覆盖，验证玩家在 256 x 256 地图点击 Feature footprint、从通话选择移动目标、抵达后调查 Feature 的核心路径。最后运行本改动范围所需验证命令并记录任何环境阻塞。",
+      "files": {
+        "create": [],
+        "modify": [
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ],
+        "test": [
+          "apps/pc-client/tests/e2e/app.spec.ts"
+        ]
+      },
+      "acceptance_criteria": [
+        "AC1: e2e 能验证 MapPage 点击后显示 Feature 名称和底层 tileId。",
+        "AC2: e2e 能验证 CallPage 针对同优先级 Feature 展示可区分调查按钮。",
+        "AC3: npm run validate:content、PC lint/test、editor:test 至少完成一次。",
+        "AC4: 如果 Playwright 因本地环境阻塞无法运行，最终说明必须区分环境阻塞和测试断言失败。"
+      ],
+      "tech_notes": "遵循 AGENTS 测试体系；涉及 MapPage/CallPage 用户旅程时应尝试 PC e2e。"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialMapState, initialCrew, initialLogs, initialTiles } from "../data/gameData";
@@ -93,8 +93,8 @@ describe("MapPage", () => {
     expect(screen.getByText("129-129")).toBeInTheDocument();
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
-    expect(screen.getByText("未知信号")).toBeInTheDocument();
-    expect(screen.queryByText("无当前可见对象")).not.toBeInTheDocument();
+    expect(screen.getByText("无当前可见对象")).toBeInTheDocument();
+    expect(screen.queryByText("未知信号")).not.toBeInTheDocument();
   });
 
   it("lists only runtime-visible map objects for the selected tile", () => {
@@ -105,7 +105,7 @@ describe("MapPage", () => {
     expect(objectList).not.toHaveTextContent("damaged");
     expect(objectList).not.toHaveTextContent("facility");
     expect(objectList).not.toHaveTextContent("维生装置");
-    expect(objectList).toHaveTextContent("未知信号");
+    expect(objectList).not.toHaveTextContent("未知信号");
   });
 
   it("does not show unknown signal after all tile objects are revealed", () => {
@@ -123,7 +123,83 @@ describe("MapPage", () => {
 
     expect(screen.getByText(initialLogs[initialLogs.length - 1].text)).toBeInTheDocument();
   });
+
+  it("shows visible feature hits and the actual tile id after selecting a feature footprint", () => {
+    const map = createInitialMapState();
+    map.featuresById = {
+      ...map.featuresById,
+      iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+    };
+    renderMapPage({ map });
+
+    focusMapTile("129-129");
+
+    const readout = within(screen.getByLabelText("Feature 命中结果"));
+    expect(screen.getByText(/\[TILE\] 129-129/)).toBeInTheDocument();
+    expect(readout.getByText("发电机")).toBeInTheDocument();
+    expect(readout.getByText("IAFS坠毁点")).toBeInTheDocument();
+    expect(readout.getByText("可调查")).toBeInTheDocument();
+    expect(readout.getByText("背景")).toBeInTheDocument();
+  });
+
+  it("lists every visible feature at a tile and separates background from investigatable hits", () => {
+    const map = createInitialMapState();
+    map.featuresById = {
+      ...map.featuresById,
+      iafs_scattered_supplies: { id: "iafs_scattered_supplies", status: "unsearched", revealed: true },
+    };
+    renderMapPage({ map });
+
+    focusMapTile("130-130");
+
+    const readout = within(screen.getByLabelText("Feature 命中结果"));
+    expect(readout.getByText("IAFS坠毁点")).toBeInTheDocument();
+    expect(readout.getByText("南侧通道")).toBeInTheDocument();
+    expect(readout.getByText("散落的物资")).toBeInTheDocument();
+    expect(readout.getByText("背景")).toBeInTheDocument();
+    expect(readout.getByText("可调查")).toBeInTheDocument();
+  });
+
+  it("keeps tile terrain and weather readout for blank tiles without visible features", () => {
+    renderMapPage();
+
+    focusMapTile("1-1");
+
+    expect(screen.getByText(/\[TILE\] 1-1 \/ 平原 \/ 晴朗/)).toBeInTheDocument();
+    expect(screen.getByText(/\[FEATURE\] 无可见 Feature/)).toBeInTheDocument();
+  });
+
+  it("returns only the selected tile id when marking a coordinate from a call", () => {
+    const onSelectMoveTarget = vi.fn();
+    renderMapPage({
+      returnTarget: "call",
+      moveSelectionCrewId: initialCrew[0].id,
+      onSelectMoveTarget,
+    });
+
+    focusMapTile("130-130");
+    fireEvent.click(screen.getByRole("button", { name: "标记当前坐标" }));
+
+    expect(onSelectMoveTarget).toHaveBeenCalledTimes(1);
+    expect(onSelectMoveTarget).toHaveBeenCalledWith("130-130");
+  });
 });
+
+function focusMapTile(tileId: string) {
+  const [rowText, colText] = tileId.split("-");
+  const row = Number(rowText);
+  const col = Number(colText);
+  const mapSurface = screen.getByLabelText("ASCII 地图");
+  Object.defineProperty(mapSurface, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
+  });
+
+  fireEvent.click(mapSurface, {
+    clientX: ((col - 0.5) / 256) * 900,
+    clientY: ((row - 0.5) / 256) * 700,
+  });
+}
 
 function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) {
   return render(

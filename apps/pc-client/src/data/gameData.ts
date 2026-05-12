@@ -5,8 +5,8 @@ import {
   type CrewProfile,
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
+  type FeatureRuntimeState,
 } from "../content/contentData";
-import { mapObjectDefinitionById, type RuntimeMapObjectsState } from "../content/mapObjects";
 import type { EventMark, EventRuntimeState } from "../events/types";
 import type { InventoryEntry } from "../inventorySystem";
 import { getDisplayCoord, getTileLocationLabel, parseTileId, type RuntimeMapState } from "../mapSystem";
@@ -199,7 +199,7 @@ export function createInitialMapState(): GameMapState {
   for (const mapTile of defaultMapConfig.tiles) {
     const activeSpecialStateIds = mapTile.specialStates.filter((state) => state.startsActive).map((state) => state.id);
     const discovered = discoveredTileIdsSet.has(mapTile.id);
-    if (!discovered && activeSpecialStateIds.length === 0 && mapTile.objectIds.length === 0) {
+    if (!discovered && activeSpecialStateIds.length === 0) {
       continue;
     }
 
@@ -207,12 +207,7 @@ export function createInitialMapState(): GameMapState {
       discovered,
       investigated: discovered,
       activeSpecialStateIds,
-      revealedObjectIds: discovered
-        ? mapTile.objectIds
-            .map((objectId) => mapObjectDefinitionById.get(objectId))
-            .filter((object): object is NonNullable<typeof object> => Boolean(object && object.visibility === "onDiscovered"))
-            .map((object) => object.id)
-        : [],
+      revealedObjectIds: [],
       revealedSpecialStateIds: discovered
         ? mapTile.specialStates
             .filter((state) => state.visibility === "onDiscovered" && state.startsActive)
@@ -228,18 +223,22 @@ export function createInitialMapState(): GameMapState {
     cols: defaultMapConfig.size.cols,
     originTileId: defaultMapConfig.originTileId,
     tilesById,
+    featuresById: createInitialFeaturesByIdState(),
     discoveredTileIds,
     investigationReportsById: {},
-    mapObjects: createInitialMapObjectsState(),
   };
 }
 
-export function createInitialMapObjectsState(): RuntimeMapObjectsState {
-  const state: RuntimeMapObjectsState = {};
-  for (const definition of mapObjectDefinitionById.values()) {
+export function createInitialFeaturesByIdState(): Record<string, FeatureRuntimeState | undefined> {
+  const state: Record<string, FeatureRuntimeState | undefined> = {};
+  for (const definition of defaultMapConfig.features) {
+    if (definition.investigatable !== true) {
+      continue;
+    }
+
     state[definition.id] = {
       id: definition.id,
-      status_enum: definition.initial_status,
+      status: definition.initial_status,
     };
   }
   return state;

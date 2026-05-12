@@ -1,5 +1,5 @@
 /**
- * Integration coverage for the new map-object-action pipeline:
+ * Integration coverage for the feature-first IAFS call action pipeline:
  *
  * - PS-002: a tool-gated action (`inventory_has_item`) is hidden / disabled
  *   when the crew member lacks the item, and visible+enabled once the item is
@@ -8,13 +8,14 @@
  *   updates after `set_object_status` writes a new status into
  *   `gameState.map.mapObjects` — i.e. the runtime state-change loop is closed.
  *
- * The tests use synthetic injected `MapObjectDefinition` entries so they stay
- * decoupled from real content drift.
+ * Legacy map-object coverage uses synthetic injected `MapObjectDefinition`
+ * entries so it stays decoupled from real IAFS content drift.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { buildCallView } from "./callActions";
-import { defaultMapConfig, questDefinitions } from "./content/contentData";
+import { defaultMapConfig, questDefinitions, type MapFeatureDefinition } from "./content/contentData";
 import { mapObjectDefinitionById } from "./content/mapObjects";
+import { settleAction } from "./callActionSettlement";
 import { executeEffects, type EffectExecutionContext, type EffectGameState } from "./events/effects";
 import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gameData";
 import type { Condition, CrewActionState, Effect } from "./events/types";
@@ -24,9 +25,11 @@ const CRASH_SITE_TILE_ID = "129-129";
 
 const STUB_TILE_ID = "2-3";
 const STUB_OBJECT_ID = "__integration_locked_door__";
+const originalMapFeatures = [...defaultMapConfig.features];
 
 afterEach(() => {
   mapObjectDefinitionById.delete(STUB_OBJECT_ID);
+  defaultMapConfig.features = originalMapFeatures;
 });
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
@@ -188,7 +191,7 @@ function createRepairCrewAction(overrides: Partial<CrewActionState> = {}): CrewA
     progress_seconds: 0,
     duration_seconds: 180,
     action_params: {
-      object_id: "iafs_generator",
+      target_feature_id: "iafs_generator",
     },
     can_interrupt: true,
     interrupt_duration_seconds: 10,
@@ -212,21 +215,71 @@ function createCrashSiteState(overrides: Partial<GameState> = {}): GameState {
         [CRASH_SITE_TILE_ID]: {
           discovered: true,
           investigated: true,
-          revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
+          revealedObjectIds: [],
         },
       },
-      mapObjects: {
-        iafs_generator: { id: "iafs_generator", status_enum: "damaged" },
-        iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-        iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
       },
+      mapObjects: {},
     },
     tiles: [createCrashSiteTile()],
     ...overrides,
   });
 }
 
+function createFeatureRepairCrashSiteState(overrides: Partial<GameState> = {}): GameState {
+  return createCrashSiteState({
+    map: {
+      ...createCrashSiteState().map,
+      tilesById: {
+        [CRASH_SITE_TILE_ID]: {
+          discovered: true,
+          investigated: true,
+          revealedObjectIds: [],
+        },
+      },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
+      },
+      mapObjects: {},
+    },
+    ...overrides,
+  });
+}
+
 describe("map-object-action pipeline integration", () => {
+  it("exposes lower-priority features as context without promoting them to action groups", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({ id: "__integration_high_feature__", name: "高优先级目标", priority: 30 }),
+      createInvestigatableFeature({ id: "__integration_low_feature__", name: "低优先级目标", priority: 10 }),
+    ]);
+
+    const member = createMember();
+    const view = buildCallView({ member, tile: createTile(), gameState: createGameState({ crew: [member] }) });
+
+    expect(view.featureContexts).toEqual([
+      expect.objectContaining({
+        id: "__integration_high_feature__",
+        name: "高优先级目标",
+        statusLabel: "已损坏",
+        isActionTarget: true,
+      }),
+      expect.objectContaining({
+        id: "__integration_low_feature__",
+        name: "低优先级目标",
+        statusLabel: "已损坏",
+        isActionTarget: false,
+      }),
+    ]);
+    expect(view.groups.map((group) => group.title)).toEqual(expect.arrayContaining(["高优先级目标（已损坏）"]));
+    expect(view.groups.map((group) => group.title)).not.toEqual(expect.arrayContaining(["低优先级目标（已损坏）"]));
+  });
+
   it("shows the three crash-site repair actions on a normal call at the crash site", () => {
     const member = createCrashSiteMember();
     const view = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
@@ -243,7 +296,57 @@ describe("map-object-action pipeline integration", () => {
     expect(shuttleCoreAction?.disabled).toBeUndefined();
   });
 
-  it("shows inspect actions for crash-site objects regardless of repair status", () => {
+  it("settles authored IAFS repair actions into feature status updates", () => {
+    const state = createCrashSiteState();
+    const member = createCrashSiteMember();
+
+    for (const featureId of ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]) {
+      const feature = defaultMapConfig.features.find((entry) => entry.id === featureId);
+      if (feature?.investigatable !== true) {
+        throw new Error(`Expected ${featureId} to be an investigatable feature`);
+      }
+      const repairAction = feature.actions.find((entry) => entry.id === `${featureId}:repair`);
+      if (repairAction?.local_action?.kind !== "timed_repair") {
+        throw new Error(`Expected ${featureId} repair action to define timed_repair`);
+      }
+
+      const patch = settleAction({
+        member,
+        action: createRepairCrewAction({
+          id: `repair:mike:${featureId}:0`,
+          crew_id: "mike",
+          duration_seconds: repairAction.local_action.duration_seconds,
+          ends_at: repairAction.local_action.duration_seconds,
+          action_params: {
+            target_feature_id: featureId,
+            action_def_id: repairAction.id,
+            success_effects: repairAction.local_action.success_effects,
+            failure_effects: repairAction.local_action.failure_effects,
+          },
+        }),
+        occurredAt: repairAction.local_action.duration_seconds,
+        resources: createResources(),
+        baseInventory: [],
+        tiles: [createCrashSiteTile()],
+        map: state.map,
+        logs: [],
+      });
+
+      expect(patch.map.featuresById?.[featureId]).toMatchObject({ id: featureId, status: "repaired", revealed: true });
+      expect(patch.map.mapObjects?.[featureId]).toBeUndefined();
+      expect(patch.triggerContexts[0]?.payload).toEqual(
+        expect.objectContaining({
+          action_type: "repair",
+          action_def_id: repairAction.id,
+          object_id: null,
+          feature_id: featureId,
+          repair_result: "success",
+        }),
+      );
+    }
+  });
+
+  it("shows inspect actions for crash-site features regardless of repair status", () => {
     const member = createCrashSiteMember();
     const damagedView = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
@@ -257,10 +360,10 @@ describe("map-object-action pipeline integration", () => {
       gameState: createCrashSiteState({
         map: {
           ...createCrashSiteState().map,
-          mapObjects: {
-            iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
-            iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-            iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+          featuresById: {
+            iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
+            iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+            iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
           },
         },
       }),
@@ -271,7 +374,7 @@ describe("map-object-action pipeline integration", () => {
     );
   });
 
-  it("hides crash-site object groups before a survey event reveals them", () => {
+  it("hides crash-site feature groups before a survey event reveals them", () => {
     const member = createCrashSiteMember();
     const hiddenView = buildCallView({
       member,
@@ -286,6 +389,11 @@ describe("map-object-action pipeline integration", () => {
               revealedObjectIds: [],
             },
           },
+          featuresById: {
+            iafs_generator: { id: "iafs_generator", status: "damaged", revealed: false },
+            iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: false },
+            iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: false },
+          },
         },
       }),
     });
@@ -293,7 +401,7 @@ describe("map-object-action pipeline integration", () => {
     expect(hiddenView.groups.map((group) => group.title)).toEqual(["基础行动"]);
   });
 
-  it("keeps repair visible but disables it when another crew member is already repairing the object", () => {
+  it("keeps repair visible but disables it when another crew member is already repairing the feature", () => {
     const member = createCrashSiteMember();
     const state = createCrashSiteState({
       crew: [member, createCrashSiteMember({ id: "amy", name: "Amy" })],
@@ -320,6 +428,27 @@ describe("map-object-action pipeline integration", () => {
     expect(unlockedRepairTargets[1]?.disabled).toBeUndefined();
   });
 
+  it("keeps feature repair visible but disables it when another crew member is already repairing the feature", () => {
+    const member = createCrashSiteMember();
+    const state = createFeatureRepairCrashSiteState({
+      crew: [member, createCrashSiteMember({ id: "amy", name: "Amy" })],
+      crew_actions: {
+        "repair:amy:iafs_generator:0": createRepairCrewAction({
+          action_params: { target_feature_id: "iafs_generator" },
+        }),
+      },
+    });
+
+    const action = buildCallView({ member, tile: createCrashSiteTile(), gameState: state }).groups
+      .flatMap((group) => group.actions)
+      .find((entry) => entry.id === "iafs_generator:repair");
+
+    expect(action).toBeDefined();
+    expect(action).toMatchObject({ id: "iafs_generator:repair", featureId: "iafs_generator" });
+    expect(action?.disabled).toBe(true);
+    expect(action?.disabledReason).toContain("其他队员");
+  });
+
   it("keeps repair visible but disables it with a self-repair reason when the same crew is already repairing it", () => {
     const member = createCrashSiteMember();
     const state = createCrashSiteState({
@@ -340,15 +469,15 @@ describe("map-object-action pipeline integration", () => {
     expect(action?.disabledReason).toContain("已在维修");
   });
 
-  it("hides the repair action after the object has been repaired", () => {
+  it("hides the repair action after the feature has been repaired", () => {
     const member = createCrashSiteMember();
     const state = createCrashSiteState({
       map: {
         ...createCrashSiteState().map,
-        mapObjects: {
-          iafs_generator: { id: "iafs_generator", status_enum: "repaired" },
-          iafs_life_support: { id: "iafs_life_support", status_enum: "damaged" },
-          iafs_shuttle_core: { id: "iafs_shuttle_core", status_enum: "damaged" },
+        featuresById: {
+          iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
+          iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+          iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
         },
       },
     });
@@ -360,7 +489,7 @@ describe("map-object-action pipeline integration", () => {
     expect(action).toBeUndefined();
   });
 
-  it("keeps repair available for retry after a failed attempt leaves the object damaged", () => {
+  it("keeps repair available for retry after a failed attempt leaves the feature damaged", () => {
     const member = createCrashSiteMember({ status: "维修失败，待命中。", statusTone: "muted" });
     const action = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState({ crew: [member] }) }).groups
       .flatMap((group) => group.actions)
@@ -540,4 +669,40 @@ describe("map-object-action pipeline integration", () => {
 
 function findGroup(view: ReturnType<typeof buildCallView>, objectName: string) {
   return view.groups.find((group) => group.title === objectName || group.title.startsWith(`${objectName}（`));
+}
+
+function setFeatureFixtures(features: MapFeatureDefinition[]): void {
+  defaultMapConfig.features = [...originalMapFeatures, ...features];
+}
+
+function createInvestigatableFeature({
+  id,
+  name,
+  priority,
+}: {
+  id: string;
+  name: string;
+  priority: number;
+}): MapFeatureDefinition {
+  return {
+    id,
+    name,
+    kind: "test:feature",
+    priority,
+    visibility: "always",
+    footprint: { type: "row_spans", spans: [{ row: 2, colStart: 3, colEnd: 3 }] },
+    investigatable: true,
+    status_options: ["damaged", "repaired"],
+    initial_status: "damaged",
+    actions: [
+      {
+        id: `${id}:inspect`,
+        category: "feature",
+        label: "调查",
+        tone: "neutral",
+        conditions: [],
+        event_id: `${id}:inspect`,
+      },
+    ],
+  };
 }

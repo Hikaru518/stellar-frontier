@@ -40,7 +40,7 @@ describe("mapContentStore", () => {
         id: "default-map",
         file_path: "content/maps/default-map.json",
         radar_file_path: "content/maps/radar/default-map-radar.json",
-        data: expect.objectContaining({ id: "default-map" }),
+        data: expect.objectContaining({ id: "default-map", features: [] }),
       }),
     ]);
     expect(library.map_objects).toEqual([
@@ -69,6 +69,19 @@ describe("mapContentStore", () => {
       "content/maps/default-map.json",
       "content/maps/temp-only.json",
     ]);
+  });
+
+  it("preserves map features when loading maps", async () => {
+    const feature = minimalFeature("loaded_feature");
+    await writeJson("content/maps/feature-map.json", {
+      ...minimalMap("feature-map"),
+      features: [feature],
+    });
+    await writeJson("content/maps/radar/feature-map-radar.json", minimalRadar("feature-map"));
+
+    const library = await loadMapEditorLibrary({ repoRoot });
+
+    expect(library.maps.find((map) => map.id === "feature-map")?.data.features).toEqual([feature]);
   });
 
   async function writeJson(relativePath, value) {
@@ -105,6 +118,20 @@ function minimalMap(id) {
         specialStates: [],
       },
     ],
+  };
+}
+
+function minimalFeature(id) {
+  return {
+    id,
+    name: "Test Feature",
+    kind: "site:test",
+    priority: 10,
+    visibility: "onDiscovered",
+    footprint: {
+      type: "row_spans",
+      spans: [{ row: 1, colStart: 1, colEnd: 1 }],
+    },
   };
 }
 

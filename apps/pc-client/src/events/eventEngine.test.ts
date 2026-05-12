@@ -198,7 +198,12 @@ describe("event engine trigger intake", () => {
 
     const quest = selected.state.quest_state?.quests.regroup_after_crash;
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["129-129"]?.revealedObjectIds).toEqual(["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]);
+    expect(selected.state.map?.tilesById?.["129-129"]?.revealedObjectIds).toEqual([]);
+    expect(selected.state.map?.featuresById).toMatchObject({
+      iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+      iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+      iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
+    });
     expect(quest?.todos.survey_crash_site).toMatchObject({ status: "completed", completed_at: 245 });
     expect(quest?.current_node_id).toBe("repair_targets_revealed");
     expect(quest?.status).toBe("incomplete");
@@ -236,7 +241,12 @@ describe("event engine trigger intake", () => {
     });
 
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["130-130"]?.revealedObjectIds).toEqual(["iafs_scattered_supplies"]);
+    expect(selected.state.map?.tilesById?.["130-130"]?.revealedObjectIds).toEqual([]);
+    expect(selected.state.map?.featuresById?.iafs_scattered_supplies).toMatchObject({
+      id: "iafs_scattered_supplies",
+      status: "unsearched",
+      revealed: true,
+    });
   });
 
   it.each([
@@ -274,7 +284,7 @@ describe("event engine trigger intake", () => {
         payload: {
           action_type: "search",
           action_def_id: "iafs_scattered_supplies:search",
-          object_id: "iafs_scattered_supplies",
+          feature_id: "iafs_scattered_supplies",
         },
       },
     });
@@ -286,6 +296,42 @@ describe("event engine trigger intake", () => {
     expect(result.state.active_calls[callId]?.rendered_lines.map((line) => line.text).join(" ")).toContain(expectedText);
     expect(result.state.inventories.inv_mike.items).toEqual(expectedItems);
     expect(result.state.world_flags.iafs_scattered_supplies_searched).toMatchObject({ value: true });
+    expect(result.state.map?.featuresById?.iafs_scattered_supplies).toMatchObject({
+      id: "iafs_scattered_supplies",
+      status: "searched",
+      revealed: true,
+    });
+  });
+
+  it.each([
+    { featureStatus: "damaged", expectedEventId: "iafs_generator_inspect_damaged" },
+    { featureStatus: "repaired", expectedEventId: "iafs_generator_inspect_repaired" },
+  ])("routes generator inspect by feature_status_equals when the feature is $featureStatus", ({ featureStatus, expectedEventId }) => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+
+    const result = processTrigger({
+      state: createAuthoredCrashSiteState({
+        iafs_generator: { id: "iafs_generator", status: featureStatus, revealed: true },
+      }),
+      index: indexResult.index,
+      context: {
+        ...triggerContext(300),
+        trigger_type: "action_complete",
+        source: "call",
+        crew_id: "mike",
+        tile_id: "129-129",
+        action_id: "iafs_generator:inspect",
+        payload: {
+          action_type: "inspect",
+          action_def_id: "iafs_generator:inspect",
+          feature_id: "iafs_generator",
+        },
+      },
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.event?.event_definition_id).toBe(expectedEventId);
   });
 
   it("queues a success callback and records repair quest progress when authored repair actions complete", () => {
@@ -323,7 +369,7 @@ describe("event engine trigger intake", () => {
         crew_id: "mike",
         tile_id: "129-129",
         action_id: "repair:mike:iafs_generator:0",
-        payload: { action_type: "repair", object_id: "iafs_generator", repair_result: "success" },
+        payload: { action_type: "repair", feature_id: "iafs_generator", repair_result: "success" },
       },
     });
 
@@ -363,7 +409,7 @@ describe("event engine trigger intake", () => {
         crew_id: "mike",
         tile_id: "129-129",
         action_id: "repair:mike:iafs_generator:0",
-        payload: { action_type: "repair", object_id: "iafs_generator", repair_result: "failure" },
+        payload: { action_type: "repair", feature_id: "iafs_generator", repair_result: "failure" },
       },
     });
 
@@ -687,7 +733,9 @@ function createState(): GraphRunnerGameState {
   };
 }
 
-function createAuthoredCrashSiteState(): GraphRunnerGameState {
+function createAuthoredCrashSiteState(
+  featureOverrides: Record<string, { id: string; status?: string; revealed?: boolean; investigated?: boolean }> = {},
+): GraphRunnerGameState {
   return {
     ...createEmptyEventRuntimeState(),
     elapsed_game_seconds: 240,
@@ -720,6 +768,12 @@ function createAuthoredCrashSiteState(): GraphRunnerGameState {
     map: {
       tilesById: {
         "129-129": { revealedObjectIds: [] },
+      },
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "damaged", revealed: false },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: false },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: false },
+        ...featureOverrides,
       },
       mapObjects: {},
     },
@@ -758,10 +812,11 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
         ...state.map?.tilesById,
         "130-130": { revealedObjectIds: [] },
       },
-      mapObjects: {
-        ...state.map?.mapObjects,
-        iafs_scattered_supplies: { id: "iafs_scattered_supplies", status_enum: "unsearched" },
+      featuresById: {
+        ...state.map?.featuresById,
+        iafs_scattered_supplies: { id: "iafs_scattered_supplies", status: "unsearched", revealed: true },
       },
+      mapObjects: {},
     },
     inventories: {
       ...state.inventories,

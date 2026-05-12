@@ -1,17 +1,20 @@
 import type { ConditionEvaluationContext } from "../events/conditions";
+import type { MapFeatureDefinition } from "../content/contentData";
 import type { CrewMember, GameState, MapTile } from "../data/gameData";
 
 /**
  * Builds a {@link ConditionEvaluationContext} suitable for evaluating call-page
  * action conditions. The action pipeline is described in
- * `docs/plans/2026-04-29-01-40/technical-design.md` §4 step 3 — universal and
- * object actions both go through `events/conditions.ts:evaluateConditions`, so
+ * `docs/plans/2026-04-29-01-40/technical-design.md` §4 step 3 — universal,
+ * object, and feature actions all go through `events/conditions.ts:evaluateConditions`, so
  * we expose:
  *
  * - the crew array (so `primary_crew` / `crew_id` targets resolve),
  * - at minimum the current tile under `state.tiles`,
  * - the runtime map-objects table under `state.map.mapObjects`, so the
  *   `object_status_equals` handler condition can read `status_enum`,
+ * - the runtime Feature table under `state.map.featuresById`, so the
+ *   `feature_status_equals` handler condition can read Feature status,
  * - the standard runtime collections (`active_events`, `active_calls`,
  *   `crew_actions`, `inventories`, `world_flags`, `world_history`, …) so any
  *   future condition author can lean on them without rebuilding the bridge.
@@ -24,14 +27,19 @@ export interface BuildCallActionContextArgs {
   member: CrewMember;
   tile: MapTile;
   gameState: GameState;
+  feature?: MapFeatureDefinition;
 }
 
 export function buildCallActionContext({
   member,
   tile,
   gameState,
+  feature,
 }: BuildCallActionContextArgs): ConditionEvaluationContext {
-  const stateMap = gameState.map as GameState["map"] & { mapObjects?: Record<string, { id: string; status_enum: string; tags?: string[] }> };
+  const stateMap = gameState.map as GameState["map"] & {
+    featuresById?: NonNullable<GameState["map"]["featuresById"]>;
+    mapObjects?: Record<string, { id: string; status_enum: string; tags?: string[] }>;
+  };
   // Bridge each crew member's runtime view to the shape `events/conditions.ts`
   // expects. In particular `crew_action_status` reads `current_action_id` /
   // `currentActionId` and looks up `crew_actions[currentActionId].status`.
@@ -85,7 +93,10 @@ export function buildCallActionContext({
       elapsedGameSeconds: gameState.elapsedGameSeconds,
       // Pass the runtime map-objects table through under `state.map.mapObjects`
       // — that is exactly the path the `object_status_equals` handler reads.
+      // Feature inline actions use the same condition evaluator, with
+      // `feature_status_equals` reading runtime status from `featuresById`.
       map: {
+        featuresById: stateMap?.featuresById ?? {},
         mapObjects: stateMap?.mapObjects ?? {},
       },
     } as ConditionEvaluationContext["state"],
@@ -95,6 +106,15 @@ export function buildCallActionContext({
       source: "call",
       crew_id: member.id,
       tile_id: tile.id,
+      ...(feature
+        ? {
+            payload: {
+              feature_id: feature.id,
+              feature_kind: feature.kind,
+              feature_tags: feature.tags ?? [],
+            },
+          }
+        : {}),
     },
   };
 }

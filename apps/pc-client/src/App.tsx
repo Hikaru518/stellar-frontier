@@ -10,9 +10,17 @@ import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
-import { eventContentLibrary, questDefinitions, type QuestNavigationEntry } from "./content/contentData";
+import {
+  defaultMapConfig,
+  eventContentLibrary,
+  questDefinitions,
+  type FeatureActionDefinition,
+  type FeatureRuntimeState,
+  type MapFeatureDefinition,
+  type QuestNavigationEntry,
+} from "./content/contentData";
 import { buildCallView, getTimedRepairLockReason, isMapObjectRepaired } from "./callActions";
-import { mapObjectDefinitionById, type ActionDef, type MapObjectDefinition, type TimedRepairLocalActionDef } from "./content/mapObjects";
+import type { ActionDef, MapObjectDefinition } from "./content/mapObjects";
 import { buildEventContentIndex } from "./events/contentIndex";
 import { completeObjective, processEventWakeups, processTrigger, selectCallOption } from "./events/eventEngine";
 import type { GraphRunnerGameState } from "./events/graphRunner";
@@ -28,8 +36,8 @@ import {
   type TriggerContext,
   type WorldFlag,
 } from "./events/types";
-import { defaultMapConfig } from "./content/contentData";
-import { canMoveToTile, getTileLocationLabel, resolveVisibleTileObjects } from "./mapSystem";
+import { canMoveToTile, getFeatureRuntimeStatus, getTileLocationLabel, resolveVisibleTileObjects } from "./mapSystem";
+import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, getVisibleFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
 import {
   createBaseInventoryFromResources,
   createInitialMapState,
@@ -78,6 +86,7 @@ const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 const MOBILE_FALLBACK_AFTER_MS = 10000;
 const defaultMapTileById = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile]));
+const defaultMapFeatureById = new Map(defaultMapConfig.features.map((feature) => [feature.id, feature]));
 
 type QuestNavigationHint =
   | { type: "tile"; tileId: string; label: string }
@@ -1080,8 +1089,8 @@ function isSavedBaselineCompatible(saved: SavedGameState) {
   return saved.map.configId === defaultMapConfig.id && saved.map.configVersion === defaultMapConfig.version;
 }
 
-function getMoveTargetSelectionLabel(_map: GameMapState, tileId: string) {
-  return getTileLocationLabel(defaultMapConfig, tileId);
+function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
+  return getTileLocationLabel(defaultMapConfig, tileId, map);
 }
 
 function createStandbyCrewAction(state: GameState, crewId: CrewId, occurredAt: number): GameState {
@@ -1591,19 +1600,6 @@ function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-function findCandidateObject(tileId: string, verb: string, map: GameMapState | undefined): MapObjectDefinition | undefined {
-  const configTile = defaultMapTileById.get(tileId);
-  if (!configTile) {
-    return undefined;
-  }
-  for (const { definition } of resolveVisibleTileObjects(configTile, map)) {
-    if (definition.actions.some((action) => action.id === `${definition.id}:${verb}`)) {
-      return definition;
-    }
-  }
-  return undefined;
-}
-
 /**
  * 对前/后两份 event_logs 做 id 集合差集，对每条新增 EventLog 写一条
  * `event.resolved`。R2（design §13）：用 EventLog.id 集合做差集，绝不能用
@@ -1713,8 +1709,9 @@ function processAppEventWakeups(state: GameState): GameState {
 
 interface LocationStoryActionSelection {
   member: CrewMember;
-  object: MapObjectDefinition;
-  action: ActionDef;
+  object?: MapObjectDefinition;
+  feature?: MapFeatureDefinition;
+  action: ActionDef | FeatureActionDefinition;
 }
 
 function findVisibleLocationStoryAction(
@@ -1742,6 +1739,11 @@ function findLocationStoryActionSelection(
   crewId: CrewId,
   actionId: string,
 ): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
+  const featureSelection = findFeatureLocationActionSelection(state, crewId, actionId);
+  if (featureSelection) {
+    return featureSelection;
+  }
+
   const member = state.crew.find((item) => item.id === crewId);
   const tile = member ? createRuntimeTileView(state, member.currentTile) : undefined;
   if (!member || !tile) {
@@ -1760,7 +1762,7 @@ function findLocationStoryActionSelection(
 }
 
 export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actionId: string): TimedLocalDispatchResult {
-  const selection = findLocationStoryActionSelection(state, crewId, actionId);
+  const selection = findTimedLocalActionSelection(state, crewId, actionId);
   if (!selection || selection.action.local_action?.kind !== "timed_repair") {
     return {
       matched: false,
@@ -1770,7 +1772,7 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     };
   }
 
-  if (isMapObjectRepaired(state, selection.object.id)) {
+  if (isRepairSelectionRepaired(state, selection)) {
     return {
       matched: true,
       accepted: false,
@@ -1779,7 +1781,8 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     };
   }
 
-  const lockReason = getTimedRepairLockReason(state.crew_actions, crewId, selection.object.id);
+  const repairTargetId = getRepairSelectionTargetId(selection);
+  const lockReason = repairTargetId ? getTimedRepairLockReason(state.crew_actions, crewId, repairTargetId) : undefined;
   if (lockReason) {
     return {
       matched: true,
@@ -1800,9 +1803,10 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
   }
 
   const action = createRepairCrewActionState(state, selection);
+  const targetName = getRepairSelectionTargetName(selection);
   const nextMember = {
     ...selection.member,
-    status: `正在维修${selection.object.name}。`,
+    status: `正在维修${targetName}。`,
     statusTone: "accent" as Tone,
     activeAction: {
       id: action.id,
@@ -1824,7 +1828,7 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     },
     logs: appendLogEntry(
       state.logs,
-      `${selection.member.name} 开始维修${selection.object.name}，预计 ${formatDuration(action.duration_seconds)}。`,
+      `${selection.member.name} 开始维修${targetName}，预计 ${formatDuration(action.duration_seconds)}。`,
       "accent",
       state.elapsedGameSeconds,
     ),
@@ -1838,13 +1842,101 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
   };
 }
 
+function findTimedLocalActionSelection(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
+  const featureSelection = findFeatureLocationActionSelection(state, crewId, actionId);
+  if (featureSelection?.action.local_action?.kind === "timed_repair") {
+    return featureSelection;
+  }
+
+  const objectSelection = findLocationStoryActionSelection(state, crewId, actionId);
+  if (objectSelection?.action.local_action?.kind === "timed_repair") {
+    return objectSelection;
+  }
+
+  return undefined;
+}
+
+function findFeatureLocationActionSelection(
+  state: GameState,
+  crewId: CrewId,
+  actionId: string,
+): (LocationStoryActionSelection & { tile: MapTile; feature: MapFeatureDefinition; action: FeatureActionDefinition }) | undefined {
+  const member = state.crew.find((item) => item.id === crewId);
+  const tile = member ? createRuntimeTileView(state, member.currentTile) : undefined;
+  if (!member || !tile) {
+    return undefined;
+  }
+
+  for (const feature of getTopInvestigatableFeatures(state, member.currentTile)) {
+    if (feature.investigatable !== true) {
+      continue;
+    }
+    const action = feature.actions.find((item) => item.id === actionId);
+    if (!action) {
+      continue;
+    }
+    return { member, tile, feature, action };
+  }
+
+  return undefined;
+}
+
+function getTopInvestigatableFeatures(state: GameState, tileId: string): MapFeatureDefinition[] {
+  const index = buildFeatureTileIndex(defaultMapConfig);
+  return selectTopInvestigatableFeatures(getInvestigatableFeaturesAtTile(defaultMapConfig, index, state.map, tileId));
+}
+
+function getVisibleFeaturesForTile(map: GameMapState, tileId: string): MapFeatureDefinition[] {
+  const index = buildFeatureTileIndex(defaultMapConfig);
+  return getVisibleFeaturesAtTile(defaultMapConfig, index, map, tileId);
+}
+
+function isRepairSelectionRepaired(state: GameState, selection: LocationStoryActionSelection): boolean {
+  if (selection.feature) {
+    return getFeatureRuntimeStatus(state.map, selection.feature) === "repaired";
+  }
+
+  return selection.object ? isMapObjectRepaired(state, selection.object.id) : false;
+}
+
+function getRepairSelectionTargetId(selection: LocationStoryActionSelection): string | undefined {
+  return selection.feature?.id ?? selection.object?.id;
+}
+
+function getRepairSelectionTargetName(selection: LocationStoryActionSelection): string {
+  return selection.feature?.name ?? selection.object?.name ?? "目标";
+}
+
 
 function createRepairCrewActionState(
   state: GameState,
   selection: LocationStoryActionSelection,
 ): CrewActionState {
-  const localAction = selection.action.local_action as TimedRepairLocalActionDef;
-  const actionId = `repair:${selection.member.id}:${selection.object.id}:${state.elapsedGameSeconds}`;
+  const localAction = selection.action.local_action;
+  if (!localAction || localAction.kind !== "timed_repair") {
+    throw new Error(`Cannot create repair crew action for non-repair action ${selection.action.id}.`);
+  }
+
+  const targetId = getRepairSelectionTargetId(selection);
+  const actionId = `repair:${selection.member.id}:${targetId ?? selection.action.id}:${state.elapsedGameSeconds}`;
+  const actionParams: Record<string, unknown> = {
+    action_def_id: selection.action.id,
+    success_effects: localAction.success_effects,
+    failure_effects: localAction.failure_effects,
+  };
+  if (selection.feature) {
+    actionParams.target_feature_id = selection.feature.id;
+  } else if (selection.object) {
+    actionParams.object_id = selection.object.id;
+  }
+  if ("success_check" in localAction && localAction.success_check) {
+    actionParams.success_check = localAction.success_check;
+  }
+
   return {
     id: actionId,
     crew_id: selection.member.id,
@@ -1862,12 +1954,7 @@ function createRepairCrewActionState(
     ends_at: state.elapsedGameSeconds + localAction.duration_seconds,
     progress_seconds: 0,
     duration_seconds: localAction.duration_seconds,
-    action_params: {
-      object_id: selection.object.id,
-      success_check: localAction.success_check,
-      success_effects: localAction.success_effects,
-      failure_effects: localAction.failure_effects,
-    },
+    action_params: actionParams,
     can_interrupt: true,
     interrupt_duration_seconds: 10,
   };
@@ -1896,8 +1983,10 @@ function triggerLocationStoryAction(
 
 function createLocationStoryActionTriggerContext(
   state: GameState,
-  { member, object, action }: LocationStoryActionSelection,
+  { member, object, feature, action }: LocationStoryActionSelection,
 ): TriggerContext {
+  const objectTags = object?.tags ?? [];
+  const featureTags = feature?.tags ?? [];
   return {
     trigger_type: "action_complete",
     occurred_at: state.elapsedGameSeconds,
@@ -1909,8 +1998,15 @@ function createLocationStoryActionTriggerContext(
     payload: {
       action_type: actionVerb(action.id),
       action_def_id: action.id,
-      object_id: object.id,
-      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), object.tags ?? []),
+      object_id: object?.id ?? null,
+      ...(feature
+        ? {
+            feature_id: feature.id,
+            feature_kind: feature.kind,
+            feature_tags: featureTags,
+          }
+        : {}),
+      tags: mergeTags(getCurrentAreaSurveyTileTags(state, member.currentTile), objectTags, featureTags),
     },
   };
 }
@@ -1926,7 +2022,7 @@ function getVisibleMapObjects(state: GameState, tileId: string): MapObjectDefini
 
 function getCurrentAreaSurveyTileTags(state: GameState, tileId: string): string[] {
   const tile = createRuntimeTileView(state, tileId);
-  return tile ? mergeTags(inferTileTags(tile), inferTileDangerTags(tile, state.map)) : [];
+  return tile ? mergeTags(inferTileTags(tile, state.map), inferTileDangerTags(tile, state.map)) : [];
 }
 
 function actionVerb(actionId: string): string {
@@ -2218,14 +2314,14 @@ function toTileState(tile: MapTile, map: GameMapState): TileState {
       y: tile.row,
     },
     terrain_type: tile.terrain,
-    tags: inferTileTags(tile),
+    tags: inferTileTags(tile, map),
     danger_tags: inferTileDangerTags(tile, map),
     discovery_state: tile.investigated ? "mapped" : "known",
     survey_state: tile.investigated ? "surveyed" : "unsurveyed",
     visibility: "visible",
     current_crew_ids: tile.crew,
     resource_nodes: [],
-    site_objects: getConfigTileObjects(tile).map((object) => ({ id: object.id, object_type: object.kind, tags: object.tags ?? [] })),
+    site_objects: [],
     buildings: [],
     event_marks: tile.eventMarks ?? [],
     history_keys: [],
@@ -2287,7 +2383,7 @@ function createRuntimeTileView(state: GameState, tileId: string): MapTile | unde
   const discovered = state.map.discoveredTileIds.includes(tileId) || Boolean(runtimeTile?.discovered);
   return {
     id: configTile.id,
-    coord: getTileLocationLabel(defaultMapConfig, configTile.id),
+    coord: getTileLocationLabel(defaultMapConfig, configTile.id, state.map),
     row: configTile.row,
     col: configTile.col,
     terrain: configTile.terrain,
@@ -2361,11 +2457,11 @@ function crewInventoryId(crewId: CrewId) {
   return `crew:${crewId}`;
 }
 
-function inferTileTags(tile: MapTile) {
-  const configObjects = getConfigTileObjects(tile);
-  const text = [tile.terrain, tile.status, ...configObjects.flatMap((object) => [object.name, object.kind, ...(object.tags ?? [])])].join(" ");
+function inferTileTags(tile: MapTile, map: GameMapState) {
+  const features = getVisibleFeaturesForTile(map, tile.id);
+  const text = [tile.terrain, tile.status, ...features.flatMap((feature) => [feature.name, feature.kind, ...(feature.tags ?? [])])].join(" ");
   const explicitTags = "tags" in tile && Array.isArray(tile.tags) ? tile.tags.filter((tag): tag is string => typeof tag === "string") : [];
-  const tags = new Set<string>([...explicitTags, ...configObjects.flatMap((object) => object.tags ?? [])]);
+  const tags = new Set<string>([...explicitTags, ...features.flatMap((feature) => feature.tags ?? [])]);
 
   if (/森林|木材|野生动物/.test(text)) {
     tags.add("forest");
@@ -2405,18 +2501,42 @@ function inferTileDangerTags(tile: MapTile, map: GameMapState) {
   return configDangerTags;
 }
 
-function getConfigTileObjects(tile: Pick<MapTile, "id">): MapObjectDefinition[] {
-  const configTile = defaultMapTileById.get(tile.id);
-  return (
-    configTile?.objectIds
-      .map((objectId) => mapObjectDefinitionById.get(objectId))
-      .filter((object): object is MapObjectDefinition => Boolean(object)) ?? []
-  );
-}
-
 function appendLogEntry(logs: SystemLog[], text: string, tone: Tone, elapsedGameSeconds: number, reportId?: string) {
   const id = logs.reduce((highest, log) => Math.max(highest, log.id), 0) + 1;
   return [...logs, { id, time: formatGameTime(elapsedGameSeconds), text, tone, ...(reportId ? { reportId } : {}) }];
+}
+
+function migrateLegacyMapObjectFeatureStates(mapObjects: GameMapState["mapObjects"] | undefined): Record<string, FeatureRuntimeState | undefined> {
+  const featuresById: Record<string, FeatureRuntimeState | undefined> = {};
+  for (const [objectId, objectState] of Object.entries(mapObjects ?? {})) {
+    const feature = defaultMapFeatureById.get(objectId);
+    if (feature?.investigatable !== true || typeof objectState?.status_enum !== "string") {
+      continue;
+    }
+
+    featuresById[feature.id] = {
+      id: feature.id,
+      status: objectState.status_enum,
+    };
+  }
+  return featuresById;
+}
+
+function normalizeSavedFeatureStates(
+  featuresById: GameMapState["featuresById"] | undefined,
+): Record<string, FeatureRuntimeState | undefined> {
+  const normalized: Record<string, FeatureRuntimeState | undefined> = {};
+  for (const [featureId, featureState] of Object.entries(featuresById ?? {})) {
+    if (!featureState || !defaultMapFeatureById.has(featureId)) {
+      continue;
+    }
+
+    normalized[featureId] = {
+      ...featureState,
+      id: featureId,
+    };
+  }
+  return normalized;
 }
 
 function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
@@ -2426,6 +2546,8 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
   }
 
   const discoveredTileIds = Array.isArray(map.discoveredTileIds) ? map.discoveredTileIds.filter((id) => defaultMapTileById.has(id)) : fresh.discoveredTileIds;
+  const migratedFeatureStates = migrateLegacyMapObjectFeatureStates(map.mapObjects);
+  const savedFeatureStates = normalizeSavedFeatureStates(map.featuresById);
   return {
     configId: defaultMapConfig.id,
     configVersion: defaultMapConfig.version,
@@ -2433,9 +2555,9 @@ function normalizeSavedMap(map: Partial<GameMapState>): GameMapState {
     cols: defaultMapConfig.size.cols,
     originTileId: defaultMapConfig.originTileId,
     tilesById: { ...fresh.tilesById, ...(map.tilesById ?? {}) },
+    featuresById: { ...(fresh.featuresById ?? {}), ...migratedFeatureStates, ...savedFeatureStates },
     discoveredTileIds,
     investigationReportsById: map.investigationReportsById ?? {},
-    mapObjects: { ...(fresh.mapObjects ?? {}), ...(map.mapObjects ?? {}) },
   };
 }
 
@@ -2484,13 +2606,6 @@ function discoverMapTile(map: GameMapState, tileId: string): GameMapState {
       [tileId]: {
         ...previous,
         discovered: true,
-        revealedObjectIds: addUnique(
-          previous.revealedObjectIds ?? [],
-          ...configTile.objectIds.flatMap((objectId) => {
-            const def = mapObjectDefinitionById.get(objectId);
-            return def && def.visibility === "onDiscovered" ? [objectId] : [];
-          }),
-        ),
         revealedSpecialStateIds: addUnique(
           previous.revealedSpecialStateIds ?? [],
           ...configTile.specialStates.filter((state) => state.visibility === "onDiscovered" && (previous.activeSpecialStateIds ?? []).includes(state.id)).map((state) => state.id),

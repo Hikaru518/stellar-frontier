@@ -1,6 +1,7 @@
-import type { MapConfigDefinition, MapTileDefinition } from "./content/contentData";
+import type { FeatureRuntimeState, MapConfigDefinition, MapFeatureDefinition, MapTileDefinition } from "./content/contentData";
 import { mapObjectDefinitionById, type MapObjectDefinition, type MapObjectRuntime, type RuntimeMapObjectsState } from "./content/mapObjects";
 import type { CrewId, InvestigationReport } from "./data/gameData";
+import { buildFeatureTileIndex, getFeaturesAtTile, getVisibleFeaturesAtTile, type TileFeatureIndex } from "./mapFeatureSystem";
 
 export interface TileCoord {
   row: number;
@@ -33,9 +34,14 @@ export interface RuntimeMapState {
   investigationReportsById: Record<string, InvestigationReport>;
   tilesById: Record<string, RuntimeMapTileState | undefined>;
   /**
-   * Flat by-id state for every map object, populated at game-start from
-   * `mapObjectDefinitionById`. Optional on the type so narrow test fixtures
-   * still compile; runtime always treats `undefined` as `{}`.
+   * Flat by-id runtime state for authored map features. Optional on the type
+   * so narrow test fixtures and legacy saves can be normalized defensively.
+   */
+  featuresById?: Record<string, FeatureRuntimeState | undefined>;
+  /**
+   * Legacy by-id state for map objects. New feature-aware code should read
+   * `featuresById`; this remains optional for old saves and pre-migration
+   * runtime paths that are removed in later feature tasks.
    */
   mapObjects?: RuntimeMapObjectsState;
 }
@@ -65,18 +71,19 @@ export function getDisplayCoord(tile: TileCoord, origin: TileCoord): DisplayCoor
   };
 }
 
-export function getTileAreaName(config: MapConfigDefinition, tileId: string) {
-  return getTile(config, tileId)?.areaName;
+export function getTileAreaName(config: MapConfigDefinition, tileId: string, map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">) {
+  return getTileFeatureLabel(config, tileId, map);
 }
 
-export function getTileLocationLabel(config: MapConfigDefinition, tileId: string) {
+export function getTileLocationLabel(config: MapConfigDefinition, tileId: string, map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">) {
   const tile = getTile(config, tileId);
   const origin = getOrigin(config);
   if (!tile || !origin) {
     return tileId;
   }
 
-  return `${tile.areaName} ${formatDisplayCoord(getDisplayCoord(tile, origin))}`;
+  const label = getTileFeatureLabel(config, tileId, map) ?? tileId;
+  return `${label} ${formatDisplayCoord(getDisplayCoord(tile, origin))}`;
 }
 
 export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeMapState, tileId: string) {
@@ -88,18 +95,28 @@ export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeM
   return true;
 }
 
-/**
- * Look up the {@link MapObjectDefinition}s referenced by a tile's `objectIds`.
- *
- * The tile config carries only `string[]` ids — definitions live in
- * `content/map-objects/*.json` and are indexed by `mapObjectDefinitionById`.
- * Unknown ids are skipped silently (with a `console.warn`) so a stale tile
- * reference cannot crash the map view; the migration script + JSON Schema
- * enforce referential integrity at content build time.
- */
+export function getFeatureRuntimeStatus(
+  map: Pick<RuntimeMapState, "featuresById"> | undefined,
+  feature: MapFeatureDefinition,
+): string | undefined {
+  return map?.featuresById?.[feature.id]?.status ?? (feature.investigatable === true ? feature.initial_status : undefined);
+}
+
+export function getFeatureRuntimeState(
+  map: Pick<RuntimeMapState, "featuresById"> | undefined,
+  feature: MapFeatureDefinition,
+): FeatureRuntimeState {
+  const status = getFeatureRuntimeStatus(map, feature);
+  return {
+    ...(map?.featuresById?.[feature.id] ?? {}),
+    id: feature.id,
+    ...(status === undefined ? {} : { status }),
+  };
+}
+
 export function resolveTileObjects(tile: MapTileDefinition): MapObjectDefinition[] {
   const result: MapObjectDefinition[] = [];
-  for (const objectId of tile.objectIds) {
+  for (const objectId of getLegacyTileObjectIds(tile)) {
     const definition = mapObjectDefinitionById.get(objectId);
     if (!definition) {
       console.warn(`[mapSystem] tile ${tile.id} references unknown objectId ${objectId}`);
@@ -124,7 +141,16 @@ export function isMapObjectVisibleOnTile(tileId: string, definition: MapObjectDe
 }
 
 export function resolveVisibleTileObjects(tile: MapTileDefinition, map: RuntimeMapState | undefined): VisibleTileObject[] {
-  return resolveTileObjects(tile)
+  const definitionsById = new Map(resolveTileObjects(tile).map((definition) => [definition.id, definition]));
+  const runtimeTile = map?.tilesById[tile.id];
+  for (const objectId of runtimeTile?.revealedObjectIds ?? []) {
+    const definition = mapObjectDefinitionById.get(objectId);
+    if (definition) {
+      definitionsById.set(definition.id, definition);
+    }
+  }
+
+  return [...definitionsById.values()]
     .filter((definition) => isMapObjectVisibleOnTile(tile.id, definition, map))
     .map((definition) => ({
       definition,
@@ -138,6 +164,10 @@ export function formatMapObjectStatus(status: string | undefined): string {
       return "已损坏";
     case "repaired":
       return "正常";
+    case "available":
+      return "可调查";
+    case "investigated":
+      return "已调查";
     case "unsearched":
       return "未搜寻";
     default:
@@ -147,6 +177,36 @@ export function formatMapObjectStatus(status: string | undefined): string {
 
 function getTile(config: MapConfigDefinition, tileId: string) {
   return config.tiles.find((tile) => tile.id === tileId);
+}
+
+const featureIndexCache = new WeakMap<MapConfigDefinition, TileFeatureIndex>();
+
+function getTileFeatureLabel(
+  config: MapConfigDefinition,
+  tileId: string,
+  map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">,
+): string | undefined {
+  const index = getFeatureIndex(config);
+  const features = map
+    ? getVisibleFeaturesAtTile(config, index, map, tileId)
+    : getFeaturesAtTile(config, index, tileId).filter((feature) => feature.visibility !== "hidden");
+  return features[0]?.name;
+}
+
+function getFeatureIndex(config: MapConfigDefinition): TileFeatureIndex {
+  const cached = featureIndexCache.get(config);
+  if (cached) {
+    return cached;
+  }
+
+  const index = buildFeatureTileIndex(config);
+  featureIndexCache.set(config, index);
+  return index;
+}
+
+function getLegacyTileObjectIds(tile: MapTileDefinition): string[] {
+  const legacyTile = tile as MapTileDefinition & { objectIds?: unknown };
+  return Array.isArray(legacyTile.objectIds) ? legacyTile.objectIds.filter((objectId): objectId is string => typeof objectId === "string") : [];
 }
 
 function getOrigin(config: MapConfigDefinition) {

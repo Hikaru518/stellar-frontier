@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { settleAction } from "./callActionSettlement";
-import { defaultMapConfig } from "./content/contentData";
+import { defaultMapConfig, type MapFeatureDefinition } from "./content/contentData";
 import type { CrewMember, GameMapState, GameState, MapTile, ResourceSummary } from "./data/gameData";
 import type { CrewActionState } from "./events/types";
 
 type TileWithContent = MapTile & { tags?: string[] };
+
+const originalMapFeatures = [...defaultMapConfig.features];
 
 function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {
@@ -91,6 +93,20 @@ function createRepairMap(tileId = "4-4", objectId = "iafs_generator", status = "
   };
 }
 
+function createFeatureRepairMap(tileId = "4-4", featureId = "iafs_generator", status = "damaged"): GameMapState {
+  return {
+    ...createMap(tileId),
+    featuresById: {
+      [featureId]: {
+        id: featureId,
+        status,
+        revealed: true,
+        investigated: true,
+      },
+    },
+  };
+}
+
 function createCrewAction(overrides: Partial<CrewActionState> = {}): CrewActionState {
   return {
     id: "mike-survey-1-1",
@@ -118,6 +134,7 @@ function createCrewAction(overrides: Partial<CrewActionState> = {}): CrewActionS
 
 describe("settleAction", () => {
   afterEach(() => {
+    defaultMapConfig.features = [...originalMapFeatures];
     vi.restoreAllMocks();
   });
 
@@ -143,6 +160,147 @@ describe("settleAction", () => {
         payload: expect.objectContaining({ object_id: null, tags: ["blank_tile"] }),
       }),
     ]);
+  });
+
+  it("marks a target feature survey as investigated and emits feature payload", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({
+        id: "test_feature_survey_target",
+        name: "测试调查目标",
+        kind: "test:wreckage",
+        tags: ["signal", "wreckage"],
+      }),
+    ]);
+
+    const patch = settleAction({
+      member: createMember(),
+      action: createCrewAction({
+        action_params: {
+          target_feature_id: "test_feature_survey_target",
+          action_def_id: "test_feature_survey_target:investigate",
+        },
+      }),
+      occurredAt: 120,
+      resources: createResources(),
+      baseInventory: [],
+      tiles: [createTile("1-1")],
+      map: createFeatureMap("1-1", "test_feature_survey_target"),
+      logs: [],
+    });
+
+    expect(patch.map.tilesById["1-1"]?.investigated).toBe(true);
+    expect(patch.map.tilesById["1-1"]?.revealedObjectIds).toEqual([]);
+    expect(patch.map.featuresById?.test_feature_survey_target).toEqual(
+      expect.objectContaining({
+        id: "test_feature_survey_target",
+        status: "available",
+        revealed: true,
+        investigated: true,
+        investigatedAt: 120,
+        lastTriggeredAt: 120,
+      }),
+    );
+    expect(patch.map.featuresById?.test_feature_survey_target?.historyKeys).toHaveLength(1);
+    expect(patch.triggerContexts).toEqual([
+      expect.objectContaining({
+        trigger_type: "action_complete",
+        crew_id: "mike",
+        tile_id: "1-1",
+        payload: expect.objectContaining({
+          action_type: "survey",
+          action_def_id: "test_feature_survey_target:investigate",
+          object_id: null,
+          feature_id: "test_feature_survey_target",
+          feature_kind: "test:wreckage",
+          feature_tags: ["signal", "wreckage"],
+          tags: ["blank_tile", "signal", "wreckage"],
+        }),
+      }),
+    ]);
+  });
+
+  it("does not repeat a target feature one-time survey reveal across its footprint", () => {
+    setFeatureFixtures([
+      createInvestigatableFeature({
+        id: "test_feature_footprint",
+        name: "跨格目标",
+        footprint: { type: "row_spans", spans: [{ row: 1, colStart: 1, colEnd: 2 }] },
+      }),
+    ]);
+
+    const first = settleAction({
+      member: createMember({ currentTile: "1-1" }),
+      action: createCrewAction({
+        target_tile_id: "1-1",
+        action_params: { target_feature_id: "test_feature_footprint" },
+      }),
+      occurredAt: 120,
+      resources: createResources(),
+      baseInventory: [],
+      tiles: [createTile("1-1")],
+      map: createFeatureMap("1-1", "test_feature_footprint"),
+      logs: [],
+    });
+    const firstFeatureState = first.map.featuresById?.test_feature_footprint;
+
+    const second = settleAction({
+      member: createMember({ currentTile: "1-2" }),
+      action: createCrewAction({
+        id: "mike-survey-1-2",
+        from_tile_id: "1-2",
+        target_tile_id: "1-2",
+        action_params: { target_feature_id: "test_feature_footprint" },
+      }),
+      occurredAt: 180,
+      resources: createResources(),
+      baseInventory: [],
+      tiles: [createTile("1-2")],
+      map: first.map,
+      logs: first.logs,
+    });
+
+    expect(second.map.tilesById["1-2"]?.investigated).toBe(true);
+    expect(second.map.featuresById?.test_feature_footprint).toEqual(
+      expect.objectContaining({
+        investigated: true,
+        revealed: true,
+        investigatedAt: 120,
+        lastTriggeredAt: 120,
+        historyKeys: firstFeatureState?.historyKeys,
+      }),
+    );
+    expect(second.map.featuresById?.test_feature_footprint?.historyKeys).toHaveLength(1);
+    expect(second.triggerContexts[0]?.payload).toEqual(
+      expect.objectContaining({
+        feature_id: "test_feature_footprint",
+        feature_first_investigation: false,
+      }),
+    );
+  });
+
+  it("fails safely when a target feature id is unknown", () => {
+    const patch = settleAction({
+      member: createMember({ activeAction: { id: "active", actionType: "survey", status: "inProgress", startTime: 0, durationSeconds: 120, finishTime: 120 } }),
+      action: createCrewAction({
+        action_params: { target_feature_id: "missing_feature" },
+      }),
+      occurredAt: 120,
+      resources: createResources(),
+      baseInventory: [],
+      tiles: [createTile("1-1")],
+      map: createMap("1-1"),
+      logs: [],
+    });
+
+    expect(patch.member.activeAction).toBeUndefined();
+    expect(patch.map.tilesById["1-1"]?.investigated).toBe(false);
+    expect(patch.map.featuresById?.missing_feature).toBeUndefined();
+    expect(patch.triggerContexts).toEqual([]);
+    expect(patch.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: "行动完成失败：调查目标 missing_feature 不存在。", tone: "danger" }),
+      ]),
+    );
   });
 
   it("adds gather yield from action params into inventory", () => {
@@ -213,6 +371,56 @@ describe("settleAction", () => {
         payload: expect.objectContaining({
           action_type: "repair",
           object_id: "iafs_generator",
+          repair_result: "success",
+        }),
+      }),
+    ]);
+  });
+
+  it("settles a feature repair success, writes feature status, and emits feature context", () => {
+    const patch = settleAction({
+      member: createMember({ currentTile: "4-4", attributes: { physical: 3, agility: 5, intellect: 3, perception: 3, luck: 3 } }),
+      action: createCrewAction({
+        id: "mike-repair-generator-feature",
+        type: "repair",
+        target_tile_id: "4-4",
+        duration_seconds: 180,
+        action_params: {
+          target_feature_id: "iafs_generator",
+          action_def_id: "iafs_generator:repair",
+          success_effects: [{ type: "set_feature_status", feature_id: "iafs_generator", status: "repaired" }],
+          failure_effects: [],
+        },
+      }),
+      occurredAt: 180,
+      resources: createResources(),
+      baseInventory: [],
+      tiles: [createTile("4-4", { tags: ["crash_site"] })],
+      map: createFeatureRepairMap(),
+      logs: [],
+    });
+
+    expect(patch.map.featuresById?.iafs_generator).toEqual(
+      expect.objectContaining({
+        id: "iafs_generator",
+        status: "repaired",
+        revealed: true,
+        investigated: true,
+      }),
+    );
+    expect(patch.member).toMatchObject({ status: "维修完成，待命中。", statusTone: "success", activeAction: undefined });
+    expect(patch.triggerContexts).toEqual([
+      expect.objectContaining({
+        trigger_type: "action_complete",
+        crew_id: "mike",
+        tile_id: "4-4",
+        payload: expect.objectContaining({
+          action_type: "repair",
+          action_def_id: "iafs_generator:repair",
+          object_id: null,
+          feature_id: "iafs_generator",
+          feature_kind: "facility:power_system",
+          feature_tags: ["iafs", "crash_site", "repair_target", "power_system"],
           repair_result: "success",
         }),
       }),
@@ -311,3 +519,47 @@ describe("settleAction", () => {
     );
   });
 });
+
+function setFeatureFixtures(features: MapFeatureDefinition[]) {
+  defaultMapConfig.features = [...originalMapFeatures, ...features];
+}
+
+function createInvestigatableFeature({
+  id,
+  name,
+  kind = "test:feature",
+  tags = ["test_feature"],
+  footprint = { type: "row_spans", spans: [{ row: 1, colStart: 1, colEnd: 1 }] },
+}: {
+  id: string;
+  name: string;
+  kind?: string;
+  tags?: string[];
+  footprint?: MapFeatureDefinition["footprint"];
+}): MapFeatureDefinition {
+  return {
+    id,
+    name,
+    kind,
+    priority: 50,
+    tags,
+    visibility: "always",
+    footprint,
+    investigatable: true,
+    status_options: ["available"],
+    initial_status: "available",
+    actions: [],
+  };
+}
+
+function createFeatureMap(tileId: string, featureId: string): GameMapState {
+  return {
+    ...createMap(tileId),
+    featuresById: {
+      [featureId]: {
+        id: featureId,
+        status: "available",
+      },
+    },
+  };
+}

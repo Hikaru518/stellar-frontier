@@ -23,6 +23,17 @@
       "sample_fixtures": []
     },
     {
+      "handler_type": "feature_status_equals",
+      "kind": "condition",
+      "description": "检查运行时地图 Feature 状态是否等于预期值。",
+      "params_schema_ref": "#/$defs/feature_status_equals_params",
+      "allowed_target_types": [],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": []
+    },
+    {
       "handler_type": "quest_progress",
       "kind": "effect",
       "description": "Apply explicit quest progress updates to GameState.quest_state. The world_flags target is only a handler_effect placeholder; quest state is not stored in world_flags.",

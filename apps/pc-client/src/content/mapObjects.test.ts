@@ -96,7 +96,7 @@ describe("mapObjects content", () => {
     }
   });
 
-  it("places the three IAFS crash-site objects and encloses the wider start zone with mountain obstacles", () => {
+  it("keeps crash-site objects in features and applies the wider start zone terrain bounds", () => {
     const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "129-129");
     const clearedOldRingTileIds = [
       "127-128",
@@ -119,7 +119,8 @@ describe("mapObjects content", () => {
     const coldPassTileIds = ["113-128", "113-129", "113-130"];
     const redPathTileIds = ["144-128", "144-129", "144-130"];
 
-    expect(crashTile?.objectIds).toEqual(crashSiteObjectIds);
+    expect(crashTile).not.toHaveProperty("objectIds");
+    expect(defaultMapJson.features?.map((feature) => feature.id)).toEqual(expect.arrayContaining([...crashSiteObjectIds]));
 
     for (const tileId of clearedOldRingTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
@@ -128,25 +129,21 @@ describe("mapObjects content", () => {
 
     for (const tileId of boundaryMountainTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.areaName).toBe("坠毁外缘山体");
       expect(tile?.terrain).toBe("山");
     }
 
     for (const tileId of obstacleTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.areaName).toBe("坠毁障碍带");
       expect(tile?.terrain).toBe("山");
     }
 
     for (const tileId of coldPassTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.areaName).toBe("寒潮隘口");
       expect(tile?.terrain).not.toBe("山");
     }
 
     for (const tileId of redPathTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.areaName).toBe("赤岩小径");
       expect(tile?.terrain).not.toBe("山");
     }
   });
@@ -194,7 +191,6 @@ describe("mapObjects content", () => {
             id: "1-1",
             row: 1,
             col: 1,
-            areaName: "Landing Zone",
             terrain: "平原",
             weather: "晴朗",
             environment: {
@@ -203,7 +199,6 @@ describe("mapObjects content", () => {
               magneticFieldMicroTesla: 40,
               radiationLevel: "low",
             },
-            objectIds: [],
             specialStates: [
               {
                 id: "removed_danger",

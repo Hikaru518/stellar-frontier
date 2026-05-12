@@ -119,7 +119,86 @@ describe("event content exports", () => {
 });
 
 describe("default map config", () => {
-  it("exposes tile.objectIds (post-migration) and no inline tile.objects field", async () => {
+  it("exposes seeded feature content for the default crash site", async () => {
+    const rawFeatures = (defaultMapJson as { features?: unknown }).features;
+    expect(Array.isArray(rawFeatures)).toBe(true);
+
+    const features = contentData.defaultMapConfig.features;
+    const featureIds = features.map((feature) => feature.id);
+    const legacyIafsObjectIds = [
+      "iafs_generator",
+      "iafs_life_support",
+      "iafs_shuttle_core",
+      "iafs_scattered_supplies",
+    ];
+
+    expect(features.some((feature) => feature.investigatable !== true)).toBe(true);
+    expect(features.some((feature) => feature.investigatable === true)).toBe(true);
+    expect(featureIds).toEqual(expect.arrayContaining(legacyIafsObjectIds));
+
+    for (const feature of features) {
+      for (const span of feature.footprint.spans) {
+        expect(span.row).toBeGreaterThanOrEqual(1);
+        expect(span.row).toBeLessThanOrEqual(contentData.defaultMapConfig.size.rows);
+        expect(span.colStart).toBeGreaterThanOrEqual(1);
+        expect(span.colStart).toBeLessThanOrEqual(contentData.defaultMapConfig.size.cols);
+        expect(span.colEnd).toBeGreaterThanOrEqual(span.colStart);
+        expect(span.colEnd).toBeLessThanOrEqual(contentData.defaultMapConfig.size.cols);
+      }
+    }
+  });
+
+  it("types passive and investigatable map features separately", async () => {
+    const passiveFeature: contentData.MapFeatureDefinition = {
+      id: "snowfield",
+      name: "雪原",
+      kind: "biome:snowfield",
+      priority: 10,
+      visibility: "always",
+      footprint: {
+        type: "row_spans",
+        spans: [{ row: 129, colStart: 129, colEnd: 132 }],
+      },
+    };
+
+    const investigatableFeature: contentData.MapFeatureDefinition = {
+      id: "distress_beacon",
+      name: "异常信标",
+      kind: "signal:distress",
+      priority: 90,
+      tags: ["signal"],
+      visibility: "onDiscovered",
+      footprint: {
+        type: "row_spans",
+        spans: [{ row: 130, colStart: 130, colEnd: 130 }],
+      },
+      investigatable: true,
+      status_options: ["unread", "decoded"],
+      initial_status: "unread",
+      actions: [
+        {
+          id: "distress_beacon:decode",
+          category: "feature",
+          label: "解析信标",
+          conditions: [],
+        },
+      ],
+    };
+
+    expect(passiveFeature.investigatable).toBeUndefined();
+    expect(investigatableFeature.investigatable).toBe(true);
+    if (investigatableFeature.investigatable !== true) {
+      throw new Error("Expected investigatable feature fixture to narrow to the investigatable shape.");
+    }
+    expect(investigatableFeature.actions[0].category).toBe("feature");
+  });
+
+  it("does not expose legacy tile area/object gameplay fields", async () => {
+    const tileSchema = (mapsSchema as { $defs: { tile: { required: string[]; properties: Record<string, unknown> } } }).$defs.tile;
+    expect(tileSchema.required).not.toEqual(expect.arrayContaining(["areaName", "objectIds"]));
+    expect(tileSchema.properties).not.toHaveProperty("areaName");
+    expect(tileSchema.properties).not.toHaveProperty("objectIds");
+
     expect(contentData.defaultMapConfig.tiles.length).toBeGreaterThan(0);
     const sampleTiles = [
       contentData.defaultMapConfig.tiles[0],
@@ -131,7 +210,8 @@ describe("default map config", () => {
       if (!tile) {
         throw new Error("Expected sampled map tile to exist.");
       }
-      expect(Array.isArray(tile.objectIds)).toBe(true);
+      expect("areaName" in tile).toBe(false);
+      expect("objectIds" in tile).toBe(false);
       expect("objects" in tile).toBe(false);
     }
   });

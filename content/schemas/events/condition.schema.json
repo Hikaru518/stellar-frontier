@@ -8,6 +8,26 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["type"],
+      "allOf": [
+        {
+          "if": {
+            "required": ["handler_type"],
+            "properties": {
+              "handler_type": {
+                "const": "feature_status_equals"
+              }
+            }
+          },
+          "then": {
+            "required": ["params"],
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/feature_status_equals_params"
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "type": {
           "type": "string",
@@ -74,6 +94,20 @@
         }
       }
     },
+    "feature_status_equals_params": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["feature_id", "status"],
+      "properties": {
+        "feature_id": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "target_ref": {
       "type": "object",
       "additionalProperties": false,
@@ -91,6 +125,10 @@
           "minLength": 1
         }
       }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
     },
     "target_type": {
       "type": "string",

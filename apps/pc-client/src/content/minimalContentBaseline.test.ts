@@ -40,6 +40,8 @@ describe("minimal content baseline", () => {
       "universal:stop",
       "universal:survey",
     ]);
+    expect(JSON.stringify(eventContentLibrary.event_definitions)).not.toContain("object_status_equals");
+    expect(JSON.stringify(eventContentLibrary.event_definitions)).not.toContain("payload.object_id");
 
     expect(defaultMapConfig.size).toEqual({ rows: 256, cols: 256 });
     expect(defaultMapConfig.originTileId).toBe("129-129");
@@ -60,14 +62,17 @@ describe("minimal content baseline", () => {
       "131-130",
     ]);
     expect(defaultMapConfig.tiles).toHaveLength(65536);
-    expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")?.objectIds).toEqual([
-      "iafs_generator",
-      "iafs_life_support",
-      "iafs_shuttle_core",
-    ]);
+    expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")).not.toHaveProperty("objectIds");
     expect(defaultMapConfig.radar.glyphRows).toHaveLength(256);
     expect(defaultMapConfig.radar.toneRows).toHaveLength(256);
-    expect(defaultMapConfig.tiles.find((tile) => tile.id === "130-130")?.objectIds).toEqual(["iafs_scattered_supplies"]);
+    expect(defaultMapConfig.tiles.find((tile) => tile.id === "130-130")).not.toHaveProperty("areaName");
     expect(defaultMapConfig.tiles.every((tile) => tile.specialStates.length === 0)).toBe(true);
+
+    const scatteredSupplies = defaultMapConfig.features.find((feature) => feature.id === "iafs_scattered_supplies");
+    expect(scatteredSupplies).toMatchObject({
+      id: "iafs_scattered_supplies",
+      status_options: ["unsearched", "searched"],
+      initial_status: "unsearched",
+    });
   });
 });

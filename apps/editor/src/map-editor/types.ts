@@ -28,13 +28,60 @@ export interface MapTileDefinition {
   id: string;
   row: number;
   col: number;
-  areaName: string;
   terrain: string;
   weather: string;
   environment: MapEnvironmentDefinition;
-  objectIds: string[];
   specialStates: MapSpecialStateDefinition[];
 }
+
+export type MapFeatureVisibility = "always" | MapVisibility;
+
+export interface FeatureRowSpan {
+  row: number;
+  colStart: number;
+  colEnd: number;
+}
+
+export interface FeatureFootprint {
+  type: "row_spans";
+  spans: FeatureRowSpan[];
+}
+
+export interface FeatureActionDefinition {
+  id: string;
+  category: "feature";
+  label: string;
+  tone?: string;
+  conditions: unknown[];
+  event_id?: string;
+  display_when_unavailable?: "disabled";
+  unavailable_hint?: string;
+  local_action?: unknown;
+}
+
+export interface MapFeatureDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  kind: string;
+  priority: number;
+  tags?: string[];
+  visibility: MapFeatureVisibility;
+  footprint: FeatureFootprint;
+  investigatable?: boolean;
+  status_options?: string[];
+  initial_status?: string;
+  actions?: FeatureActionDefinition[];
+}
+
+export type MapFeatureFootprintBrushMode = "add" | "erase";
+
+export type MapFeaturePatch = Partial<
+  Pick<
+    MapFeatureDefinition,
+    "name" | "description" | "kind" | "priority" | "tags" | "visibility" | "investigatable" | "status_options" | "initial_status" | "actions"
+  >
+>;
 
 export interface RadarWorldDefinition {
   width: number;
@@ -97,6 +144,7 @@ export interface MapEditorDraft {
   initialDiscoveredTileIds: string[];
   radarPath: string;
   tiles: MapTileDefinition[];
+  features: MapFeatureDefinition[];
   radar: RadarDefinition;
 }
 
@@ -151,7 +199,7 @@ export type MapEditorCommand =
   | {
       type: "gameplay/updateTile";
       tileId: string;
-      patch: Partial<Pick<MapTileDefinition, "areaName" | "terrain" | "weather" | "environment" | "objectIds" | "specialStates">>;
+      patch: Partial<Pick<MapTileDefinition, "terrain" | "weather" | "environment" | "specialStates">>;
     }
   | {
       type: "gameplay/setOrigin";
@@ -172,6 +220,25 @@ export type MapEditorCommand =
       tileId: string;
       glyph?: string;
       tone?: string;
+    }
+  | {
+      type: "feature/create";
+      feature: MapFeatureDefinition;
+    }
+  | {
+      type: "feature/update";
+      featureId: string;
+      patch: MapFeaturePatch;
+    }
+  | {
+      type: "feature/applyFootprintBrush";
+      featureId: string;
+      mode: MapFeatureFootprintBrushMode;
+      tileIds: string[];
+    }
+  | {
+      type: "feature/delete";
+      featureId: string;
     }
   | {
       type: "history/undo";
