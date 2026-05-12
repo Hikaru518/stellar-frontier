@@ -4,7 +4,7 @@ import { defaultMapConfig, type MapFeatureDefinition } from "../content/contentD
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, isTilePassable, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
-import { buildFeatureTileIndex, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
+import { buildFeatureTileIndex, expandFeatureFootprint, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
 import { parseTileId } from "../mapSystem";
 
 const CELL_W = 8;
@@ -15,14 +15,36 @@ const RADAR = defaultMapConfig.radar;
 const RADAR_WORLD = RADAR.world;
 const MAP_DEBUG_SYMBOLS = {
   blocked: "X",
+  investigatableRevealed: "I",
+  investigatableUnrevealed: "?",
 } as const;
+const MAP_DEBUG_BACKGROUND_START = { r: 69, g: 174, b: 255 };
+const MAP_DEBUG_BACKGROUND_END = { r: 255, g: 219, b: 82 };
 
 type FocusCoord = { x: number; y: number };
 type RenderTone = string;
 
-interface MapDebugPoint extends FocusCoord {
+interface MapDebugBackgroundCell extends FocusCoord {
+  tileId: string;
+  featureOrder: number;
+  featureCount: number;
+}
+
+interface MapDebugInvestigatableCell extends FocusCoord {
+  tileId: string;
+  hasUnrevealed: boolean;
+  symbol: string;
+}
+
+interface MapDebugBlockedCell extends FocusCoord {
   tileId: string;
   symbol: string;
+}
+
+interface MapDebugLayerData {
+  backgrounds: MapDebugBackgroundCell[];
+  investigatables: MapDebugInvestigatableCell[];
+  blocked: MapDebugBlockedCell[];
 }
 
 interface RenderGlitch {
@@ -105,7 +127,7 @@ export function MapPage({
   const focusLabel = useMemo(() => getRadarFocusLabel(backgroundFocusFeatures), [backgroundFocusFeatures]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
-  const mapDebugPoints = useMemo(() => getMapDebugPoints(tiles), [tiles]);
+  const mapDebugData = useMemo(() => getMapDebugData(tiles, map), [map, tiles]);
 
   const crewActionViews = useMemo(
     () =>
@@ -424,17 +446,46 @@ export function MapPage({
       context.textAlign = "center";
       context.textBaseline = "middle";
 
-      for (const point of mapDebugPoints) {
-        if (!isCoordInsideViewport(point, viewport)) {
+      for (const cell of mapDebugData.backgrounds) {
+        if (!isCoordInsideViewport(cell, viewport)) {
           continue;
         }
 
-        const sx = (point.x - viewport.left) * cellW;
-        const sy = (point.y - viewport.top) * cellH;
-        context.fillStyle = getDebugPointFill();
+        const sx = (cell.x - viewport.left) * cellW;
+        const sy = (cell.y - viewport.top) * cellH;
+        context.fillStyle = getBackgroundDebugFill(cell.featureOrder, cell.featureCount);
         context.fillRect(sx, sy, Math.max(1, cellW), Math.max(1, cellH));
-        context.fillStyle = getDebugPointTextColor();
-        context.fillText(point.symbol, sx + cellW / 2, sy + cellH / 2);
+      }
+
+      for (const cell of mapDebugData.investigatables) {
+        if (!isCoordInsideViewport(cell, viewport)) {
+          continue;
+        }
+
+        const sx = (cell.x - viewport.left) * cellW;
+        const sy = (cell.y - viewport.top) * cellH;
+        const insetX = Math.max(0, cellW * 0.08);
+        const insetY = Math.max(0, cellH * 0.08);
+        context.fillStyle = getInvestigatableDebugFill(cell.hasUnrevealed);
+        context.fillRect(sx + insetX, sy + insetY, Math.max(1, cellW - insetX * 2), Math.max(1, cellH - insetY * 2));
+        context.strokeStyle = getInvestigatableDebugStroke(cell.hasUnrevealed);
+        context.lineWidth = 1;
+        context.strokeRect(sx + insetX, sy + insetY, Math.max(1, cellW - insetX * 2), Math.max(1, cellH - insetY * 2));
+        context.fillStyle = getInvestigatableDebugTextColor(cell.hasUnrevealed);
+        context.fillText(cell.symbol, sx + cellW / 2, sy + cellH / 2);
+      }
+
+      for (const cell of mapDebugData.blocked) {
+        if (!isCoordInsideViewport(cell, viewport)) {
+          continue;
+        }
+
+        const sx = (cell.x - viewport.left) * cellW;
+        const sy = (cell.y - viewport.top) * cellH;
+        context.fillStyle = getBlockedDebugFill();
+        context.fillRect(sx, sy, Math.max(1, cellW), Math.max(1, cellH));
+        context.fillStyle = getBlockedDebugTextColor();
+        context.fillText(cell.symbol, sx + cellW / 2, sy + cellH / 2);
       }
     }
 
@@ -444,7 +495,7 @@ export function MapPage({
     return () => {
       window.removeEventListener("resize", resize);
     };
-  }, [mapDebugPoints, showDebugLayer, viewport]);
+  }, [mapDebugData, showDebugLayer, viewport]);
 
   return (
     <GameConsoleLayout
@@ -571,7 +622,10 @@ export function MapPage({
                 [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
               </p>
               <p className="console-map-trace-line">
-                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked
+                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.investigatableUnrevealed}=unrevealed / {MAP_DEBUG_SYMBOLS.investigatableRevealed}=revealed
+              </p>
+              <p className="console-map-trace-line">
+                [DEBUG] bg blue-&gt;yellow / orange=unrevealed / white=revealed
               </p>
               {returnTarget === "call" ? (
                 <div className="console-map-return-actions">
@@ -695,7 +749,65 @@ function makeRenderBuffer<T>(rows: number, cols: number, fill: T) {
   return Array.from({ length: rows }, () => Array<T>(cols).fill(fill));
 }
 
-function getMapDebugPoints(tiles: MapTile[]): MapDebugPoint[] {
+function getMapDebugData(tiles: MapTile[], map: Pick<GameMapState, "featuresById">): MapDebugLayerData {
+  return {
+    backgrounds: getMapDebugBackgroundCells(),
+    investigatables: getMapDebugInvestigatableCells(map),
+    blocked: getMapDebugBlockedCells(tiles),
+  };
+}
+
+function getMapDebugBackgroundCells(): MapDebugBackgroundCell[] {
+  const backgroundFeatures = defaultMapConfig.features.filter((feature) => feature.investigatable !== true);
+  return backgroundFeatures.flatMap((feature, featureOrder) =>
+    expandFeatureFootprint(feature, defaultMapConfig).flatMap((tileId) => {
+      const coord = debugCoordFromTileId(tileId);
+      if (!coord) {
+        return [];
+      }
+
+      return [
+        {
+          tileId,
+          featureOrder,
+          featureCount: backgroundFeatures.length,
+          ...coord,
+        },
+      ];
+    }),
+  );
+}
+
+function getMapDebugInvestigatableCells(map: Pick<GameMapState, "featuresById">): MapDebugInvestigatableCell[] {
+  const cellsByTileId = new Map<string, MapDebugInvestigatableCell>();
+
+  for (const feature of defaultMapConfig.features) {
+    if (feature.investigatable !== true) {
+      continue;
+    }
+
+    const hasUnrevealed = isDebugFeatureUnrevealed(feature, map);
+    for (const tileId of expandFeatureFootprint(feature, defaultMapConfig)) {
+      const coord = debugCoordFromTileId(tileId);
+      if (!coord) {
+        continue;
+      }
+
+      const previous = cellsByTileId.get(tileId);
+      const nextHasUnrevealed = previous?.hasUnrevealed || hasUnrevealed;
+      cellsByTileId.set(tileId, {
+        tileId,
+        ...coord,
+        hasUnrevealed: nextHasUnrevealed,
+        symbol: nextHasUnrevealed ? MAP_DEBUG_SYMBOLS.investigatableUnrevealed : MAP_DEBUG_SYMBOLS.investigatableRevealed,
+      });
+    }
+  }
+
+  return [...cellsByTileId.values()];
+}
+
+function getMapDebugBlockedCells(tiles: MapTile[]): MapDebugBlockedCell[] {
   return tiles.flatMap((tile) => {
     const coord = parseTileId(tile.id);
     if (!coord) {
@@ -718,12 +830,46 @@ function getMapDebugPoints(tiles: MapTile[]): MapDebugPoint[] {
   });
 }
 
-function getDebugPointFill() {
+function isDebugFeatureUnrevealed(feature: MapFeatureDefinition, map: Pick<GameMapState, "featuresById">) {
+  return feature.visibility === "hidden" && map.featuresById?.[feature.id]?.revealed !== true;
+}
+
+function debugCoordFromTileId(tileId: string): FocusCoord | null {
+  const coord = parseTileId(tileId);
+  return coord ? { x: coord.col - 1, y: coord.row - 1 } : null;
+}
+
+function getBackgroundDebugFill(featureOrder: number, featureCount: number) {
+  const ratio = featureCount <= 1 ? 0 : featureOrder / (featureCount - 1);
+  const r = Math.round(lerp(MAP_DEBUG_BACKGROUND_START.r, MAP_DEBUG_BACKGROUND_END.r, ratio));
+  const g = Math.round(lerp(MAP_DEBUG_BACKGROUND_START.g, MAP_DEBUG_BACKGROUND_END.g, ratio));
+  const b = Math.round(lerp(MAP_DEBUG_BACKGROUND_START.b, MAP_DEBUG_BACKGROUND_END.b, ratio));
+  const alpha = 0.2 + ratio * 0.18;
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
+}
+
+function getInvestigatableDebugFill(hasUnrevealed: boolean) {
+  return hasUnrevealed ? "rgba(255, 148, 29, 0.72)" : "rgba(255, 255, 255, 0.68)";
+}
+
+function getInvestigatableDebugStroke(hasUnrevealed: boolean) {
+  return hasUnrevealed ? "rgba(255, 205, 118, 0.96)" : "rgba(255, 255, 255, 0.96)";
+}
+
+function getInvestigatableDebugTextColor(hasUnrevealed: boolean) {
+  return hasUnrevealed ? "rgba(46, 23, 0, 0.98)" : "rgba(22, 26, 28, 0.98)";
+}
+
+function getBlockedDebugFill() {
   return "rgba(255, 91, 86, 0.18)";
 }
 
-function getDebugPointTextColor() {
+function getBlockedDebugTextColor() {
   return "rgba(255, 141, 133, 0.96)";
+}
+
+function lerp(start: number, end: number, ratio: number) {
+  return start + (end - start) * clamp(ratio, 0, 1);
 }
 
 function applyRenderGlitch(

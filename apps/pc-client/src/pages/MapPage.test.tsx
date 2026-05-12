@@ -75,11 +75,13 @@ describe("MapPage", () => {
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
   });
 
-  it("keeps the movement debug layer off by default and toggles it on demand", () => {
+  it("keeps the map debug layer off by default and toggles it on demand", () => {
     renderMapPage();
 
     expect(screen.getByText("debug OFF")).toBeInTheDocument();
     expect(screen.getByText(/\[DEBUG\] X=blocked/)).toBeInTheDocument();
+    expect(screen.getByText(/\?=unrevealed \/ I=revealed/)).toBeInTheDocument();
+    expect(screen.getByText(/\[DEBUG\] bg blue->yellow \/ orange=unrevealed \/ white=revealed/)).toBeInTheDocument();
     expect(screen.queryByText(/O=object/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "显示调试层" }));
