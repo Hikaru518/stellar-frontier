@@ -79,6 +79,7 @@ export function CallPage({
   const isRuntimeContext = Boolean(call?.runtimeCallId);
   const runtimeCallClosed = isRuntimeContext && (!runtimeCall || !isRuntimeCallActive(runtimeCall, elapsedGameSeconds));
   const callClosed = Boolean(call?.settled || runtimeCallClosed);
+  const canEndCall = callClosed || !isRuntimeContext;
   const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
   const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
   const crewActionViews = useMemo(
@@ -268,9 +269,11 @@ export function CallPage({
             <span>call controls</span>
           </div>
 
-          <button type="button" className="choice-button choice-muted" onClick={onEndCall}>
-            <span>结束通话</span>
-          </button>
+          {canEndCall ? (
+            <button type="button" className="choice-button choice-muted" onClick={onEndCall}>
+              <span>结束通话</span>
+            </button>
+          ) : null}
 
           {call.selectingMoveTarget && !callView.isRuntime ? (
             <MoveConfirmPanel

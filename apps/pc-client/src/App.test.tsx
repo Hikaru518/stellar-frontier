@@ -144,6 +144,24 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
     expect(screen.getByText("第 1 日 00 小时 00 分钟 00 秒")).toBeInTheDocument();
     expect(screen.getByText("未读通讯 1")).toBeInTheDocument();
+    expect(within(getMikeCrewCard()).getByRole("button", { name: "接通" })).toBeInTheDocument();
+  });
+
+  it("marks the opening Mike runtime call as answerable on the map crew card", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+
+    expect(within(getMikeCrewCard()).getByRole("button", { name: "接通" })).toBeInTheDocument();
+  });
+
+  it("does not show the manual end-call control while an event call awaits a choice", () => {
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
+
+    expect(screen.getByRole("button", { name: "我们会带你回家。先稳住，把眼前的情况说清楚。" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "结束通话" })).toBeNull();
   });
 
   it("opens the global debug toolbox from the floating entry", () => {
