@@ -172,6 +172,23 @@ describe("MapPage", () => {
     expect(screen.getAllByText("野外").length).toBeGreaterThan(0);
   });
 
+  it("shows call map actions in the upper details panel instead of the trace panel", () => {
+    renderMapPage({
+      returnTarget: "call",
+      moveSelectionCrewId: initialCrew[0].id,
+    });
+
+    const detailPanel = screen.getByText("地图详情").closest("section");
+    const tracePanel = screen.getByText("map trace").closest("section");
+
+    expect(detailPanel).toBeTruthy();
+    expect(tracePanel).toBeTruthy();
+    expect(within(detailPanel as HTMLElement).getByRole("button", { name: "标记当前坐标" })).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByRole("button", { name: "返回当前通话" })).toBeInTheDocument();
+    expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "标记当前坐标" })).not.toBeInTheDocument();
+    expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "返回当前通话" })).not.toBeInTheDocument();
+  });
+
   it("returns only the selected tile id when marking a coordinate from a call", () => {
     const onSelectMoveTarget = vi.fn();
     renderMapPage({

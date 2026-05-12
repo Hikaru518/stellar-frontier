@@ -153,6 +153,25 @@ export function MapPage({
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
   const mapDebugData = useMemo(() => getMapDebugData(tiles, map), [map, tiles]);
   const crewMarkers = useMemo(() => getMapCrewMarkers(crew), [crew]);
+  const mapCallReturnActions = returnTarget === "call" ? (
+    <div className="console-map-return-actions" aria-label="通话地图操作">
+      {moveSelectionMember ? (
+        <button
+          type="button"
+          className="console-crew-button"
+          onClick={() => {
+            pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
+            onSelectMoveTarget(focusTileId);
+          }}
+        >
+          标记当前坐标
+        </button>
+      ) : null}
+      <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
+        返回当前通话
+      </button>
+    </div>
+  ) : null;
 
   const crewActionViews = useMemo(
     () =>
@@ -669,6 +688,7 @@ export function MapPage({
             <div className="console-column-header">
               <span>地图详情</span>
             </div>
+            {mapCallReturnActions}
             <FieldList
               rows={[
                 ["区块", focusTileId],
@@ -741,25 +761,6 @@ export function MapPage({
                 [DEBUG] bg blue-&gt;yellow / orange=unrevealed / white=revealed
               </p>
               <p className="console-map-trace-line">[CREW] cyan marker=当前队员位置 / label=姓名或同格人数</p>
-              {returnTarget === "call" ? (
-                <div className="console-map-return-actions">
-                  {moveSelectionMember ? (
-                    <button
-                      type="button"
-                      className="console-crew-button"
-                      onClick={() => {
-                        pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
-                        onSelectMoveTarget(focusTileId);
-                      }}
-                    >
-                      标记当前坐标
-                    </button>
-                  ) : null}
-                  <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
-                    返回当前通话
-                  </button>
-                </div>
-              ) : null}
               {traceLines.length ? (
                 traceLines.map((line, index) => (
                   <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>

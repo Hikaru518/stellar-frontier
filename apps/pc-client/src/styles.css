@@ -2122,6 +2122,19 @@ blockquote {
   color: #79d8ff;
 }
 
+.console-map-return-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(166, 107, 51, 0.28);
+  padding-bottom: 10px;
+}
+
+.console-map-return-actions .console-crew-button {
+  width: 100%;
+}
+
 .console-map-feature-readout {
   display: grid;
   gap: 8px;
