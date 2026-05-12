@@ -94,7 +94,7 @@ test("shows revealed crash-site feature hits on the occupied origin tile", async
 
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ 发电机 \+3/)).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
   const featureReadout = page.locator('[aria-label="Feature 命中结果"]');
   await expect(featureReadout.getByText("背景")).toBeVisible();
   await expect(featureReadout.getByText("IAFS坠毁点")).toBeVisible();
@@ -117,7 +117,7 @@ test("clicking a Feature footprint shows the Feature name and underlying tile id
 
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "130-129");
   await expect(page.getByText("[TILE] 130-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] \(0,-1\) \/ 南侧通道 \+1/)).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] \(0,-1\) \/ 南侧通道/)).toBeVisible();
   const featureReadout = page.locator('[aria-label="Feature 命中结果"]');
   await expect(featureReadout.getByText("IAFS坠毁点")).toBeVisible();
   await expect(featureReadout.getByText("南侧通道")).toBeVisible();

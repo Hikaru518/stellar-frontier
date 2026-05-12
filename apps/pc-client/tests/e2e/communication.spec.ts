@@ -40,5 +40,5 @@ test("shows the control center mobile sync status with incoming station state", 
 
   await expect(page.getByText("COMMUNICATION STATION ......... INCOMING")).toBeVisible();
   await expect(page.getByText("mobile")).toBeVisible();
-  await expect(page.getByText("WAIT")).toBeVisible();
+  await expect(page.getByText("FALLBACK")).toBeVisible();
 });

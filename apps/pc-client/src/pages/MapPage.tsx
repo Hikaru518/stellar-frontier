@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldList, GameConsoleLayout } from "../components/Layout";
-import { defaultMapConfig, type MapFeatureDefinition, type MapTileDefinition } from "../content/contentData";
+import { defaultMapConfig, type MapFeatureDefinition } from "../content/contentData";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, isTilePassable, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
 import { buildFeatureTileIndex, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
-import { formatMapObjectStatus, isMapObjectVisibleOnTile, parseTileId, resolveTileObjects, resolveVisibleTileObjects } from "../mapSystem";
+import { parseTileId } from "../mapSystem";
 
 const CELL_W = 8;
 const CELL_H = 10;
@@ -15,8 +15,6 @@ const RADAR = defaultMapConfig.radar;
 const RADAR_WORLD = RADAR.world;
 const MAP_DEBUG_SYMBOLS = {
   blocked: "X",
-  passable: ".",
-  object: "O",
 } as const;
 
 type FocusCoord = { x: number; y: number };
@@ -24,9 +22,7 @@ type RenderTone = string;
 
 interface MapDebugPoint extends FocusCoord {
   tileId: string;
-  kind: "blocked" | "object";
   symbol: string;
-  allObjectsRevealed?: boolean;
 }
 
 interface RenderGlitch {
@@ -106,16 +102,10 @@ export function MapPage({
   );
   const backgroundFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable !== true), [visibleFocusFeatures]);
   const investigatableFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable === true), [visibleFocusFeatures]);
-  const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile, visibleFocusFeatures), [focusCoord, focusConfigTile, visibleFocusFeatures]);
+  const focusLabel = useMemo(() => getRadarFocusLabel(backgroundFocusFeatures), [backgroundFocusFeatures]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
-  const focusObjectDefinitions = useMemo(() => (focusConfigTile ? resolveTileObjects(focusConfigTile) : []), [focusConfigTile]);
-  const visibleFocusObjects = useMemo(() => (focusConfigTile ? resolveVisibleTileObjects(focusConfigTile, map) : []), [focusConfigTile, map]);
-  const hiddenFocusObjectCount = useMemo(
-    () => (focusConfigTile ? focusObjectDefinitions.filter((definition) => !isMapObjectVisibleOnTile(focusConfigTile.id, definition, map)).length : 0),
-    [focusConfigTile, focusObjectDefinitions, map],
-  );
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
-  const mapDebugPoints = useMemo(() => getMapDebugPoints(tiles, map), [map, tiles]);
+  const mapDebugPoints = useMemo(() => getMapDebugPoints(tiles), [tiles]);
 
   const crewActionViews = useMemo(
     () =>
@@ -441,9 +431,9 @@ export function MapPage({
 
         const sx = (point.x - viewport.left) * cellW;
         const sy = (point.y - viewport.top) * cellH;
-        context.fillStyle = getDebugPointFill(point);
+        context.fillStyle = getDebugPointFill();
         context.fillRect(sx, sy, Math.max(1, cellW), Math.max(1, cellH));
-        context.fillStyle = getDebugPointTextColor(point);
+        context.fillStyle = getDebugPointTextColor();
         context.fillText(point.symbol, sx + cellW / 2, sy + cellH / 2);
       }
     }
@@ -530,18 +520,6 @@ export function MapPage({
             ) : (
               <p className="console-map-trace-line">[FEATURE] 无可见 Feature</p>
             )}
-            <div className="console-map-trace" aria-label="当前可见地图对象">
-              <p className="console-map-trace-lead">地图对象</p>
-              {visibleFocusObjects.map(({ definition, runtime }) => (
-                <p key={definition.id} className="console-map-trace-line">
-                  {formatMapObjectLabel(definition.name, formatMapObjectStatus(runtime?.status_enum ?? definition.initial_status))}
-                </p>
-              ))}
-              {hiddenFocusObjectCount > 0 ? <p className="console-map-trace-line">未知信号</p> : null}
-              {!visibleFocusObjects.length && hiddenFocusObjectCount === 0 ? (
-                <p className="console-map-trace-line">无当前可见对象</p>
-              ) : null}
-            </div>
           </section>
 
           <section className="console-side-panel">
@@ -593,7 +571,7 @@ export function MapPage({
                 [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
               </p>
               <p className="console-map-trace-line">
-                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.object}=object / yellow hidden / white revealed
+                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked
               </p>
               {returnTarget === "call" ? (
                 <div className="console-map-return-actions">
@@ -717,8 +695,8 @@ function makeRenderBuffer<T>(rows: number, cols: number, fill: T) {
   return Array.from({ length: rows }, () => Array<T>(cols).fill(fill));
 }
 
-function getMapDebugPoints(tiles: MapTile[], map: GameMapState): MapDebugPoint[] {
-  const blockedPoints = tiles.flatMap((tile) => {
+function getMapDebugPoints(tiles: MapTile[]): MapDebugPoint[] {
+  return tiles.flatMap((tile) => {
     const coord = parseTileId(tile.id);
     if (!coord) {
       return [];
@@ -734,51 +712,18 @@ function getMapDebugPoints(tiles: MapTile[], map: GameMapState): MapDebugPoint[]
         tileId: tile.id,
         x: coord.col - 1,
         y: coord.row - 1,
-        kind: "blocked" as const,
         symbol: MAP_DEBUG_SYMBOLS.blocked,
       },
     ];
   });
-
-  const objectPoints = defaultMapConfig.tiles.flatMap((tile) => {
-    const definitions = resolveTileObjects(tile);
-    if (!definitions.length) {
-      return [];
-    }
-    const coord = parseTileId(tile.id);
-    if (!coord) {
-      return [];
-    }
-
-    return [
-      {
-        tileId: tile.id,
-        x: coord.col - 1,
-        y: coord.row - 1,
-        kind: "object" as const,
-        symbol: MAP_DEBUG_SYMBOLS.object,
-        allObjectsRevealed: definitions.every((definition) => isMapObjectVisibleOnTile(tile.id, definition, map)),
-      },
-    ];
-  });
-
-  return [...blockedPoints, ...objectPoints];
 }
 
-function getDebugPointFill(point: MapDebugPoint) {
-  if (point.kind === "blocked") {
-    return "rgba(255, 91, 86, 0.18)";
-  }
-
-  return point.allObjectsRevealed ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 215, 88, 0.18)";
+function getDebugPointFill() {
+  return "rgba(255, 91, 86, 0.18)";
 }
 
-function getDebugPointTextColor(point: MapDebugPoint) {
-  if (point.kind === "blocked") {
-    return "rgba(255, 141, 133, 0.96)";
-  }
-
-  return point.allObjectsRevealed ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 215, 88, 0.96)";
+function getDebugPointTextColor() {
+  return "rgba(255, 141, 133, 0.96)";
 }
 
 function applyRenderGlitch(
@@ -891,31 +836,8 @@ function getViewport(center: FocusCoord, zoom: number) {
   };
 }
 
-function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
-  if (visibleFeatures.length === 1) {
-    return visibleFeatures[0].name;
-  }
-
-  if (visibleFeatures.length > 1) {
-    return `${visibleFeatures[0].name} +${visibleFeatures.length - 1}`;
-  }
-
-  const region = [...RADAR.regions]
-    .sort((left, right) => right.priority - left.priority)
-    .find((entry) => isInsideRegion(coord, entry.shape));
-  return region?.label ?? tile?.id ?? "未命名区域";
-}
-
-function formatMapObjectLabel(name: string, statusLabel: string) {
-  return statusLabel ? `${name}（${statusLabel}）` : name;
-}
-
-function isInsideRegion(coord: FocusCoord, shape: (typeof RADAR.regions)[number]["shape"]) {
-  if (shape.type === "circle") {
-    return distance(coord.x, coord.y, shape.x, shape.y) <= shape.radius;
-  }
-
-  return coord.x >= shape.x1 && coord.x <= shape.x2 && coord.y >= shape.y1 && coord.y <= shape.y2;
+function getRadarFocusLabel(backgroundFeatures: readonly MapFeatureDefinition[]) {
+  return backgroundFeatures[0]?.name ?? "野外";
 }
 
 function formatDisplayCoord(coord: FocusCoord) {

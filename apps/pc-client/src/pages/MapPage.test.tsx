@@ -79,7 +79,8 @@ describe("MapPage", () => {
     renderMapPage();
 
     expect(screen.getByText("debug OFF")).toBeInTheDocument();
-    expect(screen.getByText(/X=blocked \/ O=object/)).toBeInTheDocument();
+    expect(screen.getByText(/\[DEBUG\] X=blocked/)).toBeInTheDocument();
+    expect(screen.queryByText(/O=object/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "显示调试层" }));
 
@@ -93,29 +94,16 @@ describe("MapPage", () => {
     expect(screen.getByText("129-129")).toBeInTheDocument();
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
-    expect(screen.getByText("无当前可见对象")).toBeInTheDocument();
+    expect(screen.queryByText("地图对象")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("当前可见地图对象")).not.toBeInTheDocument();
     expect(screen.queryByText("未知信号")).not.toBeInTheDocument();
   });
 
-  it("lists only runtime-visible map objects for the selected tile", () => {
+  it("does not render the legacy map object list even when runtime object state exists", () => {
     renderMapPage({ map: createMapWithRevealedOriginObjects(["iafs_generator"]) });
 
-    const objectList = screen.getByLabelText("当前可见地图对象");
-    expect(objectList).toHaveTextContent("发电机（已损坏）");
-    expect(objectList).not.toHaveTextContent("damaged");
-    expect(objectList).not.toHaveTextContent("facility");
-    expect(objectList).not.toHaveTextContent("维生装置");
-    expect(objectList).not.toHaveTextContent("未知信号");
-  });
-
-  it("does not show unknown signal after all tile objects are revealed", () => {
-    renderMapPage({ map: createMapWithRevealedOriginObjects(["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]) });
-
-    const objectList = screen.getByLabelText("当前可见地图对象");
-    expect(objectList).toHaveTextContent("发电机（已损坏）");
-    expect(objectList).toHaveTextContent("维生装置（已损坏）");
-    expect(objectList).toHaveTextContent("穿梭机核心（已损坏）");
-    expect(objectList).not.toHaveTextContent("未知信号");
+    expect(screen.queryByText("地图对象")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("当前可见地图对象")).not.toBeInTheDocument();
   });
 
   it("shows the latest system log in the bottom bar", () => {
@@ -158,6 +146,7 @@ describe("MapPage", () => {
     expect(readout.getByText("散落的物资")).toBeInTheDocument();
     expect(readout.getByText("背景")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
+    expect(screen.getAllByText("南侧通道").length).toBeGreaterThan(0);
   });
 
   it("keeps tile terrain and weather readout for blank tiles without visible features", () => {
@@ -167,6 +156,7 @@ describe("MapPage", () => {
 
     expect(screen.getByText(/\[TILE\] 1-1 \/ 平原 \/ 晴朗/)).toBeInTheDocument();
     expect(screen.getByText(/\[FEATURE\] 无可见 Feature/)).toBeInTheDocument();
+    expect(screen.getAllByText("野外").length).toBeGreaterThan(0);
   });
 
   it("returns only the selected tile id when marking a coordinate from a call", () => {
