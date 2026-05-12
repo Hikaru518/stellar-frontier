@@ -139,6 +139,17 @@ export function normalizeQuestState(savedState: unknown, definitions: QuestDefin
   };
 }
 
+export function clearQuestUpdateMarkers(state: QuestRuntimeState): QuestRuntimeState {
+  if (state.updated_quest_ids.length === 0) {
+    return state;
+  }
+
+  return {
+    ...state,
+    updated_quest_ids: [],
+  };
+}
+
 export function applyQuestProgress(input: ApplyQuestProgressInput): ApplyQuestProgressResult {
   const definition = input.definitions.find((quest) => quest.id === input.quest_id);
   const quest = input.state.quests[input.quest_id];

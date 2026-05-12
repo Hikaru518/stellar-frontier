@@ -3,6 +3,7 @@ import type { QuestDefinition } from "./content/contentData";
 import {
   applyQuestProgress,
   buildQuestSidebarView,
+  clearQuestUpdateMarkers,
   createInitialQuestState,
   normalizeQuestState,
   type QuestRuntimeState,
@@ -172,6 +173,22 @@ describe("questSystem", () => {
       completed_at: null,
     });
     expect(state.quests.side_quest.status).toBe("incomplete");
+  });
+
+  it("clears quest update markers without changing quest progress", () => {
+    const state = applyQuestProgress({
+      state: createInitialQuestState(questDefinitions, 0),
+      definitions: questDefinitions,
+      operation: "mark_updated",
+      quest_id: "main_quest",
+      occurred_at: 20,
+    }).state;
+
+    const cleared = clearQuestUpdateMarkers(state);
+
+    expect(cleared.updated_quest_ids).toEqual([]);
+    expect(cleared.quests).toBe(state.quests);
+    expect(clearQuestUpdateMarkers(cleared)).toBe(cleared);
   });
 
   it("supports quest-level todos without requiring subquests", () => {

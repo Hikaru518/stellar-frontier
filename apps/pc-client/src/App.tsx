@@ -61,7 +61,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
-import { buildQuestSidebarView, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
+import { buildQuestSidebarView, clearQuestUpdateMarkers, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
 import { logger } from "./logger";
 import {
   acquireYuanDualDeviceTerminal,
@@ -183,7 +183,7 @@ function App() {
   const mobileMode: MobileMode = typeof mobileSession.lastHeartbeatAt === "number" && !mobileFallback ? "active" : mobileFallback ? "fallback" : "waiting";
   const activeMobileCalls = getActiveRuntimeCalls(gameState, elapsedGameSeconds);
   const activeRuntimeCallCrewIds = activeMobileCalls.map((call) => call.crew_id);
-  const hasQuestUpdates = gameState.quest_state.updated_quest_ids.length > 0;
+  const hasQuestUpdates = page !== "station" && gameState.quest_state.updated_quest_ids.length > 0;
   const mobileStatusCard = {
     mode: mobileMode,
     lastHeartbeatAt: mobileSession.lastHeartbeatAt,
@@ -221,7 +221,7 @@ function App() {
     if (entry.type === "page") {
       setQuestNavigationHint(null);
       setMapReturnTarget("control");
-      setPage(entry.page);
+      navigateToPage(entry.page);
       return;
     }
 
@@ -232,7 +232,7 @@ function App() {
       }
       setQuestNavigationHint({ type: "tile", tileId: entry.tile_id, label: entry.label });
       setMapReturnTarget("control");
-      setPage("map");
+      navigateToPage("map");
       return;
     }
 
@@ -242,7 +242,7 @@ function App() {
       return;
     }
     setQuestNavigationHint({ type: "crew", crewId: crewMember.id, label: entry.label });
-    setPage("station");
+    navigateToPage("station");
   }
 
   useEffect(() => {
@@ -387,37 +387,51 @@ function App() {
     }));
   }
 
+  function acknowledgeViewedQuestUpdates() {
+    setGameState((state) => {
+      const questState = clearQuestUpdateMarkers(state.quest_state);
+      return questState === state.quest_state ? state : { ...state, quest_state: questState };
+    });
+  }
+
+  function navigateToPage(nextPage: PageId) {
+    if (page === "station" && nextPage !== "station") {
+      acknowledgeViewedQuestUpdates();
+    }
+    setPage(nextPage);
+  }
+
   function openStation() {
-    setPage("station");
+    navigateToPage("station");
   }
 
   function openControlOverview() {
-    setPage("control");
+    navigateToPage("control");
   }
 
   function openCrewStatusPage(crewId: CrewId) {
     setCrewConsoleView({ mode: "status", crewId });
-    setPage("crew");
+    navigateToPage("crew");
   }
 
   function openCrewInventoryPage(crewId: CrewId) {
     setCrewConsoleView({ mode: "inventory", crewId });
-    setPage("crew");
+    navigateToPage("crew");
   }
 
   function openMap(returnTarget: MapReturnTarget) {
     setMapReturnTarget(returnTarget);
-    setPage("map");
+    navigateToPage("map");
   }
 
   function returnFromMap() {
-    setPage(mapReturnTarget === "call" && currentCall ? "call" : "control");
+    navigateToPage(mapReturnTarget === "call" && currentCall ? "call" : "control");
   }
 
   function closeCurrentCallAndReturn() {
     setCurrentCall(null);
     setMapReturnTarget("control");
-    setPage(preCallPage === "call" || preCallPage === "ending" ? "control" : preCallPage);
+    navigateToPage(preCallPage === "call" || preCallPage === "ending" ? "control" : preCallPage);
   }
 
   function resetGame() {
@@ -575,7 +589,7 @@ function App() {
         state.elapsedGameSeconds,
       ),
     }));
-    setPage("call");
+    navigateToPage("call");
   }
 
   function endCall() {
@@ -622,7 +636,7 @@ function App() {
           : call,
       );
       setMapReturnTarget("call");
-      setPage("map");
+      navigateToPage("map");
       appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
       return;
     }
@@ -775,7 +789,7 @@ function App() {
           }
         : call,
     );
-    setPage("call");
+    navigateToPage("call");
   }
 
   function clearMoveTarget() {
