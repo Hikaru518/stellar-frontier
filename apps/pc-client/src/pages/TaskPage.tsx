@@ -17,6 +17,7 @@ interface TaskPageProps {
   elapsedGameSeconds: number;
   tiles: MapTile[];
   gameTimeLabel: string;
+  hasQuestUpdates: boolean;
   logs: SystemLog[];
   onStatusFilterChange: (filter: QuestStatusFilter) => void;
   onCategoryFilterChange: (filter: QuestCategoryFilter) => void;
@@ -42,6 +43,7 @@ export function TaskPage({
   elapsedGameSeconds,
   tiles,
   gameTimeLabel,
+  hasQuestUpdates,
   logs,
   onStatusFilterChange,
   onCategoryFilterChange,
@@ -114,7 +116,7 @@ export function TaskPage({
       ]}
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
-        { id: "task", label: "任务", meta: "task", active: true },
+        { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, active: true },
         { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
       ]}
       crewPanel={

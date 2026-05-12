@@ -693,23 +693,23 @@ function buildRoute(previous: Map<string, string>, fromTileId: string, targetTil
 
 function getTerrainMoveCost(tile: MapTile) {
   if (tile.terrain.includes("丘陵")) {
-    return 90;
+    return 25;
   }
   if (tile.terrain.includes("森林")) {
-    return 120;
+    return 30;
   }
   if (tile.terrain.includes("山")) {
-    return 180;
+    return 45;
   }
   if (tile.terrain.includes("沙漠")) {
-    return 150;
+    return 35;
   }
-  return 60;
+  return 15;
 }
 
 function getMoveStepDuration(member: CrewMember, tile?: MapTile) {
-  const baseDuration = tile ? getTerrainMoveCost(tile) : 60;
-  return member.conditions.includes("wounded") ? baseDuration * 1.5 : baseDuration;
+  const baseDuration = tile ? getTerrainMoveCost(tile) : 15;
+  return Math.ceil(member.conditions.includes("wounded") ? baseDuration * 1.5 : baseDuration);
 }
 
 function getMoveActionStepDurations(member: CrewMember, action: CrewActionState, tiles: MapTile[]) {

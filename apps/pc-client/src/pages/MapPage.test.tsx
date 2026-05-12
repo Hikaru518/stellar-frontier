@@ -1,9 +1,9 @@
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialMapState, initialCrew, initialLogs, initialTiles } from "../data/gameData";
-import { MapPage } from "./MapPage";
+import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage } from "./MapPage";
 
 describe("MapPage", () => {
   it("renders a single interactive ascii map surface after the header", () => {
@@ -11,7 +11,7 @@ describe("MapPage", () => {
 
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
     expect(screen.getByLabelText("ASCII 地图")).toBeInTheDocument();
-    expect(screen.getByText("render + function + debug / 256 x 256")).toBeInTheDocument();
+    expect(screen.getByText("render + function + crew + debug / 256 x 256")).toBeInTheDocument();
   });
 
   it("does not render the old quest sidebar UI", () => {
@@ -75,15 +75,29 @@ describe("MapPage", () => {
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
   });
 
-  it("keeps the movement debug layer off by default and toggles it on demand", () => {
+  it("keeps the map debug layer off by default and toggles it on demand", () => {
     renderMapPage();
 
     expect(screen.getByText("debug OFF")).toBeInTheDocument();
-    expect(screen.getByText(/X=blocked \/ O=object/)).toBeInTheDocument();
+    expect(screen.getByText(/\[DEBUG\] X=blocked/)).toBeInTheDocument();
+    expect(screen.getByText(/\?=unrevealed \/ I=revealed/)).toBeInTheDocument();
+    expect(screen.getByText(/\[DEBUG\] bg blue->yellow \/ orange=unrevealed \/ white=revealed/)).toBeInTheDocument();
+    expect(screen.queryByText(/O=object/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "显示调试层" }));
 
     expect(screen.getByText("debug ON")).toBeInTheDocument();
+  });
+
+  it("keeps the map crew layer off by default and toggles it on demand", () => {
+    renderMapPage();
+
+    expect(screen.getByText("crew OFF")).toBeInTheDocument();
+    expect(screen.getByText(/\[CREW\] cyan marker=当前队员位置/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示队员层" }));
+
+    expect(screen.getByText("crew ON")).toBeInTheDocument();
   });
 
   it("shows selected tile details in the right panel", () => {
@@ -93,29 +107,16 @@ describe("MapPage", () => {
     expect(screen.getByText("129-129")).toBeInTheDocument();
     expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
-    expect(screen.getByText("无当前可见对象")).toBeInTheDocument();
+    expect(screen.queryByText("地图对象")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("当前可见地图对象")).not.toBeInTheDocument();
     expect(screen.queryByText("未知信号")).not.toBeInTheDocument();
   });
 
-  it("lists only runtime-visible map objects for the selected tile", () => {
+  it("does not render the legacy map object list even when runtime object state exists", () => {
     renderMapPage({ map: createMapWithRevealedOriginObjects(["iafs_generator"]) });
 
-    const objectList = screen.getByLabelText("当前可见地图对象");
-    expect(objectList).toHaveTextContent("发电机（已损坏）");
-    expect(objectList).not.toHaveTextContent("damaged");
-    expect(objectList).not.toHaveTextContent("facility");
-    expect(objectList).not.toHaveTextContent("维生装置");
-    expect(objectList).not.toHaveTextContent("未知信号");
-  });
-
-  it("does not show unknown signal after all tile objects are revealed", () => {
-    renderMapPage({ map: createMapWithRevealedOriginObjects(["iafs_generator", "iafs_life_support", "iafs_shuttle_core"]) });
-
-    const objectList = screen.getByLabelText("当前可见地图对象");
-    expect(objectList).toHaveTextContent("发电机（已损坏）");
-    expect(objectList).toHaveTextContent("维生装置（已损坏）");
-    expect(objectList).toHaveTextContent("穿梭机核心（已损坏）");
-    expect(objectList).not.toHaveTextContent("未知信号");
+    expect(screen.queryByText("地图对象")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("当前可见地图对象")).not.toBeInTheDocument();
   });
 
   it("shows the latest system log in the bottom bar", () => {
@@ -142,7 +143,7 @@ describe("MapPage", () => {
     expect(readout.getByText("背景")).toBeInTheDocument();
   });
 
-  it("lists every visible feature at a tile and separates background from investigatable hits", () => {
+  it("shows the moved 2x2 scattered supplies footprint", () => {
     const map = createInitialMapState();
     map.featuresById = {
       ...map.featuresById,
@@ -150,14 +151,15 @@ describe("MapPage", () => {
     };
     renderMapPage({ map });
 
-    focusMapTile("130-130");
+    focusMapTile("133-134");
 
     const readout = within(screen.getByLabelText("Feature 命中结果"));
-    expect(readout.getByText("IAFS坠毁点")).toBeInTheDocument();
-    expect(readout.getByText("南侧通道")).toBeInTheDocument();
     expect(readout.getByText("散落的物资")).toBeInTheDocument();
-    expect(readout.getByText("背景")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
+    expect(readout.queryByText("背景")).not.toBeInTheDocument();
+
+    focusMapTile("134-135");
+    expect(within(screen.getByLabelText("Feature 命中结果")).getByText("散落的物资")).toBeInTheDocument();
   });
 
   it("keeps tile terrain and weather readout for blank tiles without visible features", () => {
@@ -167,6 +169,24 @@ describe("MapPage", () => {
 
     expect(screen.getByText(/\[TILE\] 1-1 \/ 平原 \/ 晴朗/)).toBeInTheDocument();
     expect(screen.getByText(/\[FEATURE\] 无可见 Feature/)).toBeInTheDocument();
+    expect(screen.getAllByText("野外").length).toBeGreaterThan(0);
+  });
+
+  it("shows call map actions in the upper details panel instead of the trace panel", () => {
+    renderMapPage({
+      returnTarget: "call",
+      moveSelectionCrewId: initialCrew[0].id,
+    });
+
+    const detailPanel = screen.getByText("地图详情").closest("section");
+    const tracePanel = screen.getByText("map trace").closest("section");
+
+    expect(detailPanel).toBeTruthy();
+    expect(tracePanel).toBeTruthy();
+    expect(within(detailPanel as HTMLElement).getByRole("button", { name: "标记当前坐标" })).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByRole("button", { name: "返回当前通话" })).toBeInTheDocument();
+    expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "标记当前坐标" })).not.toBeInTheDocument();
+    expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "返回当前通话" })).not.toBeInTheDocument();
   });
 
   it("returns only the selected tile id when marking a coordinate from a call", () => {
@@ -203,7 +223,7 @@ function focusMapTile(tileId: string) {
 
 function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) {
   return render(
-    <MapPage
+    <StatefulMapPage
       tiles={initialTiles}
       crew={initialCrew}
       crewActions={{}}
@@ -212,6 +232,8 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
       returnTarget="control"
       map={createInitialMapState()}
+      layerVisibility={DEFAULT_MAP_LAYER_VISIBILITY}
+      onLayerVisibilityChange={vi.fn()}
       onOpenControl={vi.fn()}
       onOpenTask={vi.fn()}
       onReturnFromMap={vi.fn()}
@@ -223,6 +245,11 @@ function renderMapPage(overrides: Partial<ComponentProps<typeof MapPage>> = {}) 
       {...overrides}
     />
   );
+}
+
+function StatefulMapPage(props: ComponentProps<typeof MapPage>) {
+  const [layerVisibility, setLayerVisibility] = useState(props.layerVisibility);
+  return <MapPage {...props} layerVisibility={layerVisibility} onLayerVisibilityChange={setLayerVisibility} />;
 }
 
 function createMapWithRevealedOriginObjects(revealedObjectIds: string[]) {

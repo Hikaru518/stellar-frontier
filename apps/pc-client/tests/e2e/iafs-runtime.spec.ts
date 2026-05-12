@@ -1,5 +1,6 @@
 import {
   CRASH_SITE_FEATURE_IDS,
+  answerMikeIncomingCall,
   expect,
   featureSection,
   findSavedCrew,
@@ -25,8 +26,9 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await expect(page.getByRole("heading", { name: "发电机" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "调查当前区域" }).click();
-  await expect(page.getByText("调查指令已提交，预计 00:15 后回传结果。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await page.clock.runFor(45_000);
+  await answerMikeIncomingCall(page);
 
   await expect(
     page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。"),
@@ -58,7 +60,7 @@ test("dispatches a revealed generator repair into a timed crew action", async ({
 
   await featureSection(page, "发电机").getByRole("button", { name: "维修" }).click();
 
-  await expect(page.getByText("维修指令已提交。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await page.waitForFunction((key) => {
     const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
     return Object.values(save.crew_actions ?? {}).some((action) => {
@@ -110,7 +112,9 @@ test("default survey away from the crash site reports no new clue", async ({ pag
   await page.goto("/");
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "调查当前区域" }).click();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await page.clock.runFor(45_000);
+  await answerMikeIncomingCall(page);
 
   await expect(page.getByText("暂时没有发现值得特别关注的新东西，至少眼下没有。")).toBeVisible();
   await page.getByRole("button", { name: "收到，继续保持观察。" }).click();

@@ -169,6 +169,26 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "[DEBUG]" })).toBeInTheDocument();
   });
 
+  it("keeps map layer visibility after leaving and reopening the map", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+    expect(screen.getByText("crew OFF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "显示队员层" }));
+    fireEvent.click(screen.getByRole("button", { name: "显示渲染层" }));
+    expect(screen.getByText("crew ON")).toBeInTheDocument();
+    expect(screen.getByText("render OFF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /控制台/ }));
+    expect(screen.getByRole("heading", { name: "前沿基地控制中心" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+    expect(screen.getByText("crew ON")).toBeInTheDocument();
+    expect(screen.getByText("render OFF")).toBeInTheDocument();
+    expect(screen.getByText("debug OFF")).toBeInTheDocument();
+  });
+
   it("creates a blank-world save on first load", () => {
     render(<App />);
 
@@ -603,6 +623,7 @@ describe("App", () => {
       vi.advanceTimersByTime(15000);
     });
 
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
     expect(screen.getByText(/这里还有几套能辨认出来的关键设施/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "标记这些可用设施。" }));
 
@@ -785,9 +806,11 @@ describe("App", () => {
         activeCalls={{}}
         elapsedGameSeconds={0}
         gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+        hasQuestUpdates={false}
         gameState={gameState}
         logs={initialLogs}
         onDecision={vi.fn()}
+        onEndCall={vi.fn()}
         onConfirmMove={vi.fn()}
         onClearMoveTarget={vi.fn()}
         onOpenMap={vi.fn()}

@@ -8,6 +8,8 @@ import type { CrewMember, GameState, MapTile } from "./data/gameData";
 import { buildFeatureTileIndex, getInvestigatableFeaturesAtTile, selectTopInvestigatableFeatures } from "./mapFeatureSystem";
 import { formatMapObjectStatus, getFeatureRuntimeStatus } from "./mapSystem";
 
+const HIDDEN_UNIVERSAL_ACTION_IDS = new Set(["universal:standby"]);
+
 export interface CallActionGroup {
   title: string;
   actions: CallActionView[];
@@ -159,7 +161,7 @@ function collectCandidates(
   gameState: GameState,
   topInvestigatableFeatures: readonly MapFeatureDefinition[],
 ): ActionCandidate[] {
-  const candidates: ActionCandidate[] = universalActions.map((action) => ({ action }));
+  const candidates: ActionCandidate[] = universalActions.filter((action) => !HIDDEN_UNIVERSAL_ACTION_IDS.has(action.id)).map((action) => ({ action }));
 
   for (const feature of topInvestigatableFeatures) {
     if (feature.investigatable !== true) {

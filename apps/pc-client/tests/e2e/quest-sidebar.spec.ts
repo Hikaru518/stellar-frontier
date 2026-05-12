@@ -1,4 +1,4 @@
-import { createCompatibleMap, expect, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
+import { answerMikeIncomingCall, createCompatibleMap, expect, GAME_SAVE_KEY, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -16,6 +16,29 @@ test("shows the task page and supports status/category filters", async ({ page }
   await page.locator(".console-task-filter-group").filter({ hasText: "完成状态" }).getByRole("button", { name: "全部" }).click();
   await page.locator(".console-task-filter-group").filter({ hasText: "任务类型" }).getByRole("button", { name: "次要" }).click();
   await expect(page.getByText("当前筛选下没有任务。").first()).toBeVisible();
+});
+
+test("clears the task update star after viewing task updates", async ({ page }) => {
+  const questState = createInitialQuestStateForE2e();
+  questState.updated_quest_ids = ["regroup_after_crash"];
+  await installSave(page, { quest_state: questState });
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "任务有更新 task" })).toBeVisible();
+
+  await page.getByRole("button", { name: "任务有更新 task" }).click();
+  await expect(page.getByRole("heading", { name: "任务追踪" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "任务有更新 task" })).toHaveCount(0);
+  await expect(page.getByText("RECENT UPDATE: 重整坠毁现场")).toBeVisible();
+  await expect(page.getByRole("button", { name: /重整坠毁现场 UPDATED/ })).toBeVisible();
+
+  await page.getByRole("button", { name: /控制台/ }).click();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "任务有更新 task" })).toHaveCount(0);
+  await page.waitForFunction((key) => {
+    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    return Array.isArray(save.quest_state?.updated_quest_ids) && save.quest_state.updated_quest_ids.length === 0;
+  }, GAME_SAVE_KEY);
 });
 
 test("shows completion result for completed crash-site quest from authored content", async ({ page }) => {
@@ -56,6 +79,7 @@ test("completes a quest todo through the crash-site event and preserves it after
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "调查当前区域" }).click();
   await page.clock.runFor(45_000);
+  await answerMikeIncomingCall(page);
   await expect(
     page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。").first(),
   ).toBeVisible();

@@ -208,6 +208,18 @@ export interface FeatureTimedRepairLocalActionDefinition {
   failure_effects: FeatureActionSetStatusEffect[];
 }
 
+export interface FeatureTimedActionLocalActionDefinition {
+  kind: "timed_action";
+  action_type: "gather" | "build" | "extract";
+  duration_seconds: number;
+  handler?: string;
+  status_text?: string;
+  completion_status?: string;
+  completion_log?: string;
+}
+
+export type FeatureLocalActionDefinition = FeatureTimedRepairLocalActionDefinition | FeatureTimedActionLocalActionDefinition;
+
 export interface FeatureActionDefinition {
   id: string;
   category: "feature";
@@ -217,7 +229,7 @@ export interface FeatureActionDefinition {
   event_id?: string;
   display_when_unavailable?: FeatureActionUnavailableDisplay;
   unavailable_hint?: string;
-  local_action?: FeatureTimedRepairLocalActionDefinition;
+  local_action?: FeatureLocalActionDefinition;
 }
 
 export interface BaseMapFeatureDefinition {

@@ -4,7 +4,7 @@ import { ControlCenter } from "./pages/ControlCenter";
 import { CrewConsolePage, type CrewConsoleMode } from "./pages/CrewConsolePage";
 import { DebugToolbox, type TimeMultiplier } from "./pages/DebugToolbox";
 import { EndingPage } from "./pages/EndingPage";
-import { MapPage } from "./pages/MapPage";
+import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage, type MapLayerVisibility, type MapViewportState } from "./pages/MapPage";
 import { TaskPage } from "./pages/TaskPage";
 import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
@@ -15,6 +15,7 @@ import {
   eventContentLibrary,
   questDefinitions,
   type FeatureActionDefinition,
+  type FeatureLocalActionDefinition,
   type FeatureRuntimeState,
   type MapFeatureDefinition,
   type QuestNavigationEntry,
@@ -60,7 +61,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
-import { buildQuestSidebarView, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
+import { buildQuestSidebarView, clearQuestUpdateMarkers, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
 import { logger } from "./logger";
 import {
   acquireYuanDualDeviceTerminal,
@@ -150,6 +151,7 @@ function App() {
   const [gameState, setGameState] = useState<GameState>(initialState);
   const [page, setPage] = useState<PageId>("control");
   const [currentCall, setCurrentCall] = useState<CallContext | null>(null);
+  const [preCallPage, setPreCallPage] = useState<PageId>("control");
   const [mapReturnTarget, setMapReturnTarget] = useState<MapReturnTarget>("control");
   const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -158,6 +160,8 @@ function App() {
   const [questCategoryFilter, setQuestCategoryFilter] = useState<QuestCategoryFilter>("all");
   const [selectedQuestId, setSelectedQuestId] = useState<string | undefined>();
   const [questNavigationHint, setQuestNavigationHint] = useState<QuestNavigationHint | null>(null);
+  const [mapLayerVisibility, setMapLayerVisibility] = useState<MapLayerVisibility>(DEFAULT_MAP_LAYER_VISIBILITY);
+  const [mapViewportState, setMapViewportState] = useState<MapViewportState | null>(null);
   const [crewConsoleView, setCrewConsoleView] = useState<{ mode: CrewConsoleMode; crewId: CrewId | null }>({
     mode: "status",
     crewId: null,
@@ -179,6 +183,7 @@ function App() {
   const mobileMode: MobileMode = typeof mobileSession.lastHeartbeatAt === "number" && !mobileFallback ? "active" : mobileFallback ? "fallback" : "waiting";
   const activeMobileCalls = getActiveRuntimeCalls(gameState, elapsedGameSeconds);
   const activeRuntimeCallCrewIds = activeMobileCalls.map((call) => call.crew_id);
+  const hasQuestUpdates = page !== "station" && gameState.quest_state.updated_quest_ids.length > 0;
   const mobileStatusCard = {
     mode: mobileMode,
     lastHeartbeatAt: mobileSession.lastHeartbeatAt,
@@ -216,7 +221,7 @@ function App() {
     if (entry.type === "page") {
       setQuestNavigationHint(null);
       setMapReturnTarget("control");
-      setPage(entry.page);
+      navigateToPage(entry.page);
       return;
     }
 
@@ -227,7 +232,7 @@ function App() {
       }
       setQuestNavigationHint({ type: "tile", tileId: entry.tile_id, label: entry.label });
       setMapReturnTarget("control");
-      setPage("map");
+      navigateToPage("map");
       return;
     }
 
@@ -237,7 +242,7 @@ function App() {
       return;
     }
     setQuestNavigationHint({ type: "crew", crewId: crewMember.id, label: entry.label });
-    setPage("station");
+    navigateToPage("station");
   }
 
   useEffect(() => {
@@ -382,31 +387,51 @@ function App() {
     }));
   }
 
+  function acknowledgeViewedQuestUpdates() {
+    setGameState((state) => {
+      const questState = clearQuestUpdateMarkers(state.quest_state);
+      return questState === state.quest_state ? state : { ...state, quest_state: questState };
+    });
+  }
+
+  function navigateToPage(nextPage: PageId) {
+    if (page === "station" && nextPage !== "station") {
+      acknowledgeViewedQuestUpdates();
+    }
+    setPage(nextPage);
+  }
+
   function openStation() {
-    setPage("station");
+    navigateToPage("station");
   }
 
   function openControlOverview() {
-    setPage("control");
+    navigateToPage("control");
   }
 
   function openCrewStatusPage(crewId: CrewId) {
     setCrewConsoleView({ mode: "status", crewId });
-    setPage("crew");
+    navigateToPage("crew");
   }
 
   function openCrewInventoryPage(crewId: CrewId) {
     setCrewConsoleView({ mode: "inventory", crewId });
-    setPage("crew");
+    navigateToPage("crew");
   }
 
   function openMap(returnTarget: MapReturnTarget) {
     setMapReturnTarget(returnTarget);
-    setPage("map");
+    navigateToPage("map");
   }
 
   function returnFromMap() {
-    setPage(mapReturnTarget === "call" && currentCall ? "call" : "control");
+    navigateToPage(mapReturnTarget === "call" && currentCall ? "call" : "control");
+  }
+
+  function closeCurrentCallAndReturn() {
+    setCurrentCall(null);
+    setMapReturnTarget("control");
+    navigateToPage(preCallPage === "call" || preCallPage === "ending" ? "control" : preCallPage);
   }
 
   function resetGame() {
@@ -444,7 +469,9 @@ function App() {
     const freshState = createInitialGameState();
     setGameState(freshState);
     setCurrentCall(null);
+    setPreCallPage("control");
     setMapReturnTarget("control");
+    setMapViewportState(null);
     setPage("control");
     setDebugOpen(false);
   }
@@ -548,6 +575,9 @@ function App() {
     }
 
     const type = runtimeCall && isUrgentRuntimeCallState(runtimeCall) ? "emergency" : "normal";
+    if (page !== "call" && page !== "ending") {
+      setPreCallPage(page);
+    }
     setCurrentCall({ crewId, type, settled: false, runtimeCallId: runtimeCall?.id });
     setGameState((state) => ({
       ...state,
@@ -559,7 +589,7 @@ function App() {
         state.elapsedGameSeconds,
       ),
     }));
-    setPage("call");
+    navigateToPage("call");
   }
 
   function endCall() {
@@ -567,7 +597,7 @@ function App() {
       appendLog("通话尚未下达指令，通讯台将其标记为待决策。", "accent");
     }
 
-    setPage("station");
+    closeCurrentCallAndReturn();
   }
 
   function handleDecision(actionId: string) {
@@ -579,8 +609,18 @@ function App() {
       if (currentCall.settled) {
         return;
       }
-      dispatchRuntimeCallOption(currentCall.runtimeCallId!, currentCall.crewId ?? null, actionId);
-      setCurrentCall((call) => (call ? { ...call, settled: true, result: "事件选项已提交。" } : call));
+      const nextState = dispatchRuntimeCallOption(currentCall.runtimeCallId!, currentCall.crewId ?? null, actionId);
+      const nextRuntimeCall = findRuntimeCallForCrew(nextState, currentCall.crewId);
+      if (nextRuntimeCall && nextRuntimeCall.id !== currentCall.runtimeCallId) {
+        setCurrentCall({
+          crewId: currentCall.crewId,
+          type: isUrgentRuntimeCallState(nextRuntimeCall) ? "emergency" : currentCall.type,
+          settled: false,
+          runtimeCallId: nextRuntimeCall.id,
+        });
+      } else {
+        closeCurrentCallAndReturn();
+      }
       return;
     }
 
@@ -596,7 +636,7 @@ function App() {
           : call,
       );
       setMapReturnTarget("call");
-      setPage("map");
+      navigateToPage("map");
       appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
       return;
     }
@@ -605,10 +645,13 @@ function App() {
       return;
     }
 
-    dispatchBasicOrStoryAction(currentCall.crewId, actionId, true);
+    const result = dispatchBasicOrStoryAction(currentCall.crewId, actionId, true);
+    if (result.closeCall) {
+      closeCurrentCallAndReturn();
+    }
   }
 
-  function dispatchRuntimeCallOption(callId: string, crewId: string | null, optionId: string) {
+  function dispatchRuntimeCallOption(callId: string, crewId: string | null, optionId: string): GameState {
     const authoritativeState = gameStateRef.current;
     logger.log({
       type: "player.call.choice",
@@ -620,21 +663,25 @@ function App() {
       },
       gameSeconds: authoritativeState.elapsedGameSeconds,
     });
-    setGameState((state) =>
-      mergeEventRuntimeState(
-        state,
-        selectCallOption({
-          state: toEventEngineState(state),
-          index: eventContentIndex,
-          call_id: callId,
-          option_id: optionId,
-          occurred_at: state.elapsedGameSeconds,
-        }).state,
-      ),
+    const nextState = applyRuntimeCallOptionState(authoritativeState, callId, optionId);
+    setGameState(nextState);
+    return nextState;
+  }
+
+  function applyRuntimeCallOptionState(state: GameState, callId: string, optionId: string): GameState {
+    return mergeEventRuntimeState(
+      state,
+      selectCallOption({
+        state: toEventEngineState(state),
+        index: eventContentIndex,
+        call_id: callId,
+        option_id: optionId,
+        occurred_at: state.elapsedGameSeconds,
+      }).state,
     );
   }
 
-  function dispatchBasicOrStoryAction(crewId: CrewId, actionId: string, updateCurrentCall = false) {
+  function dispatchBasicOrStoryAction(crewId: CrewId, actionId: string, updateCurrentCall = false): { closeCall: boolean } {
     const authoritativeState = gameStateRef.current;
     if (actionId === "universal:survey") {
       logger.log({
@@ -659,11 +706,11 @@ function App() {
             : call,
         );
       }
-      return;
+      return { closeCall: updateCurrentCall };
     }
 
     if (currentCall?.settled) {
-      return;
+      return { closeCall: false };
     }
 
     if (actionId === "universal:standby" || actionId === "universal:stop") {
@@ -684,7 +731,7 @@ function App() {
       if (updateCurrentCall) {
         setCurrentCall((call) => (call ? { ...call, settled: true, result: "行动指令已提交。" } : call));
       }
-      return;
+      return { closeCall: updateCurrentCall };
     }
 
     const localTimedResult = dispatchTimedLocalAction(authoritativeState, crewId, actionId);
@@ -696,7 +743,7 @@ function App() {
           payload: {
             crew_id: crewId,
             action_id: actionId,
-            action_kind: "repair",
+            action_kind: localTimedResult.actionKind ?? "repair",
           },
           gameSeconds: authoritativeState.elapsedGameSeconds,
         });
@@ -705,7 +752,7 @@ function App() {
       if (updateCurrentCall) {
         setCurrentCall((call) => (call ? { ...call, settled: localTimedResult.accepted, result: localTimedResult.reason } : call));
       }
-      return;
+      return { closeCall: updateCurrentCall && localTimedResult.accepted };
     }
 
     const selectedStoryAction = findVisibleLocationStoryAction(authoritativeState, crewId, actionId);
@@ -724,10 +771,11 @@ function App() {
             : call,
         );
       }
-      return;
+      return { closeCall: updateCurrentCall && !applied.createdEvent };
     }
 
     appendLog(`通话选项未提交：${actionId} 不是可执行的基础行动或事件选项。`, "muted");
+    return { closeCall: false };
   }
 
   function selectMoveTarget(tileId: string) {
@@ -741,7 +789,7 @@ function App() {
           }
         : call,
     );
-    setPage("call");
+    navigateToPage("call");
   }
 
   function clearMoveTarget() {
@@ -837,6 +885,7 @@ function App() {
           }
         : call,
     );
+    closeCurrentCallAndReturn();
   }
 
   const pageContent = (() => {
@@ -870,6 +919,7 @@ function App() {
           elapsedGameSeconds={elapsedGameSeconds}
           tiles={tiles}
           gameTimeLabel={gameTimeLabel}
+          hasQuestUpdates={hasQuestUpdates}
           logs={logs}
           onStatusFilterChange={setQuestStatusFilter}
           onCategoryFilterChange={setQuestCategoryFilter}
@@ -893,9 +943,11 @@ function App() {
           activeCalls={gameState.active_calls}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
+          hasQuestUpdates={hasQuestUpdates}
           gameState={gameState}
           logs={logs}
           onDecision={handleDecision}
+          onEndCall={endCall}
           onConfirmMove={confirmMove}
           onClearMoveTarget={clearMoveTarget}
           onOpenMap={() => openMap("call")}
@@ -917,9 +969,14 @@ function App() {
           activeCalls={gameState.active_calls}
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
+          hasQuestUpdates={hasQuestUpdates}
           returnTarget={mapReturnTarget}
           moveSelectionCrewId={currentCall?.selectingMoveTarget ? currentCall.crewId : null}
           initialSelectedTileId={questNavigationHint?.type === "tile" ? questNavigationHint.tileId : undefined}
+          viewportState={mapViewportState}
+          onViewportStateChange={setMapViewportState}
+          layerVisibility={mapLayerVisibility}
+          onLayerVisibilityChange={setMapLayerVisibility}
           map={gameState.map}
           onOpenControl={openControlOverview}
           onOpenTask={openStation}
@@ -944,6 +1001,7 @@ function App() {
           eventLogs={gameState.event_logs}
           logs={logs}
           gameTimeLabel={gameTimeLabel}
+          hasQuestUpdates={hasQuestUpdates}
           selectedCrewId={crewConsoleView.crewId}
           mode={crewConsoleView.mode}
           onOpenControl={openControlOverview}
@@ -963,7 +1021,12 @@ function App() {
         eventLogs={gameState.event_logs}
         objectives={gameState.objectives}
         resources={resources}
+        crewActions={gameState.crew_actions}
+        activeCalls={gameState.active_calls}
+        elapsedGameSeconds={elapsedGameSeconds}
+        tiles={tiles}
         gameTimeLabel={gameTimeLabel}
+        hasQuestUpdates={hasQuestUpdates}
         runtimeCallCrewIds={activeRuntimeCallCrewIds}
         onOpenStation={openStation}
         onOpenMap={() => openMap("control")}
@@ -1414,6 +1477,7 @@ export interface TimedLocalDispatchResult {
   accepted: boolean;
   reason: string;
   state: GameState;
+  actionKind?: CrewActionState["type"];
 }
 
 function collectDueCrewActions(crewActions: Record<Id, CrewActionState>, elapsedGameSeconds: number): Map<Id, CrewActionState> {
@@ -1763,13 +1827,18 @@ function findLocationStoryActionSelection(
 
 export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actionId: string): TimedLocalDispatchResult {
   const selection = findTimedLocalActionSelection(state, crewId, actionId);
-  if (!selection || selection.action.local_action?.kind !== "timed_repair") {
+  const localAction = selection?.action.local_action;
+  if (!selection || !localAction) {
     return {
       matched: false,
       accepted: false,
       reason: "",
       state,
     };
+  }
+
+  if (localAction.kind === "timed_action") {
+    return dispatchGenericTimedLocalAction(state, selection, localAction);
   }
 
   if (isRepairSelectionRepaired(state, selection)) {
@@ -1839,6 +1908,64 @@ export function dispatchTimedLocalAction(state: GameState, crewId: CrewId, actio
     accepted: true,
     reason: "维修指令已提交。",
     state: nextState,
+    actionKind: "repair",
+  };
+}
+
+function dispatchGenericTimedLocalAction(
+  state: GameState,
+  selection: LocationStoryActionSelection & { tile: MapTile },
+  localAction: Extract<FeatureLocalActionDefinition, { kind: "timed_action" }>,
+): TimedLocalDispatchResult {
+  const blockingAction = selectActiveCrewActionForCrew(state.crew_actions, selection.member.id);
+  if (blockingAction) {
+    return {
+      matched: true,
+      accepted: false,
+      reason: "该队员已有进行中的主要行动。",
+      state,
+    };
+  }
+
+  const action = createGenericTimedCrewActionState(state, selection, localAction);
+  const targetName = getRepairSelectionTargetName(selection);
+  const actionLabel = selection.action.label.replace("{featureName}", targetName).replace("{objectName}", targetName);
+  const nextMember = {
+    ...selection.member,
+    status: localAction.status_text ?? `正在${actionLabel}${targetName}。`,
+    statusTone: "accent" as Tone,
+    activeAction: {
+      id: action.id,
+      actionType: localAction.action_type,
+      status: "inProgress" as const,
+      startTime: state.elapsedGameSeconds,
+      durationSeconds: action.duration_seconds,
+      finishTime: action.ends_at ?? state.elapsedGameSeconds + action.duration_seconds,
+      targetTile: selection.member.currentTile,
+      params: action.action_params,
+    },
+  };
+  const nextState = {
+    ...state,
+    crew: state.crew.map((member) => (member.id === nextMember.id ? nextMember : member)),
+    crew_actions: {
+      ...state.crew_actions,
+      [action.id]: action,
+    },
+    logs: appendLogEntry(
+      state.logs,
+      `${selection.member.name} 开始${actionLabel}${targetName}，预计 ${formatDuration(action.duration_seconds)}。`,
+      "accent",
+      state.elapsedGameSeconds,
+    ),
+  };
+
+  return {
+    matched: true,
+    accepted: true,
+    reason: "行动指令已提交。",
+    state: nextState,
+    actionKind: localAction.action_type,
   };
 }
 
@@ -1848,7 +1975,7 @@ function findTimedLocalActionSelection(
   actionId: string,
 ): (LocationStoryActionSelection & { tile: MapTile }) | undefined {
   const featureSelection = findFeatureLocationActionSelection(state, crewId, actionId);
-  if (featureSelection?.action.local_action?.kind === "timed_repair") {
+  if (featureSelection?.action.local_action?.kind === "timed_repair" || featureSelection?.action.local_action?.kind === "timed_action") {
     return featureSelection;
   }
 
@@ -1941,6 +2068,48 @@ function createRepairCrewActionState(
     id: actionId,
     crew_id: selection.member.id,
     type: "repair",
+    status: "active",
+    source: "player_command",
+    parent_event_id: null,
+    objective_id: null,
+    action_request_id: null,
+    from_tile_id: selection.member.currentTile,
+    to_tile_id: null,
+    target_tile_id: selection.member.currentTile,
+    path_tile_ids: [],
+    started_at: state.elapsedGameSeconds,
+    ends_at: state.elapsedGameSeconds + localAction.duration_seconds,
+    progress_seconds: 0,
+    duration_seconds: localAction.duration_seconds,
+    action_params: actionParams,
+    can_interrupt: true,
+    interrupt_duration_seconds: 10,
+  };
+}
+
+function createGenericTimedCrewActionState(
+  state: GameState,
+  selection: LocationStoryActionSelection,
+  localAction: Extract<FeatureLocalActionDefinition, { kind: "timed_action" }>,
+): CrewActionState {
+  const targetId = getRepairSelectionTargetId(selection);
+  const actionId = `${localAction.action_type}:${selection.member.id}:${targetId ?? selection.action.id}:${state.elapsedGameSeconds}`;
+  const actionParams: Record<string, unknown> = {
+    action_def_id: selection.action.id,
+    handler: localAction.handler ?? "timed_generic",
+    ...(localAction.completion_status ? { completion_status: localAction.completion_status } : {}),
+    ...(localAction.completion_log ? { completion_log: localAction.completion_log } : {}),
+  };
+  if (selection.feature) {
+    actionParams.target_feature_id = selection.feature.id;
+  } else if (selection.object) {
+    actionParams.object_id = selection.object.id;
+  }
+
+  return {
+    id: actionId,
+    crew_id: selection.member.id,
+    type: localAction.action_type,
     status: "active",
     source: "player_command",
     parent_event_id: null,

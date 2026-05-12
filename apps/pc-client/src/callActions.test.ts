@@ -121,13 +121,13 @@ function createRuntimeCall(overrides: Partial<RuntimeCall> = {}): RuntimeCall {
 }
 
 describe("buildCallView", () => {
-  it("shows only the four universal actions on the blank map", () => {
+  it("hides standby and stop from the blank-map universal actions", () => {
     const view = buildCallView({ member: createMember(), tile: createTile("1-1"), gameState: createGameState() });
 
     expect(view.groups).toHaveLength(1);
     expect(view.groups[0]).toMatchObject({ title: "基础行动" });
     expect(view.groups[0].actions.map((action) => action.id)).toEqual(
-      universalActions.filter((action) => action.id !== "universal:stop").map((action) => action.id),
+      universalActions.filter((action) => action.id !== "universal:standby" && action.id !== "universal:stop").map((action) => action.id),
     );
   });
 

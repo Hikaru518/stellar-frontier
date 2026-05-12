@@ -210,7 +210,7 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
-  it("reveals the authored scattered supplies object after surveying tile 130-130", () => {
+  it("reveals the authored scattered supplies object after surveying tile 133-134", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -221,7 +221,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "130-130",
+        tile_id: "133-134",
         action_id: "act_survey_supplies",
         payload: { action_type: "survey" },
       },
@@ -241,7 +241,7 @@ describe("event engine trigger intake", () => {
     });
 
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["130-130"]?.revealedObjectIds).toEqual([]);
+    expect(selected.state.map?.tilesById?.["133-134"]?.revealedObjectIds).toEqual([]);
     expect(selected.state.map?.featuresById?.iafs_scattered_supplies).toMatchObject({
       id: "iafs_scattered_supplies",
       status: "unsearched",
@@ -261,7 +261,7 @@ describe("event engine trigger intake", () => {
       ],
     },
     {
-      occurredAt: 240,
+      occurredAt: 360,
       expectedNode: "late_report",
       expectedText: "看来我们晚来了一步，有不少东西被风吹走了",
       expectedItems: [{ item_id: "ice_pick", quantity: 1 }],
@@ -276,13 +276,13 @@ describe("event engine trigger intake", () => {
       context: {
         ...triggerContext(occurredAt),
         trigger_type: "action_complete",
-        source: "call",
+        source: "crew_action",
         crew_id: "mike",
-        tile_id: "130-130",
+        tile_id: "133-134",
         action_id: "iafs_scattered_supplies:search",
         event_definition_id: "iafs_scattered_supplies_search",
         payload: {
-          action_type: "search",
+          action_type: "gather",
           action_def_id: "iafs_scattered_supplies:search",
           feature_id: "iafs_scattered_supplies",
         },
@@ -785,8 +785,8 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
   const state = createAuthoredCrashSiteState();
   const suppliesTile = {
     ...state.tiles["129-129"],
-    id: "130-130",
-    coordinates: { x: 130, y: 130 },
+    id: "133-134",
+    coordinates: { x: 133, y: 134 },
     terrain_type: "south_pass",
     tags: ["iafs", "supplies"],
     current_crew_ids: ["mike"],
@@ -799,18 +799,18 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
       ...state.crew,
       mike: {
         ...state.crew.mike,
-        tile_id: "130-130",
+        tile_id: "133-134",
       },
     },
     tiles: {
       ...state.tiles,
-      "130-130": suppliesTile,
+      "133-134": suppliesTile,
     },
     map: {
       ...state.map,
       tilesById: {
         ...state.map?.tilesById,
-        "130-130": { revealedObjectIds: [] },
+        "133-134": { revealedObjectIds: [] },
       },
       featuresById: {
         ...state.map?.featuresById,

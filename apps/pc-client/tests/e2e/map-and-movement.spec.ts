@@ -24,7 +24,12 @@ test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) =
   const stage = page.locator(".console-ascii-map-stage");
   await expect(stage).toBeVisible();
   await expect(stage).toHaveAttribute("data-focus-tile-id", "129-129");
-  await expect(page.getByText("render + function + debug / 256 x 256")).toBeVisible();
+  await expect(page.getByText("render + function + crew + debug / 256 x 256")).toBeVisible();
+  await expect(page.getByText("crew OFF", { exact: true })).toBeVisible();
+  await expect(stage.locator(".console-retro-map-crew-canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "显示队员层" }).click();
+  await expect(page.getByText("crew ON", { exact: true })).toBeVisible();
+  await expect(stage.locator(".console-retro-map-crew-canvas")).toHaveCount(1);
   await expect(page.getByText("debug OFF", { exact: true })).toBeVisible();
   await expect(stage.locator(".console-retro-map-debug-canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "显示调试层" }).click();
@@ -94,7 +99,7 @@ test("shows revealed crash-site feature hits on the occupied origin tile", async
 
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ 发电机 \+3/)).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
   const featureReadout = page.locator('[aria-label="Feature 命中结果"]');
   await expect(featureReadout.getByText("背景")).toBeVisible();
   await expect(featureReadout.getByText("IAFS坠毁点")).toBeVisible();
@@ -117,7 +122,7 @@ test("clicking a Feature footprint shows the Feature name and underlying tile id
 
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "130-129");
   await expect(page.getByText("[TILE] 130-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] \(0,-1\) \/ 南侧通道 \+1/)).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] \(0,-1\) \/ 南侧通道/)).toBeVisible();
   const featureReadout = page.locator('[aria-label="Feature 命中结果"]');
   await expect(featureReadout.getByText("IAFS坠毁点")).toBeVisible();
   await expect(featureReadout.getByText("南侧通道")).toBeVisible();
@@ -136,7 +141,7 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
   const confirmMoveButton = page.getByRole("button", { name: /确认请求 麦克 前往 IAFS坠毁点 \(1,0\)/ });
   await expect(confirmMoveButton).toBeVisible();
   await confirmMoveButton.click();
-  await expect(page.getByText("移动请求已确认。队员开始按路线逐格推进，抵达后会原地待命。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
 
   await page.clock.runFor(61_000);
   await page.waitForFunction((key) => {
@@ -144,6 +149,7 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
     return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "129-130";
   }, GAME_SAVE_KEY);
 
+  await startNormalMikeCall(page);
   await expect(page.getByText(/地点：IAFS坠毁点 \(1,0\)/)).toBeVisible();
 
   await page.getByRole("button", { name: /地图/ }).click();

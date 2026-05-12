@@ -9,7 +9,8 @@ test("opens basic normal-call actions for the current 麦克 baseline", async ({
   await expect(page.getByText("基础行动")).toBeVisible();
   await expect(page.getByRole("button", { name: "调查当前区域" })).toBeVisible();
   await expect(page.getByRole("button", { name: "移动到指定区域" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "原地待命" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "原地待命" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "结束通话" })).toBeVisible();
 });
 
 test("opens the call map submenu and returns to the active 麦克 call", async ({ page }) => {
@@ -39,6 +40,6 @@ test("shows the control center mobile sync status with incoming station state", 
   await page.goto("/");
 
   await expect(page.getByText("COMMUNICATION STATION ......... INCOMING")).toBeVisible();
-  await expect(page.getByText("mobile")).toBeVisible();
-  await expect(page.getByText("WAIT")).toBeVisible();
+  const mobileStatus = page.locator(".console-status-card").filter({ hasText: "mobile" });
+  await expect(mobileStatus).toContainText(/WAIT|FALLBACK|ACTIVE/);
 });

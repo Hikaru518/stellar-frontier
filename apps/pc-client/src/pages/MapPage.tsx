@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldList, GameConsoleLayout } from "../components/Layout";
-import { defaultMapConfig, type MapFeatureDefinition, type MapTileDefinition } from "../content/contentData";
+import { defaultMapConfig, type MapFeatureDefinition } from "../content/contentData";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, isTilePassable, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
-import { buildFeatureTileIndex, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
-import { formatMapObjectStatus, isMapObjectVisibleOnTile, parseTileId, resolveTileObjects, resolveVisibleTileObjects } from "../mapSystem";
+import { buildFeatureTileIndex, expandFeatureFootprint, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
+import { parseTileId } from "../mapSystem";
 
 const CELL_W = 8;
 const CELL_H = 10;
@@ -15,18 +15,60 @@ const RADAR = defaultMapConfig.radar;
 const RADAR_WORLD = RADAR.world;
 const MAP_DEBUG_SYMBOLS = {
   blocked: "X",
-  passable: ".",
-  object: "O",
+  investigatableRevealed: "I",
+  investigatableUnrevealed: "?",
 } as const;
+const MAP_DEBUG_BACKGROUND_START = { r: 69, g: 174, b: 255 };
+const MAP_DEBUG_BACKGROUND_END = { r: 255, g: 219, b: 82 };
+
+export interface MapLayerVisibility {
+  render: boolean;
+  functional: boolean;
+  crew: boolean;
+  debug: boolean;
+}
+
+export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
+  render: true,
+  functional: true,
+  crew: false,
+  debug: false,
+};
 
 type FocusCoord = { x: number; y: number };
 type RenderTone = string;
 
-interface MapDebugPoint extends FocusCoord {
+export interface MapViewportState {
+  zoom: number;
+  center: { x: number; y: number };
+}
+
+interface MapDebugBackgroundCell extends FocusCoord {
   tileId: string;
-  kind: "blocked" | "object";
+  featureOrder: number;
+  featureCount: number;
+}
+
+interface MapDebugInvestigatableCell extends FocusCoord {
+  tileId: string;
+  hasUnrevealed: boolean;
   symbol: string;
-  allObjectsRevealed?: boolean;
+}
+
+interface MapDebugBlockedCell extends FocusCoord {
+  tileId: string;
+  symbol: string;
+}
+
+interface MapDebugLayerData {
+  backgrounds: MapDebugBackgroundCell[];
+  investigatables: MapDebugInvestigatableCell[];
+  blocked: MapDebugBlockedCell[];
+}
+
+interface MapCrewMarker extends FocusCoord {
+  tileId: string;
+  label: string;
 }
 
 interface RenderGlitch {
@@ -46,9 +88,14 @@ interface MapPageProps {
   activeCalls: Record<string, RuntimeCall>;
   elapsedGameSeconds: number;
   gameTimeLabel: string;
+  hasQuestUpdates?: boolean;
   returnTarget: MapReturnTarget;
   moveSelectionCrewId?: CrewId | null;
   initialSelectedTileId?: string;
+  viewportState?: MapViewportState | null;
+  onViewportStateChange?: (state: MapViewportState) => void;
+  layerVisibility: MapLayerVisibility;
+  onLayerVisibilityChange: (visibility: MapLayerVisibility) => void;
   onOpenControl: () => void;
   onOpenTask: () => void;
   onReturnFromMap: () => void;
@@ -67,9 +114,14 @@ export function MapPage({
   activeCalls,
   elapsedGameSeconds,
   gameTimeLabel,
+  hasQuestUpdates = false,
   returnTarget,
   moveSelectionCrewId,
   initialSelectedTileId,
+  viewportState,
+  onViewportStateChange,
+  layerVisibility,
+  onLayerVisibilityChange,
   onOpenControl,
   onOpenTask,
   onReturnFromMap,
@@ -84,20 +136,21 @@ export function MapPage({
   const initialFocus = useMemo(() => focusFromTileId(initialSelectedTileId), [initialSelectedTileId]);
   const [focusCoord, setFocusCoord] = useState<FocusCoord>(initialFocus);
   const [traceLines, setTraceLines] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(1);
-  const [center, setCenter] = useState<FocusCoord>(initialFocus);
+  const [zoom, setZoom] = useState(() => clamp(viewportState?.zoom ?? 1, MIN_ZOOM, MAX_ZOOM));
+  const [center, setCenter] = useState<FocusCoord>(() => clampCoord(viewportState?.center ?? initialFocus));
   const [dragging, setDragging] = useState(false);
-  const [showRenderLayer, setShowRenderLayer] = useState(true);
-  const [showFunctionalLayer, setShowFunctionalLayer] = useState(true);
-  const [showDebugLayer, setShowDebugLayer] = useState(false);
+  const showRenderLayer = layerVisibility.render;
+  const showFunctionalLayer = layerVisibility.functional;
+  const showCrewLayer = layerVisibility.crew;
+  const showDebugLayer = layerVisibility.debug;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const crewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const debugCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);
   const configTileById = useMemo(() => new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile])), []);
   const featureTileIndex = useMemo(() => buildFeatureTileIndex(defaultMapConfig), []);
-  const crewWorldCoords = useMemo(() => new Map(crew.map((member) => [member.id, radarCoordFromTileId(member.currentTile)])), [crew]);
   const focusTileId = useMemo(() => tileIdFromRadarCoord(focusCoord), [focusCoord]);
   const focusConfigTile = configTileById.get(focusTileId);
   const visibleFocusFeatures = useMemo(
@@ -106,16 +159,30 @@ export function MapPage({
   );
   const backgroundFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable !== true), [visibleFocusFeatures]);
   const investigatableFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable === true), [visibleFocusFeatures]);
-  const focusLabel = useMemo(() => getRadarFocusLabel(focusCoord, focusConfigTile, visibleFocusFeatures), [focusCoord, focusConfigTile, visibleFocusFeatures]);
+  const focusLabel = useMemo(() => getRadarFocusLabel(backgroundFocusFeatures), [backgroundFocusFeatures]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
-  const focusObjectDefinitions = useMemo(() => (focusConfigTile ? resolveTileObjects(focusConfigTile) : []), [focusConfigTile]);
-  const visibleFocusObjects = useMemo(() => (focusConfigTile ? resolveVisibleTileObjects(focusConfigTile, map) : []), [focusConfigTile, map]);
-  const hiddenFocusObjectCount = useMemo(
-    () => (focusConfigTile ? focusObjectDefinitions.filter((definition) => !isMapObjectVisibleOnTile(focusConfigTile.id, definition, map)).length : 0),
-    [focusConfigTile, focusObjectDefinitions, map],
-  );
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
-  const mapDebugPoints = useMemo(() => getMapDebugPoints(tiles, map), [map, tiles]);
+  const mapDebugData = useMemo(() => getMapDebugData(tiles, map), [map, tiles]);
+  const crewMarkers = useMemo(() => getMapCrewMarkers(crew), [crew]);
+  const mapCallReturnActions = returnTarget === "call" ? (
+    <div className="console-map-return-actions" aria-label="通话地图操作">
+      {moveSelectionMember ? (
+        <button
+          type="button"
+          className="console-crew-button"
+          onClick={() => {
+            pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
+            onSelectMoveTarget(focusTileId);
+          }}
+        >
+          标记当前坐标
+        </button>
+      ) : null}
+      <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
+        返回当前通话
+      </button>
+    </div>
+  ) : null;
 
   const crewActionViews = useMemo(
     () =>
@@ -139,8 +206,18 @@ export function MapPage({
     setTraceLines((current) => (current[0] === line ? current : [line, ...current].slice(0, 10)));
   }, [focusDisplayCoord, focusLabel]);
 
+  useEffect(() => {
+    onViewportStateChange?.({ zoom, center });
+  }, [center, onViewportStateChange, zoom]);
+
   function pushTrace(line: string) {
     setTraceLines((current) => [line, ...current].slice(0, 10));
+  }
+
+  function toggleLayer(layer: keyof MapLayerVisibility, traceName: string) {
+    const nextValue = !layerVisibility[layer];
+    onLayerVisibilityChange({ ...layerVisibility, [layer]: nextValue });
+    pushTrace(`[LAYER] ${traceName} ${nextValue ? "ON" : "OFF"}`);
   }
 
   function handleOpenCrewStatus(member: CrewMember) {
@@ -282,7 +359,7 @@ export function MapPage({
         for (let col = 0; col < cols; col += 1) {
           const worldX = Math.floor(viewport.left + (col / cols) * viewport.width);
           const worldY = Math.floor(viewport.top + (row / rows) * viewport.height);
-          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord, crewWorldCoords);
+          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord);
           chars[row][col] = char;
           tones[row][col] = tone;
         }
@@ -317,7 +394,7 @@ export function MapPage({
       window.cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
     };
-  }, [crewWorldCoords, focusCoord, showRenderLayer, viewport]);
+  }, [focusCoord, showRenderLayer, viewport]);
 
   useEffect(() => {
     if (!showFunctionalLayer) {
@@ -394,6 +471,90 @@ export function MapPage({
   }, [focusCoord, showFunctionalLayer, viewport]);
 
   useEffect(() => {
+    if (!showCrewLayer) {
+      return undefined;
+    }
+
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
+      return undefined;
+    }
+
+    if (!(crewCanvasRef.current instanceof HTMLCanvasElement)) {
+      return undefined;
+    }
+    const canvasEl = crewCanvasRef.current;
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) {
+      return undefined;
+    }
+    const context: CanvasRenderingContext2D = ctx;
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+    function resize() {
+      const rect = canvasEl.getBoundingClientRect();
+      canvasEl.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvasEl.height = Math.max(1, Math.floor(rect.height * dpr));
+      drawCrewLayer();
+    }
+
+    function drawCrewLayer() {
+      const width = canvasEl.width / dpr;
+      const height = canvasEl.height / dpr;
+      const cellW = width / viewport.width;
+      const cellH = height / viewport.height;
+      const markerRadius = clamp(Math.min(cellW, cellH) * 1.8, 5, 14);
+      const fontSize = clamp(markerRadius * 1.25, 8, 14);
+
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.font = `${fontSize}px "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace`;
+      context.textAlign = "left";
+      context.textBaseline = "middle";
+
+      for (const marker of crewMarkers) {
+        if (!isCoordInsideViewport(marker, viewport)) {
+          continue;
+        }
+
+        const sx = (marker.x - viewport.left) * cellW + cellW / 2;
+        const sy = (marker.y - viewport.top) * cellH + cellH / 2;
+        const labelX = sx + markerRadius + 5;
+        const labelWidth = context.measureText(marker.label).width;
+
+        context.fillStyle = "rgba(64, 255, 202, 0.18)";
+        context.beginPath();
+        context.arc(sx, sy, markerRadius + 2, 0, Math.PI * 2);
+        context.fill();
+
+        context.strokeStyle = "rgba(64, 255, 202, 0.92)";
+        context.lineWidth = 1;
+        context.beginPath();
+        context.arc(sx, sy, markerRadius, 0, Math.PI * 2);
+        context.stroke();
+        context.beginPath();
+        context.moveTo(sx - markerRadius - 4, sy);
+        context.lineTo(sx + markerRadius + 4, sy);
+        context.moveTo(sx, sy - markerRadius - 4);
+        context.lineTo(sx, sy + markerRadius + 4);
+        context.stroke();
+
+        context.fillStyle = "rgba(11, 20, 18, 0.76)";
+        context.fillRect(labelX - 3, sy - fontSize * 0.74, labelWidth + 6, fontSize * 1.48);
+        context.fillStyle = "rgba(208, 255, 236, 0.96)";
+        context.fillText(marker.label, labelX, sy);
+      }
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    return () => {
+      window.removeEventListener("resize", resize);
+    };
+  }, [crewMarkers, showCrewLayer, viewport]);
+
+  useEffect(() => {
     if (!showDebugLayer) {
       return undefined;
     }
@@ -434,17 +595,46 @@ export function MapPage({
       context.textAlign = "center";
       context.textBaseline = "middle";
 
-      for (const point of mapDebugPoints) {
-        if (!isCoordInsideViewport(point, viewport)) {
+      for (const cell of mapDebugData.backgrounds) {
+        if (!isCoordInsideViewport(cell, viewport)) {
           continue;
         }
 
-        const sx = (point.x - viewport.left) * cellW;
-        const sy = (point.y - viewport.top) * cellH;
-        context.fillStyle = getDebugPointFill(point);
+        const sx = (cell.x - viewport.left) * cellW;
+        const sy = (cell.y - viewport.top) * cellH;
+        context.fillStyle = getBackgroundDebugFill(cell.featureOrder, cell.featureCount);
         context.fillRect(sx, sy, Math.max(1, cellW), Math.max(1, cellH));
-        context.fillStyle = getDebugPointTextColor(point);
-        context.fillText(point.symbol, sx + cellW / 2, sy + cellH / 2);
+      }
+
+      for (const cell of mapDebugData.investigatables) {
+        if (!isCoordInsideViewport(cell, viewport)) {
+          continue;
+        }
+
+        const sx = (cell.x - viewport.left) * cellW;
+        const sy = (cell.y - viewport.top) * cellH;
+        const insetX = Math.max(0, cellW * 0.08);
+        const insetY = Math.max(0, cellH * 0.08);
+        context.fillStyle = getInvestigatableDebugFill(cell.hasUnrevealed);
+        context.fillRect(sx + insetX, sy + insetY, Math.max(1, cellW - insetX * 2), Math.max(1, cellH - insetY * 2));
+        context.strokeStyle = getInvestigatableDebugStroke(cell.hasUnrevealed);
+        context.lineWidth = 1;
+        context.strokeRect(sx + insetX, sy + insetY, Math.max(1, cellW - insetX * 2), Math.max(1, cellH - insetY * 2));
+        context.fillStyle = getInvestigatableDebugTextColor(cell.hasUnrevealed);
+        context.fillText(cell.symbol, sx + cellW / 2, sy + cellH / 2);
+      }
+
+      for (const cell of mapDebugData.blocked) {
+        if (!isCoordInsideViewport(cell, viewport)) {
+          continue;
+        }
+
+        const sx = (cell.x - viewport.left) * cellW;
+        const sy = (cell.y - viewport.top) * cellH;
+        context.fillStyle = getBlockedDebugFill();
+        context.fillRect(sx, sy, Math.max(1, cellW), Math.max(1, cellH));
+        context.fillStyle = getBlockedDebugTextColor();
+        context.fillText(cell.symbol, sx + cellW / 2, sy + cellH / 2);
       }
     }
 
@@ -454,7 +644,7 @@ export function MapPage({
     return () => {
       window.removeEventListener("resize", resize);
     };
-  }, [mapDebugPoints, showDebugLayer, viewport]);
+  }, [mapDebugData, showDebugLayer, viewport]);
 
   return (
     <GameConsoleLayout
@@ -469,7 +659,7 @@ export function MapPage({
       ]}
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
-        { id: "task", label: "任务", meta: "task", onClick: onOpenTask },
+        { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
         { id: "map", label: "地图", meta: "map", active: true },
       ]}
       crewPanel={
@@ -513,6 +703,7 @@ export function MapPage({
             <div className="console-column-header">
               <span>地图详情</span>
             </div>
+            {mapCallReturnActions}
             <FieldList
               rows={[
                 ["区块", focusTileId],
@@ -530,18 +721,6 @@ export function MapPage({
             ) : (
               <p className="console-map-trace-line">[FEATURE] 无可见 Feature</p>
             )}
-            <div className="console-map-trace" aria-label="当前可见地图对象">
-              <p className="console-map-trace-lead">地图对象</p>
-              {visibleFocusObjects.map(({ definition, runtime }) => (
-                <p key={definition.id} className="console-map-trace-line">
-                  {formatMapObjectLabel(definition.name, formatMapObjectStatus(runtime?.status_enum ?? definition.initial_status))}
-                </p>
-              ))}
-              {hiddenFocusObjectCount > 0 ? <p className="console-map-trace-line">未知信号</p> : null}
-              {!visibleFocusObjects.length && hiddenFocusObjectCount === 0 ? (
-                <p className="console-map-trace-line">无当前可见对象</p>
-              ) : null}
-            </div>
           </section>
 
           <section className="console-side-panel">
@@ -556,30 +735,28 @@ export function MapPage({
                 <button
                   type="button"
                   className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => {
-                    setShowRenderLayer((value) => !value);
-                    pushTrace(`[LAYER] render ${showRenderLayer ? "OFF" : "ON"}`);
-                  }}
+                  onClick={() => toggleLayer("render", "render")}
                 >
                   显示渲染层
                 </button>
                 <button
                   type="button"
                   className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => {
-                    setShowFunctionalLayer((value) => !value);
-                    pushTrace(`[LAYER] function ${showFunctionalLayer ? "OFF" : "ON"}`);
-                  }}
+                  onClick={() => toggleLayer("functional", "function")}
                 >
                   显示功能层
                 </button>
                 <button
                   type="button"
+                  className={`console-layer-toggle ${showCrewLayer ? "console-layer-toggle-active" : ""}`}
+                  onClick={() => toggleLayer("crew", "crew")}
+                >
+                  显示队员层
+                </button>
+                <button
+                  type="button"
                   className={`console-layer-toggle ${showDebugLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => {
-                    setShowDebugLayer((value) => !value);
-                    pushTrace(`[LAYER] debug ${showDebugLayer ? "OFF" : "ON"}`);
-                  }}
+                  onClick={() => toggleLayer("debug", "debug")}
                 >
                   显示调试层
                 </button>
@@ -593,27 +770,12 @@ export function MapPage({
                 [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
               </p>
               <p className="console-map-trace-line">
-                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.object}=object / yellow hidden / white revealed
+                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.investigatableUnrevealed}=unrevealed / {MAP_DEBUG_SYMBOLS.investigatableRevealed}=revealed
               </p>
-              {returnTarget === "call" ? (
-                <div className="console-map-return-actions">
-                  {moveSelectionMember ? (
-                    <button
-                      type="button"
-                      className="console-crew-button"
-                      onClick={() => {
-                        pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
-                        onSelectMoveTarget(focusTileId);
-                      }}
-                    >
-                      标记当前坐标
-                    </button>
-                  ) : null}
-                  <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
-                    返回当前通话
-                  </button>
-                </div>
-              ) : null}
+              <p className="console-map-trace-line">
+                [DEBUG] bg blue-&gt;yellow / orange=unrevealed / white=revealed
+              </p>
+              <p className="console-map-trace-line">[CREW] cyan marker=当前队员位置 / label=姓名或同格人数</p>
               {traceLines.length ? (
                 traceLines.map((line, index) => (
                   <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
@@ -638,7 +800,7 @@ export function MapPage({
         <div className="console-screen-header">
           <span>crt situation map</span>
           <strong>卫星雷达地图 / retro lofi field</strong>
-          <span>render + function + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
+          <span>render + function + crew + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
         </div>
 
         <div
@@ -664,6 +826,12 @@ export function MapPage({
             </div>
           ) : null}
 
+          {showCrewLayer ? (
+            <div className="console-retro-map-crew-layer" aria-hidden="true">
+              <canvas ref={crewCanvasRef} className="console-retro-map-crew-canvas" />
+            </div>
+          ) : null}
+
           {showDebugLayer ? (
             <div className="console-retro-map-debug-layer" aria-hidden="true">
               <canvas ref={debugCanvasRef} className="console-retro-map-debug-canvas" />
@@ -674,6 +842,7 @@ export function MapPage({
             <span>focus {focusDisplayCoord}</span>
             <span>render {showRenderLayer ? "ON" : "OFF"}</span>
             <span>function {showFunctionalLayer ? "ON" : "OFF"}</span>
+            <span>crew {showCrewLayer ? "ON" : "OFF"}</span>
             <span>debug {showDebugLayer ? "ON" : "OFF"}</span>
           </div>
         </div>
@@ -717,8 +886,90 @@ function makeRenderBuffer<T>(rows: number, cols: number, fill: T) {
   return Array.from({ length: rows }, () => Array<T>(cols).fill(fill));
 }
 
-function getMapDebugPoints(tiles: MapTile[], map: GameMapState): MapDebugPoint[] {
-  const blockedPoints = tiles.flatMap((tile) => {
+function getMapDebugData(tiles: MapTile[], map: Pick<GameMapState, "featuresById">): MapDebugLayerData {
+  return {
+    backgrounds: getMapDebugBackgroundCells(),
+    investigatables: getMapDebugInvestigatableCells(map),
+    blocked: getMapDebugBlockedCells(tiles),
+  };
+}
+
+function getMapCrewMarkers(crew: CrewMember[]): MapCrewMarker[] {
+  const membersByTileId = new Map<string, CrewMember[]>();
+  for (const member of crew) {
+    const members = membersByTileId.get(member.currentTile) ?? [];
+    members.push(member);
+    membersByTileId.set(member.currentTile, members);
+  }
+
+  return [...membersByTileId.entries()].flatMap(([tileId, members]) => {
+    const firstMember = members[0];
+    if (!firstMember || !parseTileId(tileId)) {
+      return [];
+    }
+
+    return [
+      {
+        tileId,
+        ...radarCoordFromTileId(tileId),
+        label: members.length === 1 ? firstMember.name : `${members.length}人 ${members.map((member) => member.name).join("/")}`,
+      },
+    ];
+  });
+}
+
+function getMapDebugBackgroundCells(): MapDebugBackgroundCell[] {
+  const backgroundFeatures = defaultMapConfig.features.filter((feature) => feature.investigatable !== true);
+  return backgroundFeatures.flatMap((feature, featureOrder) =>
+    expandFeatureFootprint(feature, defaultMapConfig).flatMap((tileId) => {
+      const coord = debugCoordFromTileId(tileId);
+      if (!coord) {
+        return [];
+      }
+
+      return [
+        {
+          tileId,
+          featureOrder,
+          featureCount: backgroundFeatures.length,
+          ...coord,
+        },
+      ];
+    }),
+  );
+}
+
+function getMapDebugInvestigatableCells(map: Pick<GameMapState, "featuresById">): MapDebugInvestigatableCell[] {
+  const cellsByTileId = new Map<string, MapDebugInvestigatableCell>();
+
+  for (const feature of defaultMapConfig.features) {
+    if (feature.investigatable !== true) {
+      continue;
+    }
+
+    const hasUnrevealed = isDebugFeatureUnrevealed(feature, map);
+    for (const tileId of expandFeatureFootprint(feature, defaultMapConfig)) {
+      const coord = debugCoordFromTileId(tileId);
+      if (!coord) {
+        continue;
+      }
+
+      const previous = cellsByTileId.get(tileId);
+      const nextHasUnrevealed = previous?.hasUnrevealed || hasUnrevealed;
+      cellsByTileId.set(tileId, {
+        tileId,
+        ...coord,
+        hasUnrevealed: nextHasUnrevealed,
+        symbol: nextHasUnrevealed ? MAP_DEBUG_SYMBOLS.investigatableUnrevealed : MAP_DEBUG_SYMBOLS.investigatableRevealed,
+      });
+    }
+  }
+
+  return [...cellsByTileId.values()];
+}
+
+function getMapDebugBlockedCells(tiles: MapTile[]): MapDebugBlockedCell[] {
+  return tiles.flatMap((tile) => {
     const coord = parseTileId(tile.id);
     if (!coord) {
       return [];
@@ -734,51 +985,52 @@ function getMapDebugPoints(tiles: MapTile[], map: GameMapState): MapDebugPoint[]
         tileId: tile.id,
         x: coord.col - 1,
         y: coord.row - 1,
-        kind: "blocked" as const,
         symbol: MAP_DEBUG_SYMBOLS.blocked,
       },
     ];
   });
-
-  const objectPoints = defaultMapConfig.tiles.flatMap((tile) => {
-    const definitions = resolveTileObjects(tile);
-    if (!definitions.length) {
-      return [];
-    }
-    const coord = parseTileId(tile.id);
-    if (!coord) {
-      return [];
-    }
-
-    return [
-      {
-        tileId: tile.id,
-        x: coord.col - 1,
-        y: coord.row - 1,
-        kind: "object" as const,
-        symbol: MAP_DEBUG_SYMBOLS.object,
-        allObjectsRevealed: definitions.every((definition) => isMapObjectVisibleOnTile(tile.id, definition, map)),
-      },
-    ];
-  });
-
-  return [...blockedPoints, ...objectPoints];
 }
 
-function getDebugPointFill(point: MapDebugPoint) {
-  if (point.kind === "blocked") {
-    return "rgba(255, 91, 86, 0.18)";
-  }
-
-  return point.allObjectsRevealed ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 215, 88, 0.18)";
+function isDebugFeatureUnrevealed(feature: MapFeatureDefinition, map: Pick<GameMapState, "featuresById">) {
+  return feature.visibility === "hidden" && map.featuresById?.[feature.id]?.revealed !== true;
 }
 
-function getDebugPointTextColor(point: MapDebugPoint) {
-  if (point.kind === "blocked") {
-    return "rgba(255, 141, 133, 0.96)";
-  }
+function debugCoordFromTileId(tileId: string): FocusCoord | null {
+  const coord = parseTileId(tileId);
+  return coord ? { x: coord.col - 1, y: coord.row - 1 } : null;
+}
 
-  return point.allObjectsRevealed ? "rgba(255, 255, 255, 0.96)" : "rgba(255, 215, 88, 0.96)";
+function getBackgroundDebugFill(featureOrder: number, featureCount: number) {
+  const ratio = featureCount <= 1 ? 0 : featureOrder / (featureCount - 1);
+  const r = Math.round(lerp(MAP_DEBUG_BACKGROUND_START.r, MAP_DEBUG_BACKGROUND_END.r, ratio));
+  const g = Math.round(lerp(MAP_DEBUG_BACKGROUND_START.g, MAP_DEBUG_BACKGROUND_END.g, ratio));
+  const b = Math.round(lerp(MAP_DEBUG_BACKGROUND_START.b, MAP_DEBUG_BACKGROUND_END.b, ratio));
+  const alpha = 0.2 + ratio * 0.18;
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
+}
+
+function getInvestigatableDebugFill(hasUnrevealed: boolean) {
+  return hasUnrevealed ? "rgba(255, 148, 29, 0.72)" : "rgba(255, 255, 255, 0.68)";
+}
+
+function getInvestigatableDebugStroke(hasUnrevealed: boolean) {
+  return hasUnrevealed ? "rgba(255, 205, 118, 0.96)" : "rgba(255, 255, 255, 0.96)";
+}
+
+function getInvestigatableDebugTextColor(hasUnrevealed: boolean) {
+  return hasUnrevealed ? "rgba(46, 23, 0, 0.98)" : "rgba(22, 26, 28, 0.98)";
+}
+
+function getBlockedDebugFill() {
+  return "rgba(255, 91, 86, 0.18)";
+}
+
+function getBlockedDebugTextColor() {
+  return "rgba(255, 141, 133, 0.96)";
+}
+
+function lerp(start: number, end: number, ratio: number) {
+  return start + (end - start) * clamp(ratio, 0, 1);
 }
 
 function applyRenderGlitch(
@@ -857,13 +1109,7 @@ function spawnRenderGlitch(glitches: RenderGlitch[], rows: number, cols: number,
   }
 }
 
-function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord, crewWorldCoords: Map<CrewId, FocusCoord>) {
-  for (const coord of crewWorldCoords.values()) {
-    if (distance(x, y, coord.x, coord.y) <= 1.2) {
-      return { char: RADAR.symbols.crew.glyph, tone: RADAR.symbols.crew.tone as RenderTone };
-    }
-  }
-
+function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord) {
   if (x === focusCoord.x && y === focusCoord.y) {
     return { char: RADAR.symbols.focus.glyph, tone: RADAR.symbols.focus.tone as RenderTone };
   }
@@ -891,31 +1137,8 @@ function getViewport(center: FocusCoord, zoom: number) {
   };
 }
 
-function getRadarFocusLabel(coord: FocusCoord, tile: MapTileDefinition | undefined, visibleFeatures: readonly MapFeatureDefinition[]) {
-  if (visibleFeatures.length === 1) {
-    return visibleFeatures[0].name;
-  }
-
-  if (visibleFeatures.length > 1) {
-    return `${visibleFeatures[0].name} +${visibleFeatures.length - 1}`;
-  }
-
-  const region = [...RADAR.regions]
-    .sort((left, right) => right.priority - left.priority)
-    .find((entry) => isInsideRegion(coord, entry.shape));
-  return region?.label ?? tile?.id ?? "未命名区域";
-}
-
-function formatMapObjectLabel(name: string, statusLabel: string) {
-  return statusLabel ? `${name}（${statusLabel}）` : name;
-}
-
-function isInsideRegion(coord: FocusCoord, shape: (typeof RADAR.regions)[number]["shape"]) {
-  if (shape.type === "circle") {
-    return distance(coord.x, coord.y, shape.x, shape.y) <= shape.radius;
-  }
-
-  return coord.x >= shape.x1 && coord.x <= shape.x2 && coord.y >= shape.y1 && coord.y <= shape.y2;
+function getRadarFocusLabel(backgroundFeatures: readonly MapFeatureDefinition[]) {
+  return backgroundFeatures[0]?.name ?? "野外";
 }
 
 function formatDisplayCoord(coord: FocusCoord) {
@@ -952,10 +1175,6 @@ function isCoordInsideViewport(coord: FocusCoord, viewport: ReturnType<typeof ge
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function distance(x: number, y: number, tx: number, ty: number) {
-  return Math.hypot(x - tx, y - ty);
 }
 
 function isE2eAnimationDisabled() {
