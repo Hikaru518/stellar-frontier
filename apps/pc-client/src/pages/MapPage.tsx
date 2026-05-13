@@ -666,8 +666,10 @@ export function MapPage({
         <div className="console-crew-stack">
           {crew.map((member) => {
             const actionView = crewActionViews[member.id];
+            const hasRuntimeCall = Object.values(activeCalls).some((call) => call.crew_id === member.id && isRuntimeCallActive(call, elapsedGameSeconds));
+            const hasCallEntry = hasRuntimeCall || member.hasIncoming;
             return (
-              <article key={member.id} className="console-crew-card">
+              <article key={member.id} className={`console-crew-card ${hasCallEntry ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
                 <div className="console-crew-copy">
                   <div className="console-crew-heading">
@@ -688,8 +690,8 @@ export function MapPage({
                   <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => handleOpenCrewInventory(member)}>
                     查看背包
                   </button>
-                  <button type="button" className="console-crew-button" onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate}>
-                    通话
+                  <button type="button" className="console-crew-button" onClick={() => onStartCall(member.id)} disabled={!actionView.canStartCall}>
+                    {hasCallEntry ? "接通" : "通话"}
                   </button>
                 </div>
               </article>
@@ -1171,6 +1173,13 @@ function clampCoord(coord: FocusCoord): FocusCoord {
 
 function isCoordInsideViewport(coord: FocusCoord, viewport: ReturnType<typeof getViewport>) {
   return coord.x >= viewport.left && coord.x <= viewport.left + viewport.width && coord.y >= viewport.top && coord.y <= viewport.top + viewport.height;
+}
+
+function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {
+  return (
+    (call.status === "incoming" || call.status === "connected" || call.status === "awaiting_choice") &&
+    (typeof call.expires_at !== "number" || call.expires_at > elapsedGameSeconds)
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
