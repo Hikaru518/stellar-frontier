@@ -6,6 +6,12 @@
       "definitions": "definitions/iafs-inspection.json",
       "call_templates": "call_templates/iafs-inspection.json",
       "presets": null
+    },
+    {
+      "id": "iafs-main",
+      "definitions": "definitions/iafs-main.json",
+      "call_templates": "call_templates/iafs-main.json",
+      "presets": null
     }
   ]
 }

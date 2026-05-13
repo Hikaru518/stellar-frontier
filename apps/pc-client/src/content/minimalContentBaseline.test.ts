@@ -5,9 +5,9 @@ import { mapObjectDefinitions, universalActions } from "./mapObjects";
 
 describe("minimal content baseline", () => {
   it("exposes the crash-site bootstrap runtime dataset", () => {
-    expect(eventContentLibrary.domains).toEqual(["iafs-inspection"]);
-    expect(eventContentLibrary.event_definitions).toHaveLength(17);
-    expect(eventContentLibrary.call_templates).toHaveLength(21);
+    expect(eventContentLibrary.domains).toEqual(["iafs-inspection", "iafs-main"]);
+    expect(eventContentLibrary.event_definitions).toHaveLength(27);
+    expect(eventContentLibrary.call_templates).toHaveLength(35);
     expect(mapObjectDefinitions.map((definition) => definition.id)).toEqual([
       "iafs_generator",
       "iafs_life_support",
