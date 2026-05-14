@@ -35,20 +35,20 @@ test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) =
   await page.getByRole("button", { name: "显示调试层" }).click();
   await expect(page.getByText("debug ON", { exact: true })).toBeVisible();
   await expect(stage.locator(".console-retro-map-debug-canvas")).toHaveCount(1);
-  await expect(page.getByText("[JSON] radar glyph/tone/regions loaded from content/maps/radar/default-map-radar.json")).toBeVisible();
+  await expect(page.getByText("[JSON] radar glyph/tone/regions loaded from content/maps/ascii/default-map-radar.json")).toBeVisible();
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
   await expect(page.getByText(/\[FOCUS\] \(0,0\) \/ IAFS坠毁点/)).toBeVisible();
 });
 
-test("renders the console radar canvas inside a stable fixed map viewport", async ({ page }) => {
+test("renders the console terrain layer inside a stable fixed map viewport", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: /地图/ }).click();
 
   const stage = page.locator(".console-ascii-map-stage");
-  const renderCanvas = stage.locator(".console-retro-map-render-layer");
+  const renderLayer = stage.locator(".console-terrain-map-render-layer");
   const functionCanvas = stage.locator(".console-retro-map-function-canvas");
-  await expect(renderCanvas).toHaveCount(1);
+  await expect(renderLayer).toHaveCount(1);
   await expect(functionCanvas).toHaveCount(1);
   const initialBox = await stage.boundingBox();
   expect(initialBox?.height).toBeGreaterThan(0);

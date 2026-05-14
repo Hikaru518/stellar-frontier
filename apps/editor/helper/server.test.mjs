@@ -432,14 +432,14 @@ describe("helper server", () => {
       valid: true,
       saved: true,
       file_path: "content/maps/new-map.json",
-      radar_file_path: "content/maps/radar/new-map-radar.json",
+      radar_file_path: "content/maps/ascii/new-map-radar.json",
     }));
     const saved = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/new-map.json"), "utf8"));
     expect(saved.id).toBe("new-map");
     expect(saved.radar).toBeUndefined();
-    expect(saved.radarPath).toBe("content/maps/radar/new-map-radar.json");
+    expect(saved.radarPath).toBe("content/maps/ascii/new-map-radar.json");
     expect(saved.features).toEqual([feature]);
-    const savedRadar = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/radar/new-map-radar.json"), "utf8"));
+    const savedRadar = JSON.parse(await fs.readFile(path.join(tempRepoRoot, "content/maps/ascii/new-map-radar.json"), "utf8"));
     expect(savedRadar).toEqual(expect.objectContaining({ mapId: "new-map", glyphRows: ["."] }));
   });
 
@@ -513,7 +513,7 @@ describe("helper server", () => {
     await new Promise((resolve) => server.close(resolve));
     tempRepoRoot = await fs.mkdtemp(path.join(os.tmpdir(), "stellar-map-server-"));
     await writeTempJson("content/maps/default-map.json", minimalMap("default-map"));
-    await writeTempJson("content/maps/radar/default-map-radar.json", minimalRadar("default-map"));
+    await writeTempJson("content/maps/ascii/default-map-radar.json", minimalRadar("default-map"));
     await writeTempJson("content/map-objects/resources.json", { map_objects: [] });
     await writeTempJson("content/schemas/maps.schema.json", { title: "maps schema" });
     await writeTempJson("content/schemas/map-radar.schema.json", { title: "map radar schema" });
@@ -627,7 +627,7 @@ function minimalMap(id) {
     size: { rows: 1, cols: 1 },
     originTileId: "1-1",
     initialDiscoveredTileIds: ["1-1"],
-    radarPath: `content/maps/radar/${id}-radar.json`,
+    radarPath: `content/maps/ascii/${id}-radar.json`,
     tiles: [
       {
         id: "1-1",

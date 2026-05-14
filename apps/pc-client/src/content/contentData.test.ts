@@ -4,7 +4,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import eventManifest from "../../../../content/events/manifest.json";
 import defaultMapJson from "../../../../content/maps/default-map.json";
-import defaultMapRadarJson from "../../../../content/maps/radar/default-map-radar.json";
+import defaultMapRadarJson from "../../../../content/maps/ascii/default-map-radar.json";
 import mapRadarSchema from "../../../../content/schemas/map-radar.schema.json";
 import mapsSchema from "../../../../content/schemas/maps.schema.json";
 import { buildEventContentIndex } from "../events/contentIndex";
@@ -217,7 +217,7 @@ describe("default map config", () => {
   });
 
   it("types split radar presentation rows on MapConfigDefinition", async () => {
-    expect(defaultMapJson.radarPath).toBe("content/maps/radar/default-map-radar.json");
+    expect(defaultMapJson.radarPath).toBe("content/maps/ascii/default-map-radar.json");
     expect(contentData.defaultMapConfig.radar.world).toMatchObject({ width: 256, height: 256, origin: { x: 128, y: 128 } });
     expect(contentData.defaultMapConfig.radar.glyphRows).toHaveLength(256);
     expect(contentData.defaultMapConfig.radar.toneRows).toHaveLength(256);

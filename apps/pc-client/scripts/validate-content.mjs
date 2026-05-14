@@ -20,7 +20,7 @@ const questDataPaths = listJsonFiles("content/quests");
 const mapSchemaPath = "content/schemas/maps.schema.json";
 const mapDataPaths = listJsonFiles("content/maps");
 const mapRadarSchemaPath = "content/schemas/map-radar.schema.json";
-const mapRadarDataPaths = listJsonFiles("content/maps/radar");
+const mapRadarDataPaths = listJsonFiles("content/maps/ascii");
 
 const contentAssetGroups = [
   {

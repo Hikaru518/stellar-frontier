@@ -549,7 +549,7 @@
     "controlMode": "临时开发模式：渲染层、功能层与调试层已拆分显示。",
     "callMode": "本次从通话进入：地图交互仍需回到通话确认。",
     "worldLine": "[WORLD] 256 x 256 interactive coordinate grid",
-    "jsonLine": "[JSON] radar glyph/tone/regions loaded from content/maps/radar/default-map-radar.json",
+    "jsonLine": "[JSON] radar glyph/tone/regions loaded from content/maps/ascii/default-map-radar.json",
     "emptyLine": "[MAP] WAITING FOR 256x256 FIELD INPUT"
   },
   "regions": [

@@ -1,0 +1,140 @@
+[
+  {
+    "id": "impact-marker",
+    "sheetIndex": 0,
+    "row": 0,
+    "column": 0
+  },
+  {
+    "id": "camp-marker",
+    "sheetIndex": 1,
+    "row": 0,
+    "column": 1
+  },
+  {
+    "id": "dome-settlement",
+    "sheetIndex": 2,
+    "row": 0,
+    "column": 2
+  },
+  {
+    "id": "tower-array",
+    "sheetIndex": 3,
+    "row": 0,
+    "column": 3
+  },
+  {
+    "id": "gear-workshop",
+    "sheetIndex": 4,
+    "row": 0,
+    "column": 4
+  },
+  {
+    "id": "depot-building",
+    "sheetIndex": 5,
+    "row": 0,
+    "column": 5
+  },
+  {
+    "id": "fortress-marker",
+    "sheetIndex": 6,
+    "row": 1,
+    "column": 0
+  },
+  {
+    "id": "mine-entrance",
+    "sheetIndex": 7,
+    "row": 1,
+    "column": 1
+  },
+  {
+    "id": "forge-anvil",
+    "sheetIndex": 8,
+    "row": 1,
+    "column": 2
+  },
+  {
+    "id": "bridge-station",
+    "sheetIndex": 9,
+    "row": 1,
+    "column": 3
+  },
+  {
+    "id": "route-path",
+    "sheetIndex": 10,
+    "row": 1,
+    "column": 4
+  },
+  {
+    "id": "rift-crack",
+    "sheetIndex": 11,
+    "row": 1,
+    "column": 5
+  },
+  {
+    "id": "spore-orbit",
+    "sheetIndex": 12,
+    "row": 2,
+    "column": 0
+  },
+  {
+    "id": "alien-nest-core",
+    "sheetIndex": 13,
+    "row": 2,
+    "column": 1
+  },
+  {
+    "id": "gate-ring",
+    "sheetIndex": 14,
+    "row": 2,
+    "column": 2
+  },
+  {
+    "id": "node-network",
+    "sheetIndex": 15,
+    "row": 2,
+    "column": 3
+  },
+  {
+    "id": "signal-chamber",
+    "sheetIndex": 16,
+    "row": 2,
+    "column": 4
+  },
+  {
+    "id": "particle-cluster",
+    "sheetIndex": 17,
+    "row": 2,
+    "column": 5
+  },
+  {
+    "id": "target-core-amber",
+    "sheetIndex": 18,
+    "row": 3,
+    "column": 0
+  },
+  {
+    "id": "target-core-teal",
+    "sheetIndex": 19,
+    "row": 3,
+    "column": 1
+  },
+  {
+    "id": "ice-crack-field",
+    "sheetIndex": 20,
+    "row": 3,
+    "column": 2
+  },
+  {
+    "id": "crowned-eye-node",
+    "sheetIndex": 21,
+    "row": 3,
+    "column": 3
+  },
+  {
+    "id": "fracture-core",
+    "sheetIndex": 22,
+    "row": 3,
+    "column": 4
+  }
+]

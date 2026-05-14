@@ -267,7 +267,7 @@ function normalizeRadar(radar: MapEditorDraft["radar"] | undefined, rows: number
 }
 
 function defaultRadarPath(mapId: string): string {
-  return `content/maps/radar/${mapId}-radar.json`;
+  return `content/maps/ascii/${mapId}-radar.json`;
 }
 
 function normalizeRows(rowsValue: string[] | undefined, rows: number, cols: number, fill: string): string[] {

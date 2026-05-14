@@ -24,10 +24,10 @@ export function validateMapEditorMap(data, { mapObjects = [] } = {}) {
     });
   }
 
-  if (typeof data.radarPath !== "string" || !/^content\/maps\/radar\/[a-z][a-z0-9_-]*\.json$/.test(data.radarPath)) {
+  if (typeof data.radarPath !== "string" || !/^content\/maps\/ascii\/[a-z][a-z0-9_-]*\.json$/.test(data.radarPath)) {
     pushIssue(issues, {
       code: "invalid_radar_path",
-      message: "Map radarPath must be content/maps/radar/<file>.json.",
+      message: "Map radarPath must be content/maps/ascii/<file>.json.",
       path: "/radarPath",
       target: { kind: "radar", field: "radarPath" },
     });
