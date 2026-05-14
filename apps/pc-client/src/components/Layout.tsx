@@ -1,5 +1,11 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { SystemLog, Tone } from "../data/gameData";
+import {
+  PERFORMANCE_DIAGNOSTIC_SOURCES,
+  recordPerformanceDiagnostic,
+  subscribePerformanceDiagnostics,
+  type PerformanceDiagnosticSnapshot,
+} from "../performanceDiagnostics";
 
 interface ConsoleShellProps {
   title: string;
@@ -76,6 +82,8 @@ export function GameConsoleLayout({
   children,
 }: GameConsoleLayoutProps) {
   const screenRef = useRef<HTMLDivElement | null>(null);
+  const performanceMonitor = useConsolePerformanceSnapshot();
+  const [isPerformancePanelOpen, setIsPerformancePanelOpen] = useState(false);
 
   useEffect(() => {
     const screen = screenRef.current;
@@ -141,7 +149,11 @@ export function GameConsoleLayout({
             </div>
             {subtitle ? <p className="console-status-summary">{subtitle}</p> : null}
           </div>
-          <ConsoleScope />
+          <ConsolePerformanceStatusButton
+            isOpen={isPerformancePanelOpen}
+            snapshot={performanceMonitor.snapshot}
+            onToggle={() => setIsPerformancePanelOpen((value) => !value)}
+          />
         </div>
       </header>
 
@@ -181,7 +193,14 @@ export function GameConsoleLayout({
           <div className="console-display-case">
             <div className="console-display-bezel">
               <div ref={screenRef} className="console-display-screen" data-glitch="off">
-                {children}
+                {isPerformancePanelOpen ? (
+                  <ConsolePerformanceDetails
+                    diagnostics={performanceMonitor.diagnostics}
+                    snapshot={performanceMonitor.snapshot}
+                  />
+                ) : (
+                  children
+                )}
               </div>
             </div>
           </div>
@@ -195,101 +214,342 @@ export function GameConsoleLayout({
   );
 }
 
-function ConsoleScope() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const frameRef = useRef<number | null>(null);
+type PerformanceTone = "stable" | "busy" | "lag";
+type PerformanceSourcePriority = "normal" | "warn" | "danger";
+
+interface PerformanceSnapshot {
+  fps: number;
+  frameMs: number;
+  jankCount: number;
+  longTaskCount: number;
+  longTaskMs: number;
+  tone: PerformanceTone;
+}
+
+interface PerformanceCounters {
+  frames: number;
+  lastFrameAt: number;
+  lastPublishAt: number;
+  latestFrameMs: number;
+  jankCount: number;
+  longTaskCount: number;
+  longTaskMs: number;
+}
+
+interface PerformanceSourceView {
+  label: string;
+  value: string;
+  durationMs: number;
+  priority: PerformanceSourcePriority;
+}
+
+const INITIAL_PERFORMANCE_SNAPSHOT: PerformanceSnapshot = {
+  fps: 0,
+  frameMs: 0,
+  jankCount: 0,
+  longTaskCount: 0,
+  longTaskMs: 0,
+  tone: "stable",
+};
+
+const INITIAL_PERFORMANCE_DIAGNOSTICS = createInitialPerformanceDiagnostics();
+
+function createInitialPerformanceDiagnostics(): PerformanceDiagnosticSnapshot {
+  return PERFORMANCE_DIAGNOSTIC_SOURCES.reduce((snapshot, source) => {
+    snapshot[source] = { source, durationMs: 0, count: 0, updatedAt: 0 };
+    return snapshot;
+  }, {} as PerformanceDiagnosticSnapshot);
+}
+
+function getPerformanceTone(snapshot: Omit<PerformanceSnapshot, "tone">): PerformanceTone {
+  if (snapshot.fps > 0 && (snapshot.fps < 30 || snapshot.frameMs > 80 || snapshot.longTaskCount >= 2)) {
+    return "lag";
+  }
+
+  if (snapshot.fps > 0 && (snapshot.fps < 50 || snapshot.frameMs > 34 || snapshot.jankCount > 0 || snapshot.longTaskCount > 0)) {
+    return "busy";
+  }
+
+  return "stable";
+}
+
+function useConsolePerformanceSnapshot() {
+  const [snapshot, setSnapshot] = useState<PerformanceSnapshot>(INITIAL_PERFORMANCE_SNAPSHOT);
+  const [diagnostics, setDiagnostics] = useState<PerformanceDiagnosticSnapshot>(INITIAL_PERFORMANCE_DIAGNOSTICS);
+  const countersRef = useRef<PerformanceCounters>({
+    frames: 0,
+    lastFrameAt: 0,
+    lastPublishAt: 0,
+    latestFrameMs: 0,
+    jankCount: 0,
+    longTaskCount: 0,
+    longTaskMs: 0,
+  });
+
+  useEffect(() => subscribePerformanceDiagnostics(setDiagnostics), []);
 
   useEffect(() => {
-    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
+    if (
+      typeof window === "undefined" ||
+      typeof window.requestAnimationFrame !== "function" ||
+      (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent))
+    ) {
       return;
     }
 
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
+    let rafId: number | null = null;
+    let observer: PerformanceObserver | null = null;
+    const counters = countersRef.current;
+
+    if (
+      typeof PerformanceObserver !== "undefined" &&
+      PerformanceObserver.supportedEntryTypes?.includes("longtask")
+    ) {
+      observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          counters.longTaskCount += 1;
+          counters.longTaskMs += entry.duration;
+        }
+      });
+      observer.observe({ entryTypes: ["longtask"] });
     }
 
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return;
-    }
-
-    let frame = 0;
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-
-    const draw = () => {
-      const width = canvas.width / Math.max(1, window.devicePixelRatio || 1);
-      const height = canvas.height / Math.max(1, window.devicePixelRatio || 1);
-
-      context.fillStyle = "#15120e";
-      context.fillRect(0, 0, width, height);
-
-      context.strokeStyle = "rgba(116,166,166,0.16)";
-      context.lineWidth = 1;
-      for (let x = 0; x < width; x += 16) {
-        context.beginPath();
-        context.moveTo(x, 0);
-        context.lineTo(x, height);
-        context.stroke();
-      }
-      for (let y = 0; y < height; y += 10) {
-        context.beginPath();
-        context.moveTo(0, y);
-        context.lineTo(width, y);
-        context.stroke();
-      }
-
-      const bandX = (frame * 1.7) % width;
-      context.fillStyle = "rgba(240,166,77,0.12)";
-      context.fillRect(bandX, 0, 4, height);
-
-      const tone = "#ffb85a";
-      const fillTone = "rgba(255,184,90,0.22)";
-      const freq = 2.2;
-
-      for (let x = 0; x < width; x += 3) {
-        const t = x / Math.max(1, width);
-        const wave = Math.sin(t * Math.PI * 2 * freq + frame * 0.08);
-        const beat = Math.sin(t * Math.PI * 6.8 - frame * 0.04);
-        const y = height / 2 + (wave * 0.28 + beat * 0.12) * height;
-        const pixelY = Math.round(y / 3) * 3;
-        context.fillStyle = fillTone;
-        context.fillRect(x, pixelY, 3, 3);
-        if ((x / 3 + Math.floor(frame * 0.6)) % 6 === 0) {
-          context.fillStyle = tone;
-          context.fillRect(x, pixelY, 3, 3);
+    const tick = (now: number) => {
+      if (counters.lastFrameAt > 0) {
+        const delta = now - counters.lastFrameAt;
+        counters.latestFrameMs = delta;
+        if (delta > 50) {
+          counters.jankCount += 1;
         }
       }
 
-      frame += 1;
-      frameRef.current = window.requestAnimationFrame(draw);
+      counters.lastFrameAt = now;
+      counters.frames += 1;
+
+      if (counters.lastPublishAt === 0) {
+        counters.lastPublishAt = now;
+      }
+
+      const elapsed = now - counters.lastPublishAt;
+      if (elapsed >= 1000) {
+        recordPerformanceDiagnostic("longtask", counters.longTaskMs, counters.longTaskCount);
+        const nextSnapshot = {
+          fps: Math.round((counters.frames * 1000) / Math.max(1, elapsed)),
+          frameMs: Math.round(counters.latestFrameMs),
+          jankCount: counters.jankCount,
+          longTaskCount: counters.longTaskCount,
+          longTaskMs: Math.round(counters.longTaskMs),
+        };
+
+        setSnapshot({
+          ...nextSnapshot,
+          tone: getPerformanceTone(nextSnapshot),
+        });
+
+        counters.frames = 0;
+        counters.jankCount = 0;
+        counters.longTaskCount = 0;
+        counters.longTaskMs = 0;
+        counters.lastPublishAt = now;
+      }
+
+      rafId = window.requestAnimationFrame(tick);
     };
 
-    resize();
-    draw();
-    window.addEventListener("resize", resize);
+    rafId = window.requestAnimationFrame(tick);
+
     return () => {
-      if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
       }
-      window.removeEventListener("resize", resize);
+      observer?.disconnect();
     };
   }, []);
 
+  return { snapshot, diagnostics };
+}
+
+function getPerformanceToneLabel(tone: PerformanceTone) {
+  return tone === "lag" ? "lag" : tone === "busy" ? "busy" : "ok";
+}
+
+function formatPerformanceEntry(entry: PerformanceDiagnosticSnapshot[keyof PerformanceDiagnosticSnapshot]) {
+  if (entry.durationMs <= 0) {
+    return "--";
+  }
+
+  return `${entry.durationMs}ms${entry.count > 1 ? ` x${entry.count}` : ""}`;
+}
+
+function getPerformanceSourcePriority(durationMs: number): PerformanceSourcePriority {
+  if (durationMs >= 80) {
+    return "danger";
+  }
+  if (durationMs >= 34) {
+    return "warn";
+  }
+  return "normal";
+}
+
+function getSourceDiagnosticViews(diagnostics: PerformanceDiagnosticSnapshot): PerformanceSourceView[] {
+  const prioritySources = PERFORMANCE_DIAGNOSTIC_SOURCES.filter((source) => source !== "render").map((source) => {
+    const entry = diagnostics[source];
+    return {
+      label: source,
+      value: formatPerformanceEntry(entry),
+      durationMs: entry.durationMs,
+      priority: getPerformanceSourcePriority(entry.durationMs),
+    };
+  });
+
+  const activeSources = prioritySources
+    .filter((source) => source.durationMs > 0)
+    .sort((left, right) => right.durationMs - left.durationMs)
+    .slice(0, 6);
+
+  if (activeSources.length > 0) {
+    return activeSources;
+  }
+
+  return [
+    {
+      label: "render",
+      value: formatPerformanceEntry(diagnostics.render),
+      durationMs: diagnostics.render.durationMs,
+      priority: getPerformanceSourcePriority(diagnostics.render.durationMs),
+    },
+  ];
+}
+
+function getPerformanceDiagnosticLog(snapshot: PerformanceSnapshot, diagnostics: PerformanceDiagnosticSnapshot): string[] {
+  const lines: string[] = [];
+  const tick = diagnostics.tick.durationMs;
+  const settle = diagnostics.settle.durationMs;
+  const wakeups = diagnostics.wakeups.durationMs;
+  const eventState = diagnostics.eventState.durationMs;
+  const eventWake = diagnostics.eventWake.durationMs;
+  const save = diagnostics.save.durationMs;
+  const render = diagnostics.render.durationMs;
+
+  if (snapshot.tone === "stable" && snapshot.longTaskCount === 0 && Math.max(tick, save, render) < 34) {
+    return ["OK frame budget is clear", "NO ACTIVE BOTTLENECK"];
+  }
+
+  if (snapshot.longTaskCount > 0) {
+    lines.push(`LONGTASK ${snapshot.longTaskCount}/${snapshot.longTaskMs}ms main thread blocked`);
+  }
+
+  if (eventState >= 80) {
+    lines.push(`ROOT eventState conversion dominates wakeups (${eventState}ms)`);
+    lines.push("CHECK full GameState to event engine projection");
+  } else if (eventWake >= 80) {
+    lines.push(`ROOT event wakeup execution is hot (${eventWake}ms)`);
+    lines.push("CHECK processEventWakeups / graph runner");
+  } else if (wakeups >= 80) {
+    lines.push(`ROOT event wakeup pipeline is hot (${wakeups}ms)`);
+  } else if (settle >= 80) {
+    lines.push(`ROOT game settlement is hot (${settle}ms)`);
+  } else if (tick >= 80) {
+    lines.push(`ROOT global tick is hot (${tick}ms)`);
+  }
+
+  if (save >= 50) {
+    lines.push(`STORAGE saveGameState cost ${save}ms`);
+  }
+
+  if (render >= 34) {
+    lines.push(`RENDER app commit cost ${render}ms`);
+  }
+
+  return lines.length > 0 ? lines : ["BUSY transient frame pressure", "WATCH source spikes"];
+}
+
+function ConsolePerformanceStatusButton({
+  snapshot,
+  isOpen,
+  onToggle,
+}: {
+  snapshot: PerformanceSnapshot;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const toneLabel = getPerformanceToneLabel(snapshot.tone);
   return (
-    <div className="console-scope-box" aria-hidden="true">
-      <canvas ref={canvasRef} className="console-scope-canvas" />
-      <div className="console-scope-readout">
-        <span>echo</span>
-        <span>65%</span>
-      </div>
+    <button
+      type="button"
+      className={`console-performance-button console-performance-button-${snapshot.tone}`}
+      aria-label={`性能监控：${toneLabel}`}
+      aria-pressed={isOpen}
+      onClick={onToggle}
+    >
+      <span className="console-performance-light" aria-hidden="true" />
+      <span className="console-performance-button-copy">
+        <span>perf</span>
+        <strong>{toneLabel}</strong>
+      </span>
+    </button>
+  );
+}
+
+function ConsolePerformanceDetails({
+  snapshot,
+  diagnostics,
+}: {
+  snapshot: PerformanceSnapshot;
+  diagnostics: PerformanceDiagnosticSnapshot;
+}) {
+  const toneLabel = getPerformanceToneLabel(snapshot.tone);
+  const sources = getSourceDiagnosticViews(diagnostics);
+  const logLines = getPerformanceDiagnosticLog(snapshot, diagnostics);
+
+  return (
+    <div className={`console-screen-content console-performance-details console-performance-details-${snapshot.tone}`} aria-label="性能监控详情">
+      <header className="console-performance-details-header">
+        <div>
+          <span>performance monitor</span>
+          <strong>{toneLabel}</strong>
+        </div>
+      </header>
+      <dl className="console-performance-details-grid">
+        <div>
+          <dt>fps</dt>
+          <dd>{snapshot.fps || "--"}</dd>
+        </div>
+        <div>
+          <dt>frame</dt>
+          <dd>{snapshot.frameMs ? `${snapshot.frameMs}ms` : "--"}</dd>
+        </div>
+        <div>
+          <dt>jank</dt>
+          <dd>{snapshot.jankCount}</dd>
+        </div>
+        <div>
+          <dt>long</dt>
+          <dd>{snapshot.longTaskCount ? `${snapshot.longTaskCount}/${snapshot.longTaskMs}ms` : "0"}</dd>
+        </div>
+      </dl>
+      <section className="console-performance-source-panel">
+        <p className="console-screen-section">[ SOURCE DIAGNOSTICS ]</p>
+        <dl>
+          {sources.map((source) => (
+            <div key={source.label} className={`console-performance-source-${source.priority}`}>
+              <dt>{source.label}</dt>
+              <dd>{source.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <section className="console-performance-log-panel">
+        <p className="console-screen-section">[ ROOT CAUSE LOG ]</p>
+        <ol>
+          {logLines.map((line) => (
+            <li key={line}>
+              <span>]</span>
+              {line}
+            </li>
+          ))}
+        </ol>
+      </section>
     </div>
   );
 }
