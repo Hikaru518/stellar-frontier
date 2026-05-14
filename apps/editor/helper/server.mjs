@@ -430,7 +430,7 @@ function isAllowedMapSavePath(filePath) {
 function getMapRadarSavePath(data) {
   const radarPath = data?.radarPath ?? defaultMapRadarSavePath(data);
   if (!isAllowedMapRadarPath(radarPath)) {
-    throw httpError(400, "path_not_allowed", "Map radar path must be content/maps/radar/<file>.json.");
+    throw httpError(400, "path_not_allowed", "Map radar path must be content/maps/ascii/<file>.json.");
   }
   return radarPath;
 }
@@ -439,11 +439,11 @@ function defaultMapRadarSavePath(data) {
   if (typeof data?.id !== "string" || !/^[a-z][a-z0-9_-]*$/.test(data.id)) {
     throw httpError(400, "invalid_map_id", "Map id must be a safe file name.");
   }
-  return `content/maps/radar/${data.id}-radar.json`;
+  return `content/maps/ascii/${data.id}-radar.json`;
 }
 
 function isAllowedMapRadarPath(filePath) {
-  return typeof filePath === "string" && /^content\/maps\/radar\/[a-z][a-z0-9_-]*\.json$/.test(filePath);
+  return typeof filePath === "string" && /^content\/maps\/ascii\/[a-z][a-z0-9_-]*\.json$/.test(filePath);
 }
 
 function splitMapDraftForSave(data, radarPath) {

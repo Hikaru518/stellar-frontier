@@ -11,7 +11,7 @@ source:
 
 ## 1. Research Summary（研究摘要）
 
-本轮研究关注 256 x 256 地图下，如何把玩家理解的“森林 / 村庄 / 飞船遗骸”等多格区域，从旧的单 tile 语义中拆出来。项目已经完成地图尺寸迁移：`content/maps/default-map.json` 是 256 x 256，包含 65,536 个显式 tile；`content/maps/radar/default-map-radar.json` 已经有 circle / box 的 `regions`，但这些 region 目前主要服务雷达显示和 label fallback，不是 gameplay 事实源。
+本轮研究关注 256 x 256 地图下，如何把玩家理解的“森林 / 村庄 / 飞船遗骸”等多格区域，从旧的单 tile 语义中拆出来。项目已经完成地图尺寸迁移：`content/maps/default-map.json` 是 256 x 256，包含 65,536 个显式 tile；`content/maps/ascii/default-map-radar.json` 已经有 circle / box 的 `regions`，但这些 region 目前主要服务雷达显示和 label fallback，不是 gameplay 事实源。
 
 关键结论：现在的 tile 同时承担移动坐标、点击焦点、区域名、地形、天气、环境读数、对象引用、特殊状态和调查状态。随着地图放大，这会让“大区域属性”和“一次性区域事件”难以表达。更自然的方向是保留 tile 作为移动 / 点击 / 路径单位，新增 gameplay area / region 层承载属性、对象归属、事件去重和玩家可见描述；tile 可以缓存或派生所属区域，但不应继续作为所有语义的唯一作者入口。
 
@@ -72,7 +72,7 @@ source:
 ### 5.1 Project Files（项目文件）
 
 - `content/maps/default-map.json` - 当前 256 x 256 默认地图与 tile 内容。
-- `content/maps/radar/default-map-radar.json` - 现有 radar regions、glyphRows、toneRows。
+- `content/maps/ascii/default-map-radar.json` - 现有 radar regions、glyphRows、toneRows。
 - `content/schemas/maps.schema.json` - 当前 map/tile schema。
 - `content/schemas/map-radar.schema.json` - 当前 radar region shape schema。
 - `apps/pc-client/src/mapSystem.ts` - tile id、坐标、移动合法性与对象解析 helper。

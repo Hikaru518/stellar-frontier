@@ -55,7 +55,7 @@ const questModules = import.meta.glob("../../../../content/quests/*.json", {
   import: "default",
 }) as Record<string, QuestsContent>;
 
-const radarModules = import.meta.glob("../../../../content/maps/radar/*.json", {
+const radarModules = import.meta.glob("../../../../content/maps/ascii/*.json", {
   eager: true,
   import: "default",
 }) as Record<string, RadarContentDefinition>;

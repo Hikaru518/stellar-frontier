@@ -27,7 +27,7 @@ depth: full
 - map JSON 新增 `features`，每个 Feature 自带 `footprint`、`priority`、`kind`、`visibility`、`tags` 和可选调查配置。
 - `tiles` 保留 `id`、`row`、`col`、`terrain`、`weather`、`environment`、`specialStates` 等底层 tile 数据；新版玩法模型移除 `tile.areaName` 和 `tile.objectIds`。
 - `content/map-objects/*.json` 不再作为新内容 source of truth。现有 IAFS 对象定义迁移到 `features` 后，旧 map object runtime 只允许作为旧存档兼容输入。
-- `content/maps/radar/*.json` 继续负责渲染层，不要求和 `features` 同步。
+- `content/maps/ascii/*.json` 继续负责渲染层，不要求和 `features` 同步。
 
 **Content loading / normalization 层**
 
@@ -119,7 +119,7 @@ depth: full
 ```mermaid
 flowchart TD
     MapJson["content/maps/*.json<br/>tiles + features"] --> Loader["contentData.ts<br/>load + normalize"]
-    RadarJson["content/maps/radar/*.json<br/>render layer"] --> Loader
+    RadarJson["content/maps/ascii/*.json<br/>render layer"] --> Loader
     Loader --> FeatureDomain["map feature domain<br/>index + queries + selection"]
     FeatureDomain --> MapPage["MapPage<br/>click + feature readout"]
     FeatureDomain --> CallPage["CallPage / callActions<br/>feature action buttons"]

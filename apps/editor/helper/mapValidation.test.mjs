@@ -121,7 +121,7 @@ function baseMap({ rows = 1, cols = 2 } = {}) {
     size: { rows, cols },
     originTileId: "1-1",
     initialDiscoveredTileIds: ["1-1"],
-    radarPath: "content/maps/radar/test-map-radar.json",
+    radarPath: "content/maps/ascii/test-map-radar.json",
     features: [],
     tiles: Array.from({ length: rows * cols }, (_, index) => {
       const row = Math.floor(index / cols) + 1;

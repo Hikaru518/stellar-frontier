@@ -47,7 +47,7 @@
     },
     "radarPath": {
       "type": "string",
-      "pattern": "^content/maps/radar/[a-z][a-z0-9_-]*\\.json$"
+      "pattern": "^content/maps/ascii/[a-z][a-z0-9_-]*\\.json$"
     },
     "tiles": {
       "type": "array",

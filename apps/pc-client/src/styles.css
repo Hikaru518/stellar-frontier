@@ -1478,6 +1478,7 @@ blockquote {
 .game-console-bottom {
   border: 1px solid #a66b33;
   background: rgba(62, 45, 30, 0.88);
+  font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 .game-console-topbar {
@@ -2210,6 +2211,11 @@ blockquote {
     #10110d;
   cursor: crosshair;
   user-select: none;
+  touch-action: none;
+}
+
+.console-ascii-map-stage-dragging {
+  cursor: grabbing;
 }
 
 .console-ascii-map-readout {
@@ -2226,7 +2232,7 @@ blockquote {
   pointer-events: none;
 }
 
-.console-retro-map-render-layer,
+.console-terrain-map-render-layer,
 .console-retro-map-function-layer,
 .console-retro-map-crew-layer,
 .console-retro-map-debug-layer {
@@ -2234,15 +2240,48 @@ blockquote {
   inset: 0;
 }
 
-.console-retro-map-render-layer {
+.console-terrain-map-render-layer {
   z-index: 1;
+  overflow: hidden;
+  background: #10110d;
 }
 
-.console-retro-map-canvas {
+.console-terrain-map-render-layer::before,
+.console-terrain-map-render-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.console-terrain-map-render-layer::before {
+  background:
+    repeating-linear-gradient(0deg, rgba(210, 237, 139, 0.08) 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 50% 50%, transparent 50%, rgba(3, 6, 3, 0.32));
+  mix-blend-mode: screen;
+}
+
+.console-terrain-map-render-layer::after {
+  background:
+    linear-gradient(180deg, transparent 0 45%, rgba(255, 255, 255, 0.06) 46% 47%, transparent 48% 100%),
+    repeating-linear-gradient(90deg, rgba(255, 204, 94, 0.025) 0 1px, transparent 1px 11px);
+  opacity: 0.58;
+}
+
+.console-terrain-map-image {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  max-width: none;
+  object-fit: fill;
   image-rendering: pixelated;
+  opacity: 0.94;
+  filter: contrast(1.08) brightness(0.82) saturate(0.84);
+  transform-origin: top left;
+  user-select: none;
+  pointer-events: none;
 }
 
 .console-retro-map-function-layer {

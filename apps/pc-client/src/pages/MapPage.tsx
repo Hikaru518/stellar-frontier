@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldList, GameConsoleLayout } from "../components/Layout";
+import iafsTerrainBaseUrl from "../../../../content/maps/terrain/iafs-terrain-base.png";
 import { defaultMapConfig, type MapFeatureDefinition } from "../content/contentData";
 import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, SystemLog } from "../data/gameData";
 import { deriveCrewActionViewModel, isTilePassable, type CrewActionViewModel } from "../crewSystem";
@@ -7,8 +8,6 @@ import type { CrewActionState, RuntimeCall } from "../events/types";
 import { buildFeatureTileIndex, expandFeatureFootprint, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
 import { parseTileId } from "../mapSystem";
 
-const CELL_W = 8;
-const CELL_H = 10;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const RADAR = defaultMapConfig.radar;
@@ -36,7 +35,6 @@ export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
 };
 
 type FocusCoord = { x: number; y: number };
-type RenderTone = string;
 
 export interface MapViewportState {
   zoom: number;
@@ -69,15 +67,6 @@ interface MapDebugLayerData {
 interface MapCrewMarker extends FocusCoord {
   tileId: string;
   label: string;
-}
-
-interface RenderGlitch {
-  x: number;
-  y: number;
-  radius: number;
-  start: number;
-  duration: number;
-  kick: number;
 }
 
 interface MapPageProps {
@@ -144,11 +133,11 @@ export function MapPage({
   const showCrewLayer = layerVisibility.crew;
   const showDebugLayer = layerVisibility.debug;
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const crewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const debugCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{ x: number; y: number; centerX: number; centerY: number; viewportWidth: number; viewportHeight: number; moved: boolean } | null>(null);
+  const suppressNextClickRef = useRef(false);
   const configTileById = useMemo(() => new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile])), []);
   const featureTileIndex = useMemo(() => buildFeatureTileIndex(defaultMapConfig), []);
   const focusTileId = useMemo(() => tileIdFromRadarCoord(focusCoord), [focusCoord]);
@@ -162,6 +151,14 @@ export function MapPage({
   const focusLabel = useMemo(() => getRadarFocusLabel(backgroundFocusFeatures), [backgroundFocusFeatures]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
+  const terrainImageStyle = useMemo(
+    () => ({
+      width: `${(RADAR_WORLD.width / viewport.width) * 100}%`,
+      height: `${(RADAR_WORLD.height / viewport.height) * 100}%`,
+      transform: `translate(${-(viewport.left / viewport.width) * 100}%, ${-(viewport.top / viewport.height) * 100}%)`,
+    }),
+    [viewport],
+  );
   const mapDebugData = useMemo(() => getMapDebugData(tiles, map), [map, tiles]);
   const crewMarkers = useMemo(() => getMapCrewMarkers(crew), [crew]);
   const mapCallReturnActions = returnTarget === "call" ? (
@@ -244,7 +241,8 @@ export function MapPage({
   }
 
   function handleStageClick(event: React.MouseEvent<HTMLDivElement>) {
-    if (dragRef.current?.moved) {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
       return;
     }
     const coord = stagePointToWorld(event.clientX, event.clientY);
@@ -255,7 +253,18 @@ export function MapPage({
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    dragRef.current = { x: event.clientX, y: event.clientY, centerX: center.x, centerY: center.y, moved: false };
+    if (event.button !== 0) {
+      return;
+    }
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      centerX: center.x,
+      centerY: center.y,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      moved: false,
+    };
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -273,14 +282,15 @@ export function MapPage({
     }
     setCenter(
       clampCoord({
-        x: Math.round(drag.centerX - (dx / rect.width) * viewport.width),
-        y: Math.round(drag.centerY + (dy / rect.height) * viewport.height),
+        x: Math.round(drag.centerX - (dx / rect.width) * drag.viewportWidth),
+        y: Math.round(drag.centerY - (dy / rect.height) * drag.viewportHeight),
       }),
     );
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (dragRef.current?.moved) {
+      suppressNextClickRef.current = true;
       pushTrace(`[PAN] center ${center.x},${center.y}`);
     }
     dragRef.current = null;
@@ -296,105 +306,23 @@ export function MapPage({
     if (nextZoom === zoom) {
       return;
     }
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (rect) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = (event.clientY - rect.top) / rect.height;
+      const worldX = viewport.left + nx * viewport.width;
+      const worldY = viewport.top + ny * viewport.height;
+      const nextViewport = getViewport(center, nextZoom);
+      setCenter(
+        clampCoord({
+          x: Math.round(worldX - (nx - 0.5) * nextViewport.width),
+          y: Math.round(worldY - (ny - 0.5) * nextViewport.height),
+        }),
+      );
+    }
     setZoom(nextZoom);
     pushTrace(`[ZOOM] ${nextZoom.toFixed(2)}x / render + function`);
   }
-
-  useEffect(() => {
-    if (!showRenderLayer) {
-      return undefined;
-    }
-
-    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
-      return undefined;
-    }
-
-    if (isE2eAnimationDisabled()) {
-      return undefined;
-    }
-
-    if (!(canvasRef.current instanceof HTMLCanvasElement)) {
-      return undefined;
-    }
-    const canvasEl = canvasRef.current;
-
-    const ctx = canvasEl.getContext("2d");
-    if (!ctx) {
-      return undefined;
-    }
-    const context: CanvasRenderingContext2D = ctx;
-
-    const palette: Record<RenderTone, string> = RADAR.palette;
-
-    let animationId = 0;
-    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-    const glitches: RenderGlitch[] = [];
-    let nextGlitch = 0;
-
-    function resize() {
-      const rect = canvasEl.getBoundingClientRect();
-      canvasEl.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvasEl.height = Math.max(1, Math.floor(rect.height * dpr));
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      context.imageSmoothingEnabled = false;
-      context.font = `${window.innerWidth < 980 ? 10 : 12}px "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "IBM Plex Mono", "Courier New", monospace`;
-      context.textBaseline = "top";
-    }
-
-    function render(time: number) {
-      const width = canvasEl.width / dpr;
-      const height = canvasEl.height / dpr;
-      const cols = Math.max(24, Math.floor(width / CELL_W));
-      const rows = Math.max(18, Math.floor(height / CELL_H));
-      const chars = makeRenderBuffer<string>(rows, cols, " ");
-      const tones = makeRenderBuffer<RenderTone>(rows, cols, "g");
-
-      context.setTransform(1, 0, 0, 1, 0, 0);
-      context.clearRect(0, 0, canvasEl.width, canvasEl.height);
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      context.fillStyle = "#10110d";
-      context.fillRect(0, 0, width, height);
-
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          const worldX = Math.floor(viewport.left + (col / cols) * viewport.width);
-          const worldY = Math.floor(viewport.top + (row / rows) * viewport.height);
-          const { char, tone } = sampleRadarCell(worldX, worldY, focusCoord);
-          chars[row][col] = char;
-          tones[row][col] = tone;
-        }
-      }
-
-      applyRenderGlitch(chars, tones, glitches, time, nextGlitch, (value) => {
-        nextGlitch = value;
-      });
-
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          const char = chars[row][col];
-          if (char === " ") {
-            continue;
-          }
-          context.fillStyle = palette[tones[row][col]] ?? palette.g;
-          context.fillText(char, col * CELL_W + 2, row * CELL_H + 1);
-        }
-      }
-
-      context.fillStyle = "rgba(255,255,255,0.04)";
-      context.fillRect(0, ((time / 14) % (height + 40)) - 20, width, 2);
-
-      animationId = window.requestAnimationFrame(render);
-    }
-
-    resize();
-    animationId = window.requestAnimationFrame(render);
-    window.addEventListener("resize", resize);
-
-    return () => {
-      window.cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", resize);
-    };
-  }, [focusCoord, showRenderLayer, viewport]);
 
   useEffect(() => {
     if (!showFunctionalLayer) {
@@ -808,7 +736,7 @@ export function MapPage({
         <div
           ref={stageRef}
           className={`console-ascii-map-stage ${dragging ? "console-ascii-map-stage-dragging" : ""}`}
-          aria-label="ASCII 地图"
+          aria-label="地形地图"
           data-focus-tile-id={focusTileId}
           role="application"
           onClick={handleStageClick}
@@ -819,7 +747,9 @@ export function MapPage({
           onWheel={handleWheel}
         >
           {showRenderLayer ? (
-            <canvas ref={canvasRef} className="console-retro-map-render-layer console-retro-map-canvas" aria-hidden="true" />
+            <div className="console-terrain-map-render-layer" aria-hidden="true">
+              <img src={iafsTerrainBaseUrl} alt="" className="console-terrain-map-image" style={terrainImageStyle} draggable={false} />
+            </div>
           ) : null}
 
           {showFunctionalLayer ? (
@@ -882,10 +812,6 @@ function FeatureHitGroup({
 
 function getFeatureStatusForReadout(feature: MapFeatureDefinition, map: Pick<GameMapState, "featuresById"> | undefined) {
   return map?.featuresById?.[feature.id]?.status ?? (feature.investigatable === true ? feature.initial_status : undefined);
-}
-
-function makeRenderBuffer<T>(rows: number, cols: number, fill: T) {
-  return Array.from({ length: rows }, () => Array<T>(cols).fill(fill));
 }
 
 function getMapDebugData(tiles: MapTile[], map: Pick<GameMapState, "featuresById">): MapDebugLayerData {
@@ -1033,99 +959,6 @@ function getBlockedDebugTextColor() {
 
 function lerp(start: number, end: number, ratio: number) {
   return start + (end - start) * clamp(ratio, 0, 1);
-}
-
-function applyRenderGlitch(
-  chars: string[][],
-  tones: RenderTone[][],
-  glitches: RenderGlitch[],
-  time: number,
-  nextGlitch: number,
-  setNextGlitch: (time: number) => void,
-) {
-  const rows = chars.length;
-  const cols = chars[0]?.length ?? 0;
-  if (!rows || !cols) {
-    return;
-  }
-
-  if (time > nextGlitch) {
-    spawnRenderGlitch(glitches, rows, cols, time);
-    if (Math.random() > 0.66) {
-      spawnRenderGlitch(glitches, rows, cols, time);
-    }
-    setNextGlitch(time + 350 + Math.random() * 420);
-  }
-
-  for (let index = glitches.length - 1; index >= 0; index -= 1) {
-    const glitch = glitches[index];
-    const age = time - glitch.start;
-    if (age > glitch.duration) {
-      glitches.splice(index, 1);
-      continue;
-    }
-
-    const strength = 1 - age / glitch.duration;
-    const rowStart = Math.floor(clamp(glitch.y - glitch.radius, 0, rows - 1));
-    const rowEnd = Math.floor(clamp(glitch.y + glitch.radius, 0, rows - 1));
-
-    for (let row = rowStart; row <= rowEnd; row += 1) {
-      if (Math.random() > 0.44) {
-        continue;
-      }
-      const sourceChars = chars[row].slice();
-      const sourceTones = tones[row].slice();
-      const shift = Math.floor(glitch.kick * strength + (Math.random() - 0.5) * glitch.radius * 0.45);
-      for (let col = 0; col < cols; col += 1) {
-        const sourceCol = col - shift;
-        if (sourceCol >= 0 && sourceCol < cols) {
-          chars[row][col] = sourceChars[sourceCol];
-          tones[row][col] = sourceTones[sourceCol];
-        }
-      }
-    }
-
-    for (let block = 0; block < 5; block += 1) {
-      const blockX = Math.floor(clamp(glitch.x + (Math.random() - 0.5) * glitch.radius, 0, Math.max(0, cols - 8)));
-      const blockY = Math.floor(clamp(glitch.y + (Math.random() - 0.5) * glitch.radius, 0, Math.max(0, rows - 2)));
-      const blockW = 3 + Math.floor(Math.random() * 9);
-      for (let col = 0; col < blockW && blockX + col < cols; col += 1) {
-        chars[blockY][blockX + col] = Math.random() > 0.38 ? "#" : "@";
-        tones[blockY][blockX + col] = Math.random() > 0.55 ? "r" : "a";
-      }
-    }
-  }
-}
-
-function spawnRenderGlitch(glitches: RenderGlitch[], rows: number, cols: number, time: number) {
-  glitches.push({
-    x: Math.floor(Math.random() * cols),
-    y: Math.floor(Math.random() * rows),
-    radius: 5 + Math.random() * 14,
-    start: time,
-    duration: 150 + Math.random() * 260,
-    kick: (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 8)),
-  });
-  if (glitches.length > 18) {
-    glitches.shift();
-  }
-}
-
-function sampleRadarCell(x: number, y: number, focusCoord: FocusCoord) {
-  if (x === focusCoord.x && y === focusCoord.y) {
-    return { char: RADAR.symbols.focus.glyph, tone: RADAR.symbols.focus.tone as RenderTone };
-  }
-
-  if (x < 0 || y < 0 || x >= RADAR_WORLD.width || y >= RADAR_WORLD.height) {
-    return { char: " ", tone: "g" as RenderTone };
-  }
-
-  const row = RADAR.glyphRows[y] ?? "";
-  const toneRow = RADAR.toneRows[y] ?? "";
-  return {
-    char: row[x] ?? " ",
-    tone: (toneRow[x] ?? "g") as RenderTone,
-  };
 }
 
 function getViewport(center: FocusCoord, zoom: number) {

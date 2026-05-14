@@ -6,11 +6,11 @@ import { createInitialMapState, initialCrew, initialLogs, initialTiles } from ".
 import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage } from "./MapPage";
 
 describe("MapPage", () => {
-  it("renders a single interactive ascii map surface after the header", () => {
+  it("renders a single interactive terrain map surface after the header", () => {
     renderMapPage();
 
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
-    expect(screen.getByLabelText("ASCII 地图")).toBeInTheDocument();
+    expect(screen.getByLabelText("地形地图")).toBeInTheDocument();
     expect(screen.getByText("render + function + crew + debug / 256 x 256")).toBeInTheDocument();
   });
 
@@ -44,7 +44,7 @@ describe("MapPage", () => {
   it("records map interaction info in the right trace panel", () => {
     renderMapPage();
 
-    const mapSurface = screen.getByLabelText("ASCII 地图");
+    const mapSurface = screen.getByLabelText("地形地图");
     Object.defineProperty(mapSurface, "getBoundingClientRect", {
       configurable: true,
       value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
@@ -56,7 +56,7 @@ describe("MapPage", () => {
   it("keeps the minimum zoom at full-world coverage instead of sampling outside the radar", () => {
     renderMapPage();
 
-    const mapSurface = screen.getByLabelText("ASCII 地图");
+    const mapSurface = screen.getByLabelText("地形地图");
     Object.defineProperty(mapSurface, "getBoundingClientRect", {
       configurable: true,
       value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
@@ -209,7 +209,7 @@ function focusMapTile(tileId: string) {
   const [rowText, colText] = tileId.split("-");
   const row = Number(rowText);
   const col = Number(colText);
-  const mapSurface = screen.getByLabelText("ASCII 地图");
+  const mapSurface = screen.getByLabelText("地形地图");
   Object.defineProperty(mapSurface, "getBoundingClientRect", {
     configurable: true,
     value: () => ({ left: 0, top: 0, width: 900, height: 700, right: 900, bottom: 700, x: 0, y: 0, toJSON: () => ({}) }),
