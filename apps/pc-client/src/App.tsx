@@ -61,6 +61,7 @@ import {
 } from "./data/gameData";
 import { clearGameSaves, formatDuration, formatGameTime, loadGameSave, saveGameState } from "./timeSystem";
 import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSystem";
+import { recordPerformanceDiagnostic } from "./performanceDiagnostics";
 import { buildQuestSidebarView, clearQuestUpdateMarkers, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
 import { logger } from "./logger";
 import {
@@ -147,6 +148,7 @@ export function resolvePhoneRuntimeCallCrewId(
 }
 
 function App() {
+  const renderStartedAt = typeof performance !== "undefined" ? performance.now() : 0;
   const initialState = useMemo(createInitialGameState, []);
   const [gameState, setGameState] = useState<GameState>(initialState);
   const [page, setPage] = useState<PageId>("control");
@@ -246,11 +248,23 @@ function App() {
   }
 
   useEffect(() => {
+    if (renderStartedAt > 0) {
+      recordPerformanceDiagnostic("render", performance.now() - renderStartedAt);
+    }
+  });
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       setGameState((state) => {
+        const startedAt = performance.now();
         const incremented = { ...state, elapsedGameSeconds: state.elapsedGameSeconds + timeMultiplier };
+        const settleStartedAt = performance.now();
         const next = settleGameTime(incremented);
+        recordPerformanceDiagnostic("settle", performance.now() - settleStartedAt);
+        const diffStartedAt = performance.now();
         diffActionsAndLog(state.crew_actions, next.crew_actions, next.elapsedGameSeconds);
+        recordPerformanceDiagnostic("diff", performance.now() - diffStartedAt);
+        recordPerformanceDiagnostic("tick", performance.now() - startedAt);
         return next;
       });
     }, 1000);
@@ -294,7 +308,9 @@ function App() {
   }, [mobilePairingSession]);
 
   useEffect(() => {
+    const startedAt = performance.now();
     saveGameState(gameState);
+    recordPerformanceDiagnostic("save", performance.now() - startedAt);
     gameStateRef.current = gameState;
   }, [gameState]);
 
@@ -1403,8 +1419,11 @@ function settleGameTime(state: GameState): GameState {
   let baseInventory = state.baseInventory;
   let crewActions = state.crew_actions;
   const triggerContexts: TriggerContext[] = [];
+  const dueStartedAt = performance.now();
   const dueActionsByCrew = collectDueCrewActions(crewActions, state.elapsedGameSeconds);
+  recordPerformanceDiagnostic("due", performance.now() - dueStartedAt, dueActionsByCrew.size);
 
+  const crewStartedAt = performance.now();
   const crew = state.crew.map((member) => {
     let nextMember = member;
     const dueAction = dueActionsByCrew.get(member.id);
@@ -1459,16 +1478,26 @@ function settleGameTime(state: GameState): GameState {
 
     return nextMember;
   });
+  recordPerformanceDiagnostic("crew", performance.now() - crewStartedAt, state.crew.length);
 
+  const syncStartedAt = performance.now();
   const syncedMap = syncMapCrew(map, crew);
   let nextState = changed ? { ...state, crew, resources, baseInventory, map: syncedMap, tiles: syncTileCrew(tiles, crew), logs, crew_actions: crewActions } : state;
+  recordPerformanceDiagnostic("sync", performance.now() - syncStartedAt);
+  const objectivesStartedAt = performance.now();
   nextState = processObjectiveCompletions(nextState, triggerContexts);
+  recordPerformanceDiagnostic("objectives", performance.now() - objectivesStartedAt, triggerContexts.length);
 
+  const triggersStartedAt = performance.now();
   for (const context of triggerContexts) {
     nextState = processAppEventTrigger(nextState, context);
   }
+  recordPerformanceDiagnostic("triggers", performance.now() - triggersStartedAt, triggerContexts.length);
 
-  return processAppEventWakeups(nextState);
+  const wakeupsStartedAt = performance.now();
+  const wakedState = processAppEventWakeups(nextState);
+  recordPerformanceDiagnostic("wakeups", performance.now() - wakeupsStartedAt);
+  return wakedState;
 }
 
 type RuntimeSettleableCrewAction = CrewActionState & { type: "survey" | "gather" | "build" | "extract" | "repair" };
@@ -1745,12 +1774,31 @@ function processAppEventTrigger(state: GameState, context: TriggerContext): Game
 function processAppEventWakeups(state: GameState): GameState {
   // wakeups 不写 event.trigger（trigger 概念是显式 dispatch；wakeups 是定时
   // 唤醒）。这是 design §9 的语义约定。
+  const wakeDueStartedAt = performance.now();
+  const hasDueWakeup = hasDueEventWakeups(state);
+  recordPerformanceDiagnostic("wakeDue", performance.now() - wakeDueStartedAt, hasDueWakeup ? 1 : 0);
+  if (!hasDueWakeup) {
+    recordPerformanceDiagnostic("eventState", 0);
+    recordPerformanceDiagnostic("eventWake", 0);
+    recordPerformanceDiagnostic("wakeLog", 0);
+    recordPerformanceDiagnostic("wakeMerge", 0);
+    recordPerformanceDiagnostic("wakeDiff", 0);
+    return state;
+  }
+
+  const eventStateStartedAt = performance.now();
+  const eventState = toEventEngineState(state);
+  recordPerformanceDiagnostic("eventState", performance.now() - eventStateStartedAt);
+
+  const eventWakeStartedAt = performance.now();
   const result = processEventWakeups({
-    state: toEventEngineState(state),
+    state: eventState,
     index: eventContentIndex,
     elapsed_game_seconds: state.elapsedGameSeconds,
   });
+  recordPerformanceDiagnostic("eventWake", performance.now() - eventWakeStartedAt, result.graph_results?.length ?? 0);
 
+  const wakeLogStartedAt = performance.now();
   // 写 event.node.enter（来自所有 graph_results）
   if (result.graph_results) {
     for (const r of result.graph_results) {
@@ -1764,11 +1812,30 @@ function processAppEventWakeups(state: GameState): GameState {
       }
     }
   }
+  recordPerformanceDiagnostic("wakeLog", performance.now() - wakeLogStartedAt, result.graph_results?.length ?? 0);
 
+  const wakeMergeStartedAt = performance.now();
   const merged = mergeEventRuntimeState(state, result.state);
+  recordPerformanceDiagnostic("wakeMerge", performance.now() - wakeMergeStartedAt);
+  const wakeDiffStartedAt = performance.now();
   diffEventLogsAndLog(state.event_logs, merged.event_logs, state.elapsedGameSeconds);
+  recordPerformanceDiagnostic("wakeDiff", performance.now() - wakeDiffStartedAt);
 
   return merged;
+}
+
+function hasDueEventWakeups(state: GameState): boolean {
+  return Object.values(state.active_events).some((event) => {
+    if (event.status === "waiting_time") {
+      return typeof event.next_wakeup_at === "number" && event.next_wakeup_at <= state.elapsedGameSeconds;
+    }
+
+    if (event.status === "waiting_call") {
+      return typeof event.deadline_at === "number" && event.deadline_at <= state.elapsedGameSeconds;
+    }
+
+    return false;
+  });
 }
 
 interface LocationStoryActionSelection {
