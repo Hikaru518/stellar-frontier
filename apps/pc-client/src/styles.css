@@ -2238,6 +2238,7 @@ blockquote {
 }
 
 .console-terrain-map-render-layer,
+.console-terrain-map-mask-layer,
 .console-retro-map-function-layer,
 .console-retro-map-crew-layer,
 .console-retro-map-debug-layer {
@@ -2289,16 +2290,183 @@ blockquote {
   pointer-events: none;
 }
 
+.console-terrain-map-mask-layer {
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.console-terrain-map-mask-layer::before,
+.console-terrain-map-mask-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.console-terrain-map-mask-layer::before {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(222, 255, 219, 0.18) 0 0.7px, transparent 1.2px),
+    radial-gradient(circle at 38% 72%, rgba(182, 255, 169, 0.14) 0 0.6px, transparent 1.1px),
+    radial-gradient(circle at 61% 31%, rgba(255, 238, 167, 0.1) 0 0.8px, transparent 1.3px),
+    radial-gradient(circle at 86% 56%, rgba(151, 255, 137, 0.13) 0 0.6px, transparent 1.1px);
+  background-size:
+    31px 29px,
+    43px 37px,
+    59px 53px,
+    71px 67px;
+  mix-blend-mode: screen;
+  opacity: 0.42;
+}
+
+.console-terrain-map-mask-layer::after {
+  background:
+    repeating-linear-gradient(0deg, rgba(101, 255, 91, 0.08) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, transparent 0 17px, rgba(229, 255, 201, 0.12) 18px 19px, transparent 20px 41px),
+    repeating-linear-gradient(90deg, rgba(244, 185, 72, 0.035) 0 1px, transparent 1px 13px);
+  opacity: 0.72;
+}
+
+.console-terrain-map-mask-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  display: block;
+  max-width: none;
+  image-rendering: pixelated;
+  mix-blend-mode: multiply;
+  object-fit: fill;
+  opacity: 0.98;
+  pointer-events: none;
+  transform-origin: top left;
+  user-select: none;
+}
+
 .console-retro-map-function-layer {
   z-index: 2;
+  pointer-events: none;
+}
+
+.console-terrain-map-icon-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.console-retro-map-icon-anchor {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.console-retro-map-icon-anchor-masked {
+  pointer-events: none;
+}
+
+.console-retro-map-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: brightness(0.58) saturate(0.82) drop-shadow(0 0 2px rgba(38, 198, 72, 0.18));
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  opacity: 0.74;
+  pointer-events: none;
+  transition:
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+
+.console-retro-map-icon-anchor:hover .console-retro-map-icon {
+  filter: brightness(1.35) saturate(1.25) drop-shadow(0 0 4px rgba(76, 255, 112, 0.72)) drop-shadow(0 0 12px rgba(76, 255, 112, 0.42));
+  opacity: 1;
+}
+
+.console-retro-map-icon-anchor::after {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  min-width: max-content;
+  max-width: 180px;
+  padding: 4px 7px 5px;
+  border: 1px solid rgba(112, 255, 137, 0.62);
+  background:
+    linear-gradient(180deg, rgba(13, 33, 19, 0.96), rgba(5, 14, 8, 0.96)),
+    repeating-linear-gradient(0deg, rgba(148, 255, 122, 0.11) 0 1px, transparent 1px 3px);
+  box-shadow:
+    0 0 0 1px rgba(7, 13, 7, 0.9),
+    0 0 10px rgba(68, 255, 98, 0.25);
+  color: #a9ff93;
+  content: attr(data-label);
+  font-family: "Fusion Pixel", "Ark Pixel", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0;
+  line-height: 1.15;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 0 5px rgba(92, 255, 119, 0.65);
+  text-transform: uppercase;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 100ms ease,
+    transform 100ms ease;
+  white-space: nowrap;
+}
+
+.console-retro-map-icon-anchor:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .console-retro-map-debug-layer {
   z-index: 3;
+  pointer-events: none;
 }
 
 .console-retro-map-crew-layer {
-  z-index: 4;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.console-retro-map-crew-icon-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.console-retro-map-crew-icon-anchor {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.console-retro-map-crew-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: brightness(0.78) saturate(0.92) drop-shadow(0 0 3px rgba(185, 217, 87, 0.32));
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  opacity: 0.88;
+  pointer-events: none;
+  transition:
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+
+.console-retro-map-crew-icon-anchor:hover .console-retro-map-crew-icon {
+  filter: brightness(1.35) saturate(1.2) drop-shadow(0 0 4px rgba(185, 217, 87, 0.72)) drop-shadow(0 0 12px rgba(185, 217, 87, 0.42));
+  opacity: 1;
 }
 
 .console-retro-map-function-canvas,

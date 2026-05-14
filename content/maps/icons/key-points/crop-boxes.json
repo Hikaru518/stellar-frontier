@@ -1,0 +1,439 @@
+[
+  {
+    "id": "crash-site",
+    "zhName": "坠毁初始落点",
+    "crop": {
+      "row": 0,
+      "column": 0,
+      "x": 38,
+      "y": 76,
+      "w": 216,
+      "h": 225,
+      "raw": {
+        "minX": 56,
+        "minY": 94,
+        "maxX": 236,
+        "maxY": 283
+      },
+      "components": 4
+    }
+  },
+  {
+    "id": "ashfrost-scavenger-camp",
+    "zhName": "拾荒营地",
+    "crop": {
+      "row": 0,
+      "column": 1,
+      "x": 290,
+      "y": 114,
+      "w": 237,
+      "h": 176,
+      "raw": {
+        "minX": 308,
+        "minY": 132,
+        "maxX": 509,
+        "maxY": 272
+      },
+      "components": 2
+    }
+  },
+  {
+    "id": "frostbay-settlement",
+    "zhName": "霜湾聚落",
+    "crop": {
+      "row": 0,
+      "column": 2,
+      "x": 539,
+      "y": 138,
+      "w": 227,
+      "h": 152,
+      "raw": {
+        "minX": 557,
+        "minY": 156,
+        "maxX": 748,
+        "maxY": 272
+      },
+      "components": 5
+    }
+  },
+  {
+    "id": "windbarrier-towers",
+    "zhName": "风障塔列",
+    "crop": {
+      "row": 0,
+      "column": 3,
+      "x": 777,
+      "y": 114,
+      "w": 217,
+      "h": 177,
+      "raw": {
+        "minX": 795,
+        "minY": 132,
+        "maxX": 976,
+        "maxY": 273
+      },
+      "components": 3
+    }
+  },
+  {
+    "id": "ice-shell-workshop",
+    "zhName": "冰壳工坊",
+    "crop": {
+      "row": 0,
+      "column": 4,
+      "x": 1000,
+      "y": 113,
+      "w": 221,
+      "h": 179,
+      "raw": {
+        "minX": 1018,
+        "minY": 131,
+        "maxX": 1203,
+        "maxY": 274
+      },
+      "components": 2
+    }
+  },
+  {
+    "id": "stilltide-depot",
+    "zhName": "静潮仓",
+    "crop": {
+      "row": 0,
+      "column": 5,
+      "x": 1219,
+      "y": 124,
+      "w": 169,
+      "h": 166,
+      "raw": {
+        "minX": 1237,
+        "minY": 142,
+        "maxX": 1370,
+        "maxY": 272
+      },
+      "components": 4
+    }
+  },
+  {
+    "id": "cinderforge-stronghold",
+    "zhName": "烬炉城寨",
+    "crop": {
+      "row": 1,
+      "column": 0,
+      "x": 32,
+      "y": 318,
+      "w": 239,
+      "h": 188,
+      "raw": {
+        "minX": 50,
+        "minY": 336,
+        "maxX": 253,
+        "maxY": 488
+      },
+      "components": 5
+    }
+  },
+  {
+    "id": "meltwell-corridor",
+    "zhName": "熔井回廊",
+    "crop": {
+      "row": 1,
+      "column": 1,
+      "x": 312,
+      "y": 327,
+      "w": 201,
+      "h": 193,
+      "raw": {
+        "minX": 330,
+        "minY": 345,
+        "maxX": 495,
+        "maxY": 502
+      },
+      "components": 2
+    }
+  },
+  {
+    "id": "red-anvil-works",
+    "zhName": "赤砧工场",
+    "crop": {
+      "row": 1,
+      "column": 2,
+      "x": 555,
+      "y": 331,
+      "w": 183,
+      "h": 176,
+      "raw": {
+        "minX": 573,
+        "minY": 349,
+        "maxX": 720,
+        "maxY": 489
+      },
+      "components": 5
+    }
+  },
+  {
+    "id": "ashbridge-station",
+    "zhName": "灰桥驿台",
+    "crop": {
+      "row": 1,
+      "column": 3,
+      "x": 770,
+      "y": 352,
+      "w": 213,
+      "h": 152,
+      "raw": {
+        "minX": 788,
+        "minY": 370,
+        "maxX": 965,
+        "maxY": 486
+      },
+      "components": 2
+    }
+  },
+  {
+    "id": "old-ashfrost-route",
+    "zhName": "灰烬霜带旧路",
+    "crop": {
+      "row": 1,
+      "column": 4,
+      "x": 997,
+      "y": 331,
+      "w": 195,
+      "h": 181,
+      "raw": {
+        "minX": 1015,
+        "minY": 349,
+        "maxX": 1174,
+        "maxY": 494
+      },
+      "components": 6
+    }
+  },
+  {
+    "id": "high-temperature-corridor",
+    "zhName": "高温走廊",
+    "crop": {
+      "row": 1,
+      "column": 5,
+      "x": 1200,
+      "y": 326,
+      "w": 201,
+      "h": 194,
+      "raw": {
+        "minX": 1218,
+        "minY": 344,
+        "maxX": 1383,
+        "maxY": 502
+      },
+      "components": 5
+    }
+  },
+  {
+    "id": "spore-quarantine-zone",
+    "zhName": "孢子禁区",
+    "crop": {
+      "row": 2,
+      "column": 0,
+      "x": 55,
+      "y": 540,
+      "w": 209,
+      "h": 191,
+      "raw": {
+        "minX": 73,
+        "minY": 558,
+        "maxX": 246,
+        "maxY": 713
+      },
+      "components": 14
+    }
+  },
+  {
+    "id": "abandoned-fairy-node",
+    "zhName": "妖精弃巢",
+    "crop": {
+      "row": 2,
+      "column": 1,
+      "x": 307,
+      "y": 544,
+      "w": 202,
+      "h": 193,
+      "raw": {
+        "minX": 325,
+        "minY": 562,
+        "maxX": 491,
+        "maxY": 719
+      },
+      "components": 1
+    }
+  },
+  {
+    "id": "gate-outer-perimeter",
+    "zhName": "门域外围警戒环",
+    "crop": {
+      "row": 2,
+      "column": 2,
+      "x": 535,
+      "y": 543,
+      "w": 228,
+      "h": 204,
+      "raw": {
+        "minX": 553,
+        "minY": 561,
+        "maxX": 745,
+        "maxY": 729
+      },
+      "components": 1
+    }
+  },
+  {
+    "id": "gate-patrol-corridor",
+    "zhName": "巡逻回廊",
+    "crop": {
+      "row": 2,
+      "column": 3,
+      "x": 800,
+      "y": 552,
+      "w": 166,
+      "h": 192,
+      "raw": {
+        "minX": 818,
+        "minY": 570,
+        "maxX": 948,
+        "maxY": 726
+      },
+      "components": 7
+    }
+  },
+  {
+    "id": "gate-transition-band",
+    "zhName": "节律过渡带",
+    "crop": {
+      "row": 2,
+      "column": 4,
+      "x": 995,
+      "y": 552,
+      "w": 194,
+      "h": 191,
+      "raw": {
+        "minX": 1013,
+        "minY": 570,
+        "maxX": 1171,
+        "maxY": 725
+      },
+      "components": 17
+    }
+  },
+  {
+    "id": "gate-spore-front",
+    "zhName": "孢子前沿带",
+    "crop": {
+      "row": 2,
+      "column": 5,
+      "x": 1215,
+      "y": 559,
+      "w": 184,
+      "h": 170,
+      "raw": {
+        "minX": 1233,
+        "minY": 577,
+        "maxX": 1381,
+        "maxY": 711
+      },
+      "components": 12
+    }
+  },
+  {
+    "id": "gate-control-nexus",
+    "zhName": "核心控制结点",
+    "crop": {
+      "row": 3,
+      "column": 0,
+      "x": 60,
+      "y": 762,
+      "w": 208,
+      "h": 189,
+      "raw": {
+        "minX": 78,
+        "minY": 780,
+        "maxX": 250,
+        "maxY": 933
+      },
+      "components": 3
+    }
+  },
+  {
+    "id": "gate-phase-chamber",
+    "zhName": "相位校准腔",
+    "crop": {
+      "row": 3,
+      "column": 1,
+      "x": 321,
+      "y": 758,
+      "w": 206,
+      "h": 198,
+      "raw": {
+        "minX": 339,
+        "minY": 776,
+        "maxX": 509,
+        "maxY": 938
+      },
+      "components": 2
+    }
+  },
+  {
+    "id": "ice-crack-beetle-activity",
+    "zhName": "裂冰甲虫活动区",
+    "crop": {
+      "row": 3,
+      "column": 2,
+      "x": 549,
+      "y": 759,
+      "w": 233,
+      "h": 201,
+      "raw": {
+        "minX": 567,
+        "minY": 777,
+        "maxX": 764,
+        "maxY": 942
+      },
+      "components": 2
+    }
+  },
+  {
+    "id": "molten-scale-beast-nest",
+    "zhName": "熔鳞兽巢穴",
+    "crop": {
+      "row": 3,
+      "column": 3,
+      "x": 789,
+      "y": 759,
+      "w": 224,
+      "h": 207,
+      "raw": {
+        "minX": 807,
+        "minY": 777,
+        "maxX": 995,
+        "maxY": 948
+      },
+      "components": 6
+    }
+  },
+  {
+    "id": "anomalous-phase-rift",
+    "zhName": "异常相位裂谷",
+    "crop": {
+      "row": 3,
+      "column": 4,
+      "x": 1055,
+      "y": 763,
+      "w": 296,
+      "h": 207,
+      "raw": {
+        "minX": 1073,
+        "minY": 781,
+        "maxX": 1333,
+        "maxY": 952
+      },
+      "components": 2
+    }
+  }
+]

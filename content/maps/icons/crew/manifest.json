@@ -1,0 +1,13 @@
+{
+  "id": "iafs-crew-map-icons",
+  "style": "crt-green-reference-icons",
+  "iconSize": 96,
+  "icons": [
+    {
+      "id": "crew-group",
+      "zhName": "队员",
+      "crewId": null,
+      "icon": "group.png"
+    }
+  ]
+}
