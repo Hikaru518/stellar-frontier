@@ -1565,7 +1565,7 @@ blockquote {
   font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-.console-performance-button {
+.game-console-shell .console-performance-button {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
@@ -1583,10 +1583,15 @@ blockquote {
   cursor: pointer;
 }
 
-.console-performance-button:hover,
-.console-performance-button:focus-visible,
-.console-performance-button[aria-pressed="true"] {
+.game-console-shell .console-performance-button:hover:not(:disabled),
+.game-console-shell .console-performance-button:focus-visible,
+.game-console-shell .console-performance-button[aria-pressed="true"] {
   border-color: rgba(255, 184, 90, 0.82);
+  background:
+    linear-gradient(90deg, rgba(255, 184, 90, 0.16), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(116, 166, 166, 0.1) 0 1px, transparent 1px 7px),
+    #221a13;
+  color: #f0a64d;
   outline: none;
 }
 
@@ -3103,14 +3108,17 @@ blockquote {
 .console-side-panel .field-list div {
   grid-template-columns: 84px 1fr;
   border-bottom-color: rgba(166, 107, 51, 0.24);
+  font-family: "Fusion Pixel 10px Monospaced zh_hans", "Fusion Pixel 10px Monospaced latin", "Press Start 2P", "Pixelify Sans", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 .console-side-panel .field-list dt {
   color: #a98a63;
+  font-family: inherit;
 }
 
 .console-side-panel .field-list dd {
   color: #f2ead8;
+  font-family: inherit;
 }
 
 .console-action-row {
