@@ -5,6 +5,15 @@ import { describe, expect, it, vi } from "vitest";
 import { createInitialMapState, initialCrew, initialLogs, initialTiles } from "../data/gameData";
 import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage } from "./MapPage";
 
+const RADAR_WORLD_SIZE = 256;
+const MIN_VISIBLE_CELLS = 80;
+const DEFAULT_VIEWPORT = {
+  left: (RADAR_WORLD_SIZE - MIN_VISIBLE_CELLS) / 2,
+  top: (RADAR_WORLD_SIZE - MIN_VISIBLE_CELLS) / 2,
+  width: MIN_VISIBLE_CELLS,
+  height: MIN_VISIBLE_CELLS,
+};
+
 describe("MapPage", () => {
   it("renders a single interactive terrain map surface after the header", () => {
     renderMapPage();
@@ -53,7 +62,7 @@ describe("MapPage", () => {
     expect(screen.getAllByText(/^\[FOCUS\]/).length).toBeGreaterThan(0);
   });
 
-  it("keeps the minimum zoom at full-world coverage instead of sampling outside the radar", () => {
+  it("caps the minimum zoom at an 80-cell radar viewport instead of sampling outside the radar", () => {
     renderMapPage();
 
     const mapSurface = screen.getByLabelText("地形地图");
@@ -65,7 +74,7 @@ describe("MapPage", () => {
     fireEvent.wheel(mapSurface, { deltaY: 480 });
     fireEvent.click(mapSurface, { clientX: 800, clientY: 560 });
 
-    expect(mapSurface).toHaveAttribute("data-focus-tile-id", "205-228");
+    expect(mapSurface).toHaveAttribute("data-focus-tile-id", "153-160");
     expect(screen.queryByText(/\[ZOOM\] 0\./)).not.toBeInTheDocument();
   });
 
@@ -75,9 +84,9 @@ describe("MapPage", () => {
     const terrainImage = container.querySelector(".console-terrain-map-image") as HTMLImageElement | null;
     expect(terrainImage).not.toBeNull();
     expect(terrainImage).toHaveStyle({
-      width: "200%",
-      height: "200%",
-      transform: "translate(-25%, -25%)",
+      width: "320%",
+      height: "320%",
+      transform: "translate(-34.375%, -34.375%)",
     });
   });
 
@@ -175,9 +184,9 @@ describe("MapPage", () => {
   });
 
   it("keeps tile terrain and weather readout for blank tiles without visible features", () => {
-    renderMapPage();
+    renderMapPage({ viewportState: { zoom: RADAR_WORLD_SIZE / MIN_VISIBLE_CELLS, center: { x: 39, y: 39 } } });
 
-    focusMapTile("1-1");
+    focusMapTile("1-1", { left: 0, top: 0, width: MIN_VISIBLE_CELLS, height: MIN_VISIBLE_CELLS });
 
     expect(screen.getByText(/\[TILE\] 1-1 \/ 平原 \/ 晴朗/)).toBeInTheDocument();
     expect(screen.getByText(/\[FEATURE\] 无可见 Feature/)).toBeInTheDocument();
@@ -217,10 +226,12 @@ describe("MapPage", () => {
   });
 });
 
-function focusMapTile(tileId: string) {
+function focusMapTile(tileId: string, viewport = DEFAULT_VIEWPORT) {
   const [rowText, colText] = tileId.split("-");
   const row = Number(rowText);
   const col = Number(colText);
+  const worldX = col - 1;
+  const worldY = row - 1;
   const mapSurface = screen.getByLabelText("地形地图");
   Object.defineProperty(mapSurface, "getBoundingClientRect", {
     configurable: true,
@@ -228,8 +239,8 @@ function focusMapTile(tileId: string) {
   });
 
   fireEvent.click(mapSurface, {
-    clientX: ((col - 0.5) / 256) * 900,
-    clientY: ((row - 0.5) / 256) * 700,
+    clientX: ((worldX - viewport.left + 0.5) / viewport.width) * 900,
+    clientY: ((worldY - viewport.top + 0.5) / viewport.height) * 700,
   });
 }
 
