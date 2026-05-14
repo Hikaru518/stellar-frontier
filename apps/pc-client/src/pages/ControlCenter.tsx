@@ -208,6 +208,7 @@ function CrewLinkPanel({
     <div className="console-crew-stack">
       {crew.map((member) => {
         const actionView = crewActionViews[member.id];
+        const timingText = actionView.blockingReason ?? actionView.timingText;
         return (
           <article key={member.id} className={`console-crew-card ${incomingCrewIds.has(member.id) ? "console-crew-card-alert" : ""}`}>
             <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -221,7 +222,7 @@ function CrewLinkPanel({
               </div>
               <p>{getTileLocationLabel(defaultMapConfig, member.currentTile, map)}</p>
               <p>{actionView.statusText}</p>
-              <p>{actionView.blockingReason ?? actionView.timingText}</p>
+              {timingText ? <p>{timingText}</p> : null}
             </div>
             <div className="console-crew-actions">
               <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => onOpenDetail(member.id)}>

@@ -192,6 +192,7 @@ export function CommunicationStation({
                 const member = crew.find((item) => item.id === call.crew_id);
                 const crewId = isCrewId(call.crew_id) ? call.crew_id : null;
                 const isUrgent = isUrgentRuntimeCall(call);
+                const timingText = formatRuntimeCallTiming(call, elapsedGameSeconds);
                 return (
                   <article key={call.id} className="crew-card crew-card-alert">
                     <div className="avatar-box">信号</div>
@@ -201,7 +202,7 @@ export function CommunicationStation({
                         <StatusTag tone={isUrgent ? "danger" : "neutral"}>{formatRuntimeCallSeverity(call)}</StatusTag>
                       </div>
                       <p className="crew-status status-accent">{call.rendered_lines[0]?.text ?? "事件通话等待接入。"}</p>
-                      {isUrgent ? <p className="muted-text">{formatRuntimeCallTiming(call, elapsedGameSeconds)}</p> : null}
+                      {isUrgent && timingText ? <p className="muted-text">{timingText}</p> : null}
                     </div>
                     <div className="crew-actions">
                       {crewId ? (
@@ -403,6 +404,7 @@ function CrewCard({
 }) {
   const hasCallEntry = member.hasIncoming || hasRuntimeCall || Boolean(actionView.activeCallId);
   const callDisabled = !actionView.canStartCall;
+  const timingText = actionView.blockingReason ?? actionView.timingText;
   return (
     <article className={`crew-card ${hasCallEntry ? "crew-card-alert" : ""} ${highlighted ? "crew-card-quest-highlight" : ""}`}>
       <div className="avatar-box">头像</div>
@@ -416,7 +418,7 @@ function CrewCard({
         <p className={`crew-status status-${actionView.statusTone}`}>{actionView.statusText}</p>
         <p className="muted-text">位置：{getCrewLocationLabel(member)}</p>
         <p className="muted-text">行动：{actionView.actionTitle}</p>
-        <p className="muted-text">{actionView.blockingReason ?? actionView.timingText}</p>
+        {timingText ? <p className="muted-text">{timingText}</p> : null}
       </div>
       <div className="crew-actions">
         {hasCallEntry ? (
@@ -501,7 +503,7 @@ function formatRuntimeCallTiming(call: RuntimeCall, elapsedGameSeconds: number) 
     return `剩余 ${formatDuration(getRemainingSeconds(call.expires_at, elapsedGameSeconds))}`;
   }
 
-  return "无强制倒计时";
+  return null;
 }
 
 function formatRuntimeCallSeverity(call: RuntimeCall) {

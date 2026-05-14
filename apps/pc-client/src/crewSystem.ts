@@ -30,7 +30,7 @@ export interface CrewActionViewModel {
   actionTitle: string;
   statusText: string;
   statusTone: Tone;
-  timingText: string;
+  timingText: string | null;
   progressPercent: number | null;
   canCommunicate: boolean;
   canStartCall: boolean;
@@ -935,7 +935,7 @@ function getRuntimeCallTimingText(call: RuntimeCall, elapsedGameSeconds: number)
     return `事件通话剩余 ${formatDuration(getRemainingSeconds(call.expires_at, elapsedGameSeconds))}`;
   }
 
-  return "事件通话没有强制倒计时。";
+  return null;
 }
 
 function getCrewActionRemainingSeconds(action: CrewActionState, elapsedGameSeconds: number) {

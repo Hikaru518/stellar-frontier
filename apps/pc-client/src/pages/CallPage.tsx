@@ -196,6 +196,9 @@ export function CallPage({
     );
   }
 
+  const runtimeCallTiming = callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : null;
+  const callTimingText = callView.isRuntime ? runtimeCallTiming : memberActionView.timingText;
+
   return (
     <GameConsoleLayout
       title={`${member.name} 通话界面`}
@@ -205,7 +208,7 @@ export function CallPage({
         { label: "channel", value: callView.isRuntime ? "runtime" : "normal" },
         { label: "crew", value: member.name },
         { label: "status", value: callView.badge },
-        { label: "timer", value: callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : memberActionView.timingText },
+        ...(callTimingText ? [{ label: "timer", value: callTimingText }] : []),
       ]}
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
@@ -219,6 +222,7 @@ export function CallPage({
             const isActiveCrew = item.id === member.id;
             const hasRuntime = Object.values(activeCalls).some((entry) => entry.crew_id === item.id && isRuntimeCallActive(entry, elapsedGameSeconds));
             const canSwitchCall = callClosed || isActiveCrew;
+            const timingText = actionView.blockingReason ?? actionView.timingText;
             return (
               <article key={item.id} className={`console-crew-card ${isActiveCrew || hasRuntime || item.hasIncoming ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{item.name.slice(0, 1)}</div>
@@ -232,7 +236,7 @@ export function CallPage({
                   </div>
                   <p>{getTileLocationLabel(defaultMapConfig, item.currentTile, gameState.map)}</p>
                   <p>{actionView.statusText}</p>
-                  <p>{actionView.blockingReason ?? actionView.timingText}</p>
+                  {timingText ? <p>{timingText}</p> : null}
                 </div>
                 <div className="console-crew-actions">
                   <button
@@ -312,17 +316,17 @@ export function CallPage({
             </div>
           )}
 
-          <div className="console-task-trace">
-            <p className="console-map-trace-line">
-              {callView.isRuntime
-                ? callClosed
+          {!callView.isRuntime || callClosed ? (
+            <div className="console-task-trace">
+              <p className="console-map-trace-line">
+                {callView.isRuntime
                   ? "[CALL] 事件通话已关闭。"
-                  : "[CALL] 选择后只提交 option_id，事件推进由 runtime engine 负责。"
-                : callClosed
-                  ? "[CALL] 本轮选择已结算。"
-                  : "[CALL] 选择行动后会更新队员、地块或通讯状态。"}
-            </p>
-          </div>
+                  : callClosed
+                    ? "[CALL] 本轮选择已结算。"
+                    : "[CALL] 选择行动后会更新队员、地块或通讯状态。"}
+              </p>
+            </div>
+          ) : null}
         </section>
       }
       bottomBar={
@@ -365,9 +369,11 @@ export function CallPage({
               {(call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
                 <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
               ))}
-              <p className={callView.isRuntime ? "console-screen-line console-screen-line-rose" : "console-screen-line console-screen-line-cyan"}>
-                {callView.isRuntime && runtimeCall ? getRuntimeCallTiming(runtimeCall, elapsedGameSeconds) : memberActionView.timingText}
-              </p>
+              {callTimingText ? (
+                <p className={callView.isRuntime ? "console-screen-line console-screen-line-rose" : "console-screen-line console-screen-line-cyan"}>
+                  {callTimingText}
+                </p>
+              ) : null}
             </section>
             <section className="console-screen-block">
               <p className="console-screen-section">[ CALL META ]</p>
@@ -668,5 +674,5 @@ function getRuntimeCallTiming(call: RuntimeCall, elapsedGameSeconds: number) {
     return `事件通话剩余 ${formatDuration(getRemainingSeconds(call.expires_at, elapsedGameSeconds))}`;
   }
 
-  return "事件通话没有强制倒计时。";
+  return null;
 }
