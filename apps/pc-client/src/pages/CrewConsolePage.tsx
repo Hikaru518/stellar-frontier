@@ -67,10 +67,15 @@ export function CrewConsolePage({
     [activeCalls, crew, crewActions, elapsedGameSeconds, tiles],
   );
   const selectedActionView = selectedCrew ? crewActionViews[selectedCrew.id] : null;
+  const pageTitle = selectedCrew
+    ? `${selectedCrew.name} ${mode === "status" ? "角色档案" : "角色背包"}`
+    : mode === "status"
+      ? "角色档案"
+      : "角色背包";
 
   return (
     <GameConsoleLayout
-      title={selectedCrew ? `${selectedCrew.name} 角色档案` : "角色档案"}
+      title={pageTitle}
       subtitle=""
       gameTimeLabel={gameTimeLabel}
       statusItems={[
@@ -91,6 +96,7 @@ export function CrewConsolePage({
             const incoming = Object.values(activeCalls).some((call) => call.crew_id === member.id && isActiveRuntimeCall(call.status));
             const isStatusActive = mode === "status" && selectedCrew?.id === member.id;
             const isInventoryActive = mode === "inventory" && selectedCrew?.id === member.id;
+            const timingText = actionView.blockingReason ?? actionView.timingText;
             return (
               <article key={member.id} className={`console-crew-card ${incoming || member.hasIncoming ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -104,7 +110,7 @@ export function CrewConsolePage({
                   </div>
                   <p>{member.location}</p>
                   <p>{actionView.statusText}</p>
-                  <p>{actionView.timingText}</p>
+                  {timingText ? <p>{timingText}</p> : null}
                 </div>
                 <div className="console-crew-actions">
                   <button
@@ -193,6 +199,7 @@ function CrewStatusScreen({
   actionView: CrewActionViewModel;
   eventLogs: EventLog[];
 }) {
+  const timingText = actionView.blockingReason ?? actionView.timingText;
   const recentLogs = eventLogs
     .filter((log) => log.visibility === "player_visible" && log.crew_ids.includes(member.id))
     .slice()
@@ -209,7 +216,7 @@ function CrewStatusScreen({
         <p className="console-screen-section">[ FIELD CONDITION ]</p>
         <p>STATUS ........ {member.status.toUpperCase()}</p>
         <p>ACTION ........ {actionView.actionTitle.toUpperCase()}</p>
-        <p>TIMER ......... {(actionView.blockingReason ?? actionView.timingText).toUpperCase()}</p>
+        {timingText ? <p>TIMER ......... {timingText.toUpperCase()}</p> : null}
         <p>LOCATION ...... {member.location.toUpperCase()}</p>
         <p>LINK .......... {member.canCommunicate ? "ONLINE" : "OFFLINE"}</p>
       </section>

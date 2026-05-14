@@ -162,6 +162,8 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "我们会带你回家。先稳住，把眼前的情况说清楚。" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "结束通话" })).toBeNull();
+    expect(screen.queryByText("事件通话没有强制倒计时。")).toBeNull();
+    expect(screen.queryByText(/\[CALL\] 选择后只提交 option_id/)).toBeNull();
   });
 
   it("opens the global debug toolbox from the floating entry", () => {
@@ -403,6 +405,8 @@ describe("App", () => {
     expect(mikeCard).not.toBeNull();
 
     fireEvent.click(within(mikeCard as HTMLElement).getByRole("button", { name: "查看背包" }));
+    expect(screen.getByRole("heading", { name: "麦克 角色背包" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "麦克 角色档案" })).toBeNull();
     expect(screen.getByText("NO CARRIED ITEMS.")).toBeInTheDocument();
   });
 

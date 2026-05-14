@@ -668,6 +668,7 @@ export function MapPage({
             const actionView = crewActionViews[member.id];
             const hasRuntimeCall = Object.values(activeCalls).some((call) => call.crew_id === member.id && isRuntimeCallActive(call, elapsedGameSeconds));
             const hasCallEntry = hasRuntimeCall || member.hasIncoming;
+            const timingText = actionView.blockingReason ?? actionView.timingText;
             return (
               <article key={member.id} className={`console-crew-card ${hasCallEntry ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -681,7 +682,7 @@ export function MapPage({
                   </div>
                   <p>{member.location}</p>
                   <p>{actionView.statusText}</p>
-                  <p>{actionView.timingText}</p>
+                  {timingText ? <p>{timingText}</p> : null}
                 </div>
                 <div className="console-crew-actions">
                   <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => handleOpenCrewStatus(member)}>
