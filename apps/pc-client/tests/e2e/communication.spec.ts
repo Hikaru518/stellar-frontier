@@ -32,7 +32,8 @@ test("opens the communication station and shows 麦克's empty inventory", async
 
   await mikeCard(page).getByRole("button", { name: "查看背包" }).click();
 
-  await expect(page.getByRole("heading", { name: "麦克 角色档案" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "麦克 角色背包" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "麦克 角色档案" })).toHaveCount(0);
   await expect(page.getByText("NO CARRIED ITEMS.")).toBeVisible();
 });
 
