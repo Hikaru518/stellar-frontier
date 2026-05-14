@@ -21,6 +21,13 @@ const MAP_CONFIG_ID = "default-map";
 const MAP_CONFIG_VERSION = 3;
 const MAP_ROWS = 256;
 const MAP_COLS = 256;
+const MAP_MIN_VISIBLE_CELLS = 80;
+const MAP_DEFAULT_VIEWPORT = {
+  left: (MAP_COLS - MAP_MIN_VISIBLE_CELLS) / 2,
+  top: (MAP_ROWS - MAP_MIN_VISIBLE_CELLS) / 2,
+  width: MAP_MIN_VISIBLE_CELLS,
+  height: MAP_MIN_VISIBLE_CELLS,
+};
 const MAP_ORIGIN_TILE_ID = "129-129";
 
 const initialResources = {
@@ -143,8 +150,16 @@ export async function selectMapTile(page: Page, tileId: string) {
 
   await stage.click({
     position: {
-      x: clamp(((col - 1 + 0.5) / MAP_COLS) * (box?.width ?? 1), 1, Math.max(1, (box?.width ?? 1) - 1)),
-      y: clamp(((row - 1) / MAP_ROWS) * (box?.height ?? 1), 1, Math.max(1, (box?.height ?? 1) - 1)),
+      x: clamp(
+        ((col - 1 - MAP_DEFAULT_VIEWPORT.left + 0.5) / MAP_DEFAULT_VIEWPORT.width) * (box?.width ?? 1),
+        1,
+        Math.max(1, (box?.width ?? 1) - 1),
+      ),
+      y: clamp(
+        ((row - 1 - MAP_DEFAULT_VIEWPORT.top + 0.5) / MAP_DEFAULT_VIEWPORT.height) * (box?.height ?? 1),
+        1,
+        Math.max(1, (box?.height ?? 1) - 1),
+      ),
     },
   });
   await expect(stage).toHaveAttribute("data-focus-tile-id", tileId);
