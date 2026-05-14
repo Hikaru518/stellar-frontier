@@ -155,7 +155,7 @@ export function MapPage({
     () => ({
       width: `${(RADAR_WORLD.width / viewport.width) * 100}%`,
       height: `${(RADAR_WORLD.height / viewport.height) * 100}%`,
-      transform: `translate(${-(viewport.left / viewport.width) * 100}%, ${-(viewport.top / viewport.height) * 100}%)`,
+      transform: `translate(${-(viewport.left / RADAR_WORLD.width) * 100}%, ${-(viewport.top / RADAR_WORLD.height) * 100}%)`,
     }),
     [viewport],
   );

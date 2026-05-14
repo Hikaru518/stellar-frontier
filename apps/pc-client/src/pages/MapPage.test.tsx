@@ -69,6 +69,18 @@ describe("MapPage", () => {
     expect(screen.queryByText(/\[ZOOM\] 0\./)).not.toBeInTheDocument();
   });
 
+  it("keeps the terrain base image aligned with overlay layers while zoomed", () => {
+    const { container } = renderMapPage({ viewportState: { zoom: 2, center: { x: 128, y: 128 } } });
+
+    const terrainImage = container.querySelector(".console-terrain-map-image") as HTMLImageElement | null;
+    expect(terrainImage).not.toBeNull();
+    expect(terrainImage).toHaveStyle({
+      width: "200%",
+      height: "200%",
+      transform: "translate(-25%, -25%)",
+    });
+  });
+
   it("uses center-origin display coordinates for the function layer", () => {
     renderMapPage();
 
