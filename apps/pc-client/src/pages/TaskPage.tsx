@@ -124,6 +124,7 @@ export function TaskPage({
           {crew.map((member) => {
             const actionView = crewActionViews[member.id];
             const hasRuntimeCall = activeRuntimeCalls.some((call) => call.crew_id === member.id);
+            const timingText = actionView.blockingReason ?? actionView.timingText;
             return (
               <article key={member.id} className={`console-crew-card ${hasRuntimeCall || member.hasIncoming ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -137,7 +138,7 @@ export function TaskPage({
                   </div>
                   <p>{member.location}</p>
                   <p>{actionView.statusText}</p>
-                  <p>{actionView.timingText}</p>
+                  {timingText ? <p>{timingText}</p> : null}
                 </div>
                 <div className="console-crew-actions">
                   <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => handleOpenCrewStatus(member)}>
