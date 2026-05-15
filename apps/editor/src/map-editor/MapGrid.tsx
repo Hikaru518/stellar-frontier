@@ -12,6 +12,15 @@ const ZOOM_STEP = 1.14;
 
 export type MapGridInteractionMode = "pan" | "paint";
 export type MapBaseLayerMode = "none" | "radar" | "gameplay";
+export interface MapGameplayLayerVisibility {
+  terrain: boolean;
+  weather: boolean;
+}
+
+export const DEFAULT_MAP_GAMEPLAY_LAYER_VISIBILITY: MapGameplayLayerVisibility = {
+  terrain: true,
+  weather: true,
+};
 
 interface TileCenter {
   row: number;
@@ -32,6 +41,7 @@ interface MapGridProps {
   selectedTileId: string | null;
   selectedFeatureId: string | null;
   baseLayerMode: MapBaseLayerMode;
+  gameplayLayerVisibility?: MapGameplayLayerVisibility;
   featureOverlay?: boolean;
   interactionMode?: MapGridInteractionMode;
   onSelectTile: (tileId: string) => void;
@@ -46,6 +56,7 @@ export default function MapGrid({
   selectedTileId,
   selectedFeatureId,
   baseLayerMode,
+  gameplayLayerVisibility = DEFAULT_MAP_GAMEPLAY_LAYER_VISIBILITY,
   featureOverlay = true,
   interactionMode = "paint",
   onSelectTile,
@@ -179,7 +190,7 @@ export default function MapGrid({
               }}
             >
               {baseLayerMode === "radar" ? <RadarCell draft={draft} tile={tile} /> : null}
-              {baseLayerMode === "gameplay" ? <GameplayOverlay draft={draft} tile={tile} /> : null}
+              {baseLayerMode === "gameplay" ? <GameplayOverlay draft={draft} tile={tile} visibility={gameplayLayerVisibility} /> : null}
               {featureOverlay && overlayFeatures.length > 0 ? (
                 <span className="map-grid-feature-count" aria-hidden="true">
                   F{overlayFeatures.length}
@@ -299,7 +310,7 @@ function RadarCell({ draft, tile }: { draft: MapEditorDraft; tile: MapTileDefini
   );
 }
 
-function GameplayOverlay({ draft, tile }: { draft: MapEditorDraft; tile: MapTileDefinition }) {
+function GameplayOverlay({ draft, tile, visibility }: { draft: MapEditorDraft; tile: MapTileDefinition; visibility: MapGameplayLayerVisibility }) {
   const flags = [
     tile.specialStates.length > 0 ? "SP" : null,
     tile.id === draft.originTileId ? "ORIGIN" : null,
@@ -308,8 +319,8 @@ function GameplayOverlay({ draft, tile }: { draft: MapEditorDraft; tile: MapTile
 
   return (
     <span className="map-grid-gameplay-overlay" aria-hidden="true">
-      <span>{tile.terrain}</span>
-      <span>{tile.weather}</span>
+      {visibility.terrain ? <span>{tile.terrain}</span> : null}
+      {visibility.weather ? <span>{tile.weather}</span> : null}
       {flags.length > 0 ? <span>{flags.join(" ")}</span> : null}
     </span>
   );
@@ -328,6 +339,9 @@ function getTileClassName(
   const classNames = ["map-grid-tile"];
   if (baseLayerMode === "none") {
     classNames.push("map-grid-tile-base-none");
+  }
+  if (baseLayerMode === "gameplay" && isTileBlocked(tile)) {
+    classNames.push("map-grid-tile-gameplay-blocked");
   }
   if (tile.id === draft.originTileId) {
     classNames.push("map-grid-tile-origin");
@@ -354,6 +368,10 @@ function getTileClassName(
     classNames.push("map-grid-tile-feature");
   }
   return classNames.join(" ");
+}
+
+function isTileBlocked(tile: MapTileDefinition): boolean {
+  return tile.terrain.includes("不可通行") || tile.terrain.includes("山");
 }
 
 function formatTileTitle(tile: MapTileDefinition, tileFeatures: MapFeatureDefinition[]): string {

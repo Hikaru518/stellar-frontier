@@ -104,6 +104,42 @@ describe("MapEditorPage", () => {
     expect(within(featureOverlayToggle).getByRole("button", { name: "Feature Overlay" })).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("toggles gameplay terrain and weather layers in the grid", async () => {
+    const loadLibrary = vi.fn(async () =>
+      createLibraryResponse({
+        maps: [createMapAsset("default-map", "Default Map", "content/maps/default-map.json")],
+      }),
+    );
+
+    render(<MapEditorPage loadLibrary={loadLibrary} />);
+
+    await screen.findByRole("heading", { name: "Default Map" });
+    const baseLayerToggle = screen.getAllByRole("group", { name: "Base layer toggle" })[0];
+    fireEvent.click(within(baseLayerToggle).getByRole("button", { name: "Gameplay" }));
+
+    const gameplayLayerToggle = screen.getAllByRole("group", { name: "Gameplay layer toggle" })[0];
+    const terrainButton = within(gameplayLayerToggle).getByRole("button", { name: "Terrain" });
+    const weatherButton = within(gameplayLayerToggle).getByRole("button", { name: "Weather" });
+    expect(terrainButton).toHaveAttribute("aria-pressed", "true");
+    expect(weatherButton).toHaveAttribute("aria-pressed", "true");
+
+    let tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).toHaveTextContent("平原");
+    expect(tile).toHaveTextContent("晴朗");
+
+    fireEvent.click(terrainButton);
+    expect(terrainButton).toHaveAttribute("aria-pressed", "false");
+    tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).not.toHaveTextContent("平原");
+    expect(tile).toHaveTextContent("晴朗");
+
+    fireEvent.click(weatherButton);
+    expect(weatherButton).toHaveAttribute("aria-pressed", "false");
+    tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).not.toHaveTextContent("平原");
+    expect(tile).not.toHaveTextContent("晴朗");
+  });
+
   it("shows selected tile feature overlaps and applies selected feature footprint brush", async () => {
     const draft = createMapEditorDraft({ id: "default-map", name: "Default Map", rows: 2, cols: 2 });
     draft.features = [

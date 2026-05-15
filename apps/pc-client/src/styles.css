@@ -2935,6 +2935,19 @@ blockquote {
   display: grid;
   gap: 6px;
   align-content: start;
+  justify-items: start;
+  width: 40ch;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.console-screen-block .console-call-profile-line {
+  width: 100%;
+  max-width: 40ch;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .console-call-control-stack {

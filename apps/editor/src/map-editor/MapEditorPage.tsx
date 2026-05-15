@@ -4,7 +4,7 @@ import { createInitialMapEditorState, normalizeMapEditorDraft } from "./mapEdito
 import { mapEditorReducer } from "./mapEditorReducer";
 import FeatureInspector from "./FeatureInspector";
 import MapFilePanel from "./MapFilePanel";
-import MapGrid, { type MapBaseLayerMode } from "./MapGrid";
+import MapGrid, { DEFAULT_MAP_GAMEPLAY_LAYER_VISIBILITY, type MapBaseLayerMode, type MapGameplayLayerVisibility } from "./MapGrid";
 import SemanticBrushPanel from "./SemanticBrushPanel";
 import TileDetailPanel from "./TileDetailPanel";
 import TileInspector from "./TileInspector";
@@ -42,6 +42,7 @@ export default function MapEditorPage({
   const [activeSemanticBrush, setActiveSemanticBrush] = useState<SemanticBrush | null>(null);
   const [baseLayerMode, setBaseLayerMode] = useState<MapBaseLayerMode>("radar");
   const [featureOverlay, setFeatureOverlay] = useState(true);
+  const [gameplayLayerVisibility, setGameplayLayerVisibility] = useState<MapGameplayLayerVisibility>(DEFAULT_MAP_GAMEPLAY_LAYER_VISIBILITY);
   const [notice, setNotice] = useState<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<{ errors: MapValidationIssue[]; warnings: MapValidationIssue[] }>({
     errors: [],
@@ -233,6 +234,7 @@ export default function MapEditorPage({
           activeSemanticBrush={activeSemanticBrush}
           baseLayerMode={baseLayerMode}
           featureOverlay={featureOverlay}
+          gameplayLayerVisibility={gameplayLayerVisibility}
           notice={notice}
           dirty={isDirty}
           saving={saveState !== "idle"}
@@ -241,6 +243,7 @@ export default function MapEditorPage({
           onNotice={setNotice}
           onBaseLayerModeChange={setBaseLayerMode}
           onFeatureOverlayChange={setFeatureOverlay}
+          onGameplayLayerVisibilityChange={setGameplayLayerVisibility}
           onSave={handleSave}
           onCommand={dispatch}
         />
@@ -253,11 +256,13 @@ export default function MapEditorPage({
           activeSemanticBrush={activeSemanticBrush}
           baseLayerMode={baseLayerMode}
           featureOverlay={featureOverlay}
+          gameplayLayerVisibility={gameplayLayerVisibility}
           validationIssues={validationIssues}
           onActiveSemanticBrushChange={changeSemanticBrush}
           onFeatureFootprintBrushModeChange={setFeatureFootprintBrushMode}
           onBaseLayerModeChange={setBaseLayerMode}
           onFeatureOverlayChange={setFeatureOverlay}
+          onGameplayLayerVisibilityChange={setGameplayLayerVisibility}
           onSelectFeature={setSelectedFeatureId}
           onIssueSelect={handleIssueSelect}
           onCommand={dispatch}
@@ -304,6 +309,25 @@ function MapLibraryStatusBar({ library }: { library: MapEditorLibraryResponse })
   );
 }
 
+function GameplayLayerToggle({
+  visibility,
+  onChange,
+}: {
+  visibility: MapGameplayLayerVisibility;
+  onChange: (visibility: MapGameplayLayerVisibility) => void;
+}) {
+  return (
+    <div className="map-gameplay-toggle" role="group" aria-label="Gameplay layer toggle">
+      <button type="button" aria-pressed={visibility.terrain} onClick={() => onChange({ ...visibility, terrain: !visibility.terrain })}>
+        Terrain
+      </button>
+      <button type="button" aria-pressed={visibility.weather} onClick={() => onChange({ ...visibility, weather: !visibility.weather })}>
+        Weather
+      </button>
+    </div>
+  );
+}
+
 function MapCanvasShell({
   activeMapFilePath,
   editorState,
@@ -314,6 +338,7 @@ function MapCanvasShell({
   activeSemanticBrush,
   baseLayerMode,
   featureOverlay,
+  gameplayLayerVisibility,
   notice,
   dirty,
   saving,
@@ -322,6 +347,7 @@ function MapCanvasShell({
   onNotice,
   onBaseLayerModeChange,
   onFeatureOverlayChange,
+  onGameplayLayerVisibilityChange,
   onSave,
   onCommand,
 }: {
@@ -334,6 +360,7 @@ function MapCanvasShell({
   activeSemanticBrush: SemanticBrush | null;
   baseLayerMode: MapBaseLayerMode;
   featureOverlay: boolean;
+  gameplayLayerVisibility: MapGameplayLayerVisibility;
   notice: string | null;
   dirty: boolean;
   saving: boolean;
@@ -342,6 +369,7 @@ function MapCanvasShell({
   onNotice: (message: string | null) => void;
   onBaseLayerModeChange: (mode: MapBaseLayerMode) => void;
   onFeatureOverlayChange: (enabled: boolean) => void;
+  onGameplayLayerVisibilityChange: (visibility: MapGameplayLayerVisibility) => void;
   onSave: () => void;
   onCommand: (command: MapEditorCommand) => void;
 }) {
@@ -427,6 +455,13 @@ function MapCanvasShell({
             Feature Overlay
           </button>
         </div>
+        <GameplayLayerToggle
+          visibility={gameplayLayerVisibility}
+          onChange={(visibility) => {
+            onGameplayLayerVisibilityChange(visibility);
+            onNotice(null);
+          }}
+        />
       </div>
 
       {notice ? (
@@ -440,6 +475,7 @@ function MapCanvasShell({
         selectedTileId={selectedTileId}
         selectedFeatureId={selectedFeatureId}
         baseLayerMode={baseLayerMode}
+        gameplayLayerVisibility={gameplayLayerVisibility}
         featureOverlay={featureOverlay}
         interactionMode={activeTool === "select" && !selectedFeatureId && !activeSemanticBrush ? "pan" : "paint"}
         onSelectTile={onSelectTile}
@@ -525,11 +561,13 @@ function MapSummaryPanel({
   activeSemanticBrush,
   baseLayerMode,
   featureOverlay,
+  gameplayLayerVisibility,
   validationIssues,
   onActiveSemanticBrushChange,
   onFeatureFootprintBrushModeChange,
   onBaseLayerModeChange,
   onFeatureOverlayChange,
+  onGameplayLayerVisibilityChange,
   onSelectFeature,
   onIssueSelect,
   onCommand,
@@ -541,11 +579,13 @@ function MapSummaryPanel({
   activeSemanticBrush: SemanticBrush | null;
   baseLayerMode: MapBaseLayerMode;
   featureOverlay: boolean;
+  gameplayLayerVisibility: MapGameplayLayerVisibility;
   validationIssues: { errors: MapValidationIssue[]; warnings: MapValidationIssue[] };
   onActiveSemanticBrushChange: (brush: SemanticBrush | null) => void;
   onFeatureFootprintBrushModeChange: (mode: MapFeatureFootprintBrushMode) => void;
   onBaseLayerModeChange: (mode: MapBaseLayerMode) => void;
   onFeatureOverlayChange: (enabled: boolean) => void;
+  onGameplayLayerVisibilityChange: (visibility: MapGameplayLayerVisibility) => void;
   onSelectFeature: (featureId: string | null) => void;
   onIssueSelect: (issue: MapValidationIssue) => void;
   onCommand: (command: MapEditorCommand) => void;
@@ -620,6 +660,7 @@ function MapSummaryPanel({
             Feature Overlay
           </button>
         </div>
+        <GameplayLayerToggle visibility={gameplayLayerVisibility} onChange={onGameplayLayerVisibilityChange} />
       </section>
 
       <TileDetailPanel draft={draft} selectedTileId={selectedTileId} selectedFeatureId={selectedFeatureId} onSelectFeature={onSelectFeature} />
