@@ -31,6 +31,7 @@ export interface GameState extends EventRuntimeState {
   created_at_real_time: string;
   updated_at_real_time: string;
   elapsedGameSeconds: number;
+  debugSettings: DebugSettings;
   crew: CrewMember[];
   baseInventory: InventoryEntry[];
   map: GameMapState;
@@ -39,6 +40,10 @@ export interface GameState extends EventRuntimeState {
   resources: ResourceSummary;
   eventHistory: Record<string, number>;
   quest_state: QuestRuntimeState;
+}
+
+export interface DebugSettings {
+  crewMoveSpeedMultiplier: number;
 }
 
 export interface ActiveAction {

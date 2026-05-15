@@ -167,7 +167,13 @@ export async function selectMapTile(page: Page, tileId: string) {
 
 export async function setDebugTimeMultiplier(page: Page, multiplierLabel: "1x" | "2x" | "4x") {
   await page.getByRole("button", { name: "[DEBUG]" }).click();
-  await page.getByRole("button", { name: multiplierLabel }).click();
+  await page.getByRole("group", { name: "时间倍率" }).getByRole("button", { name: multiplierLabel }).click();
+  await page.getByRole("button", { name: "关闭" }).click();
+}
+
+export async function setDebugCrewMoveSpeedMultiplier(page: Page, multiplierLabel: "0.25x" | "0.5x" | "1x" | "2x" | "4x" | "8x" | "16x") {
+  await page.getByRole("button", { name: "[DEBUG]" }).click();
+  await page.getByRole("group", { name: "队员移动速度" }).getByRole("button", { name: multiplierLabel }).click();
   await page.getByRole("button", { name: "关闭" }).click();
 }
 
