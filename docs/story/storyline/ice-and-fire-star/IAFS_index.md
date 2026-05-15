@@ -38,6 +38,7 @@
 | side | 08 | 盲区测绘（第三阶段策略分支） | `IAFS_story.md` -> `支线 A：盲区测绘` | `IAFS_side_08_blind-zone-mapping.md` | done | P0 |
 | side | 09 | 七拍语法（第三阶段策略分支） | `IAFS_story.md` -> `支线 B：七拍语法` | `IAFS_side_09_seventh-beat-protocol.md` | done | P0 |
 | side | 10 | 边境清剿（第三阶段策略分支） | `IAFS_story.md` -> `支线 C：边境清剿` | `IAFS_side_10_border-purge.md` | done | P0 |
+| side | 11 | 拾荒营地哨线初遇 | `IAFS_story.md` -> `### 支线 03：灰烬拾荒者（交界带）` / 拾荒营地前置接触 | `IAFS_side_11_scavenger-sentry-line-contact.md` | done | P1 |
 
 ## 4) 与 Wiki 同步提示
 

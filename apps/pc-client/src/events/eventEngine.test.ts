@@ -249,6 +249,64 @@ describe("event engine trigger intake", () => {
     });
   });
 
+  it("starts the authored scavenger camp sentry call on outer-line arrival", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const triggerTiles = ["91-115", "91-116", "91-117", "92-115", "92-116", "92-117"];
+
+    for (const tileId of triggerTiles) {
+      const started = processTrigger({
+        state: createAuthoredScavengerCampState(tileId),
+        index: indexResult.index,
+        context: scavengerArrivalContext(tileId, 12000),
+      });
+      const callId = started.event?.active_call_id ?? "";
+      const call = started.state.active_calls[callId];
+
+      expect(started.errors).toEqual([]);
+      expect(started.candidate_report?.selected_event_definition_ids).toEqual(["iafs_scavenger_sentry_line_contact"]);
+      expect(call?.rendered_lines[0]?.text).toContain("站住。线外说话，手别乱动。");
+      expect(call?.available_options.map((option) => option.option_id)).toEqual([
+        "opt_observe",
+        "opt_threaten",
+        "opt_negotiate",
+        "opt_chat",
+      ]);
+    }
+  });
+
+  it("records the authored scavenger camp opening choice for follow-up events", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const choices = [
+      ["opt_observe", "scavenger_sentry_observed", "observe"],
+      ["opt_threaten", "scavenger_sentry_threatened", "threaten"],
+      ["opt_negotiate", "scavenger_sentry_negotiated", "negotiate"],
+      ["opt_chat", "scavenger_sentry_chatted", "chat"],
+    ] as const;
+
+    for (const [optionId, resultKey, flagValue] of choices) {
+      const started = processTrigger({
+        state: createAuthoredScavengerCampState("92-116"),
+        index: indexResult.index,
+        context: scavengerArrivalContext("92-116", 12000),
+      });
+      const callId = started.event?.active_call_id ?? "";
+      const ended = selectCallOption({
+        state: started.state,
+        index: indexResult.index,
+        call_id: callId,
+        option_id: optionId,
+        occurred_at: 12015,
+      });
+
+      expect(ended.errors).toEqual([]);
+      expect(ended.event?.status).toBe("resolved");
+      expect(ended.event?.result_key).toBe(resultKey);
+      expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe(flagValue);
+    }
+  });
+
   it.each([
     {
       occurredAt: 120,
@@ -825,6 +883,45 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
   };
 }
 
+function createAuthoredScavengerCampState(tileId: string): GraphRunnerGameState {
+  const state = createAuthoredCrashSiteState();
+  const [row, col] = tileId.split("-").map(Number);
+
+  return {
+    ...state,
+    elapsed_game_seconds: 12000,
+    crew: {
+      ...state.crew,
+      mike: {
+        ...state.crew.mike,
+        tile_id: tileId,
+        status: "idle",
+        current_action_id: null,
+        communication_state: "available",
+      },
+    },
+    tiles: {
+      ...state.tiles,
+      [tileId]: {
+        id: tileId,
+        coordinates: { x: col, y: row },
+        terrain_type: "plain",
+        tags: ["iafs", "ashfrost", "scavenger_camp"],
+        danger_tags: [],
+        discovery_state: "visited",
+        survey_state: "unsurveyed",
+        visibility: "visible",
+        current_crew_ids: ["mike"],
+        resource_nodes: [],
+        site_objects: [],
+        buildings: [],
+        event_marks: [],
+        history_keys: [],
+      },
+    },
+  };
+}
+
 function crew(id: string): CrewState {
   return {
     id,
@@ -869,6 +966,20 @@ function triggerContext(occurredAt: number): TriggerContext {
     world_flag_key: null,
     proximity: null,
     payload: {},
+  };
+}
+
+function scavengerArrivalContext(tileId: string, occurredAt: number): TriggerContext {
+  return {
+    ...triggerContext(occurredAt),
+    source: "crew_action",
+    crew_id: "mike",
+    tile_id: tileId,
+    action_id: "move:mike:scavenger-camp",
+    payload: {
+      action_type: "move",
+      target_tile_id: tileId,
+    },
   };
 }
 

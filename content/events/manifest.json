@@ -6,6 +6,12 @@
       "definitions": "definitions/iafs-inspection.json",
       "call_templates": "call_templates/iafs-inspection.json",
       "presets": null
+    },
+    {
+      "id": "iafs-scavenger-camp",
+      "definitions": "definitions/iafs-scavenger-camp.json",
+      "call_templates": "call_templates/iafs-scavenger-camp.json",
+      "presets": null
     }
   ]
 }

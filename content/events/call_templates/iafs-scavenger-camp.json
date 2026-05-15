@@ -1,0 +1,79 @@
+{
+  "call_templates": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.sentry_challenge",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "sentry_challenge",
+      "render_context_fields": ["crew_id"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "white_noise_stop",
+            "text": "站住。线外说话，手别乱动。报名字、来路、找谁。少答一样，我就当你是麻烦。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "camp_locked_down",
+              "text": "线外的废料挡板后，有人把警铃绳拉到手边。拾荒营地没有开门，帐篷边缘被临时加固过。对方没有自报姓名，也没有放下警戒。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "opt_observe": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "observe",
+              "text": "先不回答，停在线外，侧耳分辨哨站里面的动静。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_threaten": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "threaten",
+              "text": "你先把警铃放下。我们不想惹事，但你要把我们当麻烦，麻烦就会从你这儿开始。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_negotiate": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "negotiate",
+              "text": "我们没有敌意。我叫……从附近过来。想找能问路、交易，或者交换情报的人。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_chat": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "chat",
+              "text": "你这套问法很熟。最近来找麻烦的人很多，还是今天特别不想见客？",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    }
+  ]
+}
