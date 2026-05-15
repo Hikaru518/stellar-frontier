@@ -1,0 +1,423 @@
+{
+  "event_definitions": [
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_1B_trace_routing_to_settlement",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 1B：线索判读与聚落接触",
+      "summary": "坠毁点关键设备全部修复后，队伍选择通往霜湾、烬炉或双线并行的第一条接触路线。",
+      "tags": ["iafs", "mainline", "settlement_route"],
+      "status": "approved",
+      "trigger": {
+        "type": "action_complete",
+        "required_context": ["crew_id", "tile_id", "action_id"],
+        "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "repair" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.repair_result", "value": "success" } },
+          { "type": "any_of", "conditions": [
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.feature_id", "value": "iafs_generator" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.feature_id", "value": "iafs_life_support" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.feature_id", "value": "iafs_shuttle_core" } }
+          ] },
+          { "type": "handler_condition", "handler_type": "feature_status_equals", "params": { "feature_id": "iafs_generator", "status": "repaired" } },
+          { "type": "handler_condition", "handler_type": "feature_status_equals", "params": { "feature_id": "iafs_life_support", "status": "repaired" } },
+          { "type": "handler_condition", "handler_type": "feature_status_equals", "params": { "feature_id": "iafs_shuttle_core", "status": "repaired" } },
+          { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_settlement_route_selected", "value": true }] }
+        ]
+      },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:route", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "route_brief",
+        "nodes": [
+          { "id": "route_brief", "type": "call", "title": "路线判读", "call_template_id": "iafs_main_1B_trace_routing_to_settlement.call.route_brief", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "urgent", "delivery": "incoming_call", "enter_effect_refs": ["enter_1b_route_decision"], "options": [{ "id": "route_frost", "effect_refs": ["choose_route_frost"], "is_default": true }, { "id": "route_cinder", "effect_refs": ["choose_route_cinder" ] }, { "id": "route_split", "effect_refs": ["choose_route_split"] }], "option_node_mapping": { "route_frost": "contact_report", "route_cinder": "contact_report", "route_split": "contact_report" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+          { "id": "contact_report", "type": "call", "title": "聚落外缘接触", "call_template_id": "iafs_main_1B_trace_routing_to_settlement.call.contact_report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "incoming_call", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+          { "id": "end", "type": "end", "title": "首条补给线建立", "resolution": "resolved", "result_key": "settlement_route_selected", "event_log_template_id": "iafs_main_1B_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [
+        { "id": "enter_1b_route_decision", "effects": [
+          { "id": "flag_1b_started", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_main_1b_started", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_regroup_generator", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "regroup_after_crash", "todo_id": "repair_generator" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_regroup_life_support", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "regroup_after_crash", "todo_id": "repair_life_support" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_regroup_shuttle_core", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "regroup_after_crash", "todo_id": "repair_shuttle_core" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_regroup_quest", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_quest", "quest_id": "regroup_after_crash" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_return_stabilize", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "stabilize_crash_site" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_return_route_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "choose_settlement_route" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "choose_route_frost", "effects": [
+          { "id": "flag_route_frost", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_route_frost", "value": true, "tags": ["iafs", "mainline", "route"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "flag_route_selected_frost", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_settlement_route_selected", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_frostbay_frost", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_frostbay_settlement", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_cinderforge_frost", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_cinderforge_settlement", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_choose_route_frost", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "choose_route" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_dual_zone_node_frost", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "dual_zone_investigation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "choose_route_cinder", "effects": [
+          { "id": "flag_route_cinder", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_route_cinder", "value": true, "tags": ["iafs", "mainline", "route"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "flag_route_selected_cinder", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_settlement_route_selected", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_frostbay_cinder", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_frostbay_settlement", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_cinderforge_cinder", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_cinderforge_settlement", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_choose_route_cinder", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "choose_route" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_dual_zone_node_cinder", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "dual_zone_investigation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "choose_route_split", "effects": [
+          { "id": "flag_route_split", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_route_split", "value": true, "tags": ["iafs", "mainline", "route"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "flag_route_selected_split", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_settlement_route_selected", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_frostbay_split", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_frostbay_settlement", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_cinderforge_split", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_cinderforge_settlement", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_choose_route_split", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "choose_route" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_dual_zone_node_split", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "dual_zone_investigation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_1B_log", "summary": "队伍建立首条聚落接触路线", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_2A_dual_zone_investigation_init",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 2A：双区调查启动",
+      "summary": "完成第一处聚落取证后，队伍正式进入冰火双区调查。",
+      "tags": ["iafs", "mainline", "dual_zone"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "any_of", "conditions": [
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_frostbay_settlement:gather_evidence" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_cinderforge_settlement:gather_evidence" } }
+        ] },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_frost_evidence_collected", "value": true }] },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_cinder_evidence_collected", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 100, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:first_probe", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "classify_probe", "nodes": [
+        { "id": "classify_probe", "type": "check", "title": "识别首处取证来源", "branches": [
+          { "id": "frost_probe", "conditions": [{ "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_frostbay_settlement:gather_evidence" } }], "next_node_id": "dual_zone_brief", "effect_refs": ["record_frost_probe"] },
+          { "id": "cinder_probe", "conditions": [{ "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_cinderforge_settlement:gather_evidence" } }], "next_node_id": "dual_zone_brief", "effect_refs": ["record_cinder_probe"] }
+        ], "default_next_node_id": "dual_zone_brief", "evaluation_order": "first_match", "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null } },
+        { "id": "dual_zone_brief", "type": "call", "title": "双区调查令", "call_template_id": "iafs_main_2A_dual_zone_investigation_init.call.dual_zone_brief", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "open_frost_first", "effect_refs": ["set_2a_strategy_frost"], "is_default": true }, { "id": "open_cinder_first", "effect_refs": ["set_2a_strategy_cinder"] }, { "id": "open_parallel", "effect_refs": ["set_2a_strategy_parallel"] }], "option_node_mapping": { "open_frost_first": "end", "open_cinder_first": "end", "open_parallel": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "双区调查已启动", "resolution": "resolved", "result_key": "dual_zone_investigation_started", "event_log_template_id": "iafs_main_2A_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "record_frost_probe", "effects": [
+          { "id": "flag_frost_evidence", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_frost_evidence_collected", "value": true, "tags": ["iafs", "mainline", "evidence"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_frostbay_collected", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_frostbay_settlement", "status": "evidence_collected" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_frost_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "investigate_frostbay" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "record_cinder_probe", "effects": [
+          { "id": "flag_cinder_evidence", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_cinder_evidence_collected", "value": true, "tags": ["iafs", "mainline", "evidence"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_cinderforge_collected", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_cinderforge_settlement", "status": "evidence_collected" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_cinder_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "investigate_cinderforge" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "set_2a_strategy_frost", "effects": [{ "id": "flag_2a_strategy_frost", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2a_strategy_frost_first", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2a_strategy_cinder", "effects": [{ "id": "flag_2a_strategy_cinder", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2a_strategy_cinder_first", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2a_strategy_parallel", "effects": [{ "id": "flag_2a_strategy_parallel", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2a_strategy_parallel", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] }
+      ],
+      "log_templates": [{ "id": "iafs_main_2A_log", "summary": "冰火双区调查已经启动", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_2B_settlement_perimeter_investigation",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 2B：聚落与周边取证",
+      "summary": "第二处聚落证据到位后，队伍把口述、日志和现场痕迹合成可信情报链。",
+      "tags": ["iafs", "mainline", "evidence"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "any_of", "conditions": [
+          { "type": "all_of", "conditions": [
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_frostbay_settlement:gather_evidence" } },
+            { "type": "world_flag_equals", "field": "iafs_cinder_evidence_collected", "value": true }
+          ] },
+          { "type": "all_of", "conditions": [
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_cinderforge_settlement:gather_evidence" } },
+            { "type": "world_flag_equals", "field": "iafs_frost_evidence_collected", "value": true }
+          ] }
+        ] },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_settlement_evidence_strong", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:second_probe", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "classify_second_probe", "nodes": [
+        { "id": "classify_second_probe", "type": "check", "title": "识别第二处取证来源", "branches": [
+          { "id": "frost_second", "conditions": [{ "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_frostbay_settlement:gather_evidence" } }], "next_node_id": "perimeter_brief", "effect_refs": ["record_frost_probe"] },
+          { "id": "cinder_second", "conditions": [{ "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_cinderforge_settlement:gather_evidence" } }], "next_node_id": "perimeter_brief", "effect_refs": ["record_cinder_probe"] }
+        ], "default_next_node_id": "perimeter_brief", "evaluation_order": "first_match", "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null } },
+        { "id": "perimeter_brief", "type": "call", "title": "人地互证", "call_template_id": "iafs_main_2B_settlement_perimeter_investigation.call.perimeter_brief", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "prioritize_people", "effect_refs": ["set_2b_people"], "is_default": true }, { "id": "prioritize_sites", "effect_refs": ["set_2b_sites"] }, { "id": "cross_verify", "effect_refs": ["set_2b_cross"] }], "option_node_mapping": { "prioritize_people": "evidence_report", "prioritize_sites": "evidence_report", "cross_verify": "evidence_report" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "evidence_report", "type": "call", "title": "可信证据链", "call_template_id": "iafs_main_2B_settlement_perimeter_investigation.call.evidence_report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "证据链成型", "resolution": "resolved", "result_key": "settlement_evidence_strong", "final_effect_refs": ["finish_2b_evidence"], "event_log_template_id": "iafs_main_2B_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "record_frost_probe", "effects": [
+          { "id": "flag_frost_evidence", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_frost_evidence_collected", "value": true, "tags": ["iafs", "mainline", "evidence"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_frostbay_collected", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_frostbay_settlement", "status": "evidence_collected" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_frost_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "investigate_frostbay" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "record_cinder_probe", "effects": [
+          { "id": "flag_cinder_evidence", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_cinder_evidence_collected", "value": true, "tags": ["iafs", "mainline", "evidence"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_cinderforge_collected", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_cinderforge_settlement", "status": "evidence_collected" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_cinder_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "investigate_cinderforge" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] },
+        { "id": "set_2b_people", "effects": [{ "id": "flag_2b_people", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2b_people_priority", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2b_sites", "effects": [{ "id": "flag_2b_sites", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2b_sites_priority", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2b_cross", "effects": [{ "id": "flag_2b_cross", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2b_cross_verified", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_2b_evidence", "effects": [
+          { "id": "flag_evidence_strong", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_settlement_evidence_strong", "value": true, "tags": ["iafs", "mainline", "evidence"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_coordinate_workbench", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_coordinate_workbench", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_evidence_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "evidence_consolidation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_2B_log", "summary": "聚落与周边证据链完成互证", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_2C_sample_and_shard_consolidation",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 2C：样本与碎片坐标汇总",
+      "summary": "队伍把冰火双区证据、坠毁记录与门域碎片读数汇总为可用坐标。",
+      "tags": ["iafs", "mainline", "coordinates"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_coordinate_workbench:correlate_evidence" } },
+        { "type": "world_flag_equals", "field": "iafs_settlement_evidence_strong", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_coordinates_resolved", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:coordinates", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "consolidation_brief", "nodes": [
+        { "id": "consolidation_brief", "type": "call", "title": "坐标汇总", "call_template_id": "iafs_main_2C_sample_and_shard_consolidation.call.consolidation_brief", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "enter_effect_refs": ["enter_2c_consolidation"], "options": [{ "id": "fit_shard", "effect_refs": ["set_2c_shard"], "is_default": true }, { "id": "model_skyline", "effect_refs": ["set_2c_skyline"] }, { "id": "compare_testimony", "effect_refs": ["set_2c_testimony"] }], "option_node_mapping": { "fit_shard": "coordinate_report", "model_skyline": "coordinate_report", "compare_testimony": "coordinate_report" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "coordinate_report", "type": "call", "title": "门域坐标", "call_template_id": "iafs_main_2C_sample_and_shard_consolidation.call.coordinate_report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "坐标完成", "resolution": "resolved", "result_key": "coordinates_resolved", "final_effect_refs": ["finish_2c_coordinates"], "event_log_template_id": "iafs_main_2C_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "enter_2c_consolidation", "effects": [{ "id": "flag_2c_started", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_main_2c_started", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2c_shard", "effects": [{ "id": "flag_2c_shard", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2c_shard_fit", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2c_skyline", "effects": [{ "id": "flag_2c_skyline", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2c_skyline_model", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_2c_testimony", "effects": [{ "id": "flag_2c_testimony", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_2c_testimony_crosscheck", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_2c_coordinates", "effects": [
+          { "id": "flag_coordinates_resolved", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_coordinates_resolved", "value": true, "tags": ["iafs", "mainline", "coordinates"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_workbench_resolved", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_coordinate_workbench", "status": "resolved" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "reveal_gate_domain", "type": "set_feature_revealed", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_gate_domain", "revealed": true }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_coordinate_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "analyze_coordinates" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_gate_contact_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "gate_contact" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_2C_log", "summary": "碎片、证词与坠毁记录已汇总为门域坐标", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_3A_gate_contact_setup",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 3A：门域接触准备",
+      "summary": "队伍抵达门域并完成首次扫描，确认这里不是普通遗迹，而是仍会回应的离场装置。",
+      "tags": ["iafs", "mainline", "gate"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_gate_domain:scan_gate" } },
+        { "type": "world_flag_equals", "field": "iafs_coordinates_resolved", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_gate_contact_established", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:gate_contact", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "gate_setup_brief", "nodes": [
+        { "id": "gate_setup_brief", "type": "call", "title": "门域读数", "call_template_id": "iafs_main_3A_gate_contact_setup.call.gate_setup_brief", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "urgent", "delivery": "incoming_call", "options": [{ "id": "tune_to_frost", "effect_refs": ["set_3a_frost_tuning"], "is_default": true }, { "id": "tune_to_cinder", "effect_refs": ["set_3a_cinder_tuning"] }, { "id": "hold_neutral", "effect_refs": ["set_3a_neutral_tuning"] }], "option_node_mapping": { "tune_to_frost": "gate_response", "tune_to_cinder": "gate_response", "hold_neutral": "gate_response" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "gate_response", "type": "call", "title": "门域回应", "call_template_id": "iafs_main_3A_gate_contact_setup.call.gate_response", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "ack", "is_default": true }], "option_node_mapping": { "ack": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "门域接触建立", "resolution": "resolved", "result_key": "gate_contact_established", "final_effect_refs": ["finish_3a_gate_contact"], "event_log_template_id": "iafs_main_3A_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "set_3a_frost_tuning", "effects": [{ "id": "flag_3a_frost_tuning", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_3a_frost_tuning", "value": true, "tags": ["iafs", "mainline", "gate"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_3a_cinder_tuning", "effects": [{ "id": "flag_3a_cinder_tuning", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_3a_cinder_tuning", "value": true, "tags": ["iafs", "mainline", "gate"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_3a_neutral_tuning", "effects": [{ "id": "flag_3a_neutral_tuning", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_3a_neutral_tuning", "value": true, "tags": ["iafs", "mainline", "gate"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_3a_gate_contact", "effects": [
+          { "id": "flag_gate_contact", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_gate_contact_established", "value": true, "tags": ["iafs", "mainline", "gate"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_gate_scanned", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_gate_domain", "status": "scanned" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_scan_gate_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "scan_gate" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_strategy_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "strategy_alignment" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_3A_log", "summary": "门域已经回应队伍的接触信号", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_3B_strategy_fork_and_evidence_conflict",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 3B：策略分歧与证据冲突",
+      "summary": "门域可用性得到确认后，玩家决定回家路线如何回应冰火两地的冲突证词。",
+      "tags": ["iafs", "mainline", "strategy"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_gate_domain:negotiate_passage" } },
+        { "type": "world_flag_equals", "field": "iafs_gate_contact_established", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_strategy_selected", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:strategy", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "strategy_fork", "nodes": [
+        { "id": "strategy_fork", "type": "call", "title": "路线分歧", "call_template_id": "iafs_main_3B_strategy_fork_and_evidence_conflict.call.strategy_fork", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "urgent", "delivery": "incoming_call", "options": [{ "id": "side_with_frost", "effect_refs": ["choose_strategy_frost"], "is_default": true }, { "id": "side_with_cinder", "effect_refs": ["choose_strategy_cinder"] }, { "id": "independent_mediation", "effect_refs": ["choose_strategy_independent"] }], "option_node_mapping": { "side_with_frost": "end", "side_with_cinder": "end", "independent_mediation": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "策略已确定", "resolution": "resolved", "result_key": "strategy_selected", "final_effect_refs": ["finish_3b_strategy"], "event_log_template_id": "iafs_main_3B_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "choose_strategy_frost", "effects": [{ "id": "flag_strategy_selected_frost", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_strategy_selected", "value": true, "tags": ["iafs", "mainline", "strategy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }, { "id": "flag_strategy_frost", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_strategy_frost_relief", "value": true, "tags": ["iafs", "mainline", "strategy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "choose_strategy_cinder", "effects": [{ "id": "flag_strategy_selected_cinder", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_strategy_selected", "value": true, "tags": ["iafs", "mainline", "strategy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }, { "id": "flag_strategy_cinder", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_strategy_cinder_bargain", "value": true, "tags": ["iafs", "mainline", "strategy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "choose_strategy_independent", "effects": [{ "id": "flag_strategy_selected_independent", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_strategy_selected", "value": true, "tags": ["iafs", "mainline", "strategy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }, { "id": "flag_strategy_independent", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_strategy_independent_mediation", "value": true, "tags": ["iafs", "mainline", "strategy"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_3b_strategy", "effects": [
+          { "id": "set_gate_aligned", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_gate_domain", "status": "aligned" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_negotiate_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "negotiate_strategy" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_pre_endgame_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "pre_endgame" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_3B_log", "summary": "门域路线策略已经确定", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_3C_branch_combination_pre_endgame",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 3C：终局前组合准备",
+      "summary": "队伍把策略、门域参数和撤离优先级锁定为最终行动方案。",
+      "tags": ["iafs", "mainline", "pre_endgame"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_gate_domain:prepare_departure" } },
+        { "type": "world_flag_equals", "field": "iafs_strategy_selected", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_pre_endgame_locked", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:pre_endgame", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "pre_endgame_brief", "nodes": [
+        { "id": "pre_endgame_brief", "type": "call", "title": "终局前核对", "call_template_id": "iafs_main_3C_branch_combination_pre_endgame.call.pre_endgame_brief", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "normal", "delivery": "queued_message", "options": [{ "id": "protect_crew", "effect_refs": ["set_3c_protect_crew"], "is_default": true }, { "id": "protect_route", "effect_refs": ["set_3c_protect_route"] }, { "id": "protect_records", "effect_refs": ["set_3c_protect_records"] }], "option_node_mapping": { "protect_crew": "end", "protect_route": "end", "protect_records": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "终局方案锁定", "resolution": "resolved", "result_key": "pre_endgame_locked", "final_effect_refs": ["finish_3c_pre_endgame"], "event_log_template_id": "iafs_main_3C_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "set_3c_protect_crew", "effects": [{ "id": "flag_3c_protect_crew", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_3c_priority_crew", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_3c_protect_route", "effects": [{ "id": "flag_3c_protect_route", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_3c_priority_route", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_3c_protect_records", "effects": [{ "id": "flag_3c_protect_records", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_3c_priority_records", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_3c_pre_endgame", "effects": [
+          { "id": "flag_pre_endgame_locked", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_pre_endgame_locked", "value": true, "tags": ["iafs", "mainline"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_gate_departure_prepared", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_gate_domain", "status": "departure_prepared" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_prepare_departure_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "prepare_departure" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_departure_window_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "departure_window" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_3C_log", "summary": "终局前撤离方案已经锁定", "importance": "major", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_4A_departure_window_and_interpretation_split",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 4A：离场窗口与解释分歧",
+      "summary": "门域离场窗口打开前，玩家决定这趟返航要带走哪一种解释。",
+      "tags": ["iafs", "mainline", "departure"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_gate_domain:open_window" } },
+        { "type": "world_flag_equals", "field": "iafs_pre_endgame_locked", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_departure_window_open", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:departure_window", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "departure_split", "nodes": [
+        { "id": "departure_split", "type": "call", "title": "窗口打开", "call_template_id": "iafs_main_4A_departure_window_and_interpretation_split.call.departure_split", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "urgent", "delivery": "incoming_call", "options": [{ "id": "return_home", "effect_refs": ["set_4a_return_home"], "is_default": true }, { "id": "secure_locals", "effect_refs": ["set_4a_secure_locals"] }, { "id": "carry_archive", "effect_refs": ["set_4a_carry_archive"] }], "option_node_mapping": { "return_home": "end", "secure_locals": "end", "carry_archive": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "离场窗口打开", "resolution": "resolved", "result_key": "departure_window_open", "final_effect_refs": ["finish_4a_window"], "event_log_template_id": "iafs_main_4A_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "set_4a_return_home", "effects": [{ "id": "flag_4a_return_home", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4a_interpretation_return_home", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_4a_secure_locals", "effects": [{ "id": "flag_4a_secure_locals", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4a_interpretation_secure_locals", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_4a_carry_archive", "effects": [{ "id": "flag_4a_carry_archive", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4a_interpretation_carry_archive", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_4a_window", "effects": [
+          { "id": "flag_departure_window_open", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_departure_window_open", "value": true, "tags": ["iafs", "mainline", "departure"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_gate_window_open", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_gate_domain", "status": "window_open" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_open_window_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "open_departure_window" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_final_operation_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "final_operation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_4A_log", "summary": "门域离场窗口已经打开", "importance": "critical", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_4B_final_operation_chain",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 4B：最终行动链",
+      "summary": "队伍执行最终门域行动，把撤离、信标和记录压缩进可返回窗口。",
+      "tags": ["iafs", "mainline", "final_operation"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_gate_domain:execute_final_operation" } },
+        { "type": "world_flag_equals", "field": "iafs_departure_window_open", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "iafs_final_operation_done", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 150, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:final_operation", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "final_operation_report", "nodes": [
+        { "id": "final_operation_report", "type": "call", "title": "最终行动", "call_template_id": "iafs_main_4B_final_operation_chain.call.final_operation_report", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "emergency", "delivery": "incoming_call", "options": [{ "id": "commit_team", "effect_refs": ["set_4b_commit_team"], "is_default": true }, { "id": "commit_signal", "effect_refs": ["set_4b_commit_signal"] }, { "id": "commit_archive", "effect_refs": ["set_4b_commit_archive"] }], "option_node_mapping": { "commit_team": "end", "commit_signal": "end", "commit_archive": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "最终行动完成", "resolution": "resolved", "result_key": "final_operation_done", "final_effect_refs": ["finish_4b_final_operation"], "event_log_template_id": "iafs_main_4B_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "set_4b_commit_team", "effects": [{ "id": "flag_4b_commit_team", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4b_commit_team", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_4b_commit_signal", "effects": [{ "id": "flag_4b_commit_signal", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4b_commit_signal", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_4b_commit_archive", "effects": [{ "id": "flag_4b_commit_archive", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4b_commit_archive", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_4b_final_operation", "effects": [
+          { "id": "flag_final_operation_done", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_final_operation_done", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_gate_finalized", "type": "set_feature_status", "target": { "type": "world_flags" }, "params": { "feature_id": "iafs_gate_domain", "status": "finalized" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_final_operation_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "execute_final_operation" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "set_return_vector_node", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "set_quest_node", "quest_id": "return_home_from_iafs", "node_id": "return_vector" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_4B_log", "summary": "最终门域行动已经完成", "importance": "critical", "visibility": "player_visible" }],
+      "sample_contexts": []
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_main_4C_endings_and_carryover_state",
+      "version": 1,
+      "domain": "iafs-main",
+      "title": "主线 4C：结局与携带状态",
+      "summary": "玩家确认返航向量，IAFS 主线结束并写入回家完成状态。",
+      "tags": ["iafs", "mainline", "ending"],
+      "status": "approved",
+      "trigger": { "type": "action_complete", "required_context": ["crew_id", "tile_id", "action_id"], "conditions": [
+        { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_def_id", "value": "iafs_gate_domain:commit_ending" } },
+        { "type": "world_flag_equals", "field": "iafs_final_operation_done", "value": true },
+        { "type": "not", "conditions": [{ "type": "world_flag_equals", "field": "return_home_completed", "value": true }] }
+      ] },
+      "candidate_selection": { "priority": 200, "weight": 1, "mutex_group": "iafs_main_progression", "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:ending", "allow_while_active": false },
+      "event_graph": { "entry_node_id": "ending_call", "nodes": [
+        { "id": "ending_call", "type": "call", "title": "返航向量", "call_template_id": "iafs_main_4C_endings_and_carryover_state.call.ending_call", "speaker_crew_ref": { "type": "primary_crew" }, "urgency": "emergency", "delivery": "incoming_call", "options": [{ "id": "launch_for_home", "effect_refs": ["set_4c_launch_home"], "is_default": true }, { "id": "leave_beacon", "effect_refs": ["set_4c_leave_beacon"] }, { "id": "carry_question", "effect_refs": ["set_4c_carry_question"] }], "option_node_mapping": { "launch_for_home": "end", "leave_beacon": "end", "carry_question": "end" }, "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null }, "expires_in_seconds": null },
+        { "id": "end", "type": "end", "title": "回家", "resolution": "resolved", "result_key": "return_home_completed", "final_effect_refs": ["finish_4c_return_home"], "event_log_template_id": "iafs_main_4C_log", "history_writes": [], "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }, "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true } }
+      ], "edges": [], "terminal_node_ids": ["end"], "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false } },
+      "effect_groups": [
+        { "id": "set_4c_launch_home", "effects": [{ "id": "flag_4c_launch_home", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4c_launch_home", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_4c_leave_beacon", "effects": [{ "id": "flag_4c_leave_beacon", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4c_leave_beacon", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "set_4c_carry_question", "effects": [{ "id": "flag_4c_carry_question", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_4c_carry_question", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }] },
+        { "id": "finish_4c_return_home", "effects": [
+          { "id": "flag_return_home_completed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "return_home_completed", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "flag_iafs_main_completed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_main_completed", "value": true, "tags": ["iafs", "mainline", "ending"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_return_vector_todo", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_todo", "quest_id": "return_home_from_iafs", "todo_id": "confirm_return_vector" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } },
+          { "id": "complete_return_quest", "type": "handler_effect", "target": { "type": "world_flags" }, "handler_type": "quest_progress", "params": { "operation": "complete_quest", "quest_id": "return_home_from_iafs" }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": false } }
+        ] }
+      ],
+      "log_templates": [{ "id": "iafs_main_4C_log", "summary": "IAFS 主线完成：队伍锁定返航向量并踏上回家路径", "importance": "critical", "visibility": "player_visible" }],
+      "sample_contexts": []
+    }
+  ]
+}

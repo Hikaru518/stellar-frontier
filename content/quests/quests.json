@@ -67,6 +67,146 @@
           "visible_after_node": "repair_targets_revealed"
         }
       ]
+    },
+    {
+      "id": "return_home_from_iafs",
+      "category": "main",
+      "title": "从 IAFS 回家",
+      "summary": "修复坠毁点后，沿冰火双区证据链找到门域并锁定返航向量。",
+      "description": "坠毁点只能让队伍活下来，不能带他们离开。继续接触霜湾与烬炉，汇总证据，找到门域并执行返航行动。",
+      "initial_node_id": "stabilize_crash_site",
+      "completed_node_id": "journey_completed",
+      "nodes": [
+        {
+          "id": "stabilize_crash_site",
+          "description": "先稳定 IAFS 坠毁点：调查残骸并修复发电机、维生系统和穿梭机核心。"
+        },
+        {
+          "id": "choose_settlement_route",
+          "description": "坠毁点已稳定。通过通讯选择第一条聚落接触路线，并标记霜湾与烬炉。"
+        },
+        {
+          "id": "dual_zone_investigation",
+          "description": "霜湾与烬炉都已进入调查范围。分别前往两处聚落边缘收集证词与现场证据。"
+        },
+        {
+          "id": "evidence_consolidation",
+          "description": "双区证据已经互证。前往坐标工作台，把碎片、证词和坠毁前读数汇总为门域坐标。"
+        },
+        {
+          "id": "gate_contact",
+          "description": "门域坐标已经锁定。前往灰烬霜带交界处扫描门域，建立第一轮回应。"
+        },
+        {
+          "id": "strategy_alignment",
+          "description": "门域已经回应。需要处理霜湾与烬炉围绕门域的策略分歧，决定我们如何换取或保持返航窗口。"
+        },
+        {
+          "id": "pre_endgame",
+          "description": "门域策略已经确定。执行终局前准备，锁定撤离优先级。"
+        },
+        {
+          "id": "departure_window",
+          "description": "最终方案已准备。打开离场窗口，并决定这趟返航要带走哪一种解释。"
+        },
+        {
+          "id": "final_operation",
+          "description": "离场窗口已经打开。执行最终行动链，把队员、信号和记录压入返航向量。"
+        },
+        {
+          "id": "return_vector",
+          "description": "最终行动完成。确认返航向量，结束 IAFS 主线。"
+        },
+        {
+          "id": "journey_completed",
+          "type": "completed",
+          "title": "返航向量已锁定",
+          "summary": "队伍完成 IAFS 主线，带着证据与幸存者踏上回家路径。",
+          "outcomes": [
+            "坠毁点关键设施已稳定。",
+            "霜湾与烬炉证据链完成互证。",
+            "门域返航窗口被成功锁定。"
+          ]
+        }
+      ],
+      "todos": [
+        {
+          "id": "stabilize_crash_site",
+          "title": "稳定坠毁点",
+          "description": "完成坠毁点调查并修复三套关键装置。",
+          "navigation": [{ "type": "tile", "label": "查看 IAFS 坠毁点", "tile_id": "129-129" }]
+        },
+        {
+          "id": "choose_route",
+          "title": "选择聚落接触路线",
+          "description": "在通讯中决定第一条路线，开启霜湾与烬炉的双区调查。",
+          "visible_after_node": "choose_settlement_route",
+          "navigation": [{ "type": "page", "label": "打开通讯台", "page": "station" }]
+        },
+        {
+          "id": "investigate_frostbay",
+          "title": "调查霜湾聚落",
+          "description": "前往霜湾聚落边缘，收集低温区证词与现场证据。",
+          "visible_after_node": "dual_zone_investigation",
+          "navigation": [{ "type": "tile", "label": "查看霜湾聚落", "tile_id": "168-128" }]
+        },
+        {
+          "id": "investigate_cinderforge",
+          "title": "调查烬炉城寨",
+          "description": "前往烬炉城寨边缘，收集高温区证词与现场证据。",
+          "visible_after_node": "dual_zone_investigation",
+          "navigation": [{ "type": "tile", "label": "查看烬炉城寨", "tile_id": "88-128" }]
+        },
+        {
+          "id": "analyze_coordinates",
+          "title": "汇总门域坐标",
+          "description": "在坐标工作台汇总双区证据、碎片读数与坠毁记录。",
+          "visible_after_node": "evidence_consolidation",
+          "navigation": [{ "type": "tile", "label": "查看坐标工作台", "tile_id": "136-140" }]
+        },
+        {
+          "id": "scan_gate",
+          "title": "扫描门域",
+          "description": "前往门域并执行首次扫描，建立回应。",
+          "visible_after_node": "gate_contact",
+          "navigation": [{ "type": "tile", "label": "查看门域", "tile_id": "160-160" }]
+        },
+        {
+          "id": "negotiate_strategy",
+          "title": "确定门域策略",
+          "description": "处理霜湾与烬炉围绕门域的策略分歧。",
+          "visible_after_node": "strategy_alignment",
+          "navigation": [{ "type": "tile", "label": "查看门域", "tile_id": "160-160" }]
+        },
+        {
+          "id": "prepare_departure",
+          "title": "执行终局前准备",
+          "description": "锁定撤离优先级，为最后离场窗口做准备。",
+          "visible_after_node": "pre_endgame",
+          "navigation": [{ "type": "tile", "label": "查看门域", "tile_id": "160-160" }]
+        },
+        {
+          "id": "open_departure_window",
+          "title": "打开离场窗口",
+          "description": "启动门域离场窗口，并选择返航解释。",
+          "visible_after_node": "departure_window",
+          "navigation": [{ "type": "tile", "label": "查看门域", "tile_id": "160-160" }]
+        },
+        {
+          "id": "execute_final_operation",
+          "title": "执行最终行动链",
+          "description": "把撤离、信标和记录压入可返回窗口。",
+          "visible_after_node": "final_operation",
+          "navigation": [{ "type": "tile", "label": "查看门域", "tile_id": "160-160" }]
+        },
+        {
+          "id": "confirm_return_vector",
+          "title": "确认返航向量",
+          "description": "提交返航向量并结束 IAFS 主线。",
+          "visible_after_node": "return_vector",
+          "navigation": [{ "type": "tile", "label": "查看门域", "tile_id": "160-160" }]
+        }
+      ]
     }
   ]
 }
