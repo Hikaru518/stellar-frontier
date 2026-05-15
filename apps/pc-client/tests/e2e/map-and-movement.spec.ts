@@ -8,6 +8,7 @@ import {
   readSave,
   runtimeCrewAction,
   selectMapTile,
+  setDebugCrewMoveSpeedMultiplier,
   startNormalMikeCall,
   test,
 } from "./support/appTest";
@@ -154,6 +155,27 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
 
   await page.getByRole("button", { name: /地图/ }).click();
   await expect(page.locator(".console-ascii-map-stage")).toBeVisible();
+});
+
+test("debug crew move speed accelerates confirmed movement", async ({ page }) => {
+  await page.goto("/");
+  await setDebugCrewMoveSpeedMultiplier(page, "4x");
+
+  await startNormalMikeCall(page);
+  await page.getByRole("button", { name: "移动到指定区域" }).click();
+  await selectMapTile(page, "129-130");
+  await page.getByRole("button", { name: "标记当前坐标" }).click();
+  await page.getByRole("button", { name: /确认请求 麦克 前往 IAFS坠毁点 \(1,0\)/ }).click();
+
+  await page.clock.runFor(16_000);
+  await page.waitForFunction((key) => {
+    const save = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    return save.crew?.find((member: { id: string }) => member.id === "mike")?.currentTile === "129-130";
+  }, GAME_SAVE_KEY);
+
+  const saved = await readSave(page);
+  expect(findSavedCrew(saved, "mike").currentTile).toBe("129-130");
+  expect(saved.debugSettings.crewMoveSpeedMultiplier).toBe(4);
 });
 
 test("moves a seeded crew action along intermediate route steps", async ({ page }) => {
