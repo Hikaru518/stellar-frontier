@@ -172,6 +172,8 @@ export function CallPage({
   }, [activeCalls, call, elapsedGameSeconds, gameState, member, memberActionView, runtimeCall, tiles]);
   const runtimeTranscriptCallId = callView?.isRuntime && runtimeCall ? runtimeCall.id : null;
   const runtimeTranscriptEnabled = Boolean(callView?.isRuntime && runtimeTranscriptCallId && !callClosed);
+  const runtimeTranscriptAnimationDisabled = isRuntimeTranscriptAnimationDisabled();
+  const runtimeTranscriptPlaybackEnabled = runtimeTranscriptEnabled && !runtimeTranscriptAnimationDisabled;
   const runtimeTranscriptLines = runtimeTranscriptEnabled ? callView?.lines ?? [] : [];
   const firstRuntimeTranscriptLine = runtimeTranscriptLines[0];
   const [runtimeTranscript, setRuntimeTranscript] = useState<RuntimeTranscriptPlaybackState>({
@@ -187,13 +189,14 @@ export function CallPage({
       : initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine);
   const currentRuntimeTranscriptLine = runtimeTranscriptLines[activeRuntimeTranscriptLineIndex] ?? "";
   const runtimeTranscriptComplete =
+    runtimeTranscriptAnimationDisabled ||
     !runtimeTranscriptEnabled ||
     runtimeTranscriptLines.length === 0 ||
     (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
       activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length);
 
   useEffect(() => {
-    if (!runtimeTranscriptEnabled || !runtimeTranscriptCallId) {
+    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId) {
       setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0 });
       return;
     }
@@ -208,11 +211,11 @@ export function CallPage({
         charIndex: initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine),
       };
     });
-  }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptEnabled]);
+  }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptPlaybackEnabled]);
 
   useEffect(() => {
     if (
-      !runtimeTranscriptEnabled ||
+      !runtimeTranscriptPlaybackEnabled ||
       !runtimeTranscriptCallId ||
       runtimeTranscriptLines.length === 0 ||
       activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length
@@ -241,12 +244,12 @@ export function CallPage({
     activeRuntimeTranscriptLineIndex,
     currentRuntimeTranscriptLine.length,
     runtimeTranscriptCallId,
-    runtimeTranscriptEnabled,
+    runtimeTranscriptPlaybackEnabled,
     runtimeTranscriptLines.length,
   ]);
 
   const handleRuntimeTranscriptAdvance = () => {
-    if (!runtimeTranscriptEnabled || !runtimeTranscriptCallId || runtimeTranscriptLines.length === 0) {
+    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId || runtimeTranscriptLines.length === 0) {
       return;
     }
 
@@ -497,15 +500,15 @@ export function CallPage({
               </div>
             </section>
             <section
-              className={`console-screen-block ${runtimeTranscriptEnabled ? "console-call-transcript-interactive" : ""}`}
-              onClick={runtimeTranscriptEnabled ? handleRuntimeTranscriptAdvance : undefined}
-              onKeyDown={runtimeTranscriptEnabled ? handleRuntimeTranscriptKeyDown : undefined}
-              role={runtimeTranscriptEnabled ? "button" : undefined}
-              tabIndex={runtimeTranscriptEnabled ? 0 : undefined}
-              aria-label={runtimeTranscriptEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
+              className={`console-screen-block ${runtimeTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
+              onClick={runtimeTranscriptPlaybackEnabled ? handleRuntimeTranscriptAdvance : undefined}
+              onKeyDown={runtimeTranscriptPlaybackEnabled ? handleRuntimeTranscriptKeyDown : undefined}
+              role={runtimeTranscriptPlaybackEnabled ? "button" : undefined}
+              tabIndex={runtimeTranscriptPlaybackEnabled ? 0 : undefined}
+              aria-label={runtimeTranscriptPlaybackEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
             >
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
-              {runtimeTranscriptEnabled
+              {runtimeTranscriptPlaybackEnabled
                 ? renderRuntimeTranscriptLines({
                     lines: callView.lines,
                     activeCallId: runtimeTranscriptCallId,
@@ -564,6 +567,10 @@ function renderActionButton(action: CallActionOption, callClosed: boolean, onDec
 
 function initialRuntimeTranscriptCharCount(line: string | undefined) {
   return line && line.length > 0 ? 1 : 0;
+}
+
+function isRuntimeTranscriptAnimationDisabled() {
+  return typeof window !== "undefined" && window.localStorage.getItem("stellar-frontier-e2e-disable-animation") === "1";
 }
 
 function renderRuntimeTranscriptLines({
