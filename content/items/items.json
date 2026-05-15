@@ -36,6 +36,61 @@
       "description": "短柄破冰工具，可用于撬开冰层、固定绳索或临时挖掘。",
       "tags": ["tool", "mining"],
       "effects": []
+    },
+    {
+      "itemId": "violet_perfume",
+      "name": "紫罗兰香水",
+      "category": "misc",
+      "stackable": false,
+      "usableInResponse": true,
+      "consumedOnUse": false,
+      "description": "显赫家族定制香水，气味过于精致，不适合野外，却可能在社交、追踪或掩盖气味时派上用场。",
+      "tags": ["scent", "social", "personal"],
+      "effects": []
+    },
+    {
+      "itemId": "monogrammed_handkerchief",
+      "name": "家徽手帕",
+      "category": "misc",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
+      "description": "绣有家族徽记的手帕，爱丽丝嘴上嫌它累赘，却一直没有丢掉。",
+      "tags": ["personal", "social", "clue"],
+      "effects": []
+    },
+    {
+      "itemId": "academy_notebook",
+      "name": "航天学院笔记",
+      "category": "quest",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
+      "description": "记录了航天学院课程、紧急流程和几段被她划掉的家族通讯摘要。",
+      "tags": ["personal", "survey", "clue"],
+      "effects": []
+    },
+    {
+      "itemId": "miners_headlamp",
+      "name": "矿工头灯",
+      "category": "tool",
+      "stackable": false,
+      "usableInResponse": true,
+      "consumedOnUse": false,
+      "description": "旧式矿工头灯，外壳磨损严重，但照明和固定结构仍可靠。",
+      "tags": ["tool", "light", "mining"],
+      "effects": []
+    },
+    {
+      "itemId": "strange_ore_samples",
+      "name": "异星矿石标本袋",
+      "category": "quest",
+      "stackable": false,
+      "usableInResponse": false,
+      "consumedOnUse": false,
+      "description": "西蒙从多个奇怪星球矿井里留下的小石头，成分和纹理都不太正常，他坚称“总有一天能用上”。",
+      "tags": ["mining", "clue", "personal"],
+      "effects": []
     }
   ]
 }
