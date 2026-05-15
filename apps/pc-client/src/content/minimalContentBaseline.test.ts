@@ -33,7 +33,16 @@ describe("minimal content baseline", () => {
       attributes: { physical: 2, agility: 4, intellect: 3, perception: 4, luck: 5 },
     });
 
-    expect(itemDefinitions.map((item) => item.itemId)).toEqual(["repair_kit", "emergency_food", "ice_pick"]);
+    expect(itemDefinitions.map((item) => item.itemId)).toEqual([
+      "repair_kit",
+      "emergency_food",
+      "ice_pick",
+      "violet_perfume",
+      "monogrammed_handkerchief",
+      "academy_notebook",
+      "miners_headlamp",
+      "strange_ore_samples",
+    ]);
     expect(universalActions.map((action) => action.id)).toEqual([
       "universal:move",
       "universal:standby",
