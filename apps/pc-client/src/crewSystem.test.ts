@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   advanceCrewMoveAction,
+  applyMoveSpeedToNewMoveAction,
   createActiveActionFromCrewAction,
   createMovePreview,
   deriveCrewActionViewModel,
+  rescaleActiveMoveAction,
   startCrewMove,
 } from "./crewSystem";
 import { initialCrew, initialTiles } from "./data/gameData";
@@ -134,6 +136,77 @@ describe("crewSystem", () => {
     };
     expect(member.activeAction.durationSeconds).toBe(180);
     expect(member.activeAction.finishTime).toBe(190);
+  });
+
+  it("applies debug movement speed multipliers to move previews", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
+    const member = crewMember("1-1");
+
+    const doubleSpeedPreview = createMovePreview(member, "1-3", tiles, 2);
+    const halfSpeedPreview = createMovePreview(member, "1-3", tiles, 0.5);
+
+    expect(doubleSpeedPreview.steps.map((step) => step.durationSeconds)).toEqual([8, 13]);
+    expect(doubleSpeedPreview.totalDurationSeconds).toBe(21);
+    expect(halfSpeedPreview.steps.map((step) => step.durationSeconds)).toEqual([30, 50]);
+    expect(halfSpeedPreview.totalDurationSeconds).toBe(80);
+  });
+
+  it("combines wounded movement timing with debug speed and keeps a one-second floor", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
+    const wounded = { ...crewMember("1-1"), conditions: ["wounded"] };
+
+    const woundedPreview = createMovePreview(wounded, "1-3", tiles, 4);
+    const fastestPreview = createMovePreview(crewMember("1-1"), "1-2", tiles, 16);
+
+    expect(woundedPreview.steps.map((step) => step.baseDurationSeconds)).toEqual([23, 38]);
+    expect(woundedPreview.steps.map((step) => step.durationSeconds)).toEqual([6, 10]);
+    expect(fastestPreview.steps.map((step) => step.durationSeconds)).toEqual([1]);
+  });
+
+  it("rescales an active move without rolling back completed current-step progress", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原"), tile("1-3", "丘陵")];
+    const member = crewMember("1-1");
+    const preview = createMovePreview(member, "1-3", tiles);
+    const started = startCrewMove(member, preview, tiles, 0);
+
+    const rescaledAction = rescaleActiveMoveAction(started.member, started.action, tiles, 5, 2);
+
+    expect(rescaledAction.duration_seconds).toBe(21);
+    expect(rescaledAction.ends_at).toBe(24);
+    expect(rescaledAction.progress_seconds).toBe(2);
+    expect(rescaledAction.action_params.step_durations_seconds).toEqual([8, 13]);
+    expect(rescaledAction.action_params.step_finish_time).toBe(11);
+
+    const afterFirstStep = advanceCrewMoveAction(started.member, rescaledAction, tiles, [], 11, 2);
+    expect(afterFirstStep.member.currentTile).toBe("1-2");
+    expect(afterFirstStep.arrived).toBe(false);
+
+    const arrived = advanceCrewMoveAction(afterFirstStep.member, afterFirstStep.action, tiles, afterFirstStep.logs, 24, 2);
+    expect(arrived.member.currentTile).toBe("1-3");
+    expect(arrived.arrived).toBe(true);
+  });
+
+  it("scales newly created event move actions with the debug multiplier", () => {
+    const tiles = [tile("1-1", "平原"), tile("1-2", "平原")];
+    const member = crewMember("1-1");
+    const action = crewAction({
+      id: "event-move",
+      source: "event_action_request",
+      from_tile_id: "1-1",
+      target_tile_id: "1-2",
+      path_tile_ids: ["1-2"],
+      started_at: 10,
+      ends_at: 40,
+      duration_seconds: 30,
+    });
+
+    const scaled = applyMoveSpeedToNewMoveAction(member, action, tiles, 2);
+
+    expect(scaled.duration_seconds).toBe(15);
+    expect(scaled.ends_at).toBe(25);
+    expect(scaled.action_params.base_step_durations_seconds).toEqual([30]);
+    expect(scaled.action_params.step_durations_seconds).toEqual([15]);
+    expect(scaled.action_params.debug_move_speed_multiplier).toBe(2);
   });
 
   it("blocks move previews into mountain tiles", () => {

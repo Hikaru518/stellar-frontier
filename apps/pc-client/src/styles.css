@@ -919,6 +919,26 @@ blockquote {
   margin-bottom: 12px;
 }
 
+.debug-number-field {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(120px, 180px);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.debug-number-field input {
+  min-height: 34px;
+  border: 1px solid #77736b;
+  background: #fbf8f0;
+  color: #252a2e;
+  font: inherit;
+  padding: 6px 8px;
+}
+
 .debug-confirm-row {
   border: 1px dashed #9d3d1f;
   background: #f4eadf;

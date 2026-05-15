@@ -89,7 +89,9 @@ export function CallPage({
   const callClosed = Boolean(call?.settled || runtimeCallClosed);
   const canEndCall = callClosed || !isRuntimeContext;
   const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
-  const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
+  const movePreview = member && call?.selectedTargetTileId
+    ? createMovePreview(member, call.selectedTargetTileId, tiles, gameState.debugSettings.crewMoveSpeedMultiplier)
+    : null;
   const crewActionViews = useMemo(
     () =>
       Object.fromEntries(

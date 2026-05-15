@@ -4,10 +4,16 @@ import type { CrewActionState, CrewState, RuntimeCall } from "./events/types";
 import { getTileLocationLabel } from "./mapSystem";
 import { formatDuration, formatGameTime, getRemainingSeconds } from "./timeSystem";
 
+export const DEFAULT_CREW_MOVE_SPEED_MULTIPLIER = 1;
+export const MIN_CREW_MOVE_SPEED_MULTIPLIER = 0.25;
+export const MAX_CREW_MOVE_SPEED_MULTIPLIER = 16;
+export const CREW_MOVE_SPEED_MULTIPLIER_STEP = 0.25;
+
 export interface MoveStepPreview {
   tileId: string;
   coord: string;
   terrain: string;
+  baseDurationSeconds: number;
   durationSeconds: number;
 }
 
@@ -16,6 +22,7 @@ export interface MovePreview {
   reason?: string;
   fromTileId: string;
   targetTileId: string;
+  moveSpeedMultiplier: number;
   route: string[];
   steps: MoveStepPreview[];
   totalDurationSeconds: number;
@@ -68,38 +75,55 @@ export interface MoveActionSettlement {
   arrived: boolean;
 }
 
-export function createMovePreview(member: CrewMember, targetTileId: string, tiles: MapTile[]): MovePreview {
+export function normalizeCrewMoveSpeedMultiplier(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_CREW_MOVE_SPEED_MULTIPLIER;
+  }
+
+  const stepped = Math.round(value / CREW_MOVE_SPEED_MULTIPLIER_STEP) * CREW_MOVE_SPEED_MULTIPLIER_STEP;
+  return Math.min(MAX_CREW_MOVE_SPEED_MULTIPLIER, Math.max(MIN_CREW_MOVE_SPEED_MULTIPLIER, Number(stepped.toFixed(2))));
+}
+
+export function createMovePreview(
+  member: CrewMember,
+  targetTileId: string,
+  tiles: MapTile[],
+  moveSpeedMultiplier = DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
+): MovePreview {
+  const normalizedMoveSpeedMultiplier = normalizeCrewMoveSpeedMultiplier(moveSpeedMultiplier);
   const fromTileId = member.currentTile;
   const targetTile = getTile(tiles, targetTileId);
 
   if (!targetTile) {
-    return blockedPreview(member, targetTileId, "目标地块不存在。");
+    return blockedPreview(member, targetTileId, "目标地块不存在。", normalizedMoveSpeedMultiplier);
   }
 
   if (member.unavailable || !member.canCommunicate) {
-    return blockedPreview(member, targetTileId, "信号中断，无法下达指令。");
+    return blockedPreview(member, targetTileId, "信号中断，无法下达指令。", normalizedMoveSpeedMultiplier);
   }
 
   if (fromTileId === targetTileId) {
-    return blockedPreview(member, targetTileId, "队员已在此处。");
+    return blockedPreview(member, targetTileId, "队员已在此处。", normalizedMoveSpeedMultiplier);
   }
 
   if (!isTilePassable(targetTile)) {
-    return blockedPreview(member, targetTileId, `当前无法前往 ${targetTile.terrain}。`);
+    return blockedPreview(member, targetTileId, `当前无法前往 ${targetTile.terrain}。`, normalizedMoveSpeedMultiplier);
   }
 
   const route = findRoute(tiles, fromTileId, targetTileId);
   if (route.length === 0) {
-    return blockedPreview(member, targetTileId, "当前路线不可达。");
+    return blockedPreview(member, targetTileId, "当前路线不可达。", normalizedMoveSpeedMultiplier);
   }
 
   const steps = route.map((tileId) => {
     const tile = getTile(tiles, tileId);
-    const durationSeconds = getMoveStepDuration(member, tile);
+    const baseDurationSeconds = getBaseMoveStepDuration(member, tile);
+    const durationSeconds = applyMoveSpeedMultiplier(baseDurationSeconds, normalizedMoveSpeedMultiplier);
     return {
       tileId,
       coord: tile?.coord ?? tileId,
       terrain: tile?.terrain ?? "未知地形",
+      baseDurationSeconds,
       durationSeconds,
     };
   });
@@ -108,6 +132,7 @@ export function createMovePreview(member: CrewMember, targetTileId: string, tile
     canMove: true,
     fromTileId,
     targetTileId,
+    moveSpeedMultiplier: normalizedMoveSpeedMultiplier,
     route,
     steps,
     totalDurationSeconds: steps.reduce((total, step) => total + step.durationSeconds, 0),
@@ -147,7 +172,9 @@ export function startCrewMove(member: CrewMember, preview: MovePreview, tiles: M
       route_step_index: 0,
       step_started_at: elapsedGameSeconds,
       step_finish_time: elapsedGameSeconds + firstStep.durationSeconds,
+      base_step_durations_seconds: preview.steps.map((step) => step.baseDurationSeconds),
       step_durations_seconds: preview.steps.map((step) => step.durationSeconds),
+      debug_move_speed_multiplier: preview.moveSpeedMultiplier,
     },
     can_interrupt: true,
     interrupt_duration_seconds: 10,
@@ -392,16 +419,17 @@ export function advanceCrewMoveAction(
   tiles: MapTile[],
   logs: SystemLog[],
   elapsedGameSeconds: number,
+  moveSpeedMultiplier = DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
 ): MoveActionSettlement {
   if (action.type !== "move" || action.status !== "active") {
     return { member, action, logs, changed: false, arrived: false };
   }
 
   let nextMember = member.activeAction?.id === action.id ? { ...member, activeAction: undefined } : member;
-  let nextAction = hydrateMoveCrewActionRoute(nextMember, action, tiles);
+  let nextAction = hydrateMoveCrewActionRoute(nextMember, action, tiles, moveSpeedMultiplier);
   let nextLogs = logs;
   const route = nextAction.path_tile_ids ?? [];
-  const stepDurations = getMoveActionStepDurations(nextMember, nextAction, tiles);
+  const stepDurations = getMoveActionStepDurations(nextMember, nextAction, tiles, moveSpeedMultiplier);
   let routeStepIndex = readNumberParam(nextAction.action_params.route_step_index) ?? inferRouteStepIndex(nextMember.currentTile, route);
   let stepStartedAt = readNumberParam(nextAction.action_params.step_started_at) ?? nextAction.started_at ?? elapsedGameSeconds;
   let stepFinishTime = readNumberParam(nextAction.action_params.step_finish_time) ?? stepStartedAt + (stepDurations[routeStepIndex] ?? 0);
@@ -465,7 +493,7 @@ export function advanceCrewMoveAction(
     }
 
     stepStartedAt = stepFinishTime;
-    stepFinishTime = stepStartedAt + (stepDurations[routeStepIndex] ?? getMoveStepDuration(nextMember, getTile(tiles, route[routeStepIndex])));
+    stepFinishTime = stepStartedAt + (stepDurations[routeStepIndex] ?? getMoveStepDuration(nextMember, getTile(tiles, route[routeStepIndex]), moveSpeedMultiplier));
     nextAction = {
       ...nextAction,
       progress_seconds: Math.min(nextAction.duration_seconds, Math.max(0, elapsedGameSeconds - (nextAction.started_at ?? elapsedGameSeconds))),
@@ -513,7 +541,12 @@ export function hydrateMoveActionRoute(member: CrewMember, tiles: MapTile[], _el
   };
 }
 
-function hydrateMoveCrewActionRoute(member: CrewMember, action: CrewActionState, tiles: MapTile[]): CrewActionState {
+function hydrateMoveCrewActionRoute(
+  member: CrewMember,
+  action: CrewActionState,
+  tiles: MapTile[],
+  moveSpeedMultiplier = DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
+): CrewActionState {
   if (action.type !== "move" || action.status !== "active") {
     return action;
   }
@@ -534,7 +567,9 @@ function hydrateMoveCrewActionRoute(member: CrewMember, action: CrewActionState,
     return action;
   }
 
-  const stepDurations = hydratedRoute.map((tileId) => getMoveStepDuration(member, getTile(tiles, tileId)));
+  const routedAction = { ...action, path_tile_ids: hydratedRoute };
+  const baseStepDurations = getMoveActionBaseStepDurations(member, routedAction, tiles);
+  const stepDurations = baseStepDurations.map((duration) => applyMoveSpeedMultiplier(duration, moveSpeedMultiplier));
   const stepStartedAt = readNumberParam(action.action_params.step_started_at) ?? action.started_at ?? 0;
   return {
     ...action,
@@ -546,7 +581,105 @@ function hydrateMoveCrewActionRoute(member: CrewMember, action: CrewActionState,
       route_step_index: 0,
       step_started_at: stepStartedAt,
       step_finish_time: stepStartedAt + (stepDurations[0] ?? 0),
+      base_step_durations_seconds: baseStepDurations,
       step_durations_seconds: stepDurations,
+      debug_move_speed_multiplier: normalizeCrewMoveSpeedMultiplier(moveSpeedMultiplier),
+    },
+  };
+}
+
+export function applyMoveSpeedToNewMoveAction(
+  member: CrewMember,
+  action: CrewActionState,
+  tiles: MapTile[],
+  moveSpeedMultiplier: number,
+): CrewActionState {
+  if (action.type !== "move") {
+    return action;
+  }
+
+  const normalizedMoveSpeedMultiplier = normalizeCrewMoveSpeedMultiplier(moveSpeedMultiplier);
+  const hydrated = hydrateMoveCrewActionRoute(member, action, tiles, normalizedMoveSpeedMultiplier);
+  const route = hydrated.path_tile_ids ?? [];
+  if (route.length === 0) {
+    return hydrated;
+  }
+
+  const baseStepDurations = getMoveActionBaseStepDurations(member, hydrated, tiles);
+  const stepDurations = baseStepDurations.map((duration) => applyMoveSpeedMultiplier(duration, normalizedMoveSpeedMultiplier));
+  const totalDurationSeconds = sumDurations(stepDurations);
+  const startedAt = hydrated.started_at ?? 0;
+  const routeStepIndex = readNumberParam(hydrated.action_params.route_step_index) ?? inferRouteStepIndex(member.currentTile, route);
+  const boundedStepIndex = Math.min(Math.max(0, routeStepIndex), Math.max(0, route.length - 1));
+  const stepStartedAt = readNumberParam(hydrated.action_params.step_started_at) ?? startedAt;
+
+  return {
+    ...hydrated,
+    duration_seconds: totalDurationSeconds,
+    ends_at: startedAt + totalDurationSeconds,
+    progress_seconds: 0,
+    action_params: {
+      ...hydrated.action_params,
+      route_step_index: routeStepIndex,
+      step_started_at: stepStartedAt,
+      step_finish_time: stepStartedAt + (stepDurations[boundedStepIndex] ?? 0),
+      base_step_durations_seconds: baseStepDurations,
+      step_durations_seconds: stepDurations,
+      debug_move_speed_multiplier: normalizedMoveSpeedMultiplier,
+    },
+  };
+}
+
+export function rescaleActiveMoveAction(
+  member: CrewMember,
+  action: CrewActionState,
+  tiles: MapTile[],
+  elapsedGameSeconds: number,
+  moveSpeedMultiplier: number,
+): CrewActionState {
+  if (action.type !== "move" || action.status !== "active") {
+    return action;
+  }
+
+  const normalizedMoveSpeedMultiplier = normalizeCrewMoveSpeedMultiplier(moveSpeedMultiplier);
+  const hydrated = hydrateMoveCrewActionRoute(member, action, tiles, normalizedMoveSpeedMultiplier);
+  const route = hydrated.path_tile_ids ?? [];
+  if (route.length === 0) {
+    return hydrated;
+  }
+
+  const baseStepDurations = getMoveActionBaseStepDurations(member, hydrated, tiles);
+  const stepDurations = baseStepDurations.map((duration) => applyMoveSpeedMultiplier(duration, normalizedMoveSpeedMultiplier));
+  const previousStepDurations = getMoveActionStepDurations(member, hydrated, tiles, normalizedMoveSpeedMultiplier);
+  const routeStepIndex = readNumberParam(hydrated.action_params.route_step_index) ?? inferRouteStepIndex(member.currentTile, route);
+  const boundedStepIndex = Math.min(Math.max(0, routeStepIndex), Math.max(0, route.length - 1));
+  const previousCurrentStepDuration = previousStepDurations[boundedStepIndex] ?? stepDurations[boundedStepIndex] ?? 0;
+  const previousStepStartedAt = readNumberParam(hydrated.action_params.step_started_at) ?? hydrated.started_at ?? elapsedGameSeconds;
+  const elapsedInCurrentStep = Math.min(Math.max(0, elapsedGameSeconds - previousStepStartedAt), previousCurrentStepDuration);
+  const currentStepProgressRatio = previousCurrentStepDuration > 0 ? elapsedInCurrentStep / previousCurrentStepDuration : 0;
+  const currentStepDuration = stepDurations[boundedStepIndex] ?? 0;
+  const remainingCurrentStepSeconds = Math.max(0, Math.ceil(currentStepDuration * (1 - currentStepProgressRatio)));
+  const completedCurrentStepSeconds = Math.max(0, currentStepDuration - remainingCurrentStepSeconds);
+  const stepStartedAt = elapsedGameSeconds - completedCurrentStepSeconds;
+  const stepFinishTime = elapsedGameSeconds + remainingCurrentStepSeconds;
+  const remainingFutureStepSeconds = sumDurations(stepDurations.slice(boundedStepIndex + 1));
+  const totalDurationSeconds = sumDurations(stepDurations);
+  const remainingDurationSeconds = remainingCurrentStepSeconds + remainingFutureStepSeconds;
+  const progressSeconds = Math.min(totalDurationSeconds, Math.max(0, totalDurationSeconds - remainingDurationSeconds));
+
+  return {
+    ...hydrated,
+    duration_seconds: totalDurationSeconds,
+    ends_at: elapsedGameSeconds + remainingDurationSeconds,
+    progress_seconds: progressSeconds,
+    action_params: {
+      ...hydrated.action_params,
+      route_step_index: routeStepIndex,
+      step_started_at: stepStartedAt,
+      step_finish_time: stepFinishTime,
+      base_step_durations_seconds: baseStepDurations,
+      step_durations_seconds: stepDurations,
+      debug_move_speed_multiplier: normalizedMoveSpeedMultiplier,
     },
   };
 }
@@ -707,16 +840,38 @@ function getTerrainMoveCost(tile: MapTile) {
   return 15;
 }
 
-function getMoveStepDuration(member: CrewMember, tile?: MapTile) {
+function getBaseMoveStepDuration(member: CrewMember, tile?: MapTile) {
   const baseDuration = tile ? getTerrainMoveCost(tile) : 15;
   return Math.ceil(member.conditions.includes("wounded") ? baseDuration * 1.5 : baseDuration);
 }
 
-function getMoveActionStepDurations(member: CrewMember, action: CrewActionState, tiles: MapTile[]) {
+function getMoveStepDuration(
+  member: CrewMember,
+  tile?: MapTile,
+  moveSpeedMultiplier = DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
+) {
+  return applyMoveSpeedMultiplier(getBaseMoveStepDuration(member, tile), moveSpeedMultiplier);
+}
+
+function applyMoveSpeedMultiplier(durationSeconds: number, moveSpeedMultiplier: number) {
+  if (durationSeconds <= 0) {
+    return 0;
+  }
+
+  return Math.max(1, Math.ceil(durationSeconds / normalizeCrewMoveSpeedMultiplier(moveSpeedMultiplier)));
+}
+
+function getMoveActionBaseStepDurations(member: CrewMember, action: CrewActionState, tiles: MapTile[]) {
   const route = action.path_tile_ids ?? [];
+  const configuredBase = readNumberArray(action.action_params.base_step_durations_seconds);
+  if (configuredBase.length === route.length) {
+    return configuredBase;
+  }
+
   const configured = readNumberArray(action.action_params.step_durations_seconds);
-  if (configured.length === route.length) {
-    return configured;
+  const configuredMultiplier = readNumberParam(action.action_params.debug_move_speed_multiplier);
+  if (configured.length === route.length && configuredMultiplier !== undefined) {
+    return configured.map((duration) => duration * configuredMultiplier);
   }
 
   if (route.length > 0 && action.duration_seconds > 0 && action.source === "event_action_request") {
@@ -724,7 +879,26 @@ function getMoveActionStepDurations(member: CrewMember, action: CrewActionState,
     return route.map(() => perStepDuration);
   }
 
-  return route.map((tileId) => getMoveStepDuration(member, getTile(tiles, tileId)));
+  if (configured.length === route.length) {
+    return configured;
+  }
+
+  return route.map((tileId) => getBaseMoveStepDuration(member, getTile(tiles, tileId)));
+}
+
+function getMoveActionStepDurations(
+  member: CrewMember,
+  action: CrewActionState,
+  tiles: MapTile[],
+  moveSpeedMultiplier = DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
+) {
+  const route = action.path_tile_ids ?? [];
+  const configured = readNumberArray(action.action_params.step_durations_seconds);
+  if (configured.length === route.length) {
+    return configured;
+  }
+
+  return getMoveActionBaseStepDurations(member, action, tiles).map((duration) => applyMoveSpeedMultiplier(duration, moveSpeedMultiplier));
 }
 
 function inferRouteStepIndex(currentTileId: string, route: string[]) {
@@ -738,6 +912,10 @@ function readNumberParam(value: unknown): number | undefined {
 
 function readNumberArray(value: unknown): number[] {
   return Array.isArray(value) ? value.filter((item): item is number => typeof item === "number" && Number.isFinite(item)) : [];
+}
+
+function sumDurations(durations: number[]) {
+  return durations.reduce((total, duration) => total + duration, 0);
 }
 
 export function isTilePassable(tile: MapTile) {
@@ -956,12 +1134,13 @@ function getTile(tiles: MapTile[], tileId: string) {
   return tiles.find((tile) => tile.id === tileId);
 }
 
-function blockedPreview(member: CrewMember, targetTileId: string, reason: string): MovePreview {
+function blockedPreview(member: CrewMember, targetTileId: string, reason: string, moveSpeedMultiplier = DEFAULT_CREW_MOVE_SPEED_MULTIPLIER): MovePreview {
   return {
     canMove: false,
     reason,
     fromTileId: member.currentTile,
     targetTileId,
+    moveSpeedMultiplier,
     route: [],
     steps: [],
     totalDurationSeconds: 0,

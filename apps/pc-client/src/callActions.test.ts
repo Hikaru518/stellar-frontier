@@ -101,6 +101,7 @@ function createGameState(overrides: Partial<GameState> = {}): GameState {
     rng_state: null,
     quest_state: createInitialQuestState(questDefinitions, 0),
     ...overrides,
+    debugSettings: overrides.debugSettings ?? { crewMoveSpeedMultiplier: 1 },
   };
 }
 

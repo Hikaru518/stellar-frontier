@@ -8,7 +8,17 @@ import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage, type MapLayerVisibility, type Ma
 import { TaskPage } from "./pages/TaskPage";
 import { QuestSidebar } from "./components/QuestSidebar";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
-import { advanceCrewMoveAction, createMovePreview, normalizeCrewMember, startCrewMove, syncTileCrew } from "./crewSystem";
+import {
+  advanceCrewMoveAction,
+  applyMoveSpeedToNewMoveAction,
+  createMovePreview,
+  DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
+  normalizeCrewMember,
+  normalizeCrewMoveSpeedMultiplier,
+  rescaleActiveMoveAction,
+  startCrewMove,
+  syncTileCrew,
+} from "./crewSystem";
 import { appendDiaryEntry } from "./diarySystem";
 import {
   defaultMapConfig,
@@ -49,6 +59,7 @@ import {
   type ActiveAction,
   type CallContext,
   type CrewId,
+  type DebugSettings,
   type GameState,
   type CrewMember,
   type GameMapState,
@@ -494,6 +505,11 @@ function App() {
     setDebugOpen(false);
   }
 
+  function setCrewMoveSpeedMultiplier(value: number) {
+    const multiplier = normalizeCrewMoveSpeedMultiplier(value);
+    setGameState((state) => applyDebugCrewMoveSpeedMultiplier(state, multiplier));
+  }
+
   function regenerateMobilePairingSession() {
     setMobilePairingSession(createPhoneTerminalPairingSession());
     lastAcceptedPhoneSequenceRef.current = 0;
@@ -860,7 +876,7 @@ function App() {
         };
       }
 
-      const preview = createMovePreview(member, targetTileId, state.tiles);
+      const preview = createMovePreview(member, targetTileId, state.tiles, state.debugSettings.crewMoveSpeedMultiplier);
       if (!preview.canMove) {
         return {
           ...state,
@@ -1066,7 +1082,9 @@ function App() {
       {debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
+          crewMoveSpeedMultiplier={gameState.debugSettings.crewMoveSpeedMultiplier}
           onSetTimeMultiplier={setTimeMultiplier}
+          onSetCrewMoveSpeedMultiplier={setCrewMoveSpeedMultiplier}
           onResetGame={resetGame}
           onClose={() => setDebugOpen(false)}
         />
@@ -1101,6 +1119,7 @@ function createInitialGameState(): GameState {
       schema_version: GAME_SAVE_SCHEMA_VERSION,
       created_at_real_time: saved.created_at_real_time ?? now,
       updated_at_real_time: now,
+      debugSettings: normalizeDebugSettings(saved.debugSettings),
       crew: crewWithNewDefaults,
       baseInventory: Array.isArray(saved.baseInventory)
         ? saved.baseInventory
@@ -1127,6 +1146,7 @@ function createInitialGameState(): GameState {
     created_at_real_time: now,
     updated_at_real_time: now,
     elapsedGameSeconds: 0,
+    debugSettings: createDefaultDebugSettings(),
     crew: initialCrew,
     baseInventory: createBaseInventoryFromResources(initialResources),
     map,
@@ -1168,6 +1188,56 @@ function isSavedBaselineCompatible(saved: SavedGameState) {
   }
 
   return saved.map.configId === defaultMapConfig.id && saved.map.configVersion === defaultMapConfig.version;
+}
+
+function createDefaultDebugSettings(): DebugSettings {
+  return {
+    crewMoveSpeedMultiplier: DEFAULT_CREW_MOVE_SPEED_MULTIPLIER,
+  };
+}
+
+function normalizeDebugSettings(debugSettings: unknown): DebugSettings {
+  const settings = debugSettings && typeof debugSettings === "object" ? (debugSettings as Partial<DebugSettings>) : {};
+  return {
+    crewMoveSpeedMultiplier: normalizeCrewMoveSpeedMultiplier(settings.crewMoveSpeedMultiplier),
+  };
+}
+
+function applyDebugCrewMoveSpeedMultiplier(state: GameState, multiplier: number): GameState {
+  const normalizedMultiplier = normalizeCrewMoveSpeedMultiplier(multiplier);
+  let crewActions = state.crew_actions;
+  let changed = false;
+
+  for (const member of state.crew) {
+    const activeMoveAction = selectActiveCrewActionForCrew(crewActions, member.id, "move");
+    if (!activeMoveAction) {
+      continue;
+    }
+
+    const rescaledAction = rescaleActiveMoveAction(member, activeMoveAction, state.tiles, state.elapsedGameSeconds, normalizedMultiplier);
+    if (rescaledAction !== activeMoveAction) {
+      crewActions = {
+        ...crewActions,
+        [activeMoveAction.id]: rescaledAction,
+      };
+      changed = true;
+    }
+  }
+
+  const debugSettings = {
+    ...normalizeDebugSettings(state.debugSettings),
+    crewMoveSpeedMultiplier: normalizedMultiplier,
+  };
+
+  if (!changed && state.debugSettings?.crewMoveSpeedMultiplier === normalizedMultiplier) {
+    return state;
+  }
+
+  return {
+    ...state,
+    debugSettings,
+    crew_actions: crewActions,
+  };
 }
 
 function getMoveTargetSelectionLabel(map: GameMapState, tileId: string) {
@@ -1432,7 +1502,7 @@ function settleGameTime(state: GameState): GameState {
     const activeMoveAction = selectActiveCrewActionForCrew(crewActions, member.id, "move");
 
     if (activeMoveAction) {
-      const settled = advanceCrewMoveAction(member, activeMoveAction, tiles, logs, state.elapsedGameSeconds);
+      const settled = advanceCrewMoveAction(member, activeMoveAction, tiles, logs, state.elapsedGameSeconds, state.debugSettings.crewMoveSpeedMultiplier);
       nextMember = settled.member;
       logs = settled.logs;
       crewActions = {
@@ -2320,10 +2390,11 @@ export function toEventEngineState(state: GameState): GraphRunnerGameState {
 }
 
 export function mergeEventRuntimeState(state: GameState, eventState: GraphRunnerGameState): GameState {
-  const views = syncEventRuntimeToViews(state, eventState);
-  const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventState);
-  const eventMap = (eventState as GraphRunnerGameState & { map?: GameMapState }).map;
-  const worldFlags = withReturnHomeCompletionTime(state, eventState.world_flags);
+  const eventStateWithMoveSpeed = applyMoveSpeedToNewEventMoveActions(state, eventState);
+  const views = syncEventRuntimeToViews(state, eventStateWithMoveSpeed);
+  const bridged = bridgeCrewActions({ ...state, crew: views.crew }, eventStateWithMoveSpeed);
+  const eventMap = (eventStateWithMoveSpeed as GraphRunnerGameState & { map?: GameMapState }).map;
+  const worldFlags = withReturnHomeCompletionTime(state, eventStateWithMoveSpeed.world_flags);
 
   return {
     ...state,
@@ -2333,17 +2404,45 @@ export function mergeEventRuntimeState(state: GameState, eventState: GraphRunner
     map: eventMap ?? state.map,
     tiles: views.tiles,
     logs: bridged.logs,
-    active_events: eventState.active_events,
-    active_calls: eventState.active_calls,
-    objectives: eventState.objectives,
-    event_logs: eventState.event_logs,
-    world_history: eventState.world_history,
+    active_events: eventStateWithMoveSpeed.active_events,
+    active_calls: eventStateWithMoveSpeed.active_calls,
+    objectives: eventStateWithMoveSpeed.objectives,
+    event_logs: eventStateWithMoveSpeed.event_logs,
+    world_history: eventStateWithMoveSpeed.world_history,
     world_flags: worldFlags,
-    quest_state: eventState.quest_state ?? state.quest_state,
-    crew_actions: eventState.crew_actions,
-    inventories: eventState.inventories,
-    rng_state: eventState.rng_state,
+    quest_state: eventStateWithMoveSpeed.quest_state ?? state.quest_state,
+    crew_actions: eventStateWithMoveSpeed.crew_actions,
+    inventories: eventStateWithMoveSpeed.inventories,
+    rng_state: eventStateWithMoveSpeed.rng_state,
   };
+}
+
+function applyMoveSpeedToNewEventMoveActions(state: GameState, eventState: GraphRunnerGameState): GraphRunnerGameState {
+  const moveSpeedMultiplier = normalizeDebugSettings(state.debugSettings).crewMoveSpeedMultiplier;
+  let crewActions = eventState.crew_actions;
+  let changed = false;
+
+  for (const [actionId, action] of Object.entries(eventState.crew_actions)) {
+    if (state.crew_actions[actionId] || action.type !== "move" || action.status !== "active") {
+      continue;
+    }
+
+    const member = state.crew.find((item) => item.id === action.crew_id);
+    if (!member) {
+      continue;
+    }
+
+    const scaledAction = applyMoveSpeedToNewMoveAction(member, action, state.tiles, moveSpeedMultiplier);
+    if (scaledAction !== action) {
+      crewActions = {
+        ...crewActions,
+        [actionId]: scaledAction,
+      };
+      changed = true;
+    }
+  }
+
+  return changed ? { ...eventState, crew_actions: crewActions } : eventState;
 }
 
 function withReturnHomeCompletionTime(state: GameState, worldFlags: GameState["world_flags"]): GameState["world_flags"] {

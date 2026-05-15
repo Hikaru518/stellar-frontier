@@ -173,12 +173,33 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "[DEBUG]" }));
 
     const dialog = screen.getByRole("dialog", { name: "Debug toolbox / 作弊菜单" });
+    const timeGroup = within(dialog).getByRole("group", { name: "时间倍率" });
+    const moveSpeedGroup = within(dialog).getByRole("group", { name: "队员移动速度" });
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "1x" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "2x" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "4x" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "8x" })).toBeInTheDocument();
+    expect(within(timeGroup).getByRole("button", { name: "1x" })).toBeInTheDocument();
+    expect(within(timeGroup).getByRole("button", { name: "2x" })).toBeInTheDocument();
+    expect(within(timeGroup).getByRole("button", { name: "4x" })).toBeInTheDocument();
+    expect(within(timeGroup).getByRole("button", { name: "8x" })).toBeInTheDocument();
+    expect(within(moveSpeedGroup).getByRole("button", { name: "0.25x" })).toBeInTheDocument();
+    expect(within(moveSpeedGroup).getByRole("button", { name: "16x" })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("自定义队员移动速度")).toHaveValue(1);
     expect(within(dialog).getByRole("button", { name: "重置存档" })).toBeInTheDocument();
+  });
+
+  it("saves debug crew move speed multiplier and reset restores the default", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "[DEBUG]" }));
+    const dialog = screen.getByRole("dialog", { name: "Debug toolbox / 作弊菜单" });
+    const moveSpeedGroup = within(dialog).getByRole("group", { name: "队员移动速度" });
+    fireEvent.click(within(moveSpeedGroup).getByRole("button", { name: "4x" }));
+
+    expect(readSavedState()?.debugSettings).toMatchObject({ crewMoveSpeedMultiplier: 4 });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "重置存档" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认重置" }));
+
+    expect(readSavedState()?.debugSettings).toMatchObject({ crewMoveSpeedMultiplier: 1 });
   });
 
   it("keeps the debug entry available after page navigation", () => {
@@ -1240,6 +1261,7 @@ function createCompatibleSavedGameState(state: Record<string, unknown>) {
     schema_version: GAME_SAVE_SCHEMA_VERSION,
     created_at_real_time: "2026-04-27T00:00:00.000Z",
     updated_at_real_time: "2026-04-27T00:00:00.000Z",
+    debugSettings: { crewMoveSpeedMultiplier: 1 },
     map: createInitialMapState(),
     ...createEmptyEventRuntimeState(),
     quest_state: createInitialQuestState(questDefinitions, 0),
