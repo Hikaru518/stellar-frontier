@@ -280,7 +280,7 @@ describe("App", () => {
   });
 
   it("bridges the scavenger signal-lost condition into temporary crew contact loss", () => {
-    const state = createSavedCrashSiteState() as GameState;
+    const state = createSavedCrashSiteState() as unknown as GameState;
     const lostEventState = toEventEngineState(state);
     lostEventState.crew.mike = {
       ...lostEventState.crew.mike,
