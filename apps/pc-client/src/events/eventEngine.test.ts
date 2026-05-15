@@ -249,6 +249,90 @@ describe("event engine trigger intake", () => {
     });
   });
 
+  it("starts the authored scavenger camp outer discovery call on observation-zone arrival", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const triggerTiles = ["93-115", "93-116", "93-117", "94-115", "94-116", "94-117"];
+
+    for (const tileId of triggerTiles) {
+      const started = processTrigger({
+        state: createAuthoredScavengerCampState(tileId),
+        index: indexResult.index,
+        context: scavengerArrivalContext(tileId, 11880),
+      });
+      const callId = started.event?.active_call_id ?? "";
+      const callText = started.state.active_calls[callId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+
+      expect(started.errors).toEqual([]);
+      expect(started.candidate_report?.selected_event_definition_ids).toEqual(["iafs_scavenger_camp_outer_discovery"]);
+      expect(callText).toContain("拾荒者住出来的地方");
+      expect(callText).toContain("旧舱板、岩片和遮风布");
+      expect(started.state.active_calls[callId]?.available_options.map((option) => option.option_id)).toEqual([
+        "opt_approach",
+        "opt_standby",
+      ]);
+    }
+  });
+
+  it("starts moving toward the sentry line after the authored scavenger camp approach choice", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredScavengerCampState("93-116"),
+      index: indexResult.index,
+      context: scavengerArrivalContext("93-116", 11880),
+    });
+    const callId = started.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "opt_approach",
+      occurred_at: 11895,
+    });
+    const moveAction = ended.state.crew_actions.iafs_scavenger_outer_approach_move;
+
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(ended.event?.result_key).toBe("scavenger_outer_approach");
+    expect(ended.state.world_flags.iafs_scavenger_outer_discovery_choice?.value).toBe("approach");
+    expect(moveAction).toMatchObject({
+      id: "iafs_scavenger_outer_approach_move",
+      crew_id: "mike",
+      type: "move",
+      status: "active",
+      target_tile_id: "92-116",
+      duration_seconds: 30,
+      action_params: { intent: "approach_scavenger_sentry_line" },
+    });
+    expect(ended.state.crew.mike.current_action_id).toBe("iafs_scavenger_outer_approach_move");
+  });
+
+  it("records the authored scavenger camp standby choice without starting movement", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredScavengerCampState("93-116"),
+      index: indexResult.index,
+      context: scavengerArrivalContext("93-116", 11880),
+    });
+    const callId = started.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "opt_standby",
+      occurred_at: 11895,
+    });
+
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(ended.event?.result_key).toBe("scavenger_outer_standby");
+    expect(ended.state.world_flags.iafs_scavenger_outer_discovery_choice?.value).toBe("standby");
+    expect(ended.state.crew_actions).toEqual({});
+    expect(ended.state.crew.mike.current_action_id).toBeNull();
+  });
+
   it("starts the authored scavenger camp sentry call on outer-line arrival", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
@@ -262,10 +346,15 @@ describe("event engine trigger intake", () => {
       });
       const callId = started.event?.active_call_id ?? "";
       const call = started.state.active_calls[callId];
+      const callText = call?.rendered_lines.map((line) => line.text).join(" ") ?? "";
 
       expect(started.errors).toEqual([]);
       expect(started.candidate_report?.selected_event_definition_ids).toEqual(["iafs_scavenger_sentry_line_contact"]);
-      expect(call?.rendered_lines[0]?.text).toContain("站住。线外说话，手别乱动。");
+      expect(callText).toContain("灰白包巾");
+      expect(callText).toContain("管枪式自制武器");
+      expect(callText).toContain("先别急，我看得见他的手");
+      expect(callText).toContain("不要紧指挥官，我现在隐藏地很好。啊……！");
+      expect(callText).toContain("（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）站住！线外说话，手别乱动。");
       expect(call?.available_options.map((option) => option.option_id)).toEqual([
         "opt_observe",
         "opt_threaten",
@@ -275,12 +364,84 @@ describe("event engine trigger intake", () => {
     }
   });
 
-  it("records the authored scavenger camp opening choice for follow-up events", () => {
+  it("routes the authored scavenger camp observe choice through eavesdropping", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredScavengerCampState("92-116"),
+      index: indexResult.index,
+      context: scavengerArrivalContext("92-116", 12000),
+    });
+    const challengeCallId = started.event?.active_call_id ?? "";
+    const eavesdrop = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: challengeCallId,
+      option_id: "opt_observe",
+      occurred_at: 12015,
+    });
+    const eavesdropCallId = eavesdrop.event?.active_call_id ?? "";
+    const eavesdropText = eavesdrop.state.active_calls[eavesdropCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+    const ended = selectCallOption({
+      state: eavesdrop.state,
+      index: indexResult.index,
+      call_id: eavesdropCallId,
+      option_id: "ack_observe",
+      occurred_at: 12025,
+    });
+
+    expect(eavesdrop.errors).toEqual([]);
+    expect(eavesdrop.event?.current_node_id).toBe("observe_eavesdrop");
+    expect(eavesdropText).toContain("霜湾的人不能再留在后帐");
+    expect(eavesdropText).toContain("烬炉的人不会认账");
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(ended.event?.result_key).toBe("scavenger_sentry_observed");
+    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("observe");
+  });
+
+  it("routes the authored scavenger camp threat choice into temporary contact loss", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredScavengerCampState("92-116"),
+      index: indexResult.index,
+      context: scavengerArrivalContext("92-116", 12000),
+    });
+    const challengeCallId = started.event?.active_call_id ?? "";
+    const backlash = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: challengeCallId,
+      option_id: "opt_threaten",
+      occurred_at: 12015,
+    });
+    const backlashCallId = backlash.event?.active_call_id ?? "";
+    const backlashText = backlash.state.active_calls[backlashCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+    const ended = selectCallOption({
+      state: backlash.state,
+      index: indexResult.index,
+      call_id: backlashCallId,
+      option_id: "ack_threaten",
+      occurred_at: 12025,
+    });
+
+    expect(backlash.errors).toEqual([]);
+    expect(backlash.event?.current_node_id).toBe("threaten_backlash");
+    expect(backlashText).toContain("那人是来压线的");
+    expect(backlashText).toContain("别让这路信号继续往外传");
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(ended.event?.result_key).toBe("scavenger_sentry_threatened_contact_lost");
+    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("threaten");
+    expect(ended.state.world_flags.iafs_scavenger_contact_lost?.value).toBe(true);
+    expect(ended.state.crew.mike.condition_tags).toContain("iafs_scavenger_signal_lost");
+  });
+
+  it("records the authored scavenger camp negotiate and chat opening choices", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const choices = [
-      ["opt_observe", "scavenger_sentry_observed", "observe"],
-      ["opt_threaten", "scavenger_sentry_threatened", "threaten"],
       ["opt_negotiate", "scavenger_sentry_negotiated", "negotiate"],
       ["opt_chat", "scavenger_sentry_chatted", "chat"],
     ] as const;

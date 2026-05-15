@@ -7,7 +7,7 @@ import { createInitialMapState, initialCrew, initialLogs, initialTiles, resource
 import { evaluateCondition } from "./events/conditions";
 import { executeEffects } from "./events/effects";
 import { processTrigger } from "./events/eventEngine";
-import { createEmptyEventRuntimeState, type CrewActionState, type Effect } from "./events/types";
+import { createEmptyEventRuntimeState, type CrewActionState, type Effect, type RuntimeCall } from "./events/types";
 import { GAME_SAVE_KEY, GAME_SAVE_SCHEMA_VERSION, GAME_SAVE_VERSION, LEGACY_GAME_SAVE_KEY } from "./timeSystem";
 import { createInitialQuestState, type QuestRuntimeState } from "./questSystem";
 import { CallPage } from "./pages/CallPage";
@@ -159,6 +159,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
+    advanceRuntimeTranscript();
 
     expect(screen.getByRole("button", { name: "我们会带你回家。先稳住，把眼前的情况说清楚。" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "结束通话" })).toBeNull();
@@ -255,6 +256,43 @@ describe("App", () => {
       status: "awaiting_choice",
     });
     expect(saved.tiles).toBeUndefined();
+  });
+
+  it("bridges the scavenger signal-lost condition into temporary crew contact loss", () => {
+    const state = createSavedCrashSiteState() as GameState;
+    const lostEventState = toEventEngineState(state);
+    lostEventState.crew.mike = {
+      ...lostEventState.crew.mike,
+      condition_tags: [...lostEventState.crew.mike.condition_tags, "iafs_scavenger_signal_lost"],
+    };
+
+    const lostState = mergeEventRuntimeState(state, lostEventState);
+    const lostMike = lostState.crew.find((member) => member.id === "mike");
+
+    expect(lostMike).toMatchObject({
+      canCommunicate: false,
+      unavailable: false,
+      status: "失联。最后信号停在拾荒营地哨线。",
+      statusTone: "danger",
+    });
+    expect(lostMike?.conditions).toContain("iafs_scavenger_signal_lost");
+
+    const restoredEventState = toEventEngineState(lostState);
+    restoredEventState.crew.mike = {
+      ...restoredEventState.crew.mike,
+      condition_tags: restoredEventState.crew.mike.condition_tags.filter((condition) => condition !== "iafs_scavenger_signal_lost"),
+    };
+
+    const restoredState = mergeEventRuntimeState(lostState, restoredEventState);
+    const restoredMike = restoredState.crew.find((member) => member.id === "mike");
+
+    expect(restoredMike).toMatchObject({
+      canCommunicate: true,
+      unavailable: false,
+      status: "待命中。",
+      statusTone: "muted",
+    });
+    expect(restoredMike?.conditions).not.toContain("iafs_scavenger_signal_lost");
   });
 
   it("migrates legacy map object status into matching feature runtime state", () => {
@@ -576,6 +614,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+    advanceRuntimeTranscript();
 
     expect(screen.getByText(/外壳撕裂/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
@@ -603,6 +642,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
     fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+    advanceRuntimeTranscript();
 
     expect(screen.getByText(/供电回路已恢复稳定/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
@@ -646,6 +686,7 @@ describe("App", () => {
     });
 
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
+    advanceRuntimeTranscript();
     expect(screen.getByText(/这里还有几套能辨认出来的关键设施/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "标记这些可用设施。" }));
 
@@ -852,6 +893,115 @@ describe("App", () => {
     expect(confirmButton).not.toHaveTextContent(targetFeature.name);
     expect(screen.queryByText(targetFeature.name)).toBeNull();
   });
+
+  it("plays runtime call transcript lines before showing event options", () => {
+    vi.useFakeTimers();
+    try {
+      const member = createCallPageCrewMember("mike", "2-3");
+      const map = createMapWithDiscoveredTiles("2-3");
+      const gameState = createCallPageGameState(member, map);
+      const onDecision = vi.fn();
+      const runtimeCall = createRuntimeCall({
+        id: "runtime-call-vn",
+        crew_id: member.id,
+        status: "connected",
+        connected_at: 0,
+        rendered_lines: [runtimeLine("第一行通讯。", member.id), runtimeLine("后续信号。", member.id)],
+        available_options: [
+          {
+            option_id: "acknowledge",
+            template_variant_id: "acknowledge-default",
+            text: "收到。",
+            is_default: true,
+          },
+        ],
+      }) as RuntimeCall;
+
+      render(
+        <CallPage
+          call={{ crewId: member.id, type: "normal", settled: false, runtimeCallId: runtimeCall.id }}
+          crew={[member]}
+          tiles={initialTiles}
+          activeCalls={{ [runtimeCall.id]: runtimeCall }}
+          elapsedGameSeconds={0}
+          gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+          hasQuestUpdates={false}
+          gameState={gameState}
+          logs={initialLogs}
+          onDecision={onDecision}
+          onEndCall={vi.fn()}
+          onConfirmMove={vi.fn()}
+          onClearMoveTarget={vi.fn()}
+          onOpenMap={vi.fn()}
+          onOpenControl={vi.fn()}
+          onOpenTask={vi.fn()}
+          onStartCall={vi.fn()}
+          onShowCrewStatus={vi.fn()}
+          onShowCrewInventory={vi.fn()}
+        />,
+      );
+
+      const transcript = screen.getByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
+      expect(transcript).toHaveTextContent("第");
+      expect(transcript).not.toHaveTextContent("第一行通讯。");
+      expect(transcript).not.toHaveTextContent("后续信号。");
+      expect(screen.queryByRole("button", { name: "收到。" })).toBeNull();
+      expect(screen.getByText("LIVE TRANSCRIPT 未完成，点击文本区继续接收。")).toBeInTheDocument();
+
+      fireEvent.click(transcript);
+      expect(transcript).toHaveTextContent("第一行通讯。");
+      expect(transcript).not.toHaveTextContent("后续信号。");
+      expect(screen.queryByRole("button", { name: "收到。" })).toBeNull();
+
+      fireEvent.click(transcript);
+      expect(transcript).toHaveTextContent("第一行通讯。");
+      expect(transcript).toHaveTextContent("后");
+      expect(transcript).not.toHaveTextContent("后续信号。");
+      expect(screen.queryByRole("button", { name: "收到。" })).toBeNull();
+
+      fireEvent.click(transcript);
+      expect(transcript).toHaveTextContent("后续信号。");
+      const optionButton = screen.getByRole("button", { name: "收到。" });
+      expect(optionButton).toBeEnabled();
+      fireEvent.click(optionButton);
+      expect(onDecision).toHaveBeenCalledWith("acknowledge");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps normal call transcript text immediately visible", () => {
+    const member = createCallPageCrewMember("mike", "2-3");
+    const map = createMapWithDiscoveredTiles("2-3");
+    const gameState = createCallPageGameState(member, map);
+
+    render(
+      <CallPage
+        call={{ crewId: member.id, type: "normal", settled: false }}
+        crew={[member]}
+        tiles={initialTiles}
+        activeCalls={{}}
+        elapsedGameSeconds={0}
+        gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+        hasQuestUpdates={false}
+        gameState={gameState}
+        logs={initialLogs}
+        onDecision={vi.fn()}
+        onEndCall={vi.fn()}
+        onConfirmMove={vi.fn()}
+        onClearMoveTarget={vi.fn()}
+        onOpenMap={vi.fn()}
+        onOpenControl={vi.fn()}
+        onOpenTask={vi.fn()}
+        onStartCall={vi.fn()}
+        onShowCrewStatus={vi.fn()}
+        onShowCrewInventory={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("麦克 正在等待新的行动指令。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" })).toBeNull();
+  });
 });
 
 function lastElement<T>(items: T[]): T {
@@ -1050,6 +1200,17 @@ function saveFeatureCallState(features: MapFeatureDefinition[]): void {
 function openMikeCallFromTask(): void {
   fireEvent.click(screen.getByRole("button", { name: /任务/ }));
   fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+}
+
+function advanceRuntimeTranscript(maxClicks = 20): void {
+  const transcript = screen.queryByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
+  if (!transcript) {
+    return;
+  }
+
+  for (let index = 0; index < maxClicks; index += 1) {
+    fireEvent.click(transcript);
+  }
 }
 
 function createCallPageGameState(member: CrewMember, map: GameMapState): GameState {

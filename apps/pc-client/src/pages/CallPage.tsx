@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { buildCallView, type CallActionTargetView, type CallFeatureContextView } from "../callActions";
 import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
@@ -30,6 +30,12 @@ interface CallActionGroupView {
   actions: CallActionOption[];
 }
 
+interface RuntimeTranscriptPlaybackState {
+  callId: string | null;
+  lineIndex: number;
+  charIndex: number;
+}
+
 interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
@@ -51,6 +57,8 @@ interface CallPageProps {
   onShowCrewStatus: (crewId: CrewId) => void;
   onShowCrewInventory: (crewId: CrewId) => void;
 }
+
+const RUNTIME_TRANSCRIPT_STEP_MS = 42;
 
 export function CallPage({
   call,
@@ -158,6 +166,123 @@ export function CallPage({
       isRuntime: false,
     };
   }, [activeCalls, call, elapsedGameSeconds, gameState, member, memberActionView, runtimeCall, tiles]);
+  const runtimeTranscriptCallId = callView?.isRuntime && runtimeCall ? runtimeCall.id : null;
+  const runtimeTranscriptEnabled = Boolean(callView?.isRuntime && runtimeTranscriptCallId && !callClosed);
+  const runtimeTranscriptLines = runtimeTranscriptEnabled ? callView?.lines ?? [] : [];
+  const firstRuntimeTranscriptLine = runtimeTranscriptLines[0];
+  const [runtimeTranscript, setRuntimeTranscript] = useState<RuntimeTranscriptPlaybackState>({
+    callId: null,
+    lineIndex: 0,
+    charIndex: 0,
+  });
+  const activeRuntimeTranscriptLineIndex =
+    runtimeTranscript.callId === runtimeTranscriptCallId ? Math.min(runtimeTranscript.lineIndex, Math.max(runtimeTranscriptLines.length - 1, 0)) : 0;
+  const activeRuntimeTranscriptCharIndex =
+    runtimeTranscript.callId === runtimeTranscriptCallId
+      ? runtimeTranscript.charIndex
+      : initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine);
+  const currentRuntimeTranscriptLine = runtimeTranscriptLines[activeRuntimeTranscriptLineIndex] ?? "";
+  const runtimeTranscriptComplete =
+    !runtimeTranscriptEnabled ||
+    runtimeTranscriptLines.length === 0 ||
+    (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
+      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length);
+
+  useEffect(() => {
+    if (!runtimeTranscriptEnabled || !runtimeTranscriptCallId) {
+      setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0 });
+      return;
+    }
+
+    setRuntimeTranscript((current) => {
+      if (current.callId === runtimeTranscriptCallId) {
+        return current;
+      }
+      return {
+        callId: runtimeTranscriptCallId,
+        lineIndex: 0,
+        charIndex: initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine),
+      };
+    });
+  }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptEnabled]);
+
+  useEffect(() => {
+    if (
+      !runtimeTranscriptEnabled ||
+      !runtimeTranscriptCallId ||
+      runtimeTranscriptLines.length === 0 ||
+      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setRuntimeTranscript((current) => {
+        if (current.callId !== runtimeTranscriptCallId || current.lineIndex !== activeRuntimeTranscriptLineIndex) {
+          return current;
+        }
+        if (current.charIndex >= currentRuntimeTranscriptLine.length) {
+          return current;
+        }
+        return {
+          ...current,
+          charIndex: current.charIndex + 1,
+        };
+      });
+    }, RUNTIME_TRANSCRIPT_STEP_MS);
+
+    return () => window.clearInterval(timer);
+  }, [
+    activeRuntimeTranscriptCharIndex,
+    activeRuntimeTranscriptLineIndex,
+    currentRuntimeTranscriptLine.length,
+    runtimeTranscriptCallId,
+    runtimeTranscriptEnabled,
+    runtimeTranscriptLines.length,
+  ]);
+
+  const handleRuntimeTranscriptAdvance = () => {
+    if (!runtimeTranscriptEnabled || !runtimeTranscriptCallId || runtimeTranscriptLines.length === 0) {
+      return;
+    }
+
+    setRuntimeTranscript((current) => {
+      const lineIndex = current.callId === runtimeTranscriptCallId ? Math.min(current.lineIndex, runtimeTranscriptLines.length - 1) : 0;
+      const charIndex = current.callId === runtimeTranscriptCallId ? current.charIndex : initialRuntimeTranscriptCharCount(runtimeTranscriptLines[0]);
+      const currentLine = runtimeTranscriptLines[lineIndex] ?? "";
+
+      if (charIndex < currentLine.length) {
+        return {
+          callId: runtimeTranscriptCallId,
+          lineIndex,
+          charIndex: currentLine.length,
+        };
+      }
+
+      if (lineIndex < runtimeTranscriptLines.length - 1) {
+        const nextLine = runtimeTranscriptLines[lineIndex + 1];
+        return {
+          callId: runtimeTranscriptCallId,
+          lineIndex: lineIndex + 1,
+          charIndex: initialRuntimeTranscriptCharCount(nextLine),
+        };
+      }
+
+      return {
+        callId: runtimeTranscriptCallId,
+        lineIndex,
+        charIndex,
+      };
+    });
+  };
+
+  const handleRuntimeTranscriptKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    handleRuntimeTranscriptAdvance();
+  };
 
   if (!call || !member || !callView || !memberActionView) {
     return (
@@ -298,9 +423,13 @@ export function CallPage({
             <div className="console-call-action-groups">
               <section className="console-call-action-group">
                 <h3>事件选项</h3>
-                <div className="console-call-option-list">
-                  {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
-                </div>
+                {runtimeTranscriptComplete ? (
+                  <div className="console-call-option-list">
+                    {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
+                  </div>
+                ) : (
+                  <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，点击文本区继续接收。</p>
+                )}
               </section>
             </div>
           ) : (
@@ -364,11 +493,25 @@ export function CallPage({
                 </div>
               </div>
             </section>
-            <section className="console-screen-block">
+            <section
+              className={`console-screen-block ${runtimeTranscriptEnabled ? "console-call-transcript-interactive" : ""}`}
+              onClick={runtimeTranscriptEnabled ? handleRuntimeTranscriptAdvance : undefined}
+              onKeyDown={runtimeTranscriptEnabled ? handleRuntimeTranscriptKeyDown : undefined}
+              role={runtimeTranscriptEnabled ? "button" : undefined}
+              tabIndex={runtimeTranscriptEnabled ? 0 : undefined}
+              aria-label={runtimeTranscriptEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
+            >
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
-              {(call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
-                <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
-              ))}
+              {runtimeTranscriptEnabled
+                ? renderRuntimeTranscriptLines({
+                    lines: callView.lines,
+                    activeCallId: runtimeTranscriptCallId,
+                    playback: runtimeTranscript,
+                    complete: runtimeTranscriptComplete,
+                  })
+                : (call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
+                    <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
+                  ))}
               {callTimingText ? (
                 <p className={callView.isRuntime ? "console-screen-line console-screen-line-rose" : "console-screen-line console-screen-line-cyan"}>
                   {callTimingText}
@@ -414,6 +557,39 @@ function renderActionButton(action: CallActionOption, callClosed: boolean, onDec
       {action.disabledReason ? <small className="choice-disabled-reason">{action.disabledReason}</small> : null}
     </button>
   );
+}
+
+function initialRuntimeTranscriptCharCount(line: string | undefined) {
+  return line && line.length > 0 ? 1 : 0;
+}
+
+function renderRuntimeTranscriptLines({
+  lines,
+  activeCallId,
+  playback,
+  complete,
+}: {
+  lines: string[];
+  activeCallId: string | null;
+  playback: RuntimeTranscriptPlaybackState;
+  complete: boolean;
+}) {
+  if (!lines.length) {
+    return null;
+  }
+
+  const activeLineIndex = playback.callId === activeCallId ? Math.min(playback.lineIndex, lines.length - 1) : 0;
+  const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialRuntimeTranscriptCharCount(lines[0]);
+  return lines.slice(0, activeLineIndex + 1).map((line, index) => {
+    const isCurrentLine = index === activeLineIndex;
+    const renderedText = isCurrentLine ? line.slice(0, Math.min(activeCharIndex, line.length)) : line;
+    return (
+      <p key={`runtime-transcript-${index}-${line}`} className="console-call-dialogue-line">
+        {renderedText}
+        {isCurrentLine && !complete ? <span className="console-call-type-cursor" aria-hidden="true">_</span> : null}
+      </p>
+    );
+  });
 }
 
 function FeatureContextPanel({ features }: { features: CallFeatureContextView[] }) {

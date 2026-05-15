@@ -89,6 +89,8 @@ const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查�
 const MOBILE_FALLBACK_AFTER_MS = 10000;
 const defaultMapTileById = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile]));
 const defaultMapFeatureById = new Map(defaultMapConfig.features.map((feature) => [feature.id, feature]));
+const SCAVENGER_SIGNAL_LOST_CONDITION = "iafs_scavenger_signal_lost";
+const SCAVENGER_SIGNAL_LOST_STATUS = "失联。最后信号停在拾荒营地哨线。";
 
 type QuestNavigationHint =
   | { type: "tile"; tileId: string; label: string }
@@ -2440,17 +2442,47 @@ function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameSt
     crew: state.crew.map((member) => {
       const runtimeCrew = eventState.crew[member.id];
       const crewInventory = eventState.inventories[crewInventoryId(member.id)];
+      const conditions = runtimeCrew
+        ? syncRuntimeCrewConditions(member.conditions, runtimeCrew.condition_tags)
+        : member.conditions;
+      const lostAtScavengerLine = conditions.includes(SCAVENGER_SIGNAL_LOST_CONDITION);
+      const restoredFromScavengerLine =
+        member.conditions.includes(SCAVENGER_SIGNAL_LOST_CONDITION) &&
+        !lostAtScavengerLine &&
+        member.status === SCAVENGER_SIGNAL_LOST_STATUS;
 
-      return {
+      const nextMember = {
         ...member,
         ...(runtimeCrew
           ? {
               personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
-              conditions: mergeStringLists(member.conditions, runtimeCrew.condition_tags),
+              conditions,
             }
           : {}),
         ...(crewInventory ? { inventory: toGameInventoryEntries(crewInventory.items) } : {}),
       };
+
+      if (lostAtScavengerLine) {
+        return {
+          ...nextMember,
+          status: SCAVENGER_SIGNAL_LOST_STATUS,
+          statusTone: "danger" as Tone,
+          unavailable: false,
+          canCommunicate: false,
+        };
+      }
+
+      if (restoredFromScavengerLine) {
+        return {
+          ...nextMember,
+          status: "待命中。",
+          statusTone: "muted" as Tone,
+          unavailable: false,
+          canCommunicate: true,
+        };
+      }
+
+      return nextMember;
     }),
     tiles: runtimeTileOverlays.length > 0 ? mergeRuntimeTileOverlays(state.tiles, Object.fromEntries(runtimeTileOverlays)) : state.tiles,
     baseInventory: baseInventory ? toGameInventoryEntries(baseInventory.items) : state.baseInventory,
@@ -2500,6 +2532,14 @@ function toResourceSummary(existing: ResourceSummary, resources: Record<string, 
 
 function mergeStringLists(existing: string[], incoming: string[]) {
   return Array.from(new Set([...existing, ...incoming]));
+}
+
+function syncRuntimeCrewConditions(existing: string[], incoming: string[]) {
+  const merged = mergeStringLists(existing, incoming);
+  if (incoming.includes(SCAVENGER_SIGNAL_LOST_CONDITION)) {
+    return merged;
+  }
+  return merged.filter((condition) => condition !== SCAVENGER_SIGNAL_LOST_CONDITION);
 }
 
 function mergeTags(...groups: string[][]) {
