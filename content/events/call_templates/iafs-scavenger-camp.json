@@ -7,13 +7,13 @@
       "domain": "iafs-scavenger-camp",
       "event_definition_id": "iafs_scavenger_camp_outer_discovery",
       "node_id": "outer_report",
-      "render_context_fields": ["crew_id"],
+      "render_context_fields": ["crew_id", "crew_display_name"],
       "opening_lines": {
         "selection": "best_match",
         "variants": [
           {
             "id": "outer_report_settlement",
-            "text": "指挥官，我在前面看见一个村落。不是正式殖民点，更像拾荒者住出来的地方。",
+            "text": "{{crew_display_name}}：指挥官，我在前面看见一个村落。不是正式殖民点，更像拾荒者住出来的地方。",
             "priority": 0
           }
         ]
@@ -24,7 +24,7 @@
           "variants": [
             {
               "id": "outer_report_buildings",
-              "text": "房子很低，用旧舱板、岩片和遮风布拼起来，棚顶压着废管和缆索。能看见几堆整理过的零件、燃料罐和布包，像是能拿来交易的物资。",
+              "text": "{{crew_display_name}}：房子很低，用旧舱板、岩片和遮风布拼起来，棚顶压着废管和缆索。能看见几堆整理过的零件、燃料罐和布包，像是能拿来交易的物资。",
               "priority": 0
             }
           ]
@@ -34,7 +34,7 @@
           "variants": [
             {
               "id": "outer_report_people",
-              "text": "外面有人走动，衣服都很旧，补丁一层压一层。他们看起来穷，但不是乱散的流民，入口、货堆和帐篷之间有人在放哨。",
+              "text": "{{crew_display_name}}：外面有人走动，衣服都很旧，补丁一层压一层。他们看起来穷，但不是乱散的流民，入口、货堆和帐篷之间有人在放哨。",
               "priority": 0
             }
           ]
@@ -44,7 +44,7 @@
           "variants": [
             {
               "id": "outer_report_request",
-              "text": "我还没靠太近。你决定，是继续接近，还是让我先停在这里看一会儿？",
+              "text": "{{crew_display_name}}：我还没靠太近。你决定，是继续接近，还是让我先停在这里看一会儿？",
               "priority": 0
             }
           ]
@@ -56,7 +56,7 @@
           "variants": [
             {
               "id": "approach",
-              "text": "继续接近。别进营地，先靠到他们外线能喊话的位置。",
+              "text": "指示队员继续靠近外线，但不要进入营地。",
               "priority": 0
             }
           ]
@@ -66,7 +66,97 @@
           "variants": [
             {
               "id": "standby",
-              "text": "先别靠近。停在原地，继续观察他们的动静。",
+              "text": "让队员保持距离，先停下观察营地动向。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_camp_outer_discovery.call.outer_approach_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_camp_outer_discovery",
+      "node_id": "outer_approach_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "approach_ack",
+            "text": "{{crew_display_name}}：明白，我会靠到能喊话的位置，不越过他们的外线。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "approach_caution",
+              "text": "{{crew_display_name}}：如果有人先出声，我会把频道保持打开，等你决定怎么回。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_outer_approach": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_outer_approach",
+              "text": "确认继续靠近外线。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_camp_outer_discovery.call.outer_standby_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_camp_outer_discovery",
+      "node_id": "outer_standby_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "standby_ack",
+            "text": "{{crew_display_name}}：明白，我先停在这里，不再靠近。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "standby_watch",
+              "text": "{{crew_display_name}}：我会继续看入口、货堆和岗哨的动静，有变化就回报。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_outer_standby": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_outer_standby",
+              "text": "确认保持距离观察。",
               "priority": 0
             }
           ]
@@ -82,13 +172,13 @@
       "domain": "iafs-scavenger-camp",
       "event_definition_id": "iafs_scavenger_sentry_line_contact",
       "node_id": "sentry_challenge",
-      "render_context_fields": ["crew_id"],
+      "render_context_fields": ["crew_id", "crew_display_name"],
       "opening_lines": {
         "selection": "best_match",
         "variants": [
           {
             "id": "sentry_report",
-            "text": "指挥官，我到他们外线了。外面有一个哨卫，正从废料挡板附近巡逻。",
+            "text": "{{crew_display_name}}：指挥官，我到他们外线了。外面有一个哨卫，正从废料挡板附近巡逻。",
             "priority": 0
           }
         ]
@@ -99,7 +189,7 @@
           "variants": [
             {
               "id": "sentry_look",
-              "text": "他裹着灰白包巾，戴护目镜，旧隔热布外套下面露着磨白的护片。手边有警铃绳，腰侧挂着短柄钩刀，背后还有一截管枪式自制武器，但不像正规军火力。",
+              "text": "{{crew_display_name}}：他裹着灰白包巾，戴护目镜，旧隔热布外套下面露着磨白的护片。手边有警铃绳，腰侧挂着短柄钩刀，背后还有一截管枪式自制武器，但不像正规军火力。",
               "priority": 0
             }
           ]
@@ -109,7 +199,7 @@
           "variants": [
             {
               "id": "sentry_approach",
-              "text": "先别急，我看得见他的手，问题还不大。他不是冲过来，只是在把我压在线外。",
+              "text": "{{crew_display_name}}：先别急，我看得见他的手，问题还不大。他不是冲过来，只是在把我压在线外。",
               "priority": 0
             }
           ]
@@ -119,7 +209,7 @@
           "variants": [
             {
               "id": "sentry_hidden_startle",
-              "text": "不要紧指挥官，我现在隐藏地很好。啊……！",
+              "text": "{{crew_display_name}}：不要紧指挥官，我现在隐藏得很好。啊……！",
               "priority": 0
             }
           ]
@@ -128,8 +218,28 @@
           "selection": "first_match",
           "variants": [
             {
-              "id": "white_noise_interrupt",
-              "text": "（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）站住！线外说话，手别乱动。报名字、来路、找谁。少答一样，我就当你是麻烦。",
+              "id": "crew_signal_drop",
+              "text": "（{{crew_display_name}}的声音突然消失了，但你还听得到呼吸声，然后是碰撞的声音）",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "stranger_voice_interrupt",
+              "text": "（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "stranger_challenge",
+              "text": "陌生男子：站住！线外说话，手别乱动。报名字、来路、找谁。少答一样，我就当你是麻烦。",
               "priority": 0
             }
           ]
@@ -141,7 +251,7 @@
           "variants": [
             {
               "id": "observe",
-              "text": "先不回答，停在线外，侧耳分辨哨站里面的动静。",
+              "text": "暂不回应，保持隐蔽并监听线内动静。",
               "priority": 0
             }
           ]
@@ -151,7 +261,7 @@
           "variants": [
             {
               "id": "threaten",
-              "text": "把警铃绳松开。我们来问路，不是来求你开门。你要拿“麻烦”吓人，我保证第一个麻烦就落在你这条线上。",
+              "text": "强硬压制哨卫，逼他松开警铃绳。",
               "priority": 0
             }
           ]
@@ -161,7 +271,7 @@
           "variants": [
             {
               "id": "negotiate",
-              "text": "我们没有敌意。我叫……从附近过来。想找能问路、交易，或者交换情报的人。",
+              "text": "稳住局面，只透露最低限度来意。",
               "priority": 0
             }
           ]
@@ -171,7 +281,7 @@
           "variants": [
             {
               "id": "chat",
-              "text": "你这套问法很熟。最近来找麻烦的人很多，还是今天特别不想见客？",
+              "text": "用闲聊试探哨卫，套出他们最近的麻烦。",
               "priority": 0
             }
           ]
@@ -187,13 +297,13 @@
       "domain": "iafs-scavenger-camp",
       "event_definition_id": "iafs_scavenger_sentry_line_contact",
       "node_id": "observe_eavesdrop",
-      "render_context_fields": ["crew_id"],
+      "render_context_fields": ["crew_id", "crew_display_name"],
       "opening_lines": {
         "selection": "best_match",
         "variants": [
           {
             "id": "listen_first",
-            "text": "我先没回话。线里有声音，压得很低，不像是在吵我，更像是在吵里面的事。",
+            "text": "{{crew_display_name}}：我先没回话。线里有声音，压得很低，不像是在吵我，更像是在吵里面的事。",
             "priority": 0
           }
         ]
@@ -204,7 +314,7 @@
           "variants": [
             {
               "id": "frostbay_search",
-              "text": "有人说：霜湾的人不能再留在后帐，巡查队今天会搜到边线。",
+              "text": "营地里的人：霜湾的人不能再留在后帐，巡查队今天会搜到边线。",
               "priority": 0
             }
           ]
@@ -214,7 +324,7 @@
           "variants": [
             {
               "id": "furnace_reply",
-              "text": "另一个人回得更急：交出去也是死，烬炉的人不会认账。",
+              "text": "另一个人：交出去也是死，烬炉的人不会认账。",
               "priority": 0
             }
           ]
@@ -224,7 +334,7 @@
           "variants": [
             {
               "id": "caught_between",
-              "text": "他们像是夹在两拨人中间，不敢让外线开，也不敢把里面的人推出去。",
+              "text": "{{crew_display_name}}：他们像是夹在两拨人中间，不敢让外线开，也不敢把里面的人推出去。",
               "priority": 0
             }
           ]
@@ -236,7 +346,7 @@
           "variants": [
             {
               "id": "ack_observe",
-              "text": "继续保持距离，把听到的记下来。",
+              "text": "指示队员继续保持距离，并记录听到的内容。",
               "priority": 0
             }
           ]
@@ -252,13 +362,13 @@
       "domain": "iafs-scavenger-camp",
       "event_definition_id": "iafs_scavenger_sentry_line_contact",
       "node_id": "threaten_backlash",
-      "render_context_fields": ["crew_id"],
+      "render_context_fields": ["crew_id", "crew_display_name"],
       "opening_lines": {
         "selection": "best_match",
         "variants": [
           {
             "id": "threat_answered",
-            "text": "我把话压回去了。哨卫没退，他的手碰了一下警铃绳，里面马上有人压低声音。",
+            "text": "{{crew_display_name}}：把手从警铃绳上拿开。我们站在线外问路，不是来让你审的。你要是先拉警铃，我就把这当成敌对动作。",
             "priority": 0
           }
         ]
@@ -268,8 +378,28 @@
           "selection": "first_match",
           "variants": [
             {
+              "id": "sentry_pushback",
+              "text": "哨卫：你听见自己在说什么了吗？在线外命令岗哨，还拿敌对动作吓我？",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_escalates",
+              "text": "{{crew_display_name}}：我是在提醒你别把误会变成交火。手离开绳子，先让能说话的人出来。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
               "id": "line_pressure",
-              "text": "有个声音说：那人是来压线的。",
+              "text": "线内的人：她在压线，还要我们把人叫出来。别让她继续逼岗。",
               "priority": 0
             }
           ]
@@ -279,7 +409,7 @@
           "variants": [
             {
               "id": "cut_signal",
-              "text": "另一个声音更近：别让这路信号继续往外传。",
+              "text": "另一个声音：别让这路信号继续往外传。",
               "priority": 0
             }
           ]
@@ -289,7 +419,7 @@
           "variants": [
             {
               "id": "static_rise",
-              "text": "等等，通讯噪声在抬高。我还看得见外线，但信号在被压——指挥官，如果你听得到，别让其他人直接靠近——",
+              "text": "{{crew_display_name}}：等等，通讯噪声在抬高。我还看得见外线，但信号在被压——指挥官，如果你听得到，别让其他人直接靠近——",
               "priority": 0
             }
           ]
@@ -302,6 +432,106 @@
             {
               "id": "ack_threaten",
               "text": "继续呼叫，确认队员状态。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.negotiate_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "negotiate_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "negotiate_minimum_info",
+            "text": "{{crew_display_name}}：我会把信息压到最低。只说我们不是来抢货，也不是巡查队。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_keeps_line",
+              "text": "陌生男子：那就站在线外。谁让你来的，想换什么，慢慢说。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_negotiate": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_negotiate",
+              "text": "确认继续观察谈判走向。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.chat_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "chat_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "chat_probe",
+            "text": "{{crew_display_name}}：我先不报全套来历，换个问法试他。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_suspicious",
+              "text": "陌生男子：少套近乎。今天线外来的每个人都说自己只是问路。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "chat_read",
+              "text": "{{crew_display_name}}：他没放松，但也没有立刻拉警铃。至少他听进去了。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_chat": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_chat",
+              "text": "确认继续试探哨卫反应。",
               "priority": 0
             }
           ]

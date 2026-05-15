@@ -144,18 +144,28 @@ describe("event engine trigger intake", () => {
       occurred_at: 3,
     });
     const routeCallId = route.event?.active_call_id ?? "";
-    const ended = selectCallOption({
+    const routeReply = selectCallOption({
       state: route.state,
       index: indexResult.index,
       call_id: routeCallId,
       option_id: "find_exit_route",
       occurred_at: 4,
     });
+    const routeReplyCallId = routeReply.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: routeReply.state,
+      index: indexResult.index,
+      call_id: routeReplyCallId,
+      option_id: "ack_find_exit_route",
+      occurred_at: 5,
+    });
     const quest = ended.state.quest_state?.quests.regroup_after_crash;
 
     expect(facilities.errors).toEqual([]);
     expect(cargo.errors).toEqual([]);
     expect(route.errors).toEqual([]);
+    expect(routeReply.errors).toEqual([]);
+    expect(routeReply.event?.current_node_id).toBe("route_exit_reply");
     expect(ended.errors).toEqual([]);
     expect(ended.event?.status).toBe("resolved");
     expect(quest?.current_node_id).toBe("regrouping_situation");
@@ -283,15 +293,25 @@ describe("event engine trigger intake", () => {
       context: scavengerArrivalContext("93-116", 11880),
     });
     const callId = started.event?.active_call_id ?? "";
-    const ended = selectCallOption({
+    const reply = selectCallOption({
       state: started.state,
       index: indexResult.index,
       call_id: callId,
       option_id: "opt_approach",
       occurred_at: 11895,
     });
+    const replyCallId = reply.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: reply.state,
+      index: indexResult.index,
+      call_id: replyCallId,
+      option_id: "ack_outer_approach",
+      occurred_at: 11905,
+    });
     const moveAction = ended.state.crew_actions.iafs_scavenger_outer_approach_move;
 
+    expect(reply.errors).toEqual([]);
+    expect(reply.event?.current_node_id).toBe("outer_approach_reply");
     expect(ended.errors).toEqual([]);
     expect(ended.event?.status).toBe("resolved");
     expect(ended.event?.result_key).toBe("scavenger_outer_approach");
@@ -317,14 +337,24 @@ describe("event engine trigger intake", () => {
       context: scavengerArrivalContext("93-116", 11880),
     });
     const callId = started.event?.active_call_id ?? "";
-    const ended = selectCallOption({
+    const reply = selectCallOption({
       state: started.state,
       index: indexResult.index,
       call_id: callId,
       option_id: "opt_standby",
       occurred_at: 11895,
     });
+    const replyCallId = reply.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: reply.state,
+      index: indexResult.index,
+      call_id: replyCallId,
+      option_id: "ack_outer_standby",
+      occurred_at: 11905,
+    });
 
+    expect(reply.errors).toEqual([]);
+    expect(reply.event?.current_node_id).toBe("outer_standby_reply");
     expect(ended.errors).toEqual([]);
     expect(ended.event?.status).toBe("resolved");
     expect(ended.event?.result_key).toBe("scavenger_outer_standby");
@@ -353,8 +383,9 @@ describe("event engine trigger intake", () => {
       expect(callText).toContain("灰白包巾");
       expect(callText).toContain("管枪式自制武器");
       expect(callText).toContain("先别急，我看得见他的手");
-      expect(callText).toContain("不要紧指挥官，我现在隐藏地很好。啊……！");
-      expect(callText).toContain("（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）站住！线外说话，手别乱动。");
+      expect(callText).toContain("不要紧指挥官，我现在隐藏得很好。啊……！");
+      expect(callText).toContain("（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）");
+      expect(callText).toContain("陌生男子：站住！线外说话，手别乱动。");
       expect(call?.available_options.map((option) => option.option_id)).toEqual([
         "opt_observe",
         "opt_threaten",
@@ -428,7 +459,7 @@ describe("event engine trigger intake", () => {
 
     expect(backlash.errors).toEqual([]);
     expect(backlash.event?.current_node_id).toBe("threaten_backlash");
-    expect(backlashText).toContain("那人是来压线的");
+    expect(backlashText).toContain("她在压线，还要我们把人叫出来");
     expect(backlashText).toContain("别让这路信号继续往外传");
     expect(ended.errors).toEqual([]);
     expect(ended.event?.status).toBe("resolved");
@@ -442,25 +473,35 @@ describe("event engine trigger intake", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const choices = [
-      ["opt_negotiate", "scavenger_sentry_negotiated", "negotiate"],
-      ["opt_chat", "scavenger_sentry_chatted", "chat"],
+      ["opt_negotiate", "ack_negotiate", "negotiate_reply", "scavenger_sentry_negotiated", "negotiate"],
+      ["opt_chat", "ack_chat", "chat_reply", "scavenger_sentry_chatted", "chat"],
     ] as const;
 
-    for (const [optionId, resultKey, flagValue] of choices) {
+    for (const [optionId, ackOptionId, replyNodeId, resultKey, flagValue] of choices) {
       const started = processTrigger({
         state: createAuthoredScavengerCampState("92-116"),
         index: indexResult.index,
         context: scavengerArrivalContext("92-116", 12000),
       });
       const callId = started.event?.active_call_id ?? "";
-      const ended = selectCallOption({
+      const reply = selectCallOption({
         state: started.state,
         index: indexResult.index,
         call_id: callId,
         option_id: optionId,
         occurred_at: 12015,
       });
+      const replyCallId = reply.event?.active_call_id ?? "";
+      const ended = selectCallOption({
+        state: reply.state,
+        index: indexResult.index,
+        call_id: replyCallId,
+        option_id: ackOptionId,
+        occurred_at: 12025,
+      });
 
+      expect(reply.errors).toEqual([]);
+      expect(reply.event?.current_node_id).toBe(replyNodeId);
       expect(ended.errors).toEqual([]);
       expect(ended.event?.status).toBe("resolved");
       expect(ended.event?.result_key).toBe(resultKey);
@@ -597,7 +638,7 @@ describe("event engine trigger intake", () => {
     expect(result.errors).toEqual([]);
     expect(result.event?.event_definition_id).toBe("iafs_generator_repair_complete");
     expect(result.event?.status).toBe("waiting_call");
-    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("发电机这边修好了。");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("麦克：发电机这边修好了。");
     expect(quest?.todos.repair_generator).toMatchObject({ status: "completed", completed_at: 360 });
     expect(quest?.status).toBe("completed");
 
@@ -637,7 +678,7 @@ describe("event engine trigger intake", () => {
     expect(result.errors).toEqual([]);
     expect(result.event?.event_definition_id).toBe("iafs_generator_repair_failed");
     expect(result.event?.status).toBe("waiting_call");
-    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("发电机这边还没修起来。");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("麦克：发电机这边还没修起来。");
     expect(quest?.todos.repair_generator?.status).not.toBe("completed");
   });
 

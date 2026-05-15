@@ -161,7 +161,7 @@ describe("App", () => {
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
     advanceRuntimeTranscript();
 
-    expect(screen.getByRole("button", { name: "我们会带你回家。先稳住，把眼前的情况说清楚。" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "安抚麦克，承诺会带他回家，并要求他先报告现场情况。" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "结束通话" })).toBeNull();
     expect(screen.queryByText("事件通话没有强制倒计时。")).toBeNull();
     expect(screen.queryByText(/\[CALL\] 选择后只提交 option_id/)).toBeNull();
@@ -638,7 +638,7 @@ describe("App", () => {
     advanceRuntimeTranscript();
 
     expect(screen.getByText(/外壳撕裂/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认记录发电机状态。" })).toBeInTheDocument();
   });
 
   it("investigating a repaired crash-site feature creates a repaired-state runtime event call", () => {
@@ -666,7 +666,7 @@ describe("App", () => {
     advanceRuntimeTranscript();
 
     expect(screen.getByText(/供电回路已恢复稳定/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "收到，继续记录。" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认记录发电机状态。" })).toBeInTheDocument();
   });
 
   it("reveals hidden crash-site features only after surveying the crash site event", () => {
@@ -709,7 +709,7 @@ describe("App", () => {
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
     advanceRuntimeTranscript();
     expect(screen.getByText(/这里还有几套能辨认出来的关键设施/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "标记这些可用设施。" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认标记这些可用设施。" }));
 
     const saved = readSavedState();
     expect(saved?.map).toMatchObject({
@@ -913,6 +913,49 @@ describe("App", () => {
     expect(confirmButton).not.toHaveTextContent(targetFeature.id);
     expect(confirmButton).not.toHaveTextContent(targetFeature.name);
     expect(screen.queryByText(targetFeature.name)).toBeNull();
+  });
+
+  it("wraps call portrait profile copy to 40 console columns", () => {
+    const baseMember = createCallPageCrewMember("mike", "2-3");
+    const member = {
+      ...baseMember,
+      role: "角".repeat(18),
+      voiceTone: "界".repeat(18),
+      personalityTags: ["标".repeat(18)],
+      profile: {
+        ...baseMember.profile,
+        selfIntro: "自".repeat(18),
+      },
+    };
+    const gameState = createCallPageGameState(member, createMapWithDiscoveredTiles("2-3"));
+
+    render(
+      <CallPage
+        call={{ crewId: member.id, type: "normal", settled: false }}
+        crew={[member]}
+        tiles={initialTiles}
+        activeCalls={{}}
+        elapsedGameSeconds={0}
+        gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+        hasQuestUpdates={false}
+        gameState={gameState}
+        logs={initialLogs}
+        onDecision={vi.fn()}
+        onEndCall={vi.fn()}
+        onConfirmMove={vi.fn()}
+        onClearMoveTarget={vi.fn()}
+        onOpenMap={vi.fn()}
+        onOpenControl={vi.fn()}
+        onOpenTask={vi.fn()}
+        onStartCall={vi.fn()}
+        onShowCrewStatus={vi.fn()}
+        onShowCrewInventory={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(`VOICE: ${"界".repeat(18)}`)).toBeNull();
+    expect(screen.getByText(`VOICE: ${"界".repeat(16)}`)).toBeInTheDocument();
+    expect(screen.getByText("界".repeat(2))).toBeInTheDocument();
   });
 
   it("plays runtime call transcript lines before showing event options", () => {

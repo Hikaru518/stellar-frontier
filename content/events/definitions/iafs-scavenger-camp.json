@@ -44,9 +44,35 @@
               { "id": "opt_standby", "effect_refs": ["record_outer_standby_choice"] }
             ],
             "option_node_mapping": {
-              "opt_approach": "end_approach",
-              "opt_standby": "end_standby"
+              "opt_approach": "outer_approach_reply",
+              "opt_standby": "outer_standby_reply"
             },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "outer_approach_reply",
+            "type": "call",
+            "title": "确认靠近外线",
+            "call_template_id": "iafs_scavenger_camp_outer_discovery.call.outer_approach_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_outer_approach", "is_default": true }],
+            "option_node_mapping": { "ack_outer_approach": "end_approach" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "outer_standby_reply",
+            "type": "call",
+            "title": "确认保持距离",
+            "call_template_id": "iafs_scavenger_camp_outer_discovery.call.outer_standby_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_outer_standby", "is_default": true }],
+            "option_node_mapping": { "ack_outer_standby": "end_standby" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
           },
@@ -93,7 +119,7 @@
         }
       ],
       "log_templates": [{ "id": "iafs_scavenger_camp_outer_discovery_log", "summary": "队员在拾荒营地外圈发现一个贫穷的拾荒者村落。", "importance": "normal", "visibility": "player_visible" }],
-      "content_refs": { "call_template_ids": ["iafs_scavenger_camp_outer_discovery.call.outer_report"] },
+      "content_refs": { "call_template_ids": ["iafs_scavenger_camp_outer_discovery.call.outer_report", "iafs_scavenger_camp_outer_discovery.call.outer_approach_reply", "iafs_scavenger_camp_outer_discovery.call.outer_standby_reply"] },
       "sample_contexts": [
         { "trigger_type": "arrival", "occurred_at": 11880, "source": "crew_action", "crew_id": "mike", "tile_id": "93-116", "payload": { "action_type": "move", "target_tile_id": "93-116" } }
       ]
@@ -146,8 +172,8 @@
             "option_node_mapping": {
               "opt_observe": "observe_eavesdrop",
               "opt_threaten": "threaten_backlash",
-              "opt_negotiate": "end_negotiate",
-              "opt_chat": "end_chat"
+              "opt_negotiate": "negotiate_reply",
+              "opt_chat": "chat_reply"
             },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
@@ -175,6 +201,32 @@
             "delivery": "queued_message",
             "options": [{ "id": "ack_threaten", "effect_refs": ["record_threaten_choice"], "is_default": true }],
             "option_node_mapping": { "ack_threaten": "end_threaten" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "negotiate_reply",
+            "type": "call",
+            "title": "最低限度表明来意",
+            "call_template_id": "iafs_scavenger_sentry_line_contact.call.negotiate_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_negotiate", "is_default": true }],
+            "option_node_mapping": { "ack_negotiate": "end_negotiate" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "chat_reply",
+            "type": "call",
+            "title": "闲聊试探哨卫",
+            "call_template_id": "iafs_scavenger_sentry_line_contact.call.chat_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_chat", "is_default": true }],
+            "option_node_mapping": { "ack_chat": "end_chat" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
           },
@@ -256,7 +308,7 @@
         }
       ],
       "log_templates": [{ "id": "iafs_scavenger_sentry_line_contact_log", "summary": "队员抵达拾荒营地哨线，被白噪拦在线外问话。", "importance": "normal", "visibility": "player_visible" }],
-      "content_refs": { "call_template_ids": ["iafs_scavenger_sentry_line_contact.call.sentry_challenge", "iafs_scavenger_sentry_line_contact.call.observe_eavesdrop", "iafs_scavenger_sentry_line_contact.call.threaten_backlash"] },
+      "content_refs": { "call_template_ids": ["iafs_scavenger_sentry_line_contact.call.sentry_challenge", "iafs_scavenger_sentry_line_contact.call.observe_eavesdrop", "iafs_scavenger_sentry_line_contact.call.threaten_backlash", "iafs_scavenger_sentry_line_contact.call.negotiate_reply", "iafs_scavenger_sentry_line_contact.call.chat_reply"] },
       "sample_contexts": [
         { "trigger_type": "arrival", "occurred_at": 12000, "source": "crew_action", "crew_id": "mike", "tile_id": "92-116", "payload": { "action_type": "move", "target_tile_id": "92-116" } }
       ]
