@@ -411,32 +411,92 @@ describe("event engine trigger intake", () => {
 	    }
 	  });
 
-	  it("routes the authored scavenger camp observe choice through eavesdropping", () => {
+	  it("returns to the scavenger camp sentry challenge after a failed observe attempt", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
       state: createAuthoredScavengerCampState("92-116"),
       index: indexResult.index,
-      context: scavengerArrivalContext("92-116", 12000),
+      context: scavengerArrivalContext("92-116", 12001),
     });
     const challengeCallId = started.event?.active_call_id ?? "";
-    const eavesdrop = selectCallOption({
+    const failedObserve = selectCallOption({
       state: started.state,
       index: indexResult.index,
       call_id: challengeCallId,
       option_id: "opt_observe",
       occurred_at: 12015,
 	    });
-	    const eavesdropCallId = eavesdrop.event?.active_call_id ?? "";
-	    const eavesdropCall = eavesdrop.state.active_calls[eavesdropCallId];
-	    const eavesdropText = eavesdrop.state.active_calls[eavesdropCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
-	    const ended = selectCallOption({
-	      state: eavesdrop.state,
+	    const failedObserveCallId = failedObserve.event?.active_call_id ?? "";
+	    const returned = selectCallOption({
+	      state: failedObserve.state,
 	      index: indexResult.index,
-      call_id: eavesdropCallId,
-      option_id: "ack_observe",
+      call_id: failedObserveCallId,
+      option_id: "ack_observe_failure",
       occurred_at: 12025,
     });
+	    const returnedCallId = returned.event?.active_call_id ?? "";
+	    const returnedOptions = returned.state.active_calls[returnedCallId]?.available_options.map((option) => option.option_id) ?? [];
+
+	    expect(failedObserve.errors).toEqual([]);
+	    expect(failedObserve.event?.current_node_id).toBe("observe_partial_failure");
+	    expect(failedObserve.event?.check_results.sentry_observe).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_observe",
+	        attribute: "perception",
+	        attribute_label: "感知",
+	        die_sides: 20,
+	        roll: 5,
+	        modifier: 4,
+	        total: 9,
+	        dc: 10,
+	        outcome: "failure",
+	        next_node_id: "observe_partial_failure",
+	      }),
+	    );
+	    expect(returned.errors).toEqual([]);
+	    expect(returned.event?.current_node_id).toBe("sentry_challenge");
+	    expect(returned.event?.status).toBe("waiting_call");
+	    expect(returned.state.world_flags.iafs_scavenger_sentry_observe_tried?.value).toBe(true);
+	    expect(returned.state.world_flags.iafs_scavenger_sentry_observe_result?.value).toBe("failed");
+	    expect(returnedOptions).toEqual(["opt_threaten", "opt_negotiate", "opt_chat"]);
+	  });
+
+	  it("routes a successful observe supply offer through a luck check into the chief callback", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12002),
+	    });
+	    const challengeCallId = started.event?.active_call_id ?? "";
+	    const eavesdrop = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: challengeCallId,
+	      option_id: "opt_observe",
+	      occurred_at: 12015,
+	    });
+	    const eavesdropCallId = eavesdrop.event?.active_call_id ?? "";
+	    const eavesdropCall = eavesdrop.state.active_calls[eavesdropCallId];
+	    const eavesdropText = eavesdropCall?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const offered = selectCallOption({
+	      state: eavesdrop.state,
+	      index: indexResult.index,
+	      call_id: eavesdropCallId,
+	      option_id: "offer_supply_after_observe",
+	      occurred_at: 12025,
+	    });
+	    const offeredCallId = offered.event?.active_call_id ?? "";
+	    const offeredCall = offered.state.active_calls[offeredCallId];
+	    const ended = selectCallOption({
+	      state: offered.state,
+	      index: indexResult.index,
+	      call_id: offeredCallId,
+	      option_id: "ack_supply_offer_wait",
+	      occurred_at: 12035,
+	    });
 
 	    expect(eavesdrop.errors).toEqual([]);
 	    expect(eavesdrop.event?.current_node_id).toBe("observe_eavesdrop");
@@ -446,9 +506,9 @@ describe("event engine trigger intake", () => {
 	        attribute: "perception",
 	        attribute_label: "感知",
 	        die_sides: 20,
-	        roll: 7,
+	        roll: 10,
 	        modifier: 4,
-	        total: 11,
+	        total: 14,
 	        dc: 10,
 	        outcome: "success",
 	        next_node_id: "observe_eavesdrop",
@@ -456,16 +516,135 @@ describe("event engine trigger intake", () => {
 	    );
 	    expect(eavesdropCall?.rendered_lines[0]).toEqual(
 	      expect.objectContaining({
-	        text: "麦克 骰出了 7，加上 感知 数值 4，最终结果是 11. 判定要求是 10. 检定成功。",
-	        animation: expect.objectContaining({ type: "d20_roll", final_text: "7" }),
+	        text: "麦克 骰出了 10，加上 感知 数值 4，最终结果是 14. 判定要求是 10. 检定成功。",
+	        animation: expect.objectContaining({ type: "d20_roll", final_text: "10" }),
 	      }),
 	    );
-	    expect(eavesdropText).toContain("霜湾的人不能再留在后帐");
-	    expect(eavesdropText).toContain("烬炉的人不会认账");
+	    expect(eavesdropText).toContain("很缺维持性物资");
+	    expect(eavesdropCall?.available_options).toEqual([
+	      expect.objectContaining({
+	        option_id: "offer_supply_after_observe",
+	        display_tag: "运气",
+	        check_preview: expect.objectContaining({ attribute: "luck", attribute_label: "运气", dc: 12, die_sides: 20 }),
+	      }),
+	    ]);
+	    expect(offered.errors).toEqual([]);
+	    expect(offered.event?.current_node_id).toBe("supply_offer_wait");
+	    expect(offered.event?.check_results.sentry_supply_offer_luck).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_supply_offer_luck",
+	        attribute: "luck",
+	        attribute_label: "运气",
+	        die_sides: 20,
+	        roll: 20,
+	        modifier: 3,
+	        total: 23,
+	        dc: 12,
+	        outcome: "success",
+	        next_node_id: "supply_offer_wait",
+	      }),
+	    );
+	    expect(offeredCall?.rendered_lines[0]).toEqual(
+	      expect.objectContaining({
+	        text: "麦克 骰出了 20，加上 运气 数值 3，最终结果是 23. 判定要求是 12. 检定成功。",
+	        animation: expect.objectContaining({ type: "d20_roll", final_text: "20" }),
+	      }),
+	    );
 	    expect(ended.errors).toEqual([]);
-    expect(ended.event?.status).toBe("resolved");
-    expect(ended.event?.result_key).toBe("scavenger_sentry_observed");
-	    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("observe");
+	    expect(ended.event?.status).toBe("resolved");
+	    expect(ended.event?.result_key).toBe("scavenger_sentry_supply_offer_waiting");
+	    expect(ended.state.world_flags.iafs_scavenger_supply_leverage_discovered?.value).toBe(true);
+	    expect(ended.state.world_flags.iafs_scavenger_supply_leverage_source?.value).toBe("eavesdrop");
+	    expect(ended.state.world_flags.iafs_scavenger_chief_entry_reason?.value).toBe("supply_offer_eavesdrop");
+	    expect(ended.state.world_flags.iafs_scavenger_supply_offer_pending?.value).toBe(true);
+
+	    const callbackEvent = Object.values(ended.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_supply_chief_callback",
+	    );
+	    expect(callbackEvent).toEqual(
+	      expect.objectContaining({
+	        current_node_id: "wait_for_supply_chief_callback",
+	        status: "waiting_time",
+	        next_wakeup_at: 12155,
+	        parent_event_id: ended.event?.id,
+	      }),
+	    );
+
+	    const early = processEventWakeups({ state: ended.state, index: indexResult.index, elapsed_game_seconds: 12154 });
+	    expect(early.errors).toEqual([]);
+	    expect(Object.values(early.state.active_calls).some((call) => call.event_node_id === "supply_chief_callback")).toBe(false);
+
+	    const due = processEventWakeups({ state: ended.state, index: indexResult.index, elapsed_game_seconds: 12155 });
+	    const callbackDueEvent = Object.values(due.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_supply_chief_callback",
+	    );
+	    const callbackCallId = callbackDueEvent?.active_call_id ?? "";
+	    const callbackText = due.state.active_calls[callbackCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+
+	    expect(due.errors).toEqual([]);
+	    expect(callbackDueEvent).toEqual(expect.objectContaining({ current_node_id: "supply_chief_callback", status: "waiting_call" }));
+	    expect(callbackText).toContain("村长愿意见你");
+	    expect(due.state.world_flags.iafs_scavenger_chief_entry_ready?.value).toBe(true);
+	    expect(due.state.world_flags.iafs_scavenger_chief_entry_signal?.value).toBe("supply_callback");
+	  });
+
+	  it("returns to the sentry challenge when an eavesdropped supply offer sounds suspicious", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12000),
+	    });
+	    const challengeCallId = started.event?.active_call_id ?? "";
+	    const eavesdrop = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: challengeCallId,
+	      option_id: "opt_observe",
+	      occurred_at: 12015,
+	    });
+	    const eavesdropCallId = eavesdrop.event?.active_call_id ?? "";
+	    const suspicious = selectCallOption({
+	      state: eavesdrop.state,
+	      index: indexResult.index,
+	      call_id: eavesdropCallId,
+	      option_id: "offer_supply_after_observe",
+	      occurred_at: 12025,
+	    });
+	    const suspiciousCallId = suspicious.event?.active_call_id ?? "";
+	    const suspiciousText = suspicious.state.active_calls[suspiciousCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const returned = selectCallOption({
+	      state: suspicious.state,
+	      index: indexResult.index,
+	      call_id: suspiciousCallId,
+	      option_id: "ack_supply_offer_suspicion",
+	      occurred_at: 12035,
+	    });
+	    const returnedCallId = returned.event?.active_call_id ?? "";
+
+	    expect(suspicious.errors).toEqual([]);
+	    expect(suspicious.event?.current_node_id).toBe("supply_offer_suspicion");
+	    expect(suspicious.event?.check_results.sentry_supply_offer_luck).toEqual(
+	      expect.objectContaining({
+	        roll: 8,
+	        modifier: 3,
+	        total: 11,
+	        dc: 12,
+	        outcome: "failure",
+	        next_node_id: "supply_offer_suspicion",
+	      }),
+	    );
+	    expect(suspiciousText).toContain("烬炉派你来的");
+	    expect(returned.errors).toEqual([]);
+	    expect(returned.event?.current_node_id).toBe("sentry_challenge");
+	    expect(returned.event?.status).toBe("waiting_call");
+	    expect(returned.state.world_flags.iafs_scavenger_sentry_suspects_cinder_agent?.value).toBe(true);
+	    expect(returned.state.active_calls[returnedCallId]?.available_options.map((option) => option.option_id)).toEqual([
+	      "opt_threaten",
+	      "opt_negotiate",
+	      "opt_chat",
+	    ]);
 	  });
 
 	  it("shows Alice's family handkerchief option and routes it without consuming the item", () => {
@@ -613,6 +792,7 @@ describe("event engine trigger intake", () => {
 	    );
 	    expect(doubtsText).toContain("武器和外来装备");
 	    expect(doubtsText).toContain("这里明显缺物资");
+	    expect(readDoubts.state.world_flags.iafs_scavenger_sentry_doubts_tried?.value).toBe(true);
 	    expect(readDoubts.state.world_flags.iafs_scavenger_sentry_doubts_read?.value).toBe(true);
 
 	    const returned = selectCallOption({
@@ -628,6 +808,70 @@ describe("event engine trigger intake", () => {
 	    expect(returned.errors).toEqual([]);
 	    expect(returned.event?.current_node_id).toBe("chief_invitation");
 	    expect(returnedOptions).toEqual(["同意见村长。", "拒绝见村长，原地待命。"]);
+	  });
+
+	  it("starts the chief meeting when Alice accepts the heir invitation", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116", "alice"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12000, "alice"),
+	    });
+	    const challengeCallId = started.event?.active_call_id ?? "";
+	    const reply = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: challengeCallId,
+	      option_id: "opt_heir_handkerchief",
+	      occurred_at: 12015,
+	    });
+	    const replyCallId = reply.event?.active_call_id ?? "";
+	    const delayed = selectCallOption({
+	      state: reply.state,
+	      index: indexResult.index,
+	      call_id: replyCallId,
+	      option_id: "ack_heir_handkerchief",
+	      occurred_at: 12025,
+	    });
+	    const due = processEventWakeups({ state: delayed.state, index: indexResult.index, elapsed_game_seconds: 12145 });
+	    const invitationEvent = Object.values(due.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_heir_chief_invitation",
+	    );
+	    const invitationCallId = invitationEvent?.active_call_id ?? "";
+	    const accepted = selectCallOption({
+	      state: due.state,
+	      index: indexResult.index,
+	      call_id: invitationCallId,
+	      option_id: "opt_accept_chief",
+	      occurred_at: 12155,
+	    });
+	    const acceptCallId = accepted.event?.active_call_id ?? "";
+	    const meetingStarted = selectCallOption({
+	      state: accepted.state,
+	      index: indexResult.index,
+	      call_id: acceptCallId,
+	      option_id: "ack_accept_chief",
+	      occurred_at: 12165,
+	    });
+	    const chiefMeeting = Object.values(meetingStarted.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_chief_meeting",
+	    );
+
+	    expect(accepted.errors).toEqual([]);
+	    expect(accepted.event?.current_node_id).toBe("accept_chief_reply");
+	    expect(meetingStarted.errors).toEqual([]);
+	    expect(meetingStarted.event?.result_key).toBe("scavenger_chief_meeting_accept_now");
+	    expect(meetingStarted.state.world_flags.iafs_scavenger_chief_entry_reason?.value).toBe("heir_handkerchief");
+	    expect(meetingStarted.state.world_flags.iafs_scavenger_chief_entry_ready?.value).toBe(true);
+	    expect(meetingStarted.state.world_flags.iafs_scavenger_chief_entry_signal?.value).toBe("heir_invitation");
+	    expect(chiefMeeting).toEqual(
+	      expect.objectContaining({
+	        current_node_id: "chief_meeting_opening",
+	        status: "waiting_call",
+	        parent_event_id: invitationEvent?.id,
+	      }),
+	    );
 	  });
 
 	  it("returns to the heir chief invitation after a failed doubts read and can defer the meeting", () => {
@@ -683,6 +927,7 @@ describe("event engine trigger intake", () => {
 	      }),
 	    );
 	    expect(missedText).toContain("看不出更具体的东西");
+	    expect(missed.state.world_flags.iafs_scavenger_sentry_doubts_tried?.value).toBe(true);
 	    expect(missed.state.world_flags.iafs_scavenger_sentry_doubts_read).toBeUndefined();
 
 	    const returned = selectCallOption({
@@ -695,7 +940,6 @@ describe("event engine trigger intake", () => {
 	    const returnedCallId = returned.event?.active_call_id ?? "";
 	    expect(returned.state.active_calls[returnedCallId]?.available_options.map((option) => option.option_id)).toEqual([
 	      "opt_accept_chief",
-	      "opt_read_sentry",
 	      "opt_decline_chief",
 	    ]);
 
@@ -963,63 +1207,428 @@ describe("event engine trigger intake", () => {
     expect(hostageEnded.errors).toEqual([]);
     expect(hostageEnded.event?.result_key).toBe("scavenger_sentry_control_enter_with_hostage");
     expect(hostageEnded.state.world_flags.iafs_scavenger_sentry_control_choice?.value).toBe("enter_with_hostage");
+    expect(hostageEnded.state.world_flags.iafs_scavenger_chief_entry_reason?.value).toBe("sentry_control_enter_with_hostage");
+    expect(hostageEnded.state.world_flags.iafs_scavenger_has_sentry_hostage?.value).toBe(true);
+    expect(
+      Object.values(hostageEnded.state.active_events).find((event) => event.event_definition_id === "iafs_scavenger_chief_meeting"),
+    ).toEqual(expect.objectContaining({ current_node_id: "chief_meeting_opening", status: "waiting_call" }));
   });
 
-	  it("records the authored scavenger camp negotiate and chat opening choices", () => {
+	  it("records the authored scavenger camp negotiate opening choice", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
-	    const choices = [
-	      ["opt_negotiate", "ack_negotiate", "negotiate_reply", "scavenger_sentry_negotiated", "negotiate"],
-	      ["opt_chat", "ack_chat_failure", "chat_suspicion", "scavenger_sentry_chat_suspicion", "chat_failed"],
-	    ] as const;
+    const started = processTrigger({
+      state: createAuthoredScavengerCampState("92-116"),
+      index: indexResult.index,
+      context: scavengerArrivalContext("92-116", 12000),
+    });
+    const callId = started.event?.active_call_id ?? "";
+    const reply = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: callId,
+      option_id: "opt_negotiate",
+      occurred_at: 12015,
+    });
+    const replyCallId = reply.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: reply.state,
+      index: indexResult.index,
+      call_id: replyCallId,
+      option_id: "ack_negotiate",
+      occurred_at: 12025,
+    });
 
-    for (const [optionId, ackOptionId, replyNodeId, resultKey, flagValue] of choices) {
-      const started = processTrigger({
-        state: createAuthoredScavengerCampState("92-116"),
-        index: indexResult.index,
-        context: scavengerArrivalContext("92-116", 12000),
-      });
-      const callId = started.event?.active_call_id ?? "";
-      const reply = selectCallOption({
-        state: started.state,
-        index: indexResult.index,
-        call_id: callId,
-        option_id: optionId,
-        occurred_at: 12015,
-      });
-      const replyCallId = reply.event?.active_call_id ?? "";
-      const ended = selectCallOption({
-        state: reply.state,
-        index: indexResult.index,
-        call_id: replyCallId,
-        option_id: ackOptionId,
-        occurred_at: 12025,
-      });
-
-	      expect(reply.errors).toEqual([]);
-	      expect(reply.event?.current_node_id).toBe(replyNodeId);
-	      if (optionId === "opt_chat") {
-	        expect(reply.event?.check_results.sentry_chat).toEqual(
-	          expect.objectContaining({
-	            node_id: "check_chat",
-	            attribute: "intelligence",
-	            attribute_label: "智力",
-	            die_sides: 20,
-	            roll: 3,
-	            modifier: 5,
-	            total: 8,
-	            dc: 12,
-	            outcome: "failure",
-	            next_node_id: "chat_suspicion",
-	          }),
-	        );
-	      }
-	      expect(ended.errors).toEqual([]);
+    expect(reply.errors).toEqual([]);
+    expect(reply.event?.current_node_id).toBe("negotiate_reply");
+    expect(ended.errors).toEqual([]);
       expect(ended.event?.status).toBe("resolved");
-      expect(ended.event?.result_key).toBe(resultKey);
-      expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe(flagValue);
-    }
+    expect(ended.event?.result_key).toBe("scavenger_sentry_negotiated");
+    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("negotiate");
   });
+
+	  it("returns to the scavenger camp sentry challenge after a failed chat attempt", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12000),
+	    });
+	    const callId = started.event?.active_call_id ?? "";
+	    const suspicion = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: callId,
+	      option_id: "opt_chat",
+	      occurred_at: 12015,
+	    });
+	    const suspicionCallId = suspicion.event?.active_call_id ?? "";
+	    const returned = selectCallOption({
+	      state: suspicion.state,
+	      index: indexResult.index,
+	      call_id: suspicionCallId,
+	      option_id: "ack_chat_failure",
+	      occurred_at: 12025,
+	    });
+	    const returnedCallId = returned.event?.active_call_id ?? "";
+
+	    expect(suspicion.errors).toEqual([]);
+	    expect(suspicion.event?.current_node_id).toBe("chat_suspicion");
+	    expect(suspicion.event?.check_results.sentry_chat).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_chat",
+	        attribute: "intelligence",
+	        attribute_label: "智力",
+	        die_sides: 20,
+	        roll: 3,
+	        modifier: 5,
+	        total: 8,
+	        dc: 12,
+	        outcome: "failure",
+	        next_node_id: "chat_suspicion",
+	      }),
+	    );
+	    expect(returned.errors).toEqual([]);
+	    expect(returned.event?.current_node_id).toBe("sentry_challenge");
+	    expect(returned.event?.status).toBe("waiting_call");
+	    expect(returned.state.world_flags.iafs_scavenger_sentry_chat_tried?.value).toBe(true);
+	    expect(returned.state.world_flags.iafs_scavenger_sentry_chat_result?.value).toBe("failed");
+	    expect(returned.state.active_calls[returnedCallId]?.available_options.map((option) => option.option_id)).toEqual([
+	      "opt_observe",
+	      "opt_threaten",
+	      "opt_negotiate",
+	    ]);
+  });
+
+	  it("routes a successful chat supply offer into the chief callback", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12002),
+	    });
+	    const callId = started.event?.active_call_id ?? "";
+	    const reply = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: callId,
+	      option_id: "opt_chat",
+	      occurred_at: 12015,
+	    });
+	    const replyCallId = reply.event?.active_call_id ?? "";
+	    const replyText = reply.state.active_calls[replyCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const waiting = selectCallOption({
+	      state: reply.state,
+	      index: indexResult.index,
+	      call_id: replyCallId,
+	      option_id: "offer_supply_after_chat",
+	      occurred_at: 12025,
+	    });
+	    const waitingCallId = waiting.event?.active_call_id ?? "";
+	    const ended = selectCallOption({
+	      state: waiting.state,
+	      index: indexResult.index,
+	      call_id: waitingCallId,
+	      option_id: "ack_supply_offer_wait",
+	      occurred_at: 12035,
+	    });
+
+	    expect(reply.errors).toEqual([]);
+	    expect(reply.event?.current_node_id).toBe("chat_reply");
+	    expect(reply.event?.check_results.sentry_chat).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_chat",
+	        attribute: "intelligence",
+	        attribute_label: "智力",
+	        die_sides: 20,
+	        roll: 8,
+	        modifier: 5,
+	        total: 13,
+	        dc: 12,
+	        outcome: "success",
+	        next_node_id: "chat_reply",
+	      }),
+	    );
+	    expect(replyText).toContain("他们缺防寒、维修和食物");
+	    expect(waiting.errors).toEqual([]);
+	    expect(waiting.event?.current_node_id).toBe("supply_offer_wait");
+	    expect(ended.errors).toEqual([]);
+	    expect(ended.event?.status).toBe("resolved");
+	    expect(ended.event?.result_key).toBe("scavenger_sentry_supply_offer_waiting");
+	    expect(ended.state.world_flags.iafs_scavenger_supply_leverage_discovered?.value).toBe(true);
+	    expect(ended.state.world_flags.iafs_scavenger_supply_leverage_source?.value).toBe("chat");
+	    expect(ended.state.world_flags.iafs_scavenger_chief_entry_reason?.value).toBe("supply_offer_chat");
+
+	    const callbackEvent = Object.values(ended.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_supply_chief_callback",
+	    );
+	    expect(callbackEvent).toEqual(
+	      expect.objectContaining({
+	        current_node_id: "wait_for_supply_chief_callback",
+	        status: "waiting_time",
+	        next_wakeup_at: 12155,
+	        parent_event_id: ended.event?.id,
+	      }),
+	    );
+
+	    const due = processEventWakeups({ state: ended.state, index: indexResult.index, elapsed_game_seconds: 12155 });
+	    const callbackDueEvent = Object.values(due.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_supply_chief_callback",
+	    );
+	    const callbackCallId = callbackDueEvent?.active_call_id ?? "";
+	    const meetingStarted = selectCallOption({
+	      state: due.state,
+	      index: indexResult.index,
+	      call_id: callbackCallId,
+	      option_id: "ack_supply_chief_callback",
+	      occurred_at: 12165,
+	    });
+	    const chiefMeeting = Object.values(meetingStarted.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_chief_meeting",
+	    );
+
+	    expect(due.errors).toEqual([]);
+	    expect(meetingStarted.errors).toEqual([]);
+	    expect(chiefMeeting).toEqual(
+	      expect.objectContaining({
+	        current_node_id: "chief_meeting_opening",
+	        status: "waiting_call",
+	        parent_event_id: callbackDueEvent?.id,
+	      }),
+	    );
+  });
+
+	  it("starts a captive chief invitation when another crew member returns to the sentry line", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createScavengerCaptiveRescueState("alice"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12400, "alice"),
+	    });
+	    const invitationCallId = started.event?.active_call_id ?? "";
+	    const invitationCall = started.state.active_calls[invitationCallId];
+
+	    expect(started.errors).toEqual([]);
+	    expect(started.candidate_report?.selected_event_definition_ids).toEqual(["iafs_scavenger_captive_chief_invitation"]);
+	    expect(started.event?.current_node_id).toBe("captive_chief_invitation");
+	    expect(invitationCall?.available_options.map((option) => option.text)).toEqual([
+	      "同意见村长，先把被俘队员的安全摆上桌面。",
+	      "要求先确认被俘队员还安全。",
+	      "拒绝进入会谈，保持救援目标。",
+	    ]);
+
+	    const statusReply = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: invitationCallId,
+	      option_id: "opt_confirm_captive_status",
+	      occurred_at: 12410,
+	    });
+	    const statusCallId = statusReply.event?.active_call_id ?? "";
+	    const returned = selectCallOption({
+	      state: statusReply.state,
+	      index: indexResult.index,
+	      call_id: statusCallId,
+	      option_id: "ack_confirm_captive_status",
+	      occurred_at: 12420,
+	    });
+	    const returnedCallId = returned.event?.active_call_id ?? "";
+	    const accepted = selectCallOption({
+	      state: returned.state,
+	      index: indexResult.index,
+	      call_id: returnedCallId,
+	      option_id: "opt_accept_captive_chief",
+	      occurred_at: 12430,
+	    });
+	    const acceptCallId = accepted.event?.active_call_id ?? "";
+	    const meetingStarted = selectCallOption({
+	      state: accepted.state,
+	      index: indexResult.index,
+	      call_id: acceptCallId,
+	      option_id: "ack_accept_captive_chief",
+	      occurred_at: 12440,
+	    });
+	    const chiefMeeting = Object.values(meetingStarted.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_chief_meeting",
+	    );
+
+	    expect(statusReply.errors).toEqual([]);
+	    expect(statusReply.event?.current_node_id).toBe("confirm_captive_status_reply");
+	    expect(returned.errors).toEqual([]);
+	    expect(returned.event?.current_node_id).toBe("captive_chief_invitation");
+	    expect(returned.state.world_flags.iafs_scavenger_captive_status_requested?.value).toBe(true);
+	    expect(accepted.errors).toEqual([]);
+	    expect(meetingStarted.errors).toEqual([]);
+	    expect(meetingStarted.event?.result_key).toBe("scavenger_captive_chief_meeting_started");
+	    expect(meetingStarted.state.world_flags.iafs_scavenger_chief_entry_reason?.value).toBe("captive_rescue");
+	    expect(meetingStarted.state.world_flags.iafs_scavenger_chief_entry_signal?.value).toBe("captive_invitation");
+	    expect(chiefMeeting).toEqual(
+	      expect.objectContaining({
+	        current_node_id: "chief_meeting_opening",
+	        status: "waiting_call",
+	        parent_event_id: started.event?.id,
+	      }),
+	    );
+	  });
+
+	  it("does not start the captive chief invitation for the crew member who is already captive", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: {
+	        ...createScavengerCaptiveRescueState("mike"),
+	        world_history: {
+	          "event:iafs_scavenger_sentry_line_contact:world": historyEntry(
+	            "event:iafs_scavenger_sentry_line_contact:world",
+	            "iafs_scavenger_sentry_line_contact",
+	            1,
+	            null,
+	          ),
+	        },
+	      },
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12400, "mike"),
+	    });
+
+	    expect(started.errors).toEqual([]);
+	    expect(started.candidate_report?.passed_condition_ids).not.toContain("iafs_scavenger_captive_chief_invitation");
+	    expect(started.candidate_report?.selected_event_definition_ids).toEqual([]);
+	  });
+
+	  it.each([
+	    {
+	      label: "captive rescue",
+	      flags: { iafs_scavenger_chief_entry_reason: "captive_rescue", iafs_scavenger_captive_needs_rescue: true },
+	      expectedOpening: "人在后帐",
+	      expectedNode: "demand_captive_proof",
+	      expectedDemand: "不会白放",
+	      expectedRequest: "prove_value_for_captive_release",
+	    },
+	    {
+	      label: "sentry hostage",
+	      flags: { iafs_scavenger_chief_entry_reason: "sentry_control_enter_with_hostage", iafs_scavenger_has_sentry_hostage: true },
+	      expectedOpening: "带着我的哨卫",
+	      expectedNode: "demand_release_sentry",
+	      expectedDemand: "放开我的哨卫",
+	      expectedRequest: "release_sentry_hostage",
+	    },
+	    {
+	      label: "heir handkerchief",
+	      flags: { iafs_scavenger_chief_entry_reason: "heir_handkerchief" },
+	      expectedOpening: "家徽是真的",
+	      expectedNode: "demand_heir_guarantee",
+	      expectedDemand: "用它作担保",
+	      expectedRequest: "heir_guarantee",
+	    },
+	    {
+	      label: "suspicious supply offer",
+	      flags: {
+	        iafs_scavenger_chief_entry_reason: "supply_offer_eavesdrop",
+	        iafs_scavenger_sentry_suspects_cinder_agent: true,
+	      },
+	      expectedOpening: "烬炉",
+	      expectedNode: "demand_supply_commitment",
+	      expectedDemand: "第一批只谈",
+	      expectedRequest: "first_supply_commitment",
+	    },
+	    {
+	      label: "limited entry",
+	      flags: { iafs_scavenger_chief_entry_reason: "sentry_control_enter_room" },
+	      expectedOpening: "进到线里",
+	      expectedNode: "demand_limited_entry",
+	      expectedDemand: "有限入营",
+	      expectedRequest: "limited_entry_rules",
+	    },
+	  ])("routes chief meeting demand for $label", ({ flags, expectedOpening, expectedNode, expectedDemand, expectedRequest }) => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = startChiefMeetingWithFlags(indexResult.index, flags);
+	    const openingCallId = started.event.active_call_id ?? "";
+	    const openingText = started.state.active_calls[openingCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const demand = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: openingCallId,
+	      option_id: "opt_disclose_crash",
+	      occurred_at: 12170,
+	    });
+	    const demandCallId = demand.event?.active_call_id ?? "";
+	    const demandText = demand.state.active_calls[demandCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const accepted = selectCallOption({
+	      state: demand.state,
+	      index: indexResult.index,
+	      call_id: demandCallId,
+	      option_id: "opt_accept_terms",
+	      occurred_at: 12180,
+	    });
+	    const acceptCallId = accepted.event?.active_call_id ?? "";
+	    const ended = selectCallOption({
+	      state: accepted.state,
+	      index: indexResult.index,
+	      call_id: acceptCallId,
+	      option_id: "ack_accept_chief_terms",
+	      occurred_at: 12190,
+	    });
+
+	    expect(started.errors).toEqual([]);
+	    expect(openingText).toContain(expectedOpening);
+	    expect(demand.errors).toEqual([]);
+	    expect(demand.event?.current_node_id).toBe(expectedNode);
+	    expect(demandText).toContain(expectedDemand);
+	    expect(demand.state.world_flags.iafs_scavenger_ship_crash_disclosed?.value).toBe(true);
+	    expect(demand.state.world_flags.iafs_scavenger_ship_crash_disclosure_level?.value).toBe("limited");
+	    expect(demand.state.world_flags.iafs_scavenger_chief_meeting_crew?.value).toBe("alice");
+	    expect(demand.state.world_flags.iafs_scavenger_chief_meeting_tile?.value).toBe("92-116");
+	    expect(accepted.errors).toEqual([]);
+	    expect(ended.errors).toEqual([]);
+	    expect(ended.event?.result_key).toBe("scavenger_chief_meeting_terms_accepted");
+	    expect(ended.state.world_flags.iafs_scavenger_chief_deal_status?.value).toBe("accepted");
+	    expect(ended.state.world_flags.iafs_scavenger_chief_cooperation_pending?.value).toBe(true);
+	    expect(ended.state.world_flags.iafs_scavenger_chief_cooperation_request?.value).toBe(expectedRequest);
+	  });
+
+	  it.each([
+	    { optionId: "opt_defer_terms", ackId: "ack_defer_chief_terms", status: "deferred", pending: true, resultKey: "scavenger_chief_meeting_terms_deferred" },
+	    { optionId: "opt_refuse_terms", ackId: "ack_refuse_chief_terms", status: "refused", pending: false, resultKey: "scavenger_chief_meeting_terms_refused" },
+	  ])("records chief meeting $status status and request flags", ({ optionId, ackId, status, pending, resultKey }) => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = startChiefMeetingWithFlags(indexResult.index, { iafs_scavenger_chief_entry_reason: "supply_offer_chat" });
+	    const openingCallId = started.event.active_call_id ?? "";
+	    const demand = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: openingCallId,
+	      option_id: "opt_disclose_crash",
+	      occurred_at: 12170,
+	    });
+	    const demandCallId = demand.event?.active_call_id ?? "";
+	    const reply = selectCallOption({
+	      state: demand.state,
+	      index: indexResult.index,
+	      call_id: demandCallId,
+	      option_id: optionId,
+	      occurred_at: 12180,
+	    });
+	    const replyCallId = reply.event?.active_call_id ?? "";
+	    const ended = selectCallOption({
+	      state: reply.state,
+	      index: indexResult.index,
+	      call_id: replyCallId,
+	      option_id: ackId,
+	      occurred_at: 12190,
+	    });
+
+	    expect(reply.errors).toEqual([]);
+	    expect(ended.errors).toEqual([]);
+	    expect(ended.event?.result_key).toBe(resultKey);
+	    expect(ended.state.world_flags.iafs_scavenger_chief_deal_status?.value).toBe(status);
+	    expect(ended.state.world_flags.iafs_scavenger_chief_cooperation_pending?.value).toBe(pending);
+	    expect(ended.state.world_flags.iafs_scavenger_chief_cooperation_request?.value).toBe("first_supply_commitment");
+	  });
 
   it.each([
     {
@@ -1639,7 +2248,7 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
   };
 }
 
-	function createAuthoredScavengerCampState(tileId: string, crewId = "mike"): GraphRunnerGameState {
+function createAuthoredScavengerCampState(tileId: string, crewId = "mike"): GraphRunnerGameState {
 	  const state = createAuthoredCrashSiteState();
 	  const [row, col] = tileId.split("-").map(Number);
 	  const scavengerCrew =
@@ -1713,6 +2322,85 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
         history_keys: [],
       },
     },
+  };
+}
+
+function createScavengerCaptiveRescueState(activeCrewId = "alice"): GraphRunnerGameState {
+  const state = createAuthoredScavengerCampState("92-116", activeCrewId);
+  const activeCrew = state.crew[activeCrewId] ?? crew(activeCrewId);
+  const captiveMike = {
+    ...(state.crew.mike ?? crew("mike")),
+    display_name: "麦克",
+    tile_id: "90-116",
+    status: "idle" as const,
+    current_action_id: null,
+    communication_state: "available" as const,
+    condition_tags: Array.from(new Set([...(state.crew.mike?.condition_tags ?? []), "iafs_scavenger_signal_lost", "iafs_scavenger_captive"])),
+  };
+
+  return {
+    ...state,
+    crew: {
+      ...state.crew,
+      mike: captiveMike,
+      [activeCrewId]: activeCrewId === "mike" ? captiveMike : activeCrew,
+    },
+    world_flags: {
+      ...state.world_flags,
+      iafs_scavenger_captive_crew: worldFlag("iafs_scavenger_captive_crew", "mike", ["iafs", "scavenger_camp", "capture"]),
+      iafs_scavenger_captive_tile: worldFlag("iafs_scavenger_captive_tile", "90-116", ["iafs", "scavenger_camp", "capture"]),
+      iafs_scavenger_captive_needs_rescue: worldFlag("iafs_scavenger_captive_needs_rescue", true, ["iafs", "scavenger_camp", "rescue"]),
+      iafs_scavenger_captive_callback_received: worldFlag("iafs_scavenger_captive_callback_received", true, ["iafs", "scavenger_camp", "capture"]),
+      iafs_scavenger_rescue_pending: worldFlag("iafs_scavenger_rescue_pending", true, ["iafs", "scavenger_camp", "rescue"]),
+    },
+  };
+}
+
+function startChiefMeetingWithFlags(index: EventContentIndex, flags: Record<string, boolean | number | string | undefined>) {
+  const definition = index.definitionsById.get("iafs_scavenger_chief_meeting");
+  if (!definition) {
+    throw new Error("Missing iafs_scavenger_chief_meeting definition.");
+  }
+
+  const state = {
+    ...createAuthoredScavengerCampState("92-116", "alice"),
+    world_flags: Object.fromEntries(
+      Object.entries(flags)
+        .filter((entry): entry is [string, boolean | number | string] => entry[1] !== undefined)
+        .map(([key, value]) => [key, worldFlag(key, value, ["iafs", "scavenger_camp", "chief"])]),
+    ),
+  };
+
+  return startRuntimeEvent(
+    state,
+    definition,
+    {
+      ...triggerContext(12160),
+      trigger_type: "event_node_finished",
+      source: "event_node",
+      event_id: "test_chief_meeting",
+      event_definition_id: definition.id,
+      crew_id: "alice",
+      tile_id: "92-116",
+      payload: { parent_event_id: "test_parent", spawn_node_id: "test_spawn" },
+    },
+    { event_id: "test_chief_meeting", content_index: index },
+  );
+}
+
+function worldFlag(
+  key: string,
+  value: boolean | number | string,
+  tags: string[] = [],
+): GraphRunnerGameState["world_flags"][string] {
+  const valueType: "boolean" | "number" | "string" = typeof value === "boolean" ? "boolean" : typeof value === "number" ? "number" : "string";
+  return {
+    key,
+    value,
+    value_type: valueType,
+    created_at: 12000,
+    updated_at: 12000,
+    tags,
   };
 }
 

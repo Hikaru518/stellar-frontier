@@ -408,7 +408,7 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 | `mountain_signal_probe` 等待节点与时间压力 | `arrival` 或 `action_complete`；`call -> wait -> check/random -> call -> end`。 | `next_wakeup_at`、`time_wakeup`、`event_node_finished`、`crew_action_state.event_waiting`。 | 等待是事件图一等节点，时间系统能推进事件。 |
 | `volcanic_ash_trace` 跨队员 objective | `action_complete`；`call -> objective -> wait/waiting_objective -> end`。 | runtime `objective`、任意符合条件队员执行、`objective_completed`、parent event 回写。 | 事件能生成独立目标；Mike、Amy 或 Garry 完成行动后推进 parent event。 |
 | `lost_relic_argument` 长期角色和世界后果 | `arrival` 或 `action_complete`；`call -> wait -> call -> check -> 多个 end`。 | `call_template` 变体、`personality_tags` 改变、`site_objects` 删除、`world_flags`、`spawn_event` / `unlock_event_definition`、日记追加。 | 最终选项能改变角色、地图、后续事件池和玩家可见摘要。 |
-| `iafs_scavenger_sentry_line_contact` 玩家可见检定 | `arrival`；`call -> skill_check -> call -> end`，非检定选项仍可 `call -> call -> end`。 | `display_tag`、`check_preview`、`check_results`、`RenderedLine.animation`、条件可见选项。 | 检定选项可见、结果 transcript 可见，成功/失败分支不同，爱丽丝家徽选项只在条件满足时出现。 |
+| `iafs_scavenger_sentry_line_contact` / `iafs_scavenger_chief_meeting` 玩家可见检定、循环信息分支与后续会谈 | `arrival`；一次性信息选项可 `call -> skill_check -> call -> call` 回到问话，成功物资线可 `skill_check -> call -> spawn_event -> wait -> call -> spawn_event`；会谈用 `check` 按 world flags 分流。 | `display_tag`、`check_preview`、`check_results`、`RenderedLine.animation`、条件可见选项、`world_flags` 入口标记、`spawn_event` 串联事件。 | 检定选项可见、结果 transcript 可见，失败回到问话且隐藏已尝试信息选项；成功进入统一村长会谈，并按入口 reason / 人质 flags 写入合作要求。 |
 
 ## 8. 模型边界与后续扩展
 
