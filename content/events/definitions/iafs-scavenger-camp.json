@@ -164,10 +164,32 @@
             "urgency": "normal",
             "delivery": "incoming_call",
             "options": [
-              { "id": "opt_observe", "display_tag": "感知", "check_preview": { "attribute": "perception", "attribute_label": "感知", "dc": 10, "die_sides": 20 } },
+              {
+                "id": "opt_observe",
+                "display_tag": "感知",
+                "check_preview": { "attribute": "perception", "attribute_label": "感知", "dc": 10, "die_sides": 20 },
+                "effect_refs": ["mark_observe_tried"],
+                "requirements": [
+                  {
+                    "type": "not",
+                    "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_sentry_observe_tried", "value": true }]
+                  }
+                ]
+              },
               { "id": "opt_threaten", "display_tag": "体能", "check_preview": { "attribute": "strength", "attribute_label": "体能", "dc": 14, "die_sides": 20 } },
               { "id": "opt_negotiate", "effect_refs": ["record_negotiate_choice"], "is_default": true },
-              { "id": "opt_chat", "display_tag": "智力", "check_preview": { "attribute": "intelligence", "attribute_label": "智力", "dc": 12, "die_sides": 20 } },
+              {
+                "id": "opt_chat",
+                "display_tag": "智力",
+                "check_preview": { "attribute": "intelligence", "attribute_label": "智力", "dc": 12, "die_sides": 20 },
+                "effect_refs": ["mark_chat_tried"],
+                "requirements": [
+                  {
+                    "type": "not",
+                    "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_sentry_chat_tried", "value": true }]
+                  }
+                ]
+              },
               {
                 "id": "opt_heir_handkerchief",
                 "display_tag": "家族继承人候选",
@@ -232,6 +254,21 @@
             "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
           },
           {
+            "id": "check_supply_offer_luck",
+            "type": "skill_check",
+            "title": "运气判定：解释物资筹码来源",
+            "attribute": "luck",
+            "attribute_label": "运气",
+            "dc": 12,
+            "die_sides": 20,
+            "store_result_as": "sentry_supply_offer_luck",
+            "success_node_id": "supply_offer_wait",
+            "failure_node_id": "supply_offer_suspicion",
+            "success_effect_refs": ["record_supply_offer_from_observe"],
+            "failure_effect_refs": ["record_supply_offer_suspicion"],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          {
             "id": "observe_eavesdrop",
             "type": "call",
             "title": "线外偷听",
@@ -239,8 +276,16 @@
             "speaker_crew_ref": { "type": "primary_crew" },
             "urgency": "normal",
             "delivery": "queued_message",
-            "options": [{ "id": "ack_observe", "effect_refs": ["record_observe_choice"], "is_default": true }],
-            "option_node_mapping": { "ack_observe": "end_observe" },
+            "options": [
+              {
+                "id": "offer_supply_after_observe",
+                "display_tag": "运气",
+                "check_preview": { "attribute": "luck", "attribute_label": "运气", "dc": 12, "die_sides": 20 },
+                "effect_refs": ["record_supply_leverage_from_observe"],
+                "is_default": true
+              }
+            ],
+            "option_node_mapping": { "offer_supply_after_observe": "check_supply_offer_luck" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
           },
@@ -253,7 +298,7 @@
             "urgency": "normal",
             "delivery": "queued_message",
             "options": [{ "id": "ack_observe_failure", "effect_refs": ["record_observe_failure_choice"], "is_default": true }],
-            "option_node_mapping": { "ack_observe_failure": "end_observe_failure" },
+            "option_node_mapping": { "ack_observe_failure": "sentry_challenge" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
           },
@@ -326,8 +371,8 @@
             "speaker_crew_ref": { "type": "primary_crew" },
             "urgency": "normal",
             "delivery": "queued_message",
-            "options": [{ "id": "ack_chat", "effect_refs": ["record_chat_choice"], "is_default": true }],
-            "option_node_mapping": { "ack_chat": "end_chat" },
+            "options": [{ "id": "offer_supply_after_chat", "effect_refs": ["record_supply_offer_from_chat"], "is_default": true }],
+            "option_node_mapping": { "offer_supply_after_chat": "supply_offer_wait" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
           },
@@ -340,9 +385,46 @@
             "urgency": "normal",
             "delivery": "queued_message",
             "options": [{ "id": "ack_chat_failure", "effect_refs": ["record_chat_failure_choice"], "is_default": true }],
-            "option_node_mapping": { "ack_chat_failure": "end_chat_failure" },
+            "option_node_mapping": { "ack_chat_failure": "sentry_challenge" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
+          },
+          {
+            "id": "supply_offer_wait",
+            "type": "call",
+            "title": "以飞船物资换取村长回话",
+            "call_template_id": "iafs_scavenger_sentry_line_contact.call.supply_offer_wait",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_supply_offer_wait", "is_default": true }],
+            "option_node_mapping": { "ack_supply_offer_wait": "spawn_supply_chief_callback" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "supply_offer_suspicion",
+            "type": "call",
+            "title": "物资话题暴露来源",
+            "call_template_id": "iafs_scavenger_sentry_line_contact.call.supply_offer_suspicion",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_supply_offer_suspicion", "is_default": true }],
+            "option_node_mapping": { "ack_supply_offer_suspicion": "sentry_challenge" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_supply_chief_callback",
+            "type": "spawn_event",
+            "title": "等待物资筹码后的村长回话",
+            "event_definition_id": "iafs_scavenger_supply_chief_callback",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_supply_offer_wait",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
           },
           {
             "id": "heir_handkerchief_reply",
@@ -367,28 +449,6 @@
             "parent_event_link": true,
             "next_node_id": "end_heir_handkerchief",
             "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
-          },
-          {
-            "id": "end_observe",
-            "type": "end",
-            "title": "听见村内争执",
-            "resolution": "resolved",
-            "result_key": "scavenger_sentry_observed",
-            "event_log_template_id": "iafs_scavenger_sentry_line_contact_log",
-            "history_writes": [],
-            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
-            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
-          },
-          {
-            "id": "end_observe_failure",
-            "type": "end",
-            "title": "偷听被哨卫察觉",
-            "resolution": "resolved",
-            "result_key": "scavenger_sentry_observe_failed",
-            "event_log_template_id": "iafs_scavenger_sentry_line_contact_log",
-            "history_writes": [],
-            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
-            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
           },
           {
             "id": "end_threaten",
@@ -424,22 +484,11 @@
             "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
           },
           {
-            "id": "end_chat",
+            "id": "end_supply_offer_wait",
             "type": "end",
-            "title": "套问近况",
+            "title": "等待村长回话",
             "resolution": "resolved",
-            "result_key": "scavenger_sentry_chatted",
-            "event_log_template_id": "iafs_scavenger_sentry_line_contact_log",
-            "history_writes": [],
-            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
-            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
-          },
-          {
-            "id": "end_chat_failure",
-            "type": "end",
-            "title": "套话失败引起戒备",
-            "resolution": "resolved",
-            "result_key": "scavenger_sentry_chat_suspicion",
+            "result_key": "scavenger_sentry_supply_offer_waiting",
             "event_log_template_id": "iafs_scavenger_sentry_line_contact_log",
             "history_writes": [],
             "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
@@ -458,20 +507,20 @@
           }
         ],
         "edges": [],
-        "terminal_node_ids": ["end_observe", "end_observe_failure", "end_threaten", "end_threaten_success", "end_negotiate", "end_chat", "end_chat_failure", "end_heir_handkerchief"],
-        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+        "terminal_node_ids": ["end_threaten", "end_threaten_success", "end_negotiate", "end_supply_offer_wait", "end_heir_handkerchief"],
+        "graph_rules": { "acyclic": false, "max_active_nodes": 1, "allow_parallel_nodes": false }
       },
       "effect_groups": [
         {
-          "id": "record_observe_choice",
+          "id": "mark_observe_tried",
           "effects": [
-            { "id": "set_sentry_choice_observe", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_opening_choice", "value": "observe", "tags": ["iafs", "scavenger_camp"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.opening_choice" } }
+            { "id": "set_sentry_observe_tried", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_observe_tried", "value": true, "tags": ["iafs", "scavenger_camp", "sentry_line"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.observe_tried" } }
           ]
         },
         {
           "id": "record_observe_failure_choice",
           "effects": [
-            { "id": "set_sentry_choice_observe_failed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_opening_choice", "value": "observe_failed", "tags": ["iafs", "scavenger_camp"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.opening_choice" } }
+            { "id": "set_sentry_observe_result_failed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_observe_result", "value": "failed", "tags": ["iafs", "scavenger_camp", "sentry_line"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.observe_result" } }
           ]
         },
         {
@@ -495,15 +544,46 @@
           ]
         },
         {
-          "id": "record_chat_choice",
+          "id": "mark_chat_tried",
           "effects": [
-            { "id": "set_sentry_choice_chat", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_opening_choice", "value": "chat", "tags": ["iafs", "scavenger_camp"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.opening_choice" } }
+            { "id": "set_sentry_chat_tried", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_chat_tried", "value": true, "tags": ["iafs", "scavenger_camp", "sentry_line"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.chat_tried" } }
           ]
         },
         {
           "id": "record_chat_failure_choice",
           "effects": [
-            { "id": "set_sentry_choice_chat_failed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_opening_choice", "value": "chat_failed", "tags": ["iafs", "scavenger_camp"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.opening_choice" } }
+            { "id": "set_sentry_chat_result_failed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_chat_result", "value": "failed", "tags": ["iafs", "scavenger_camp", "sentry_line"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.chat_result" } }
+          ]
+        },
+        {
+          "id": "record_supply_leverage_from_observe",
+          "effects": [
+            { "id": "set_supply_leverage_discovered_observe", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_leverage_discovered", "value": true, "tags": ["iafs", "scavenger_camp", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.leverage.discovered" } },
+            { "id": "set_supply_leverage_source_observe", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_leverage_source", "value": "eavesdrop", "tags": ["iafs", "scavenger_camp", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.leverage.source" } },
+            { "id": "set_sentry_observe_result_supply", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_observe_result", "value": "supply_shortage", "tags": ["iafs", "scavenger_camp", "sentry_line", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.observe_result" } }
+          ]
+        },
+        {
+          "id": "record_supply_offer_from_observe",
+          "effects": [
+            { "id": "set_chief_entry_reason_observe", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "supply_offer_eavesdrop", "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_supply_offer_pending_observe", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_offer_pending", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.offer.pending" } }
+          ]
+        },
+        {
+          "id": "record_supply_offer_from_chat",
+          "effects": [
+            { "id": "set_supply_leverage_discovered_chat", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_leverage_discovered", "value": true, "tags": ["iafs", "scavenger_camp", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.leverage.discovered" } },
+            { "id": "set_supply_leverage_source_chat", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_leverage_source", "value": "chat", "tags": ["iafs", "scavenger_camp", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.leverage.source" } },
+            { "id": "set_sentry_chat_result_supply", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_chat_result", "value": "supply_shortage", "tags": ["iafs", "scavenger_camp", "sentry_line", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.chat_result" } },
+            { "id": "set_chief_entry_reason_chat", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "supply_offer_chat", "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_supply_offer_pending_chat", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_offer_pending", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.offer.pending" } }
+          ]
+        },
+        {
+          "id": "record_supply_offer_suspicion",
+          "effects": [
+            { "id": "set_sentry_suspects_cinder_agent", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_suspects_cinder_agent", "value": true, "tags": ["iafs", "scavenger_camp", "sentry_line", "cinder"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.suspects_cinder_agent" } }
           ]
         },
         {
@@ -514,9 +594,101 @@
         }
       ],
       "log_templates": [{ "id": "iafs_scavenger_sentry_line_contact_log", "summary": "队员抵达拾荒营地哨线，被白噪拦在线外问话。", "importance": "normal", "visibility": "player_visible" }],
-      "content_refs": { "call_template_ids": ["iafs_scavenger_sentry_line_contact.call.sentry_challenge", "iafs_scavenger_sentry_line_contact.call.observe_eavesdrop", "iafs_scavenger_sentry_line_contact.call.observe_partial_failure", "iafs_scavenger_sentry_line_contact.call.threaten_backlash", "iafs_scavenger_sentry_line_contact.call.threaten_control", "iafs_scavenger_sentry_line_contact.call.negotiate_reply", "iafs_scavenger_sentry_line_contact.call.chat_reply", "iafs_scavenger_sentry_line_contact.call.chat_suspicion", "iafs_scavenger_sentry_line_contact.call.heir_handkerchief_reply"] },
+      "content_refs": { "call_template_ids": ["iafs_scavenger_sentry_line_contact.call.sentry_challenge", "iafs_scavenger_sentry_line_contact.call.observe_eavesdrop", "iafs_scavenger_sentry_line_contact.call.observe_partial_failure", "iafs_scavenger_sentry_line_contact.call.threaten_backlash", "iafs_scavenger_sentry_line_contact.call.threaten_control", "iafs_scavenger_sentry_line_contact.call.negotiate_reply", "iafs_scavenger_sentry_line_contact.call.chat_reply", "iafs_scavenger_sentry_line_contact.call.chat_suspicion", "iafs_scavenger_sentry_line_contact.call.supply_offer_wait", "iafs_scavenger_sentry_line_contact.call.supply_offer_suspicion", "iafs_scavenger_sentry_line_contact.call.heir_handkerchief_reply"] },
       "sample_contexts": [
         { "trigger_type": "arrival", "occurred_at": 12000, "source": "crew_action", "crew_id": "mike", "tile_id": "92-116", "payload": { "action_type": "move", "target_tile_id": "92-116" } }
+      ]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_supply_chief_callback",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "title": "物资筹码后的村长回话",
+      "summary": "队员以飞船物资作为谈判筹码后，哨卫离开外线去找村长，稍后回电确认村长愿意见面。",
+      "tags": ["iafs", "ashfrost", "scavenger_camp", "supply", "chief_invitation"],
+      "status": "approved",
+      "trigger": { "type": "event_node_finished", "required_context": ["crew_id"], "conditions": [] },
+      "candidate_selection": { "priority": 0, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "event", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{crew_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "wait_for_supply_chief_callback",
+        "nodes": [
+          {
+            "id": "wait_for_supply_chief_callback",
+            "type": "wait",
+            "title": "等待哨卫传话",
+            "duration_seconds": 120,
+            "wake_trigger_type": "time_wakeup",
+            "next_node_id": "supply_chief_callback",
+            "set_next_wakeup_at": true,
+            "crew_action_during_wait": null,
+            "interrupt_policy": "not_interruptible",
+            "on_interrupted": null,
+            "enter_effect_refs": ["mark_supply_chief_callback_pending"],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          {
+            "id": "supply_chief_callback",
+            "type": "call",
+            "title": "村长愿意听物资交换",
+            "call_template_id": "iafs_scavenger_supply_chief_callback.call.supply_chief_callback",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "incoming_call",
+            "enter_effect_refs": ["mark_supply_chief_callback_ready"],
+            "options": [{ "id": "ack_supply_chief_callback", "is_default": true }],
+            "option_node_mapping": { "ack_supply_chief_callback": "spawn_chief_meeting_from_supply" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_chief_meeting_from_supply",
+            "type": "spawn_event",
+            "title": "进入物资筹码村长会谈",
+            "event_definition_id": "iafs_scavenger_chief_meeting",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_supply_chief_callback",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          {
+            "id": "end_supply_chief_callback",
+            "type": "end",
+            "title": "村长对话入口已准备",
+            "resolution": "resolved",
+            "result_key": "scavenger_supply_chief_callback_ready",
+            "event_log_template_id": "iafs_scavenger_supply_chief_callback_log",
+            "history_writes": [],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
+            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end_supply_chief_callback"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [
+        {
+          "id": "mark_supply_chief_callback_pending",
+          "effects": [
+            { "id": "set_supply_chief_callback_pending", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_chief_callback_pending", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.chief_callback.pending" } }
+          ]
+        },
+        {
+          "id": "mark_supply_chief_callback_ready",
+          "effects": [
+            { "id": "clear_supply_chief_callback_pending", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_supply_chief_callback_pending", "value": false, "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.supply.chief_callback.pending" } },
+            { "id": "set_chief_entry_ready", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_ready", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_ready" } },
+            { "id": "set_chief_entry_signal_supply_callback", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_signal", "value": "supply_callback", "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_signal" } }
+          ]
+        }
+      ],
+      "log_templates": [{ "id": "iafs_scavenger_supply_chief_callback_log", "summary": "拾荒营地村长愿意听取飞船物资交换提议。", "importance": "major", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_scavenger_supply_chief_callback.call.supply_chief_callback"] },
+      "sample_contexts": [
+        { "trigger_type": "event_node_finished", "occurred_at": 12025, "source": "event_node", "crew_id": "mike", "tile_id": "92-116", "payload": { "parent_event_id": "iafs_scavenger_sentry_line_contact:12000", "spawn_node_id": "spawn_supply_chief_callback" } }
       ]
     },
     {
@@ -562,10 +734,11 @@
                 "id": "opt_read_sentry",
                 "display_tag": "感知",
                 "check_preview": { "attribute": "perception", "attribute_label": "感知", "dc": 12, "die_sides": 20 },
+                "effect_refs": ["mark_sentry_doubts_tried"],
                 "requirements": [
                   {
                     "type": "not",
-                    "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_sentry_doubts_read", "value": true }]
+                    "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_sentry_doubts_tried", "value": true }]
                   }
                 ]
               },
@@ -628,9 +801,20 @@
             "urgency": "normal",
             "delivery": "queued_message",
             "options": [{ "id": "ack_accept_chief", "is_default": true }],
-            "option_node_mapping": { "ack_accept_chief": "end_accept_chief" },
+            "option_node_mapping": { "ack_accept_chief": "spawn_chief_meeting_from_heir" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_chief_meeting_from_heir",
+            "type": "spawn_event",
+            "title": "进入家徽村长会谈",
+            "event_definition_id": "iafs_scavenger_chief_meeting",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_accept_chief",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
           },
           {
             "id": "decline_chief_reply",
@@ -683,13 +867,22 @@
           "id": "record_chief_meeting_accept_now",
           "effects": [
             { "id": "set_chief_meeting_intent_accept", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_meeting_intent", "value": "accept_now", "tags": ["iafs", "scavenger_camp", "chief"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.meeting.intent" } },
-            { "id": "set_chief_meeting_requested_accept", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_meeting_requested", "value": true, "tags": ["iafs", "scavenger_camp", "chief"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.meeting.requested" } }
+            { "id": "set_chief_meeting_requested_accept", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_meeting_requested", "value": true, "tags": ["iafs", "scavenger_camp", "chief"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.meeting.requested" } },
+            { "id": "set_chief_entry_reason_heir", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "heir_handkerchief", "tags": ["iafs", "scavenger_camp", "chief", "heir"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_chief_entry_ready_heir", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_ready", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "heir"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_ready" } },
+            { "id": "set_chief_entry_signal_heir", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_signal", "value": "heir_invitation", "tags": ["iafs", "scavenger_camp", "chief", "heir"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_signal" } }
           ]
         },
         {
           "id": "record_sentry_doubts_read",
           "effects": [
             { "id": "set_sentry_doubts_read", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_doubts_read", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "intel"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.doubts_read" } }
+          ]
+        },
+        {
+          "id": "mark_sentry_doubts_tried",
+          "effects": [
+            { "id": "set_sentry_doubts_tried", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_doubts_tried", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "intel"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.doubts_tried" } }
           ]
         },
         {
@@ -909,9 +1102,20 @@
             "urgency": "normal",
             "delivery": "queued_message",
             "options": [{ "id": "ack_enter_room", "is_default": true }],
-            "option_node_mapping": { "ack_enter_room": "end_enter_room" },
+            "option_node_mapping": { "ack_enter_room": "spawn_chief_meeting_enter_room" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_chief_meeting_enter_room",
+            "type": "spawn_event",
+            "title": "进入普通压制村长会谈",
+            "event_definition_id": "iafs_scavenger_chief_meeting",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_enter_room",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
           },
           {
             "id": "enter_with_hostage_reply",
@@ -922,9 +1126,20 @@
             "urgency": "normal",
             "delivery": "queued_message",
             "options": [{ "id": "ack_enter_with_hostage", "is_default": true }],
-            "option_node_mapping": { "ack_enter_with_hostage": "end_enter_with_hostage" },
+            "option_node_mapping": { "ack_enter_with_hostage": "spawn_chief_meeting_enter_with_hostage" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_chief_meeting_enter_with_hostage",
+            "type": "spawn_event",
+            "title": "进入劫持哨卫村长会谈",
+            "event_definition_id": "iafs_scavenger_chief_meeting",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_enter_with_hostage",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
           },
           {
             "id": "leader_to_post_reply",
@@ -935,9 +1150,20 @@
             "urgency": "normal",
             "delivery": "queued_message",
             "options": [{ "id": "ack_leader_to_post", "is_default": true }],
-            "option_node_mapping": { "ack_leader_to_post": "end_leader_to_post" },
+            "option_node_mapping": { "ack_leader_to_post": "spawn_chief_meeting_leader_to_post" },
             "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
             "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_chief_meeting_leader_to_post",
+            "type": "spawn_event",
+            "title": "进入哨站压制村长会谈",
+            "event_definition_id": "iafs_scavenger_chief_meeting",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_leader_to_post",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
           },
           {
             "id": "end_enter_room",
@@ -981,19 +1207,29 @@
         {
           "id": "record_enter_room_choice",
           "effects": [
-            { "id": "set_control_choice_enter_room", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_control_choice", "value": "enter_room", "tags": ["iafs", "scavenger_camp", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.control.choice" } }
+            { "id": "set_control_choice_enter_room", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_control_choice", "value": "enter_room", "tags": ["iafs", "scavenger_camp", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.control.choice" } },
+            { "id": "set_chief_entry_reason_control_enter_room", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "sentry_control_enter_room", "tags": ["iafs", "scavenger_camp", "chief", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_chief_entry_ready_control_enter_room", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_ready", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_ready" } },
+            { "id": "set_chief_entry_signal_control_enter_room", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_signal", "value": "sentry_control", "tags": ["iafs", "scavenger_camp", "chief", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_signal" } }
           ]
         },
         {
           "id": "record_enter_with_hostage_choice",
           "effects": [
-            { "id": "set_control_choice_enter_with_hostage", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_control_choice", "value": "enter_with_hostage", "tags": ["iafs", "scavenger_camp", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.control.choice" } }
+            { "id": "set_control_choice_enter_with_hostage", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_control_choice", "value": "enter_with_hostage", "tags": ["iafs", "scavenger_camp", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.control.choice" } },
+            { "id": "set_chief_entry_reason_control_hostage", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "sentry_control_enter_with_hostage", "tags": ["iafs", "scavenger_camp", "chief", "negotiation", "hostage"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_has_sentry_hostage", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_has_sentry_hostage", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "hostage"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.has_sentry_hostage" } },
+            { "id": "set_chief_entry_ready_control_hostage", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_ready", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "negotiation", "hostage"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_ready" } },
+            { "id": "set_chief_entry_signal_control_hostage", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_signal", "value": "sentry_control", "tags": ["iafs", "scavenger_camp", "chief", "negotiation", "hostage"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_signal" } }
           ]
         },
         {
           "id": "record_leader_to_post_choice",
           "effects": [
-            { "id": "set_control_choice_leader_to_post", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_control_choice", "value": "leader_to_post", "tags": ["iafs", "scavenger_camp", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.control.choice" } }
+            { "id": "set_control_choice_leader_to_post", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_sentry_control_choice", "value": "leader_to_post", "tags": ["iafs", "scavenger_camp", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.sentry.control.choice" } },
+            { "id": "set_chief_entry_reason_control_leader_to_post", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "sentry_control_leader_to_post", "tags": ["iafs", "scavenger_camp", "chief", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_chief_entry_ready_control_leader_to_post", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_ready", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_ready" } },
+            { "id": "set_chief_entry_signal_control_leader_to_post", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_signal", "value": "sentry_control", "tags": ["iafs", "scavenger_camp", "chief", "negotiation"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_signal" } }
           ]
         }
       ],
@@ -1001,6 +1237,476 @@
       "content_refs": { "call_template_ids": ["iafs_scavenger_sentry_control_negotiation.call.control_parley", "iafs_scavenger_sentry_control_negotiation.call.enter_room_reply", "iafs_scavenger_sentry_control_negotiation.call.enter_with_hostage_reply", "iafs_scavenger_sentry_control_negotiation.call.leader_to_post_reply"] },
       "sample_contexts": [
         { "trigger_type": "event_node_finished", "occurred_at": 12025, "source": "event_node", "crew_id": "mike", "tile_id": "92-116", "payload": { "parent_event_id": "iafs_scavenger_sentry_line_contact:12001", "spawn_node_id": "spawn_control_negotiation" } }
+      ]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_captive_chief_invitation",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "title": "人质在营地时的村长邀请",
+      "summary": "已有队员被关在拾荒营地后，另一名未被俘队员再次抵达营地接触线时，村长主动提出见面。",
+      "tags": ["iafs", "ashfrost", "scavenger_camp", "chief", "capture", "rescue"],
+      "status": "approved",
+      "trigger": {
+        "type": "arrival",
+        "required_context": ["crew_id", "tile_id"],
+        "conditions": [
+          {
+            "type": "any_of",
+            "conditions": [
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "91-115" } },
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "91-116" } },
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "91-117" } },
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "92-115" } },
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "92-116" } },
+              { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "92-117" } }
+            ]
+          },
+          { "type": "world_flag_equals", "field": "iafs_scavenger_captive_needs_rescue", "value": true },
+          { "type": "world_flag_equals", "field": "iafs_scavenger_captive_callback_received", "value": true },
+          {
+            "type": "not",
+            "conditions": [{ "type": "has_condition", "target": { "type": "primary_crew" }, "value": "iafs_scavenger_captive" }]
+          },
+          {
+            "type": "not",
+            "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_chief_meeting_started", "value": true }]
+          }
+        ]
+      },
+      "candidate_selection": { "priority": 110, "weight": 1, "mutex_group": "iafs_scavenger_camp_contact", "max_instances_per_trigger": 1, "requires_blocking_slot": true },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:world", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "captive_chief_invitation",
+        "nodes": [
+          {
+            "id": "captive_chief_invitation",
+            "type": "call",
+            "title": "村长借人质提出见面",
+            "call_template_id": "iafs_scavenger_captive_chief_invitation.call.captive_chief_invitation",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "urgent",
+            "delivery": "incoming_call",
+            "options": [
+              { "id": "opt_accept_captive_chief", "effect_refs": ["record_captive_chief_entry"], "is_default": true },
+              { "id": "opt_confirm_captive_status", "effect_refs": ["record_captive_status_requested"] },
+              { "id": "opt_refuse_captive_chief", "effect_refs": ["record_captive_chief_refused"] }
+            ],
+            "option_node_mapping": {
+              "opt_accept_captive_chief": "accept_captive_chief_reply",
+              "opt_confirm_captive_status": "confirm_captive_status_reply",
+              "opt_refuse_captive_chief": "refuse_captive_chief_reply"
+            },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "confirm_captive_status_reply",
+            "type": "call",
+            "title": "要求确认被俘队员状态",
+            "call_template_id": "iafs_scavenger_captive_chief_invitation.call.confirm_captive_status_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_confirm_captive_status", "is_default": true }],
+            "option_node_mapping": { "ack_confirm_captive_status": "captive_chief_invitation" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "accept_captive_chief_reply",
+            "type": "call",
+            "title": "同意以被俘队员为入口见村长",
+            "call_template_id": "iafs_scavenger_captive_chief_invitation.call.accept_captive_chief_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_accept_captive_chief", "is_default": true }],
+            "option_node_mapping": { "ack_accept_captive_chief": "spawn_chief_meeting_from_captive" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "spawn_chief_meeting_from_captive",
+            "type": "spawn_event",
+            "title": "进入人质村长会谈",
+            "event_definition_id": "iafs_scavenger_chief_meeting",
+            "spawn_policy": "immediate",
+            "context_mapping": {},
+            "parent_event_link": true,
+            "next_node_id": "end_accept_captive_chief",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          {
+            "id": "refuse_captive_chief_reply",
+            "type": "call",
+            "title": "拒绝借人质进入会谈",
+            "call_template_id": "iafs_scavenger_captive_chief_invitation.call.refuse_captive_chief_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_refuse_captive_chief", "is_default": true }],
+            "option_node_mapping": { "ack_refuse_captive_chief": "end_refuse_captive_chief" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "end_accept_captive_chief",
+            "type": "end",
+            "title": "人质入口会谈开始",
+            "resolution": "resolved",
+            "result_key": "scavenger_captive_chief_meeting_started",
+            "event_log_template_id": "iafs_scavenger_captive_chief_invitation_log",
+            "history_writes": [],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
+            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
+          },
+          {
+            "id": "end_refuse_captive_chief",
+            "type": "end",
+            "title": "拒绝人质入口会谈",
+            "resolution": "resolved",
+            "result_key": "scavenger_captive_chief_meeting_refused",
+            "event_log_template_id": "iafs_scavenger_captive_chief_invitation_log",
+            "history_writes": [],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
+            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end_accept_captive_chief", "end_refuse_captive_chief"],
+        "graph_rules": { "acyclic": false, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [
+        {
+          "id": "record_captive_chief_entry",
+          "effects": [
+            { "id": "set_chief_entry_reason_captive", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_reason", "value": "captive_rescue", "tags": ["iafs", "scavenger_camp", "chief", "capture"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_reason" } },
+            { "id": "set_chief_entry_ready_captive", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_ready", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "capture"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_ready" } },
+            { "id": "set_chief_entry_signal_captive", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_entry_signal", "value": "captive_invitation", "tags": ["iafs", "scavenger_camp", "chief", "capture"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.entry_signal" } }
+          ]
+        },
+        {
+          "id": "record_captive_status_requested",
+          "effects": [
+            { "id": "set_captive_status_requested", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_captive_status_requested", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "capture"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.captive.status_requested" } }
+          ]
+        },
+        {
+          "id": "record_captive_chief_refused",
+          "effects": [
+            { "id": "set_captive_chief_invitation_refused", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_captive_chief_invitation_refused", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "capture"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.captive.chief_invitation.refused" } }
+          ]
+        }
+      ],
+      "log_templates": [{ "id": "iafs_scavenger_captive_chief_invitation_log", "summary": "拾荒营地村长借被关押队员提出见面。", "importance": "major", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_scavenger_captive_chief_invitation.call.captive_chief_invitation", "iafs_scavenger_captive_chief_invitation.call.confirm_captive_status_reply", "iafs_scavenger_captive_chief_invitation.call.accept_captive_chief_reply", "iafs_scavenger_captive_chief_invitation.call.refuse_captive_chief_reply"] },
+      "sample_contexts": [
+        { "trigger_type": "arrival", "occurred_at": 12400, "source": "crew_action", "crew_id": "alice", "tile_id": "92-116", "payload": { "action_type": "move", "target_tile_id": "92-116" } }
+      ]
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "title": "拾荒营地村长会谈",
+      "summary": "队员进入拾荒营地村长会谈，村长根据当前入口和 world flags 提出不同合作要求。",
+      "tags": ["iafs", "ashfrost", "scavenger_camp", "chief", "meeting"],
+      "status": "approved",
+      "trigger": { "type": "event_node_finished", "required_context": ["crew_id"], "conditions": [] },
+      "candidate_selection": { "priority": 0, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
+      "repeat_policy": { "scope": "event", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:{crew_id}:{occurred_at}", "allow_while_active": false },
+      "event_graph": {
+        "entry_node_id": "chief_meeting_opening",
+        "nodes": [
+          {
+            "id": "chief_meeting_opening",
+            "type": "call",
+            "title": "村长会谈开场",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.chief_meeting_opening",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "enter_effect_refs": ["mark_chief_meeting_started"],
+            "options": [{ "id": "opt_disclose_crash", "effect_refs": ["record_ship_crash_disclosure"], "is_default": true }],
+            "option_node_mapping": { "opt_disclose_crash": "chief_demand_router" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "chief_demand_router",
+            "type": "check",
+            "title": "按入口选择村长合作要求",
+            "branches": [
+              {
+                "id": "captive_rescue_request",
+                "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_captive_needs_rescue", "value": true }],
+                "next_node_id": "demand_captive_proof"
+              },
+              {
+                "id": "sentry_hostage_request",
+                "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_has_sentry_hostage", "value": true }],
+                "next_node_id": "demand_release_sentry"
+              },
+              {
+                "id": "heir_guarantee_request",
+                "conditions": [{ "type": "world_flag_equals", "field": "iafs_scavenger_chief_entry_reason", "value": "heir_handkerchief" }],
+                "next_node_id": "demand_heir_guarantee"
+              },
+              {
+                "id": "supply_commitment_request",
+                "conditions": [
+                  {
+                    "type": "any_of",
+                    "conditions": [
+                      { "type": "world_flag_equals", "field": "iafs_scavenger_chief_entry_reason", "value": "supply_offer_chat" },
+                      { "type": "world_flag_equals", "field": "iafs_scavenger_chief_entry_reason", "value": "supply_offer_eavesdrop" }
+                    ]
+                  }
+                ],
+                "next_node_id": "demand_supply_commitment"
+              }
+            ],
+            "default_next_node_id": "demand_limited_entry",
+            "evaluation_order": "first_match",
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null }
+          },
+          {
+            "id": "demand_captive_proof",
+            "type": "call",
+            "title": "以被俘队员为筹码的要求",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.demand_captive_proof",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "urgent",
+            "delivery": "queued_message",
+            "options": [
+              { "id": "opt_accept_terms", "effect_refs": ["record_chief_deal_accept", "record_chief_request_captive_proof"], "is_default": true },
+              { "id": "opt_defer_terms", "effect_refs": ["record_chief_deal_defer", "record_chief_request_captive_proof"] },
+              { "id": "opt_refuse_terms", "effect_refs": ["record_chief_deal_refuse", "record_chief_request_captive_proof"] }
+            ],
+            "option_node_mapping": { "opt_accept_terms": "accept_reply", "opt_defer_terms": "defer_reply", "opt_refuse_terms": "refuse_reply" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "demand_release_sentry",
+            "type": "call",
+            "title": "要求先释放哨卫人质",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.demand_release_sentry",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "urgent",
+            "delivery": "queued_message",
+            "options": [
+              { "id": "opt_accept_terms", "effect_refs": ["record_chief_deal_accept", "record_chief_request_release_sentry"], "is_default": true },
+              { "id": "opt_defer_terms", "effect_refs": ["record_chief_deal_defer", "record_chief_request_release_sentry"] },
+              { "id": "opt_refuse_terms", "effect_refs": ["record_chief_deal_refuse", "record_chief_request_release_sentry"] }
+            ],
+            "option_node_mapping": { "opt_accept_terms": "accept_reply", "opt_defer_terms": "defer_reply", "opt_refuse_terms": "refuse_reply" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "demand_heir_guarantee",
+            "type": "call",
+            "title": "以家徽作担保的要求",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.demand_heir_guarantee",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              { "id": "opt_accept_terms", "effect_refs": ["record_chief_deal_accept", "record_chief_request_heir_guarantee"], "is_default": true },
+              { "id": "opt_defer_terms", "effect_refs": ["record_chief_deal_defer", "record_chief_request_heir_guarantee"] },
+              { "id": "opt_refuse_terms", "effect_refs": ["record_chief_deal_refuse", "record_chief_request_heir_guarantee"] }
+            ],
+            "option_node_mapping": { "opt_accept_terms": "accept_reply", "opt_defer_terms": "defer_reply", "opt_refuse_terms": "refuse_reply" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "demand_supply_commitment",
+            "type": "call",
+            "title": "要求承诺第一批维持物资",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.demand_supply_commitment",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              { "id": "opt_accept_terms", "effect_refs": ["record_chief_deal_accept", "record_chief_request_supply_commitment"], "is_default": true },
+              { "id": "opt_defer_terms", "effect_refs": ["record_chief_deal_defer", "record_chief_request_supply_commitment"] },
+              { "id": "opt_refuse_terms", "effect_refs": ["record_chief_deal_refuse", "record_chief_request_supply_commitment"] }
+            ],
+            "option_node_mapping": { "opt_accept_terms": "accept_reply", "opt_defer_terms": "defer_reply", "opt_refuse_terms": "refuse_reply" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "demand_limited_entry",
+            "type": "call",
+            "title": "要求接受有限入营规则",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.demand_limited_entry",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [
+              { "id": "opt_accept_terms", "effect_refs": ["record_chief_deal_accept", "record_chief_request_limited_entry"], "is_default": true },
+              { "id": "opt_defer_terms", "effect_refs": ["record_chief_deal_defer", "record_chief_request_limited_entry"] },
+              { "id": "opt_refuse_terms", "effect_refs": ["record_chief_deal_refuse", "record_chief_request_limited_entry"] }
+            ],
+            "option_node_mapping": { "opt_accept_terms": "accept_reply", "opt_defer_terms": "defer_reply", "opt_refuse_terms": "refuse_reply" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "accept_reply",
+            "type": "call",
+            "title": "接受村长合作要求",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.accept_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_accept_chief_terms", "is_default": true }],
+            "option_node_mapping": { "ack_accept_chief_terms": "end_accept_chief_terms" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "defer_reply",
+            "type": "call",
+            "title": "暂缓回应村长要求",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.defer_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "normal",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_defer_chief_terms", "is_default": true }],
+            "option_node_mapping": { "ack_defer_chief_terms": "end_defer_chief_terms" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "refuse_reply",
+            "type": "call",
+            "title": "拒绝村长合作要求",
+            "call_template_id": "iafs_scavenger_chief_meeting.call.refuse_reply",
+            "speaker_crew_ref": { "type": "primary_crew" },
+            "urgency": "urgent",
+            "delivery": "queued_message",
+            "options": [{ "id": "ack_refuse_chief_terms", "is_default": true }],
+            "option_node_mapping": { "ack_refuse_chief_terms": "end_refuse_chief_terms" },
+            "blocking": { "occupies_crew_action": false, "occupies_communication": true, "blocking_key_template": null },
+            "expires_in_seconds": null
+          },
+          {
+            "id": "end_accept_chief_terms",
+            "type": "end",
+            "title": "接受村长要求",
+            "resolution": "resolved",
+            "result_key": "scavenger_chief_meeting_terms_accepted",
+            "event_log_template_id": "iafs_scavenger_chief_meeting_log",
+            "history_writes": [],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
+            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
+          },
+          {
+            "id": "end_defer_chief_terms",
+            "type": "end",
+            "title": "暂缓村长要求",
+            "resolution": "resolved",
+            "result_key": "scavenger_chief_meeting_terms_deferred",
+            "event_log_template_id": "iafs_scavenger_chief_meeting_log",
+            "history_writes": [],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
+            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
+          },
+          {
+            "id": "end_refuse_chief_terms",
+            "type": "end",
+            "title": "拒绝村长要求",
+            "resolution": "resolved",
+            "result_key": "scavenger_chief_meeting_terms_refused",
+            "event_log_template_id": "iafs_scavenger_chief_meeting_log",
+            "history_writes": [],
+            "blocking": { "occupies_crew_action": false, "occupies_communication": false, "blocking_key_template": null },
+            "cleanup_policy": { "release_blocking_claims": true, "delete_active_calls": true, "keep_player_summary": true }
+          }
+        ],
+        "edges": [],
+        "terminal_node_ids": ["end_accept_chief_terms", "end_defer_chief_terms", "end_refuse_chief_terms"],
+        "graph_rules": { "acyclic": true, "max_active_nodes": 1, "allow_parallel_nodes": false }
+      },
+      "effect_groups": [
+        {
+          "id": "mark_chief_meeting_started",
+          "effects": [
+            { "id": "set_chief_meeting_started", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_meeting_started", "value": true, "tags": ["iafs", "scavenger_camp", "chief"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.meeting.started" } },
+            { "id": "set_chief_meeting_crew", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_meeting_crew", "value_template": "{crew_id}", "tags": ["iafs", "scavenger_camp", "chief"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.meeting.crew" } },
+            { "id": "set_chief_meeting_tile", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_meeting_tile", "value_template": "{tile_id}", "tags": ["iafs", "scavenger_camp", "chief"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.meeting.tile" } }
+          ]
+        },
+        {
+          "id": "record_ship_crash_disclosure",
+          "effects": [
+            { "id": "set_ship_crash_disclosed", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_ship_crash_disclosed", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "ship_crash"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.ship_crash.disclosed" } },
+            { "id": "set_ship_crash_disclosure_level", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_ship_crash_disclosure_level", "value": "limited", "tags": ["iafs", "scavenger_camp", "chief", "ship_crash"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.ship_crash.disclosure_level" } }
+          ]
+        },
+        {
+          "id": "record_chief_deal_accept",
+          "effects": [
+            { "id": "set_chief_deal_status_accepted", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_deal_status", "value": "accepted", "tags": ["iafs", "scavenger_camp", "chief", "deal"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.deal.status" } },
+            { "id": "set_chief_cooperation_pending_accepted", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_pending", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "deal"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.pending" } }
+          ]
+        },
+        {
+          "id": "record_chief_deal_defer",
+          "effects": [
+            { "id": "set_chief_deal_status_deferred", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_deal_status", "value": "deferred", "tags": ["iafs", "scavenger_camp", "chief", "deal"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.deal.status" } },
+            { "id": "set_chief_cooperation_pending_deferred", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_pending", "value": true, "tags": ["iafs", "scavenger_camp", "chief", "deal"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.pending" } }
+          ]
+        },
+        {
+          "id": "record_chief_deal_refuse",
+          "effects": [
+            { "id": "set_chief_deal_status_refused", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_deal_status", "value": "refused", "tags": ["iafs", "scavenger_camp", "chief", "deal"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.deal.status" } },
+            { "id": "set_chief_cooperation_pending_refused", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_pending", "value": false, "tags": ["iafs", "scavenger_camp", "chief", "deal"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.pending" } }
+          ]
+        },
+        {
+          "id": "record_chief_request_captive_proof",
+          "effects": [
+            { "id": "set_chief_request_captive_proof", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_request", "value": "prove_value_for_captive_release", "tags": ["iafs", "scavenger_camp", "chief", "capture"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.request" } }
+          ]
+        },
+        {
+          "id": "record_chief_request_release_sentry",
+          "effects": [
+            { "id": "set_chief_request_release_sentry", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_request", "value": "release_sentry_hostage", "tags": ["iafs", "scavenger_camp", "chief", "hostage"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.request" } }
+          ]
+        },
+        {
+          "id": "record_chief_request_heir_guarantee",
+          "effects": [
+            { "id": "set_chief_request_heir_guarantee", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_request", "value": "heir_guarantee", "tags": ["iafs", "scavenger_camp", "chief", "heir"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.request" } }
+          ]
+        },
+        {
+          "id": "record_chief_request_supply_commitment",
+          "effects": [
+            { "id": "set_chief_request_supply_commitment", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_request", "value": "first_supply_commitment", "tags": ["iafs", "scavenger_camp", "chief", "supply"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.request" } }
+          ]
+        },
+        {
+          "id": "record_chief_request_limited_entry",
+          "effects": [
+            { "id": "set_chief_request_limited_entry", "type": "set_world_flag", "target": { "type": "world_flags" }, "params": { "key": "iafs_scavenger_chief_cooperation_request", "value": "limited_entry_rules", "tags": ["iafs", "scavenger_camp", "chief", "entry_rules"] }, "failure_policy": "fail_event", "record_policy": { "write_event_log": false, "write_world_history": true, "history_key_template": "iafs.scavenger.chief.cooperation.request" } }
+          ]
+        }
+      ],
+      "log_templates": [{ "id": "iafs_scavenger_chief_meeting_log", "summary": "队员与拾荒营地村长完成首次会谈，村长提出合作要求。", "importance": "major", "visibility": "player_visible" }],
+      "content_refs": { "call_template_ids": ["iafs_scavenger_chief_meeting.call.chief_meeting_opening", "iafs_scavenger_chief_meeting.call.demand_captive_proof", "iafs_scavenger_chief_meeting.call.demand_release_sentry", "iafs_scavenger_chief_meeting.call.demand_heir_guarantee", "iafs_scavenger_chief_meeting.call.demand_supply_commitment", "iafs_scavenger_chief_meeting.call.demand_limited_entry", "iafs_scavenger_chief_meeting.call.accept_reply", "iafs_scavenger_chief_meeting.call.defer_reply", "iafs_scavenger_chief_meeting.call.refuse_reply"] },
+      "sample_contexts": [
+        { "trigger_type": "event_node_finished", "occurred_at": 12145, "source": "event_node", "crew_id": "alice", "tile_id": "92-116", "payload": { "parent_event_id": "iafs_scavenger_heir_chief_invitation:12025", "spawn_node_id": "spawn_chief_meeting_from_heir" } }
       ]
     }
   ]
