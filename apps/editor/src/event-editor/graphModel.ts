@@ -301,6 +301,14 @@ function deriveNodeEdges(node: EventNode): DerivedEdge[] {
         edges.push(createEdge(nodeId, node.default_next_node_id, { kind: "default_branch" }));
       }
       break;
+    case "skill_check":
+      if (readString(node.success_node_id)) {
+        edges.push(createEdge(nodeId, node.success_node_id, { kind: "branch", branchId: "success" }, readEffectRefs(node.success_effect_refs)));
+      }
+      if (readString(node.failure_node_id)) {
+        edges.push(createEdge(nodeId, node.failure_node_id, { kind: "branch", branchId: "failure" }, readEffectRefs(node.failure_effect_refs)));
+      }
+      break;
     case "random":
       for (const branch of Array.isArray(node.branches) ? node.branches : []) {
         const branchId = readString(branch.id);

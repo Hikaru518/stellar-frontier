@@ -51,6 +51,7 @@ const EXPECTED_NODE_TYPES = [
   "call",
   "wait",
   "check",
+  "skill_check",
   "random",
   "action_request",
   "objective",
