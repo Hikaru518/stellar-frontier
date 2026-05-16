@@ -22,8 +22,8 @@ const env = {
   CSC_IDENTITY_AUTO_DISCOVERY: "false",
 };
 
-function bin(name) {
-  return path.resolve(appDir, "node_modules/.bin", process.platform === "win32" ? `${name}.cmd` : name);
+function packageScript(packageName, scriptPath) {
+  return path.resolve(appDir, "node_modules", packageName, scriptPath);
 }
 
 function run(command, args, options = {}) {
@@ -49,5 +49,12 @@ run(process.execPath, [
   "@stellar-frontier/pc-client",
   "build:desktop",
 ]);
-run(bin("tsc"), ["-p", "tsconfig.json"]);
-run(bin("electron-builder"), ["--win", "portable", "--x64", "--publish", "never"]);
+run(process.execPath, [packageScript("typescript", "bin/tsc"), "-p", "tsconfig.json"]);
+run(process.execPath, [
+  packageScript("electron-builder", "cli.js"),
+  "--win",
+  "portable",
+  "--x64",
+  "--publish",
+  "never",
+]);
