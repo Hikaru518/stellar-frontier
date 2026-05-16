@@ -408,6 +408,13 @@ function validateReferences(data, maps, mapRadars) {
       hasError = report(`Duplicate crewId: ${member.crewId}`);
     }
 
+    const idleChatterIds = new Set();
+    for (const chatter of member.idleChatter ?? []) {
+      if (!addUnique(idleChatterIds, chatter.id)) {
+        hasError = report(`Duplicate idleChatter id in crew ${member.crewId}: ${chatter.id}`) || hasError;
+      }
+    }
+
     for (const entry of member.inventory) {
       if (!itemIds.has(entry.itemId)) {
         hasError = report(`Unknown itemId in crew ${member.crewId}: ${entry.itemId}`);

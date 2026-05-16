@@ -355,6 +355,61 @@
     },
     {
       "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_supply_chief_callback.call.supply_chief_callback",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_supply_chief_callback",
+      "node_id": "supply_chief_callback",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "chief_callback_opening",
+            "text": "（两分钟后，哨卫的声音重新挤进频道）陌生男子：村长愿意见你，前提是你说的物资不是空话。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "callback_terms",
+              "text": "陌生男子：进线以后别乱看、别乱问。维修件、防寒材料、吃的，先让村长听你怎么分。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_acknowledges_entry",
+              "text": "{{crew_display_name}}：收到。他们把话题接到村长那里了。后面要谈的不是身份，是物资能换到什么。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_supply_chief_callback": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_supply_chief_callback",
+              "text": "确认村长对话入口已准备。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
       "id": "iafs_scavenger_camp_outer_discovery.call.outer_approach_reply",
       "version": 1,
       "domain": "iafs-scavenger-camp",
@@ -591,7 +646,7 @@
         "variants": [
           {
             "id": "listen_first",
-            "text": "{{crew_display_name}}：我先没回话。线里有声音，压得很低，不像是在吵我，更像是在吵里面的事。",
+            "text": "{{crew_display_name}}：我先没回话。线里有声音，压得很低。他们不只是在防外人，还在算自己还能撑多久。",
             "priority": 0
           }
         ]
@@ -602,7 +657,7 @@
           "variants": [
             {
               "id": "frostbay_search",
-              "text": "营地里的人：霜湾的人不能再留在后帐，巡查队今天会搜到边线。",
+              "text": "营地里的人：滤芯、保温层和应急口粮都不够了。霜湾的人不能再留在后帐，巡查队今天会搜到边线。",
               "priority": 0
             }
           ]
@@ -612,7 +667,7 @@
           "variants": [
             {
               "id": "furnace_reply",
-              "text": "另一个人：交出去也是死，烬炉的人不会认账。",
+              "text": "另一个人：交出去也是死，烬炉的人不会认账。可再缺维修料，夜里管线一冻，谁都躲不过去。",
               "priority": 0
             }
           ]
@@ -622,19 +677,19 @@
           "variants": [
             {
               "id": "caught_between",
-              "text": "{{crew_display_name}}：他们像是夹在两拨人中间，不敢让外线开，也不敢把里面的人推出去。",
+              "text": "{{crew_display_name}}：他们像是夹在两拨人中间，而且很缺维持性物资。飞船上的维修套件、防寒材料和应急食物，可能正好能当筹码。",
               "priority": 0
             }
           ]
         }
       ],
       "option_lines": {
-        "ack_observe": {
+        "offer_supply_after_observe": {
           "selection": "best_match",
           "variants": [
             {
-              "id": "ack_observe",
-              "text": "指示队员继续保持距离，并记录听到的内容。",
+              "id": "offer_supply_after_observe",
+              "text": "主动提出可以分担一部分飞船物资。",
               "priority": 0
             }
           ]
@@ -653,13 +708,13 @@
       "render_context_fields": ["crew_id", "crew_display_name"],
       "opening_lines": {
         "selection": "best_match",
-        "variants": [
-          {
-            "id": "rustle_caught",
-            "text": "{{crew_display_name}}：我听到几个词，像是“后帐”和“巡查队”，但我刚调整位置，他已经看过来了。",
-            "priority": 0
-          }
-        ]
+          "variants": [
+            {
+              "id": "rustle_caught",
+              "text": "{{crew_display_name}}：我听到几个词，像是“滤芯”和“后帐”，但我刚调整位置，他已经看过来了。",
+              "priority": 0
+            }
+          ]
       },
       "body_lines": [
         {
@@ -677,7 +732,7 @@
           "variants": [
             {
               "id": "crew_marks_fragments",
-              "text": "{{crew_display_name}}：线内确实有麻烦，但我只拿到碎片。继续沉默会让他直接拉警铃。",
+              "text": "{{crew_display_name}}：线内确实有麻烦，但我只拿到碎片。继续沉默会让他直接拉警铃，我们得换个答法。",
               "priority": 0
             }
           ]
@@ -689,7 +744,7 @@
           "variants": [
             {
               "id": "ack_observe_failure",
-              "text": "记录偷听失败和听到的碎片。",
+              "text": "停止偷听，回到线外问话。",
               "priority": 0
             }
           ]
@@ -896,7 +951,7 @@
         "variants": [
           {
             "id": "chat_probe",
-            "text": "{{crew_display_name}}：我先不报全套来历，换个问法试他。",
+            "text": "{{crew_display_name}}：我先不报全套来历，换个问法试他。问他们最近是不是在缺能过夜的东西。",
             "priority": 0
           }
         ]
@@ -907,7 +962,7 @@
           "variants": [
             {
               "id": "sentry_suspicious",
-              "text": "陌生男子：少套近乎。今天线外来的每个人都说自己只是问路。",
+              "text": "陌生男子：少套近乎。今天线外来的每个人都说自己只是问路。你们有滤芯、保温层，还是能吃的东西？没有就别绕。",
               "priority": 0
             }
           ]
@@ -917,19 +972,19 @@
           "variants": [
             {
               "id": "chat_read",
-              "text": "{{crew_display_name}}：他没放松，但也没有立刻拉警铃。至少他听进去了。",
+              "text": "{{crew_display_name}}：他没放松，但话露出来了。他们缺防寒、维修和食物一类的维持物资。飞船上能拿这些做谈判筹码。",
               "priority": 0
             }
           ]
         }
       ],
       "option_lines": {
-        "ack_chat": {
+        "offer_supply_after_chat": {
           "selection": "best_match",
           "variants": [
             {
-              "id": "ack_chat",
-              "text": "确认继续试探哨卫反应。",
+              "id": "offer_supply_after_chat",
+              "text": "提出可以分担维修、防寒和食物物资。",
               "priority": 0
             }
           ]
@@ -948,13 +1003,13 @@
       "render_context_fields": ["crew_id", "crew_display_name"],
       "opening_lines": {
         "selection": "best_match",
-        "variants": [
-          {
-            "id": "chat_probe_misread",
-            "text": "{{crew_display_name}}：我换了个轻松点的说法，但他听出来我在套话。",
-            "priority": 0
-          }
-        ]
+          "variants": [
+            {
+              "id": "chat_probe_misread",
+              "text": "{{crew_display_name}}：我换了个轻松点的说法，但他听出来我在套话，没把真实麻烦说出来。",
+              "priority": 0
+            }
+          ]
       },
       "body_lines": [
         {
@@ -972,7 +1027,7 @@
           "variants": [
             {
               "id": "crew_warning",
-              "text": "{{crew_display_name}}：他开始怀疑我们有情报来源。再追问会把门关死。",
+              "text": "{{crew_display_name}}：他开始怀疑我们有情报来源。再追问会把门关死，先回到正面问话比较稳。",
               "priority": 0
             }
           ]
@@ -984,7 +1039,117 @@
           "variants": [
             {
               "id": "ack_chat_failure",
-              "text": "确认停止套话，记录哨卫起疑。",
+              "text": "停止套话，回到线外问话。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.supply_offer_wait",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "supply_offer_wait",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "supply_offer_named",
+            "text": "{{crew_display_name}}：我把话压在物资上了。只说我们有能分担的维修件、防寒材料和应急食物，不谈别的。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_fetches_chief",
+              "text": "陌生男子：线外别动。你要是真拿得出这些，我去找村长。你乱动一下，我就当你在拖时间。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_waits",
+              "text": "{{crew_display_name}}：他离开岗位了，但警铃绳还在另一个人手边。我会待在线外等消息。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_supply_offer_wait": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_supply_offer_wait",
+              "text": "确认在线外等待村长回话。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.supply_offer_suspicion",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "supply_offer_suspicion",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "supply_offer_source_questioned",
+            "text": "{{crew_display_name}}：我刚提到能分担物资，他立刻反应过来了。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_accuses_cinder",
+              "text": "陌生男子：你怎么知道我们缺这些？线外的人不该听见这些。烬炉派你来的？",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_pulls_back",
+              "text": "{{crew_display_name}}：他开始把我往烬炉那边想了。我会先收住，不继续拿这个话题压他。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_supply_offer_suspicion": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_supply_offer_suspicion",
+              "text": "收住物资话题，回到线外问话。",
               "priority": 0
             }
           ]
@@ -1319,6 +1484,394 @@
             }
           ]
         }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_captive_chief_invitation.call.captive_chief_invitation",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_captive_chief_invitation",
+      "node_id": "captive_chief_invitation",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "captive_invitation_opening",
+            "text": "（队员刚回到营地外线，频道里就插进一个更年长的声音）陌生老人：你们丢了一个人。人在我们营地里，还活着。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "captive_invitation_terms",
+              "text": "陌生老人：想让事情往能谈的方向走，就进来见我。别派人摸后帐，别冲铃绳。你们再硬来，他就不只是被关起来。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_reports_captive_leverage",
+              "text": "{{crew_display_name}}：指挥官，他是在拿被关押的队员当筹码。现在能直接进入村长会谈，但主动权不在我们这边。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "opt_accept_captive_chief": {
+          "selection": "best_match",
+          "variants": [{ "id": "accept_captive_chief", "text": "同意见村长，先把被俘队员的安全摆上桌面。", "priority": 0 }]
+        },
+        "opt_confirm_captive_status": {
+          "selection": "best_match",
+          "variants": [{ "id": "confirm_captive_status", "text": "要求先确认被俘队员还安全。", "priority": 0 }]
+        },
+        "opt_refuse_captive_chief": {
+          "selection": "best_match",
+          "variants": [{ "id": "refuse_captive_chief", "text": "拒绝进入会谈，保持救援目标。", "priority": 0 }]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_captive_chief_invitation.call.confirm_captive_status_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_captive_chief_invitation",
+      "node_id": "confirm_captive_status_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "confirm_captive_status_opening",
+            "text": "{{crew_display_name}}：我要求他们先证明人还安全。别只给一句话。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "chief_allows_status",
+              "text": "陌生老人：他能说话，但现在不会让他上频道。你们越急，我越知道他值钱。见面，或者继续在线外猜。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_confirm_captive_status": {
+          "selection": "best_match",
+          "variants": [{ "id": "ack_confirm_captive_status", "text": "回到村长邀请的选择。", "priority": 0 }]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_captive_chief_invitation.call.accept_captive_chief_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_captive_chief_invitation",
+      "node_id": "accept_captive_chief_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "accept_captive_chief_reply",
+            "text": "{{crew_display_name}}：收到。我会进线见村长，但频道不关。第一目标是把被关押的人从筹码变成谈判条件。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [],
+      "option_lines": {
+        "ack_accept_captive_chief": {
+          "selection": "best_match",
+          "variants": [{ "id": "ack_accept_captive_chief", "text": "进入村长会谈。", "priority": 0 }]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_captive_chief_invitation.call.refuse_captive_chief_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_captive_chief_invitation",
+      "node_id": "refuse_captive_chief_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "refuse_captive_chief_reply",
+            "text": "{{crew_display_name}}：我拒绝进线。他们没有撤掉看守，也没有让人质上频道。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "rescue_still_pending",
+              "text": "{{crew_display_name}}：救援目标还在，但这会让村长知道我们不接受他设的会谈条件。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_refuse_captive_chief": {
+          "selection": "best_match",
+          "variants": [{ "id": "ack_refuse_captive_chief", "text": "确认继续保持救援待处理。", "priority": 0 }]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.chief_meeting_opening",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "chief_meeting_opening",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "opening_cinder_suspicion",
+            "text": "村长：线外的人说你们问了不该知道的物资，还像是听过我们的短话。先把烬炉这件事说清楚，再谈别的。",
+            "when": [{ "type": "world_flag_equals", "field": "iafs_scavenger_sentry_suspects_cinder_agent", "value": true }],
+            "priority": 20
+          },
+          {
+            "id": "opening_captive",
+            "text": "村长：你们的人在后帐，我们的人在门口。你能坐在这里，是因为我还没决定把这件事当仇。",
+            "when": [{ "type": "world_flag_equals", "field": "iafs_scavenger_captive_needs_rescue", "value": true }],
+            "priority": 15
+          },
+          {
+            "id": "opening_sentry_hostage",
+            "text": "村长：你带着我的哨卫进来，还想把这叫会谈。好，我听，但这张桌子从一开始就是歪的。",
+            "when": [{ "type": "world_flag_equals", "field": "iafs_scavenger_has_sentry_hostage", "value": true }],
+            "priority": 14
+          },
+          {
+            "id": "opening_heir",
+            "text": "村长：手帕上的家徽是真的，至少不是这片冰原上随手捡来的东西。你是谁，和你能带来什么，是两件事。",
+            "when": [{ "type": "world_flag_equals", "field": "iafs_scavenger_chief_entry_reason", "value": "heir_handkerchief" }],
+            "priority": 10
+          },
+          {
+            "id": "opening_supply",
+            "text": "村长：你说你们有维修件、防寒材料和食物。我让你进来，不是因为信你，是因为我们确实缺这些。",
+            "when": [
+              {
+                "type": "any_of",
+                "conditions": [
+                  { "type": "world_flag_equals", "field": "iafs_scavenger_chief_entry_reason", "value": "supply_offer_chat" },
+                  { "type": "world_flag_equals", "field": "iafs_scavenger_chief_entry_reason", "value": "supply_offer_eavesdrop" }
+                ]
+              }
+            ],
+            "priority": 8
+          },
+          {
+            "id": "opening_default",
+            "text": "村长：你已经进到线里了。现在别用哨卫那套话术，告诉我你们真正想从这里拿走什么。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crash_inferred",
+              "text": "村长：你们的装备不像商队，移动路线也不像巡逻。外面有坠落痕迹。你们的飞船坏了，对吗？",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_keeps_crash_limited",
+              "text": "{{crew_display_name}}：他已经把飞船坠毁猜出来了。我可以承认有限事实，但不暴露飞船位置和剩余库存。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "opt_disclose_crash": {
+          "selection": "best_match",
+          "variants": [{ "id": "disclose_crash", "text": "有限承认飞船坠毁，但不透露具体位置和库存。", "priority": 0 }]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.demand_captive_proof",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "demand_captive_proof",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "demand_captive_proof", "text": "村长：你们的人不会白放。先证明那艘坏船还能给营地带来价值，维修、保温、净化，任选一样让我看到。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "variants": [{ "id": "captive_not_released_now", "text": "{{crew_display_name}}：他没有承诺立刻放人，只是把释放谈判挂在我们能证明价值之后。", "priority": 0 }] }],
+      "option_lines": {
+        "opt_accept_terms": { "selection": "best_match", "variants": [{ "id": "accept_terms", "text": "接受要求：后续证明飞船物资或技术价值。", "priority": 0 }] },
+        "opt_defer_terms": { "selection": "best_match", "variants": [{ "id": "defer_terms", "text": "暂缓答复：先保住会谈，不承诺具体交付。", "priority": 0 }] },
+        "opt_refuse_terms": { "selection": "best_match", "variants": [{ "id": "refuse_terms", "text": "拒绝把被俘队员作为交易筹码。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.demand_release_sentry",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "demand_release_sentry",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "demand_release_sentry", "text": "村长：合作第一步，放开我的哨卫。你可以留在屋里继续谈，但不能把人质带到每一句话后面。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "variants": [{ "id": "hostage_pressure", "text": "{{crew_display_name}}：他把释放哨卫列成前置条件。后续合作不会在挟持状态下展开。", "priority": 0 }] }],
+      "option_lines": {
+        "opt_accept_terms": { "selection": "best_match", "variants": [{ "id": "accept_terms", "text": "接受要求：后续先释放被控制的哨卫。", "priority": 0 }] },
+        "opt_defer_terms": { "selection": "best_match", "variants": [{ "id": "defer_terms", "text": "暂缓答复：要求先谈清安全保证。", "priority": 0 }] },
+        "opt_refuse_terms": { "selection": "best_match", "variants": [{ "id": "refuse_terms", "text": "拒绝释放哨卫作为前置条件。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.demand_heir_guarantee",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "demand_heir_guarantee",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "demand_heir_guarantee", "text": "村长：家徽可以买一次信任，但不是白拿的。你用它作担保，保证你们不会把营地的位置卖给烬炉。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "variants": [{ "id": "heir_guarantee_scope", "text": "{{crew_display_name}}：他要的是身份担保，不是物资清单。接受后会进入以家徽背书的临时互信线。", "priority": 0 }] }],
+      "option_lines": {
+        "opt_accept_terms": { "selection": "best_match", "variants": [{ "id": "accept_terms", "text": "接受要求：以家徽作担保建立临时互信。", "priority": 0 }] },
+        "opt_defer_terms": { "selection": "best_match", "variants": [{ "id": "defer_terms", "text": "暂缓答复：不立刻押上家徽信用。", "priority": 0 }] },
+        "opt_refuse_terms": { "selection": "best_match", "variants": [{ "id": "refuse_terms", "text": "拒绝用家徽为营地安全担保。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.demand_supply_commitment",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "demand_supply_commitment",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "demand_supply_commitment", "text": "村长：第一批只谈维持活下去的东西。防寒层、维修件、能吃的，数量不用大，但要是真的。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "variants": [{ "id": "supply_not_consumed_now", "text": "{{crew_display_name}}：他要的是承诺和后续交付窗口。现在不需要立刻消耗飞船库存。", "priority": 0 }] }],
+      "option_lines": {
+        "opt_accept_terms": { "selection": "best_match", "variants": [{ "id": "accept_terms", "text": "接受要求：承诺后续交付第一批维持物资。", "priority": 0 }] },
+        "opt_defer_terms": { "selection": "best_match", "variants": [{ "id": "defer_terms", "text": "暂缓答复：先确认飞船可分配库存。", "priority": 0 }] },
+        "opt_refuse_terms": { "selection": "best_match", "variants": [{ "id": "refuse_terms", "text": "拒绝以飞船物资作为第一合作条件。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.demand_limited_entry",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "demand_limited_entry",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "demand_limited_entry", "text": "村长：你们可以留在线里谈，但武器低放，路线由我们的人带。先遵守入营规则，再谈你们要找什么。", "priority": 0 }] },
+      "body_lines": [{ "selection": "first_match", "variants": [{ "id": "limited_entry_scope", "text": "{{crew_display_name}}：这是最低互信路线。没有物资或家徽加成，也没有人质压力，先换取有限入营许可。", "priority": 0 }] }],
+      "option_lines": {
+        "opt_accept_terms": { "selection": "best_match", "variants": [{ "id": "accept_terms", "text": "接受要求：放低武器并遵守有限入营规则。", "priority": 0 }] },
+        "opt_defer_terms": { "selection": "best_match", "variants": [{ "id": "defer_terms", "text": "暂缓答复：要求先说明入营限制。", "priority": 0 }] },
+        "opt_refuse_terms": { "selection": "best_match", "variants": [{ "id": "refuse_terms", "text": "拒绝接受营地的有限入营规则。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.accept_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "accept_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "accept_reply", "text": "{{crew_display_name}}：我接受这个方向。村长没有立刻给出完整合作，只是把下一步条件钉下来了。", "priority": 0 }] },
+      "body_lines": [],
+      "option_lines": {
+        "ack_accept_chief_terms": { "selection": "best_match", "variants": [{ "id": "ack_accept_chief_terms", "text": "记录已接受村长的合作要求。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.defer_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "defer_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "defer_reply", "text": "{{crew_display_name}}：我没有直接答应，只把谈判窗口保住。村长接受暂缓，但不会等太久。", "priority": 0 }] },
+      "body_lines": [],
+      "option_lines": {
+        "ack_defer_chief_terms": { "selection": "best_match", "variants": [{ "id": "ack_defer_chief_terms", "text": "记录暂缓回应村长的合作要求。", "priority": 0 }] }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting.call.refuse_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting",
+      "node_id": "refuse_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": { "selection": "best_match", "variants": [{ "id": "refuse_reply", "text": "{{crew_display_name}}：我拒绝了。村长没有继续加码，只让门口的人把我带回线外。", "priority": 0 }] },
+      "body_lines": [],
+      "option_lines": {
+        "ack_refuse_chief_terms": { "selection": "best_match", "variants": [{ "id": "ack_refuse_chief_terms", "text": "记录已拒绝村长的合作要求。", "priority": 0 }] }
       },
       "fallback_order": ["default"],
       "default_variant_required": true

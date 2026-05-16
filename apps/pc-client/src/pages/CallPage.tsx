@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { buildCallView, type CallActionTargetView, type CallFeatureContextView } from "../callActions";
 import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
@@ -7,6 +7,17 @@ import type { ActionOption, CallContext, CrewId, CrewMember, GameMapState, GameS
 import type { RenderedLine, RuntimeCall } from "../events/types";
 import { getTileLocationLabel } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
+import actionMoveRouteImageUrl from "../../../../content/assets/actions/iafs/action-move-route.png";
+import actionRepairSiteImageUrl from "../../../../content/assets/actions/iafs/action-repair-site.png";
+import actionStandbyListenImageUrl from "../../../../content/assets/actions/iafs/action-standby-listen.png";
+import actionSurveyScanImageUrl from "../../../../content/assets/actions/iafs/action-survey-scan.png";
+import emptySurveyImageUrl from "../../../../content/assets/events/iafs/empty-survey.png";
+import lifeSupportModuleImageUrl from "../../../../content/assets/events/iafs/life-support-module.png";
+import odysseyCrashSiteImageUrl from "../../../../content/assets/events/iafs/odyssey-crash-site.png";
+import powerNodeImageUrl from "../../../../content/assets/events/iafs/power-node.png";
+import scatteredSuppliesImageUrl from "../../../../content/assets/events/iafs/scattered-supplies.png";
+import scavengerCampOutskirtsImageUrl from "../../../../content/assets/events/iafs/scavenger-camp-outskirts.png";
+import sentryLineStandoffImageUrl from "../../../../content/assets/events/iafs/sentry-line-standoff.png";
 
 type CallActionOption = ActionOption & {
   target?: CallActionTargetView;
@@ -31,7 +42,13 @@ interface CallActionGroupView {
   actions: CallActionOption[];
 }
 
-interface RuntimeTranscriptPlaybackState {
+interface CallSceneImage {
+  src: string;
+  alt: string;
+  caption: string;
+}
+
+interface TranscriptPlaybackState {
   callId: string | null;
   lineIndex: number;
   charIndex: number;
@@ -171,11 +188,13 @@ export function CallPage({
 
     return {
       scene: "通话画面 / 状态确认 / 当前区块回传",
-      lines: [
-        memberActionView.actionStatus === "idle"
-          ? `${member.name} 正在等待新的行动指令。`
-          : `${member.name} 当前状态：${memberActionView.statusText}`,
-      ],
+      lines: call.idleChatterLines?.length
+        ? formatIdleChatterLines(member, call.idleChatterLines)
+        : [
+            memberActionView.actionStatus === "idle"
+              ? `${member.name} 正在等待新的行动指令。`
+              : `${member.name} 当前状态：${memberActionView.statusText}`,
+          ],
       renderedLines: [],
       meta: `地点：${currentLocation} / 行动：${memberActionView.actionTitle}`,
       actions: [],
@@ -186,68 +205,75 @@ export function CallPage({
     };
   }, [activeCalls, call, elapsedGameSeconds, gameState, member, memberActionView, runtimeCall, tiles]);
   const runtimeTranscriptCallId = callView?.isRuntime && runtimeCall ? runtimeCall.id : null;
-  const runtimeTranscriptEnabled = Boolean(callView?.isRuntime && runtimeTranscriptCallId && !callClosed);
-  const runtimeTranscriptAnimationDisabled = isRuntimeTranscriptAnimationDisabled();
-  const runtimeTranscriptPlaybackEnabled = runtimeTranscriptEnabled && !runtimeTranscriptAnimationDisabled;
-  const runtimeTranscriptLines = runtimeTranscriptEnabled ? callView?.lines ?? [] : [];
-  const firstRuntimeTranscriptLine = runtimeTranscriptLines[0];
-  const [runtimeTranscript, setRuntimeTranscript] = useState<RuntimeTranscriptPlaybackState>({
+  const idleChatterTranscriptKey =
+    !callView?.isRuntime && call?.idleChatterId && call.idleChatterLines?.length
+      ? `idle:${call.crewId}:${call.idleChatterId}`
+      : null;
+  const animatedTranscriptKey = runtimeTranscriptCallId ?? idleChatterTranscriptKey;
+  const animatedTranscriptEnabled = Boolean(animatedTranscriptKey && !callClosed);
+  const transcriptAnimationDisabled = isRuntimeTranscriptAnimationDisabled();
+  const animatedTranscriptPlaybackEnabled = animatedTranscriptEnabled && !transcriptAnimationDisabled;
+  const animatedTranscriptLines = animatedTranscriptPlaybackEnabled ? callView?.lines ?? [] : [];
+  const firstAnimatedTranscriptLine = animatedTranscriptLines[0];
+  const [transcriptPlayback, setTranscriptPlayback] = useState<TranscriptPlaybackState>({
     callId: null,
     lineIndex: 0,
     charIndex: 0,
     rollAnimation: null,
   });
-  const activeRuntimeTranscriptLineIndex =
-    runtimeTranscript.callId === runtimeTranscriptCallId ? Math.min(runtimeTranscript.lineIndex, Math.max(runtimeTranscriptLines.length - 1, 0)) : 0;
-  const activeRuntimeTranscriptCharIndex =
-    runtimeTranscript.callId === runtimeTranscriptCallId
-      ? runtimeTranscript.charIndex
-      : initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine);
-  const currentRuntimeTranscriptLine = runtimeTranscriptLines[activeRuntimeTranscriptLineIndex] ?? "";
-  const currentRuntimeTranscriptRenderedLine = callView?.renderedLines[activeRuntimeTranscriptLineIndex];
-  const runtimeTranscriptComplete =
-    runtimeTranscriptAnimationDisabled ||
-    !runtimeTranscriptEnabled ||
-	    runtimeTranscriptLines.length === 0 ||
-	    (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
-	      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length &&
-	      !runtimeTranscript.rollAnimation);
+  const activeAnimatedTranscriptLineIndex =
+    transcriptPlayback.callId === animatedTranscriptKey ? Math.min(transcriptPlayback.lineIndex, Math.max(animatedTranscriptLines.length - 1, 0)) : 0;
+  const activeAnimatedTranscriptCharIndex =
+    transcriptPlayback.callId === animatedTranscriptKey
+      ? transcriptPlayback.charIndex
+      : initialTranscriptCharCount(firstAnimatedTranscriptLine);
+  const currentAnimatedTranscriptLine = animatedTranscriptLines[activeAnimatedTranscriptLineIndex] ?? "";
+  const currentAnimatedTranscriptRenderedLine = callView?.renderedLines[activeAnimatedTranscriptLineIndex];
+  const animatedTranscriptComplete =
+    transcriptAnimationDisabled ||
+    !animatedTranscriptEnabled ||
+    animatedTranscriptLines.length === 0 ||
+    (activeAnimatedTranscriptLineIndex >= animatedTranscriptLines.length - 1 &&
+      activeAnimatedTranscriptCharIndex >= currentAnimatedTranscriptLine.length &&
+      !transcriptPlayback.rollAnimation);
+  const shouldGateCallActions = animatedTranscriptEnabled && !animatedTranscriptComplete;
+  const callSceneImage = callView ? getCallSceneImage(callView) : null;
 
   useEffect(() => {
-    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId) {
-      setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0, rollAnimation: null });
+    if (!animatedTranscriptPlaybackEnabled || !animatedTranscriptKey) {
+      setTranscriptPlayback({ callId: null, lineIndex: 0, charIndex: 0, rollAnimation: null });
       return;
     }
 
-    setRuntimeTranscript((current) => {
-      if (current.callId === runtimeTranscriptCallId) {
+    setTranscriptPlayback((current) => {
+      if (current.callId === animatedTranscriptKey) {
         return current;
       }
       return {
-        callId: runtimeTranscriptCallId,
+        callId: animatedTranscriptKey,
         lineIndex: 0,
-        charIndex: initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine),
+        charIndex: initialTranscriptCharCount(firstAnimatedTranscriptLine),
         rollAnimation: null,
       };
     });
-  }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptPlaybackEnabled]);
+  }, [animatedTranscriptKey, animatedTranscriptPlaybackEnabled, firstAnimatedTranscriptLine]);
 
   useEffect(() => {
     if (
-      !runtimeTranscriptPlaybackEnabled ||
-      !runtimeTranscriptCallId ||
-      runtimeTranscriptLines.length === 0 ||
-      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length
+      !animatedTranscriptPlaybackEnabled ||
+      !animatedTranscriptKey ||
+      animatedTranscriptLines.length === 0 ||
+      (activeAnimatedTranscriptCharIndex >= currentAnimatedTranscriptLine.length && !transcriptPlayback.rollAnimation)
     ) {
       return;
     }
 
     const timer = window.setInterval(() => {
-      setRuntimeTranscript((current) => {
-        if (current.callId !== runtimeTranscriptCallId || current.lineIndex !== activeRuntimeTranscriptLineIndex) {
+      setTranscriptPlayback((current) => {
+        if (current.callId !== animatedTranscriptKey || current.lineIndex !== activeAnimatedTranscriptLineIndex) {
           return current;
         }
-        const lineAnimation = currentRuntimeTranscriptRenderedLine?.animation;
+        const lineAnimation = currentAnimatedTranscriptRenderedLine?.animation;
         if (current.rollAnimation && current.rollAnimation.lineIndex === current.lineIndex) {
           if (current.rollAnimation.ticksRemaining > 0) {
             return {
@@ -260,7 +286,7 @@ export function CallPage({
           }
           return {
             ...current,
-            charIndex: Math.min(current.charIndex + 1, currentRuntimeTranscriptLine.length),
+            charIndex: Math.min(current.charIndex + 1, currentAnimatedTranscriptLine.length),
             rollAnimation: null,
           };
         }
@@ -282,7 +308,7 @@ export function CallPage({
             },
           };
         }
-        if (current.charIndex >= currentRuntimeTranscriptLine.length) {
+        if (current.charIndex >= currentAnimatedTranscriptLine.length) {
           return current;
         }
         return {
@@ -295,51 +321,60 @@ export function CallPage({
 
     return () => window.clearInterval(timer);
   }, [
-    activeRuntimeTranscriptCharIndex,
-    activeRuntimeTranscriptLineIndex,
-    currentRuntimeTranscriptLine.length,
-    currentRuntimeTranscriptRenderedLine?.animation,
-    runtimeTranscriptCallId,
-    runtimeTranscriptPlaybackEnabled,
-    runtimeTranscriptLines.length,
+    activeAnimatedTranscriptCharIndex,
+    activeAnimatedTranscriptLineIndex,
+    animatedTranscriptKey,
+    animatedTranscriptLines.length,
+    animatedTranscriptPlaybackEnabled,
+    currentAnimatedTranscriptRenderedLine?.animation,
+    currentAnimatedTranscriptLine.length,
+    transcriptPlayback.rollAnimation,
   ]);
 
-  const handleRuntimeTranscriptAdvance = () => {
-    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId || runtimeTranscriptLines.length === 0) {
+  const handleTranscriptAdvance = () => {
+    if (!animatedTranscriptPlaybackEnabled || !animatedTranscriptKey || animatedTranscriptLines.length === 0) {
       return;
     }
 
-    setRuntimeTranscript((current) => {
-      const lineIndex = current.callId === runtimeTranscriptCallId ? Math.min(current.lineIndex, runtimeTranscriptLines.length - 1) : 0;
-      const charIndex = current.callId === runtimeTranscriptCallId ? current.charIndex : initialRuntimeTranscriptCharCount(runtimeTranscriptLines[0]);
-      const currentLine = runtimeTranscriptLines[lineIndex] ?? "";
+    setTranscriptPlayback((current) => {
+      const lineIndex = current.callId === animatedTranscriptKey ? Math.min(current.lineIndex, animatedTranscriptLines.length - 1) : 0;
+      const charIndex = current.callId === animatedTranscriptKey ? current.charIndex : initialTranscriptCharCount(animatedTranscriptLines[0]);
+      const currentLine = animatedTranscriptLines[lineIndex] ?? "";
 
       if (charIndex < currentLine.length) {
         return {
-          callId: runtimeTranscriptCallId,
+          callId: animatedTranscriptKey,
           lineIndex,
           charIndex: currentLine.length,
           rollAnimation: null,
         };
       }
 
-      if (lineIndex < runtimeTranscriptLines.length - 1) {
-        const nextLine = runtimeTranscriptLines[lineIndex + 1];
+      if (lineIndex < animatedTranscriptLines.length - 1) {
+        const nextLine = animatedTranscriptLines[lineIndex + 1];
         return {
-          callId: runtimeTranscriptCallId,
+          callId: animatedTranscriptKey,
           lineIndex: lineIndex + 1,
-          charIndex: initialRuntimeTranscriptCharCount(nextLine),
+          charIndex: initialTranscriptCharCount(nextLine),
           rollAnimation: null,
         };
       }
 
       return {
-        callId: runtimeTranscriptCallId,
+        callId: animatedTranscriptKey,
         lineIndex,
         charIndex,
         rollAnimation: null,
       };
     });
+  };
+
+  const handleTranscriptKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    handleTranscriptAdvance();
   };
 
   if (!call || !member || !callView || !memberActionView) {
@@ -481,13 +516,13 @@ export function CallPage({
             <div className="console-call-action-groups">
               <section className="console-call-action-group">
                 <h3>事件选项</h3>
-                {runtimeTranscriptComplete ? (
+                {animatedTranscriptComplete ? (
                   <div className="console-call-option-list">
                     {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
                   </div>
                 ) : (
                   <>
-                    <button type="button" className="choice-button choice-neutral" onClick={handleRuntimeTranscriptAdvance}>
+                    <button type="button" className="choice-button choice-neutral" onClick={handleTranscriptAdvance}>
                       <span>继续接收</span>
                     </button>
                     <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，继续接收后解锁事件选项。</p>
@@ -497,14 +532,24 @@ export function CallPage({
             </div>
           ) : (
             <div className="console-call-action-groups">
-              {callView.actionGroups.map((group) => (
-                <section key={group.title} className="console-call-action-group">
-                  <h3>{group.title}</h3>
-                  <div className="console-call-option-list">
-                    {group.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
-                  </div>
+              {shouldGateCallActions ? (
+                <section className="console-call-action-group">
+                  <h3>基础行动</h3>
+                  <button type="button" className="choice-button choice-neutral" onClick={handleTranscriptAdvance}>
+                    <span>继续接收</span>
+                  </button>
+                  <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，点击文本区继续接收。</p>
                 </section>
-              ))}
+              ) : (
+                callView.actionGroups.map((group) => (
+                  <section key={group.title} className="console-call-action-group">
+                    <h3>{group.title}</h3>
+                    <div className="console-call-option-list">
+                      {group.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
+                    </div>
+                  </section>
+                ))
+              )}
             </div>
           )}
 
@@ -539,20 +584,34 @@ export function CallPage({
             <section className="console-screen-block console-call-visual-grid">
               <div className="console-call-art-block">
                 <p className="console-screen-command">] OPEN SIGNAL-CAPTURE.BAS</p>
-                {buildCallAsciiScene(callView, member, callClosed).map((line, index) => (
-                  <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
-                ))}
+                {callSceneImage ? (
+                  <figure className="console-call-scene-frame">
+                    <img className="console-call-scene-image" src={callSceneImage.src} alt={callSceneImage.alt} />
+                    <figcaption className="console-call-scene-caption">{callSceneImage.caption}</figcaption>
+                  </figure>
+                ) : (
+                  buildCallAsciiScene(callView, member, callClosed).map((line, index) => (
+                    <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
+                  ))
+                )}
               </div>
             </section>
-            <section className="console-screen-block">
+            <section
+              className={`console-screen-block console-call-transcript-block ${animatedTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
+              onClick={animatedTranscriptPlaybackEnabled ? handleTranscriptAdvance : undefined}
+              onKeyDown={animatedTranscriptPlaybackEnabled ? handleTranscriptKeyDown : undefined}
+              role={animatedTranscriptPlaybackEnabled ? "button" : undefined}
+              tabIndex={animatedTranscriptPlaybackEnabled ? 0 : undefined}
+              aria-label={animatedTranscriptPlaybackEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
+            >
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
-              {runtimeTranscriptPlaybackEnabled
+              {animatedTranscriptPlaybackEnabled
                 ? renderRuntimeTranscriptLines({
                     renderedLines: callView.renderedLines,
                     lines: callView.lines,
-                    activeCallId: runtimeTranscriptCallId,
-                    playback: runtimeTranscript,
-                    complete: runtimeTranscriptComplete,
+                    activeCallId: animatedTranscriptKey,
+                    playback: transcriptPlayback,
+                    complete: animatedTranscriptComplete,
                   })
                 : (call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
                     <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
@@ -604,12 +663,33 @@ function renderActionButton(action: CallActionOption, callClosed: boolean, onDec
   );
 }
 
-function initialRuntimeTranscriptCharCount(line: string | undefined) {
+function initialTranscriptCharCount(line: string | undefined) {
   return line && line.length > 0 ? 1 : 0;
 }
 
 function isRuntimeTranscriptAnimationDisabled() {
   return typeof window !== "undefined" && window.localStorage.getItem("stellar-frontier-e2e-disable-animation") === "1";
+}
+
+function formatIdleChatterLines(member: CrewMember, lines: string[]) {
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (isAtmosphereLine(trimmed)) {
+      return trimmed;
+    }
+    return `${member.name}：${stripOuterDialogueQuotes(trimmed)}`;
+  });
+}
+
+function isAtmosphereLine(line: string) {
+  return line.startsWith("（");
+}
+
+function stripOuterDialogueQuotes(line: string) {
+  if ((line.startsWith("“") && line.endsWith("”")) || (line.startsWith("\"") && line.endsWith("\""))) {
+    return line.slice(1, -1);
+  }
+  return line;
 }
 
 function renderRuntimeTranscriptLines({
@@ -622,7 +702,7 @@ function renderRuntimeTranscriptLines({
   renderedLines: RenderedLine[];
   lines: string[];
   activeCallId: string | null;
-  playback: RuntimeTranscriptPlaybackState;
+  playback: TranscriptPlaybackState;
   complete: boolean;
 }) {
   if (!lines.length) {
@@ -630,7 +710,7 @@ function renderRuntimeTranscriptLines({
   }
 
   const activeLineIndex = playback.callId === activeCallId ? Math.min(playback.lineIndex, lines.length - 1) : 0;
-  const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialRuntimeTranscriptCharCount(lines[0]);
+  const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialTranscriptCharCount(lines[0]);
   return lines.slice(0, activeLineIndex + 1).map((line, index) => {
     const isCurrentLine = index === activeLineIndex;
     const renderedText = isCurrentLine
@@ -776,6 +856,126 @@ function MoveConfirmPanel({
       </div>
     </div>
   );
+}
+
+function getCallSceneImage(callView: CallView): CallSceneImage | null {
+  if (!callView.isRuntime) {
+    return getFieldLinkSceneImage(callView);
+  }
+
+  const sceneKey = `${callView.meta} ${callView.lines.join(" ")}`.toLowerCase();
+  const sceneImageRules: Array<{ needles: string[]; image: CallSceneImage }> = [
+    {
+      needles: ["iafs_scattered_supplies", "散落物资", "散落补给", "货舱", "补给箱", "supplies"],
+      image: {
+        src: scatteredSuppliesImageUrl,
+        alt: "散落补给与货舱残骸的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / SCATTERED SUPPLIES",
+      },
+    },
+    {
+      needles: ["iafs_default_survey_nothing_found", "调查未发现", "没有发现", "无发现", "nothing_found"],
+      image: {
+        src: emptySurveyImageUrl,
+        alt: "无发现区域勘察的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / EMPTY SURVEY",
+      },
+    },
+    {
+      needles: ["iafs_generator", "发电机", "主供电", "供电回路", "动力节点", "generator"],
+      image: {
+        src: powerNodeImageUrl,
+        alt: "发电机与动力节点的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / POWER NODE",
+      },
+    },
+    {
+      needles: ["iafs_life_support", "维生", "生命维持", "循环泵", "空气循环", "life_support"],
+      image: {
+        src: lifeSupportModuleImageUrl,
+        alt: "生命维持模块与医疗舱的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / LIFE SUPPORT",
+      },
+    },
+    {
+      needles: ["iafs_scavenger_sentry", "哨卫", "哨线", "岗哨", "警铃", "sentry"],
+      image: {
+        src: sentryLineStandoffImageUrl,
+        alt: "拾荒者哨戒线对峙的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / SENTRY LINE",
+      },
+    },
+    {
+      needles: ["iafs_scavenger_camp", "拾荒者", "营地", "村落", "帐篷", "scavenger_camp"],
+      image: {
+        src: scavengerCampOutskirtsImageUrl,
+        alt: "拾荒者营地外围的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / CAMP OUTSKIRTS",
+      },
+    },
+    {
+      needles: ["奥德赛号", "坠毁", "crash"],
+      image: {
+        src: odysseyCrashSiteImageUrl,
+        alt: "奥德赛号坠毁点的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / ODYSSEY CRASH SITE",
+      },
+    },
+  ];
+
+  for (const rule of sceneImageRules) {
+    if (rule.needles.some((needle) => sceneKey.includes(needle))) {
+      return rule.image;
+    }
+  }
+
+  return null;
+}
+
+function getFieldLinkSceneImage(callView: CallView): CallSceneImage | null {
+  const sceneKey = `${callView.meta} ${callView.lines.join(" ")}`.toLowerCase();
+  const actionImageRules: Array<{ needles: string[]; image: CallSceneImage }> = [
+    {
+      needles: ["移动至", "正在前往", "移动剩余", "move"],
+      image: {
+        src: actionMoveRouteImageUrl,
+        alt: "荒原路线前进中的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / ROUTE NAVIGATION",
+      },
+    },
+    {
+      needles: ["调查当前区域", "正在调查", "区域扫描", "survey"],
+      image: {
+        src: actionSurveyScanImageUrl,
+        alt: "区域扫描调查中的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / AREA SCAN",
+      },
+    },
+    {
+      needles: ["修复", "维修", "repair"],
+      image: {
+        src: actionRepairSiteImageUrl,
+        alt: "维修现场的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / REPAIR SITE",
+      },
+    },
+    {
+      needles: ["原地待命", "待命中", "正在等待", "standby", "idle"],
+      image: {
+        src: actionStandbyListenImageUrl,
+        alt: "原地驻留监听中的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / STANDBY LISTEN",
+      },
+    },
+  ];
+
+  for (const rule of actionImageRules) {
+    if (rule.needles.some((needle) => sceneKey.includes(needle))) {
+      return rule.image;
+    }
+  }
+
+  return null;
 }
 
 function buildCallAsciiScene(callView: CallView, member: CrewMember, callClosed: boolean) {

@@ -5,6 +5,10 @@
 - event_id:
   - `iafs_scavenger_camp_outer_discovery`
   - `iafs_scavenger_sentry_line_contact`
+  - `iafs_scavenger_supply_chief_callback`
+  - `iafs_scavenger_heir_chief_invitation`
+  - `iafs_scavenger_sentry_capture_callback`
+  - `iafs_scavenger_sentry_control_negotiation`
 - line_type: `side_with_mainline_hook`
 - unique_id: `11`
 - source_anchor: `IAFS_story.md` -> `### 支线 03：灰烬拾荒者（交界带）` / 拾荒营地前置接触
@@ -17,7 +21,8 @@
 - 奥德赛号雷达装置修复后，雷达回报北侧疑似智慧文明活动，并解锁主线任务“与当地居民联系”；本事件承接这条主线的第一处北侧接触点。
 - 外围阶段让队员主动打给指挥官，报告这是一个贫穷但有人组织的拾荒者村落，并请求下一步指示。
 - 哨线阶段先由队员描述哨卫外貌、武器和接近动作，再让白噪发出拦截台词。
-- 观察路线只让玩家听见“两派搜人”的片段；强硬路线让队员临时失联。不在本事件完整揭露难民、证据或后续庇护线真相。
+- 观察与闲聊路线是一次性信息尝试：失败回到线外问话，成功发现营地缺维持性物资，飞船物资可成为进入村长对话的筹码。
+- 强硬路线让队员临时失联。不在本事件完整揭露难民、证据或后续庇护线真相。
 
 ## Tone Narrative
 
@@ -29,7 +34,7 @@
 
 > 站住。线外说话，手别乱动。报名字、来路、找谁。少答一样，我就当你是麻烦。
 
-玩家可以选择观察、强硬、商量或套话。观察会听到村内正在争论霜湾的人、巡查队和烬炉；强硬会触发营地压制信号，队员临时失联。
+玩家可以选择观察、强硬、商量或套话。观察或套话成功会暴露营地真正缺的是滤芯、保温层、维修件和应急食物；这让玩家意识到飞船物资可成为谈判筹码。观察失败或套话失败只回到线外问话，但对应信息选项不再重复出现。强硬会触发营地压制信号，队员临时失联。
 
 ## Event Journey
 
@@ -62,16 +67,20 @@
   - `opt_negotiate`: 表明无敌意，说明问路、交易、交换情报的来意。
   - `opt_chat`: 顺着白噪的话套问近况。
 
-### 3. 观察路线
+### 3. 信息尝试路线
 
-- Node
-  - `observe_eavesdrop` (`call`)
-- Heard lines
-  - “霜湾的人不能再留在后帐，巡查队今天会搜到边线。”
-  - “交出去也是死，烬炉的人不会认账。”
-- Consequence
-  - 写入 `iafs_scavenger_sentry_opening_choice = observe`。
-  - 玩家只知道营地夹在两股力量之间；不揭露完整庇护对象和证据。
+- `opt_observe`
+  - 进入 `[感知]` 判定。
+  - 失败：`observe_partial_failure` 后回到 `sentry_challenge`；写入 `iafs_scavenger_sentry_observe_tried = true`，该选项隐藏。
+  - 成功：`observe_eavesdrop` 听到营地缺滤芯、保温层、维修料和食物，也听到霜湾 / 巡查队 / 烬炉片段。
+  - 成功后若主动提出分担物资，会进入 `[运气]` 判定；成功进入等待村长回话，失败被哨卫怀疑是烬炉派来的人并回到 `sentry_challenge`。
+- `opt_chat`
+  - 进入 `[智力]` 判定。
+  - 失败：`chat_suspicion` 后回到 `sentry_challenge`；写入 `iafs_scavenger_sentry_chat_tried = true`，该选项隐藏。
+  - 成功：`chat_reply` 套出营地缺防寒、维修和食物类维持物资。
+  - 成功后提出可以分担物资，哨卫会去找村长，让队员在线外等消息。
+- 成功提出物资筹码时写入 `iafs_scavenger_supply_leverage_discovered = true`、`iafs_scavenger_supply_leverage_source = chat | eavesdrop`、`iafs_scavenger_chief_entry_reason = supply_offer_chat | supply_offer_eavesdrop`。
+- 后续轻量事件 `iafs_scavenger_supply_chief_callback` 等待约 120 秒后回电，确认村长愿意听物资提议；确认后进入 `iafs_scavenger_chief_meeting`。
 
 ### 4. 强硬路线
 
@@ -86,13 +95,34 @@
   - 给队员添加 `iafs_scavenger_signal_lost` condition。
   - PC 端显示该队员“失联。最后信号停在拾荒营地哨线。”，不可通话，但不死亡、不离开地图。
 
+### 5. 进入村长会谈的入口
+
+- 物资筹码
+  - `iafs_scavenger_supply_chief_callback` 回电后，确认会进入 `iafs_scavenger_chief_meeting`。
+  - 入口 reason 为 `supply_offer_chat | supply_offer_eavesdrop`。
+- 家徽手帕
+  - `iafs_scavenger_heir_chief_invitation` 中同意见村长后进入 `iafs_scavenger_chief_meeting`。
+  - 入口 reason 为 `heir_handkerchief`。
+  - 邀请中“观察哨兵的迟疑”是一次性感知检定；成功写入 `iafs_scavenger_sentry_doubts_read = true`，无论成功或失败都会写入 `iafs_scavenger_sentry_doubts_tried = true` 并隐藏该选项。
+- 压制哨线
+  - `iafs_scavenger_sentry_control_negotiation` 中选择进入房间、带哨卫进村或要求首领到哨站，确认后都会进入 `iafs_scavenger_chief_meeting`。
+  - 入口 reason 分别为 `sentry_control_enter_room`、`sentry_control_enter_with_hostage`、`sentry_control_leader_to_post`。
+  - 带哨卫进村时额外写入 `iafs_scavenger_has_sentry_hostage = true`。
+- 被俘队员待救援
+  - 见 `IAFS_side_12_scavenger-chief-meeting.md`：另一名未被俘队员返回哨线，会触发 `iafs_scavenger_captive_chief_invitation`。
+
 ## Event Graph Reference
 
 | event_id | node_id | node_type | purpose | next |
 | --- | --- | --- | --- | --- |
 | `iafs_scavenger_camp_outer_discovery` | `outer_report` | `call` | 外围发现村落并请求指示 | option mapping to terminal nodes |
 | `iafs_scavenger_sentry_line_contact` | `sentry_challenge` | `call` | 哨卫描述、白噪问话与首轮回应 | option mapping |
-| `iafs_scavenger_sentry_line_contact` | `observe_eavesdrop` | `call` | 偷听两派搜人线索 | `end_observe` |
+| `iafs_scavenger_sentry_line_contact` | `observe_eavesdrop` | `call` | 偷听缺物资与两派搜人线索 | `check_supply_offer_luck` |
+| `iafs_scavenger_sentry_line_contact` | `chat_reply` | `call` | 套出缺物资并提出分担 | `supply_offer_wait` |
+| `iafs_scavenger_sentry_line_contact` | `supply_offer_suspicion` | `call` | 偷听后提物资失败，被怀疑是烬炉线人 | `sentry_challenge` |
+| `iafs_scavenger_supply_chief_callback` | `supply_chief_callback` | `call` | 村长愿意听取物资交换提议 | `iafs_scavenger_chief_meeting` |
+| `iafs_scavenger_heir_chief_invitation` | `chief_invitation` | `call` | 家徽手帕后的村长邀请 | `iafs_scavenger_chief_meeting` or deferred |
+| `iafs_scavenger_sentry_control_negotiation` | `control_parley` | `call` | 压制哨线后的谈判入口 | `iafs_scavenger_chief_meeting` |
 | `iafs_scavenger_sentry_line_contact` | `threaten_backlash` | `call` | 强硬后听见压线与断讯 | `end_threaten` |
 
 ## Outcome & Mainline Coupling
@@ -100,4 +130,5 @@
 - 本事件现在承接“与当地居民联系”主线：外围发现会确认北侧信号源是有组织的拾荒村落，并推进该主线的第一阶段。
 - 它仍不强制玩家进入拾荒营地后续线；玩家可以在外围发现后选择保持距离，后续再决定是否靠近哨线。
 - 它把拾荒营地前置为灰烬霜带政治夹缝的世界观入口。
+- 物资、家徽、压制哨线与人质待救援路线会进入统一 `iafs_scavenger_chief_meeting`；该事件只记录村长提出的后续合作要求，不在本轮消耗库存或解决人质状态。
 - 后续事件可继续展开“拾荒营地是否庇护霜湾难民”的核心矛盾；已有“灰烬拾荒者”火锅支线更适合在玩家取得营地信任之后触发。
