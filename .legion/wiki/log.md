@@ -15,3 +15,8 @@
 - Added current decision that mobile active mode replaces the PC Communication Station UI while PC remains authoritative.
 - Added trust-boundary decision / pattern for phone-origin gameplay intents: paired client identity, monotonic sequence, payload validation, and authoritative PC lookup before dispatch.
 - Added task summary for `fix-iafs-editor-manifest-tests` and recorded an event manifest testing pattern: manifest fixtures must stay self-consistent and avoid legacy domain ordering assumptions.
+
+## 2026-05-16
+
+- Added task summary for `configure-yuan-host-base-url`.
+- Recorded the current Yuan Host default URL decision: PC pairing defaults to `ws://8.159.128.125:8888/`, with `VITE_YUAN_HOST_URL` retained as the environment override.
