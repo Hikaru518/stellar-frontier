@@ -156,23 +156,23 @@ try {
 }
 `;
 
-const readme = `Stellar Frontier local HTTP package
-====================================
+const readme = `Stellar Frontier 本地 HTTP 版
+================================
 
-This package contains only the PC game client.
-It does not include the editor or mobile companion app.
+这个包只包含 PC 游戏客户端。
+它不包含 Editor，也不包含手机 companion 客户端。
 
-How to play on Windows:
+Windows 游玩方式：
 
-1. Keep all files in this folder together.
-2. Double-click "Start Stellar Frontier.cmd".
-3. A browser should open at http://127.0.0.1:51780/.
-4. Keep the command window open while playing.
-5. Close the command window to stop the local server.
+1. 解压后请保持整个文件夹结构不变，不要只移动单个文件。
+2. 双击 "Start Stellar Frontier.cmd"。
+3. 浏览器会自动打开 http://127.0.0.1:51780/。
+4. 游玩时请保持命令行窗口打开。
+5. 关闭命令行窗口即可停止本地服务器。
 
-If port 51780 is already busy, the launcher tries the next available port up to
-51820. Save data is stored by the browser for the local URL, so using the same
-port is best for keeping the same save.
+如果 51780 端口已被占用，启动器会自动尝试 51781 到 51820。
+游戏存档由浏览器按本地网址保存，所以尽量使用同一个端口游玩，
+这样更容易保留同一份存档。
 `;
 
 run(process.execPath, [
