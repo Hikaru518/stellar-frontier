@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation completed in worktree and passed scoped verification / readiness review. PR lifecycle pending. User explicitly requested commit without merge, so auto-merge must remain disabled for this task.
+Implementation completed in worktree and passed scoped verification / readiness review. PR #56 is open and not merged. User explicitly requested commit without merge, so auto-merge must remain disabled for this task.
 
 ## Result
 
@@ -19,6 +19,7 @@ Implementation completed in worktree and passed scoped verification / readiness 
 
 ## Evidence
 
+- PR: https://github.com/Hikaru518/stellar-frontier/pull/56
 - Raw contract: `.legion/tasks/mobile-terminal-visual-redesign/plan.md`
 - Verification: `.legion/tasks/mobile-terminal-visual-redesign/docs/test-report.md`
 - Readiness review: `.legion/tasks/mobile-terminal-visual-redesign/docs/review-change.md`

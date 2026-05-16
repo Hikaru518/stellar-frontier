@@ -50,4 +50,8 @@ Security lens was considered because the UI touches pairing/transport/intent pre
 
 ## PR Lifecycle Note
 
+PR: https://github.com/Hikaru518/stellar-frontier/pull/56.
+
 User requested: commit code, do not merge. This means the branch/PR may be created for review, but auto-merge must not be enabled and the PR must not be merged by this task.
+
+Current handoff state: PR is open, `mergeStateStatus=BLOCKED`, and GitHub reports no required checks on the branch.
