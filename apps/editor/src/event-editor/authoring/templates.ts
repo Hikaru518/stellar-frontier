@@ -15,6 +15,7 @@ import {
   type LogOnlyNode,
   type ObjectiveNode,
   type RandomNode,
+  type SkillCheckNode,
   type SpawnEventNode,
   type TextVariantGroup,
   type WaitNode,
@@ -58,6 +59,7 @@ export const EVENT_NODE_TYPES = [
   "call",
   "wait",
   "check",
+  "skill_check",
   "random",
   "action_request",
   "objective",
@@ -80,6 +82,7 @@ const DEFAULT_NODE_TITLES = {
   call: "Call",
   wait: "Wait",
   check: "Check",
+  skill_check: "Skill Check",
   random: "Random",
   action_request: "Action Request",
   objective: "Objective",
@@ -202,6 +205,20 @@ export function createDefaultNodeTemplate({
         branches: [{ id: DEFAULT_BRANCH_ID, conditions: [], next_node_id: nextNodeId }],
         default_next_node_id: nextNodeId,
         evaluation_order: "first_match",
+      };
+      return node;
+    }
+    case "skill_check": {
+      const node: SkillCheckNode = {
+        ...createDefaultNodeCommon("skill_check", nodeId),
+        type: "skill_check",
+        attribute: "perception",
+        attribute_label: "感知",
+        dc: 12,
+        die_sides: 20,
+        store_result_as: `${nodeId}_result`,
+        success_node_id: nextNodeId,
+        failure_node_id: nextNodeId,
       };
       return node;
     }

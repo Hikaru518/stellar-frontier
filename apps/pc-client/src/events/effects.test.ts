@@ -509,6 +509,7 @@ function createState(): EffectGameState {
         objective_ids: ["obj_rescue"],
         selected_options: {},
         random_results: {},
+        check_results: {},
         blocking_claim_ids: [],
         created_at: 90,
         updated_at: 120,

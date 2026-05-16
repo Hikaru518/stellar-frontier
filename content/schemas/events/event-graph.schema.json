@@ -64,6 +64,9 @@
               "$ref": "#/$defs/check_node"
             },
             {
+              "$ref": "#/$defs/skill_check_node"
+            },
+            {
               "$ref": "#/$defs/random_node"
             },
             {
@@ -99,6 +102,7 @@
             "call",
             "wait",
             "check",
+            "skill_check",
             "random",
             "action_request",
             "objective",
@@ -254,6 +258,44 @@
         },
         "evaluation_order": {
           "const": "first_match"
+        }
+      }
+    },
+    "skill_check_node": {
+      "type": "object",
+      "required": ["type", "attribute", "attribute_label", "dc", "die_sides", "store_result_as", "success_node_id", "failure_node_id"],
+      "properties": {
+        "type": {
+          "const": "skill_check"
+        },
+        "attribute": {
+          "$ref": "#/$defs/skill_check_attribute"
+        },
+        "attribute_label": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "dc": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "die_sides": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "store_result_as": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "success_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "failure_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "success_effect_refs": {
+          "$ref": "#/$defs/id_array"
+        },
+        "failure_effect_refs": {
+          "$ref": "#/$defs/id_array"
         }
       }
     },
@@ -503,6 +545,12 @@
         },
         "is_default": {
           "type": "boolean"
+        },
+        "display_tag": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "check_preview": {
+          "$ref": "#/$defs/skill_check_preview"
         }
       }
     },
@@ -774,6 +822,27 @@
       "type": "object",
       "additionalProperties": true
     },
+    "skill_check_preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "attribute_label", "dc"],
+      "properties": {
+        "attribute": {
+          "$ref": "#/$defs/skill_check_attribute"
+        },
+        "attribute_label": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "dc": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "die_sides": {
+          "type": "integer",
+          "minimum": 2
+        }
+      }
+    },
     "id_array": {
       "type": "array",
       "items": {
@@ -838,6 +907,10 @@
         "guarding_event_site",
         "custom_handler_action"
       ]
+    },
+    "skill_check_attribute": {
+      "type": "string",
+      "enum": ["strength", "agility", "intelligence", "perception", "luck"]
     },
     "world_history_scope": {
       "type": "string",

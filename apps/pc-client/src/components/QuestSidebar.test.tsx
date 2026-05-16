@@ -7,7 +7,7 @@ import type { QuestCategoryFilter, QuestDetailView, QuestSidebarView, QuestStatu
 import { QuestSidebar } from "./QuestSidebar";
 
 const stationNavigation: QuestNavigationEntry = { type: "page", label: "打开通讯台", page: "station" };
-const mapNavigation: QuestNavigationEntry = { type: "tile", label: "定位坠毁点", tile_id: "129-129" };
+const mapNavigation: QuestNavigationEntry = { type: "tile", label: "定位坠毁点", tile_id: "116-112" };
 const crewNavigation: QuestNavigationEntry = { type: "crew", label: "联系 麦克", crew_id: "mike" };
 
 const quests: QuestDetailView[] = [

@@ -45,7 +45,7 @@
       ],
       "log_templates": [{ "id": "iafs_opening_mike_crash_call_log", "summary": "麦克完成坠毁后首次回报，主线进入重整态势", "importance": "major", "visibility": "player_visible" }],
       "content_refs": { "call_template_ids": ["iafs_opening_mike_crash_call.call.crash_report", "iafs_opening_mike_crash_call.call.facilities_prompt", "iafs_opening_mike_crash_call.call.cargo_prompt", "iafs_opening_mike_crash_call.call.route_prompt", "iafs_opening_mike_crash_call.call.route_exit_reply", "iafs_opening_mike_crash_call.call.route_contact_reply"], "crew_ids": ["mike"] },
-      "sample_contexts": [{ "trigger_type": "game_start", "occurred_at": 0, "source": "time_system", "crew_id": "mike", "tile_id": "129-129", "payload": { "phase": "new_game" } }]
+      "sample_contexts": [{ "trigger_type": "game_start", "occurred_at": 0, "source": "time_system", "crew_id": "mike", "tile_id": "116-112", "payload": { "phase": "new_game" } }]
     },
     {
       "schema_version": "event-program-model-v1",
@@ -60,12 +60,12 @@
         "type": "action_complete",
         "required_context": ["crew_id", "tile_id", "action_id"],
         "conditions": [
-          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "129-129" } },
+          { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "116-112" } },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
         ]
       },
       "candidate_selection": { "priority": 110, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
-      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:129-129", "allow_while_active": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:116-112", "allow_while_active": false },
       "event_graph": {
         "entry_node_id": "report",
         "nodes": [
@@ -98,7 +98,7 @@
       "version": 1,
       "domain": "iafs-inspection",
       "title": "东南雪尘调查发现散落物资",
-      "summary": "调查 133-134 后，队员辨认出远处雪尘中的未知对象是一片散落物资。",
+      "summary": "调查 120-117 后，队员辨认出远处雪尘中的未知对象是一片散落物资。",
       "tags": ["iafs", "survey", "supplies"],
       "status": "approved",
       "trigger": {
@@ -106,16 +106,16 @@
         "required_context": ["crew_id", "tile_id", "action_id"],
         "conditions": [
           { "type": "any_of", "conditions": [
-            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "133-134" } },
-            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "133-135" } },
-            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "134-134" } },
-            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "134-135" } }
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "120-117" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "120-118" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "121-117" } },
+            { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "tile_id", "value": "121-118" } }
           ] },
           { "type": "handler_condition", "handler_type": "trigger_context_value_equals", "params": { "field": "payload.action_type", "value": "survey" } }
         ]
       },
       "candidate_selection": { "priority": 110, "weight": 1, "mutex_group": null, "max_instances_per_trigger": 1, "requires_blocking_slot": false },
-      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:133-134", "allow_while_active": false },
+      "repeat_policy": { "scope": "world", "max_trigger_count": 1, "cooldown_seconds": 0, "history_key_template": "event:{event_definition_id}:120-117", "allow_while_active": false },
       "event_graph": {
         "entry_node_id": "report",
         "nodes": [

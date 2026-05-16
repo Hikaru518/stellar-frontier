@@ -35,8 +35,8 @@ describe("mapSystem", () => {
 
   it("uses feature labels or tile ids with origin-relative location labels", () => {
     expect(getTileLocationLabel(defaultMapConfig, "126-126")).toBe("126-126 (-3,3)");
-    expect(getTileLocationLabel(defaultMapConfig, "128-128")).toBe("IAFS坠毁点 (-1,1)");
-    expect(getTileLocationLabel(defaultMapConfig, "129-129")).toBe("IAFS坠毁点 (0,0)");
+    expect(getTileLocationLabel(defaultMapConfig, "115-111")).toBe("IAFS坠毁点 (-18,14)");
+    expect(getTileLocationLabel(defaultMapConfig, "116-112")).toBe("IAFS坠毁点 (-17,13)");
   });
 
   it("allows movement to any authored tile inside the 256x256 map bounds", () => {

@@ -1175,7 +1175,7 @@ function bootstrapGameStartEvent(state: GameState): GameState {
       occurred_at: 0,
       source: "time_system",
       crew_id: "mike",
-      tile_id: "129-129",
+      tile_id: "116-112",
       payload: { phase: "new_game" },
     },
   });
@@ -2597,6 +2597,9 @@ function syncEventRuntimeToViews(state: GameState, eventState: GraphRunnerGameSt
         ...member,
         ...(runtimeCrew
           ? {
+              currentTile: runtimeCrew.tile_id,
+              coord: getTileLocationLabel(defaultMapConfig, runtimeCrew.tile_id, state.map),
+              location: getTileLocationLabel(defaultMapConfig, runtimeCrew.tile_id, state.map),
               personalityTags: mergeStringLists(member.personalityTags, runtimeCrew.personality_tags),
               conditions,
             }

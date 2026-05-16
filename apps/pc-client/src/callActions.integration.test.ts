@@ -21,7 +21,7 @@ import type { CrewMember, GameState, MapTile, ResourceSummary } from "./data/gam
 import type { Condition, CrewActionState, Effect } from "./events/types";
 import { createInitialQuestState } from "./questSystem";
 
-const CRASH_SITE_TILE_ID = "129-129";
+const CRASH_SITE_TILE_ID = "116-112";
 
 const STUB_TILE_ID = "2-3";
 const STUB_OBJECT_ID = "__integration_locked_door__";

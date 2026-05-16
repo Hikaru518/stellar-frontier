@@ -6,7 +6,7 @@
       "crewId": "mike",
       "name": "麦克",
       "role": "神秘幸存者",
-      "currentTile": "129-129",
+      "currentTile": "116-112",
       "status": "idle",
       "statusTone": "neutral",
       "attributes": {
@@ -77,7 +77,7 @@
       "crewId": "simon",
       "name": "西蒙",
       "role": "退休星际矿工",
-      "currentTile": "129-129",
+      "currentTile": "116-112",
       "status": "idle",
       "statusTone": "neutral",
       "attributes": {
@@ -172,7 +172,7 @@
       "crewId": "alice",
       "name": "爱丽丝",
       "role": "离家的千金宇航员",
-      "currentTile": "129-129",
+      "currentTile": "116-112",
       "status": "idle",
       "statusTone": "neutral",
       "attributes": {
