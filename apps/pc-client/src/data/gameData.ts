@@ -79,6 +79,7 @@ export interface CrewMember {
   skills: string[];
   inventory: InventoryEntry[];
   profile: CrewProfile;
+  portrait?: CrewDefinition["portrait"];
   voiceTone: string;
   personalityTags: string[];
   expertise: ExpertiseDefinition[];
@@ -328,6 +329,7 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     skills: member.skills,
     inventory: member.inventory,
     profile: member.profile,
+    portrait: member.portrait,
     voiceTone: member.voiceTone,
     personalityTags: member.personalityTags,
     expertise: member.expertise,

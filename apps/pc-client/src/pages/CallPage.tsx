@@ -31,8 +31,6 @@ interface CallActionGroupView {
   actions: CallActionOption[];
 }
 
-const CREW_PORTRAIT_PROFILE_LINE_WIDTH = 40;
-
 interface TranscriptPlaybackState {
   callId: string | null;
   lineIndex: number;
@@ -170,7 +168,7 @@ export function CallPage({
       : null;
 
     return {
-      scene: "通话画面 / 状态确认 / 当前坐标回传",
+      scene: "通话画面 / 状态确认 / 当前区块回传",
       lines: call.idleChatterLines?.length
         ? formatIdleChatterLines(member, call.idleChatterLines)
         : [
@@ -503,7 +501,12 @@ export function CallPage({
                     {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
                   </div>
                 ) : (
-                  <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，点击文本区继续接收。</p>
+                  <>
+                    <button type="button" className="choice-button choice-neutral" onClick={handleTranscriptAdvance}>
+                      <span>继续接收</span>
+                    </button>
+                    <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，继续接收后解锁事件选项。</p>
+                  </>
                 )}
               </section>
             </div>
@@ -512,6 +515,9 @@ export function CallPage({
               {shouldGateCallActions ? (
                 <section className="console-call-action-group">
                   <h3>基础行动</h3>
+                  <button type="button" className="choice-button choice-neutral" onClick={handleTranscriptAdvance}>
+                    <span>继续接收</span>
+                  </button>
                   <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，点击文本区继续接收。</p>
                 </section>
               ) : (
@@ -562,17 +568,6 @@ export function CallPage({
                   <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
                 ))}
               </div>
-              <div className="console-call-portrait-block">
-                <p className="console-screen-command">] CREW PORTRAIT</p>
-                {buildCrewPortrait(member, callView.isRuntime).map((line, index) => (
-                  <p key={`portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
-                ))}
-                <div className="console-call-profile-copy">
-                  {buildCrewPortraitProfileLines(member).map((line, index) => (
-                    <p key={`profile-${index}-${line.text}`} className={line.className}>{line.text}</p>
-                  ))}
-                </div>
-              </div>
             </section>
             <section
               className={`console-screen-block ${animatedTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
@@ -605,7 +600,7 @@ export function CallPage({
               <p className="console-screen-line console-screen-line-amber">{callView.meta}</p>
               {!callView.isRuntime ? (
                 <p className="console-call-note-line">
-                  {call.selectingMoveTarget ? "地图已进入候选坐标标记模式，确认仍需在右侧完成。" : "移动、调查、修复等行动都在右侧控制区提交。"}
+                  {call.selectingMoveTarget ? "地图已进入候选区块标记模式，确认仍需在右侧完成。" : "移动、调查、修复等行动都在右侧控制区提交。"}
                 </p>
               ) : (
                 <p className="console-call-note-line">事件图像只是快照回传，真正推进由右侧选项完成。</p>
@@ -808,10 +803,12 @@ function MoveConfirmPanel({
           <dt>目标</dt>
           <dd>{formatMoveTargetLabel(targetTile, map)}</dd>
         </div>
-        <div>
-          <dt>路线</dt>
-          <dd>{preview.canMove ? formatVisibleMoveRoute(preview, map) : preview.reason}</dd>
-        </div>
+        {!preview.canMove ? (
+          <div>
+            <dt>限制</dt>
+            <dd>{preview.reason}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>预计耗时</dt>
           <dd>{preview.canMove ? formatDuration(preview.totalDurationSeconds) : "不可达"}</dd>
@@ -918,101 +915,6 @@ function buildCallAsciiScene(callView: CallView, member: CrewMember, callClosed:
   ];
 }
 
-function buildCrewPortrait(member: CrewMember, runtime: boolean) {
-  const accent = runtime ? "RUNTIME" : "FIELD";
-  return [
-    frameTop("CREW PORTRAIT", 20),
-    frameLine(member.name.toUpperCase(), 20),
-    frameLine("", 20),
-    frameLine("     .-''''''-.", 20),
-    frameLine("   .'  .--.   '.", 20),
-    frameLine("  /   / __ \\\\   \\\\", 20),
-    frameLine(" |   | /  \\\\ |   |", 20),
-    frameLine(" |   | |  | |   |", 20),
-    frameLine(" |   | |__| |   |", 20),
-    frameLine("  \\\\   \\\\____/   /", 20),
-    frameLine("   '._  __  _.-'", 20),
-    frameLine("      \\\\/__\\\\/", 20),
-    frameLine(`TAG ${accent}`, 20),
-    frameLine("VOX TIGHT / LOW", 20),
-  ];
-}
-
-function buildCrewPortraitProfileLines(member: CrewMember) {
-  return [
-    {
-      className: "console-screen-line console-screen-line-cyan console-call-profile-line",
-      text: `CREW: ${member.name.toUpperCase()} / ${member.role}`,
-    },
-    {
-      className: "console-call-note-line console-call-profile-line",
-      text: `VOICE: ${member.voiceTone}`,
-    },
-    {
-      className: "console-call-note-line console-call-profile-line",
-      text: `TAGS: ${member.personalityTags.join(" / ") || "NONE"}`,
-    },
-    {
-      className: "console-call-note-line console-call-profile-line",
-      text: `INTRO: ${member.profile.selfIntro}`,
-    },
-  ].flatMap((line) =>
-    wrapConsoleProfileText(line.text, CREW_PORTRAIT_PROFILE_LINE_WIDTH).map((text) => ({
-      ...line,
-      text,
-    })),
-  );
-}
-
-function wrapConsoleProfileText(text: string, maxWidth: number) {
-  if (maxWidth < 1) {
-    return [text];
-  }
-
-  const lines: string[] = [];
-  let currentLine = "";
-  let currentWidth = 0;
-
-  for (const character of Array.from(text)) {
-    const characterWidth = getConsoleCharacterWidth(character);
-    if (currentLine && currentWidth + characterWidth > maxWidth) {
-      lines.push(currentLine);
-      currentLine = character;
-      currentWidth = characterWidth;
-      continue;
-    }
-
-    currentLine += character;
-    currentWidth += characterWidth;
-  }
-
-  if (currentLine || lines.length === 0) {
-    lines.push(currentLine);
-  }
-
-  return lines;
-}
-
-function getConsoleCharacterWidth(character: string) {
-  const codePoint = character.codePointAt(0) ?? 0;
-  if (
-    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
-    codePoint === 0x2329 ||
-    codePoint === 0x232a ||
-    (codePoint >= 0x2e80 && codePoint <= 0xa4cf && codePoint !== 0x303f) ||
-    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-    (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
-    (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
-    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
-    (codePoint >= 0xffe0 && codePoint <= 0xffe6)
-  ) {
-    return 2;
-  }
-
-  return 1;
-}
-
 function frameTop(label: string, innerWidth: number) {
   const core = `-[${label}]-`;
   return `+${core}${"-".repeat(Math.max(0, innerWidth - core.length))}+`;
@@ -1032,14 +934,6 @@ function formatMoveTargetLabel(tile: MapTile | undefined, map: GameMapState) {
 
 function formatMoveTargetShortLabel(tile: MapTile | undefined, map: GameMapState) {
   return tile ? getTileLocationLabel(defaultMapConfig, tile.id, map) : "未知目标";
-}
-
-function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMovePreview>>, map: GameMapState) {
-  return preview.steps
-    .map((step) => {
-      return `${getTileLocationLabel(defaultMapConfig, step.tileId, map)} ${step.terrain}`;
-    })
-    .join(" -> ");
 }
 
 function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {

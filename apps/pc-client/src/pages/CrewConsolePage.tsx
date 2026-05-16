@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { GameConsoleLayout } from "../components/Layout";
+import { buildCrewPortrait, getCrewPortraitImage } from "../components/CrewPortrait";
 import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
 import type { CrewId, CrewMember, MapTile, SystemLog } from "../data/gameData";
 import type { EventLog, CrewActionState, RuntimeCall } from "../events/types";
@@ -97,6 +98,7 @@ export function CrewConsolePage({
             const isStatusActive = mode === "status" && selectedCrew?.id === member.id;
             const isInventoryActive = mode === "inventory" && selectedCrew?.id === member.id;
             const timingText = actionView.blockingReason ?? actionView.timingText;
+            const locationLabel = getTileLocationLabel(defaultMapConfig, member.currentTile);
             return (
               <article key={member.id} className={`console-crew-card ${incoming || member.hasIncoming ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -108,7 +110,7 @@ export function CrewConsolePage({
                       {member.canCommunicate ? "在线" : "失联"}
                     </span>
                   </div>
-                  <p>{member.location}</p>
+                  <p>{locationLabel}</p>
                   <p>{actionView.statusText}</p>
                   {timingText ? <p>{timingText}</p> : null}
                 </div>
@@ -127,7 +129,7 @@ export function CrewConsolePage({
                   >
                     查看背包
                   </button>
-                  <button type="button" className="console-crew-button" onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate && !member.hasIncoming}>
+                  <button type="button" className={`console-crew-button ${incoming || member.hasIncoming ? "console-crew-button-incoming" : ""}`} onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate && !member.hasIncoming}>
                     {incoming || member.hasIncoming ? "接通" : "通话"}
                   </button>
                 </div>
@@ -200,6 +202,7 @@ function CrewStatusScreen({
   eventLogs: EventLog[];
 }) {
   const timingText = actionView.blockingReason ?? actionView.timingText;
+  const portraitImage = getCrewPortraitImage(member);
   const recentLogs = eventLogs
     .filter((log) => log.visibility === "player_visible" && log.crew_ids.includes(member.id))
     .slice()
@@ -208,25 +211,39 @@ function CrewStatusScreen({
 
   return (
     <>
+      <section className="console-screen-block console-crew-status-identity-grid">
+        <div>
+          <p className="console-screen-command">] RUN CREW-STATUS.BAS</p>
+          <p className="console-screen-line console-screen-line-cyan">CREW: {member.name.toUpperCase()} / ROLE: {member.role.toUpperCase()}</p>
+          <p className="console-screen-section">[ PROFILE ]</p>
+          <p>ORIGIN ........ {member.profile.originWorld.toUpperCase()}</p>
+          <p>PROFESSION .... {member.profile.originProfession.toUpperCase()}</p>
+          <p>VOICE ......... {member.voiceTone.toUpperCase()}</p>
+          <p>TAGS .......... {(member.personalityTags.join(" / ") || "NONE").toUpperCase()}</p>
+          <p>INTRO ......... {member.profile.selfIntro.toUpperCase()}</p>
+        </div>
+        <div className="console-call-portrait-block console-crew-status-portrait" aria-label={`${member.name} 头像`}>
+          <p className="console-screen-command">] CREW PORTRAIT</p>
+          {portraitImage ? (
+            <img className="console-crew-portrait-image console-crew-portrait-image-compact" src={portraitImage.src} alt="" />
+          ) : (
+            buildCrewPortrait(member, false).map((line, index) => (
+              <p key={`status-portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
+            ))
+          )}
+        </div>
+      </section>
       <section className="console-screen-block">
         <p className="console-screen-command">] RUN CREW-STATUS.BAS</p>
-        <p className="console-screen-line console-screen-line-cyan">CREW: {member.name.toUpperCase()} / ROLE: {member.role.toUpperCase()}</p>
+        <p className="console-screen-line console-screen-line-cyan">STATUS DATA / ACTION CHANNEL</p>
       </section>
       <section className="console-screen-block">
         <p className="console-screen-section">[ FIELD CONDITION ]</p>
         <p>STATUS ........ {member.status.toUpperCase()}</p>
         <p>ACTION ........ {actionView.actionTitle.toUpperCase()}</p>
         {timingText ? <p>TIMER ......... {timingText.toUpperCase()}</p> : null}
-        <p>LOCATION ...... {member.location.toUpperCase()}</p>
+        <p>LOCATION ...... {getTileLocationLabel(defaultMapConfig, member.currentTile).toUpperCase()}</p>
         <p>LINK .......... {member.canCommunicate ? "ONLINE" : "OFFLINE"}</p>
-      </section>
-      <section className="console-screen-block">
-        <p className="console-screen-section">[ PROFILE ]</p>
-        <p>ORIGIN ........ {member.profile.originWorld.toUpperCase()}</p>
-        <p>PROFESSION .... {member.profile.originProfession.toUpperCase()}</p>
-        <p>VOICE ......... {member.voiceTone.toUpperCase()}</p>
-        <p>TAGS .......... {(member.personalityTags.join(" / ") || "NONE").toUpperCase()}</p>
-        <p>INTRO ......... {member.profile.selfIntro.toUpperCase()}</p>
       </section>
       <section className="console-screen-block">
         <p className="console-screen-section">[ ATTRIBUTES ]</p>
