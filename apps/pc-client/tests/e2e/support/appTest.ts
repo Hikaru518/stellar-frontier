@@ -124,9 +124,9 @@ export async function completeOpeningMikeCall(page: Page) {
 
   await connectButton.click();
   await page.getByRole("button", { name: "安抚麦克，承诺会带他回家，并要求他先报告现场情况。" }).click();
-  await page.getByRole("button", { name: "要求麦克先确认飞船上仍可使用的设施。" }).click();
-  await page.getByRole("button", { name: "安排麦克搜寻坠毁点外的散落货物。" }).click();
-  await page.getByRole("button", { name: "指示麦克优先寻找离开坠毁区的路线。" }).click();
+  await page.getByRole("button", { name: "要求麦克先确认奥德赛号上仍可使用的设施。" }).click();
+  await page.getByRole("button", { name: "安排麦克搜寻奥德赛号坠毁点外的散落货物。" }).click();
+  await page.getByRole("button", { name: "指示麦克优先寻找离开奥德赛号坠毁区的路线。" }).click();
   await page.getByRole("button", { name: "确认优先寻找离开路线。" }).click();
   await expect(mikeCard(page).getByRole("button", { name: "通话" })).toBeVisible();
 }

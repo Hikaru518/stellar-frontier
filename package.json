@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client dev",
+    "production": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client production",
     "dev:pc": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client dev",
     "dev:mobile": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/mobile-client dev",
     "dev:mobile:lan": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/mobile-client dev:lan",

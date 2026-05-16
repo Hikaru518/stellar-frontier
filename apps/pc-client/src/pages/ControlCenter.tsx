@@ -147,7 +147,7 @@ export function ControlCenter({
               <p className="console-screen-section">[ CREW LINK ]</p>
               {crew.map((member, index) => (
                 <p key={member.id}>
-                  {index + 1}) {member.name.toUpperCase()} {member.location.toUpperCase()} / {member.status.toUpperCase()}
+                  {index + 1}) {member.name.toUpperCase()} {getTileLocationLabel(defaultMapConfig, member.currentTile, map).toUpperCase()} / {member.status.toUpperCase()}
                 </p>
               ))}
             </div>
@@ -233,7 +233,7 @@ function CrewLinkPanel({
               </button>
               <button
                 type="button"
-                className="console-crew-button"
+                className={`console-crew-button ${incomingCrewIds.has(member.id) ? "console-crew-button-incoming" : ""}`}
                 onClick={() => onStartCall(member.id)}
                 disabled={!member.canCommunicate && !incomingCrewIds.has(member.id)}
               >
@@ -270,7 +270,7 @@ function InvestigationReportView({ report, crew }: { report: InvestigationReport
           ["队员", member?.name ?? report.crewId],
           ["时间", formatGameTime(report.createdAtGameSeconds)],
           ["区域", report.areaName],
-          ["坐标", report.playerCoord],
+          ["区块", report.tileId],
           ["地形", report.terrain],
           ["天气", report.weather],
           ["温度", `${environment.temperatureCelsius} °C`],

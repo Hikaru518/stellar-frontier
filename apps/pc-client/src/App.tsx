@@ -7,6 +7,7 @@ import { EndingPage } from "./pages/EndingPage";
 import { DEFAULT_MAP_LAYER_VISIBILITY, MapPage, type MapLayerVisibility, type MapViewportState } from "./pages/MapPage";
 import { TaskPage } from "./pages/TaskPage";
 import { QuestSidebar } from "./components/QuestSidebar";
+import { IS_DEV_UI_ENABLED } from "./runtimeMode";
 import { settleAction, type ActionSettlementPatch } from "./callActionSettlement";
 import {
   advanceCrewMoveAction,
@@ -671,7 +672,7 @@ function App() {
       );
       setMapReturnTarget("call");
       navigateToPage("map");
-      appendLog("通话进入目的地选择模式。地图只记录候选坐标，不直接下达移动指令。", "accent");
+      appendLog("通话进入目的地选择模式。地图只记录候选区块，不直接下达移动指令。", "accent");
       return;
     }
 
@@ -1076,10 +1077,12 @@ function App() {
   return (
     <>
       {pageContent}
-      <button type="button" className="debug-floating-button" onClick={() => setDebugOpen(true)}>
-        [DEBUG]
-      </button>
-      {debugOpen ? (
+      {IS_DEV_UI_ENABLED ? (
+        <button type="button" className="debug-floating-button" onClick={() => setDebugOpen(true)}>
+          [DEBUG]
+        </button>
+      ) : null}
+      {IS_DEV_UI_ENABLED && debugOpen ? (
         <DebugToolbox
           timeMultiplier={timeMultiplier}
           crewMoveSpeedMultiplier={gameState.debugSettings.crewMoveSpeedMultiplier}
