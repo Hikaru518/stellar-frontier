@@ -3,7 +3,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("./assets/fonts/fusion-pixel-10px-monospaced-latin.ttf.woff2") format("woff2");
+  src: url("../../../content/assets/fonts/pc-client/fusion-pixel-10px-monospaced-latin.ttf.woff2") format("woff2");
 }
 
 @font-face {
@@ -11,7 +11,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("./assets/fonts/fusion-pixel-10px-monospaced-zh_hans.ttf.woff2") format("woff2");
+  src: url("../../../content/assets/fonts/pc-client/fusion-pixel-10px-monospaced-zh_hans.ttf.woff2") format("woff2");
 }
 
 :root {

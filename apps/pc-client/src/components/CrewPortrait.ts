@@ -1,7 +1,7 @@
 import type { CrewMember } from "../data/gameData";
-import alicePortraitUrl from "../assets/crew/alice-portrait.png";
-import mikePortraitUrl from "../assets/crew/mike-portrait.png";
-import simonPortraitUrl from "../assets/crew/simon-portrait.png";
+import alicePortraitUrl from "../../../../content/assets/crew/portraits/alice-portrait.png";
+import mikePortraitUrl from "../../../../content/assets/crew/portraits/mike-portrait.png";
+import simonPortraitUrl from "../../../../content/assets/crew/portraits/simon-portrait.png";
 
 export interface CrewPortraitImage {
   src: string;
