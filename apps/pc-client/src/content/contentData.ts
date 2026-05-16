@@ -129,6 +129,11 @@ export interface DiaryEntryDefinition {
   availability: DiaryAvailability;
 }
 
+export interface IdleChatterDefinition {
+  id: string;
+  lines: string[];
+}
+
 export type CrewDefinitionId = "mike" | "amy" | "garry" | "simon" | "alice";
 
 export interface CrewDefinition {
@@ -147,6 +152,7 @@ export interface CrewDefinition {
   personalityTags: string[];
   expertise: ExpertiseDefinition[];
   diaryEntries: DiaryEntryDefinition[];
+  idleChatter: IdleChatterDefinition[];
   canCommunicate: boolean;
   lastContactTime: number;
   unavailable?: boolean;

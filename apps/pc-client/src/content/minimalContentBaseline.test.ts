@@ -21,17 +21,25 @@ describe("minimal content baseline", () => {
       name: "麦克",
       currentTile: "116-112",
       canCommunicate: true,
+      idleChatter: expect.arrayContaining([
+        expect.objectContaining({ id: "mike_door_dream", lines: expect.arrayContaining(["“我刚才梦到一扇门。醒来以后，发现自己一直握着通讯器。”"]) }),
+      ]),
     });
+    expect(crewDefinitions[0].idleChatter).toHaveLength(10);
     expect(crewDefinitions[1]).toMatchObject({
       crewId: "simon",
       name: "西蒙",
       attributes: { physical: 4, agility: 5, intellect: 3, perception: 2, luck: 3 },
     });
+    expect(crewDefinitions[1].idleChatter).toHaveLength(10);
+    expect(crewDefinitions[1].idleChatter.find((item) => item.id === "simon_old_song")?.lines[0]).toContain("🎵路还很长，灯还在远方。🎵");
     expect(crewDefinitions[2]).toMatchObject({
       crewId: "alice",
       name: "爱丽丝",
       attributes: { physical: 2, agility: 4, intellect: 3, perception: 4, luck: 5 },
     });
+    expect(crewDefinitions[2].idleChatter).toHaveLength(10);
+    expect(crewDefinitions[2].idleChatter.find((item) => item.id === "alice_field_notes")?.lines[1]).toContain("这是观察，不是抱怨");
 
     expect(itemDefinitions.map((item) => item.itemId)).toEqual([
       "repair_kit",

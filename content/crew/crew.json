@@ -32,6 +32,48 @@
       "personalityTags": ["神秘", "寡言", "谨慎"],
       "expertise": [],
       "diaryEntries": [],
+      "idleChatter": [
+        {
+          "id": "mike_watch_footprints",
+          "lines": ["“……听得到。我刚才在确认周围的脚印，不全是我们的。”"]
+        },
+        {
+          "id": "mike_route_hidden",
+          "lines": ["“没事。我只是想了一下，如果这里真有回去的路，它不会摆在明面上。”"]
+        },
+        {
+          "id": "mike_quiet_safety",
+          "lines": ["“你打得正好。我差点开始相信这片安静是安全的。”"]
+        },
+        {
+          "id": "mike_sorting_gear",
+          "lines": ["“我在整理装备。少一件不重要的东西，总比多一件拖累人的东西好。”"]
+        },
+        {
+          "id": "mike_home_unknown",
+          "lines": ["“家乡？我不太记得该从哪里开始说。先别问这个。”"]
+        },
+        {
+          "id": "mike_door_dream",
+          "lines": ["（通讯接通前有几秒沉默，像是有人刚从梦里醒来。）", "“我刚才梦到一扇门。醒来以后，发现自己一直握着通讯器。”"]
+        },
+        {
+          "id": "mike_signal_edge",
+          "lines": ["“别担心，我没有走远。只是想看看信号边缘会不会有人回应。”"]
+        },
+        {
+          "id": "mike_planet_knows",
+          "lines": ["“我有时候觉得，这颗星球知道我们在找什么。它只是不急着告诉我们。”"]
+        },
+        {
+          "id": "mike_talking_too_much",
+          "lines": ["“如果我哪天说话变多了，提醒我检查一下是不是吸入了什么东西。”"]
+        },
+        {
+          "id": "mike_keep_talking",
+          "lines": ["“指挥官，我会继续保持待命。只是……别太久没人说话。”"]
+        }
+      ],
       "canCommunicate": true,
       "lastContactTime": 0
     },
@@ -89,6 +131,48 @@
         }
       ],
       "diaryEntries": [],
+      "idleChatter": [
+        {
+          "id": "simon_boot_mud",
+          "lines": ["“哈，正好。我刚把靴底的泥刮下来，够糊半面墙。”"]
+        },
+        {
+          "id": "simon_quiet_mine",
+          "lines": ["“没活干的时候最难熬。矿井里也是，安静太久通常不是好兆头。”"]
+        },
+        {
+          "id": "simon_stone_lines",
+          "lines": ["“我在数这些石头的纹路。别笑，石头比人诚实，至少它不会吹牛。”"]
+        },
+        {
+          "id": "simon_old_song",
+          "lines": ["（收音机里传来很旧的男声，旋律被静电切得断断续续：🎵路还很长，灯还在远方。🎵）", "“你知道地球老歌吗？有一首讲回家的路，旋律很慢，适合在坏天气里哼。”"]
+        },
+        {
+          "id": "simon_bad_food",
+          "lines": ["“我年轻时在三号矿井待过六个月，那地方的饭难吃得能让人想念营养膏。”"]
+        },
+        {
+          "id": "simon_water_wind",
+          "lines": ["“别急着派活。先喝口水，看看风往哪边走。老矿工都这么活下来的。”"]
+        },
+        {
+          "id": "simon_scrap_metal",
+          "lines": ["（金属片被翻动，又被小心放回布袋里。）", "“我刚才差点把一块废铁收起来。退休这么久，还是见不得东西浪费。”"]
+        },
+        {
+          "id": "simon_small_shop",
+          "lines": ["“要是能回去，我想开个小铺子，卖咖啡、矿灯，还有没人信的故事。”"]
+        },
+        {
+          "id": "simon_bad_strata",
+          "lines": ["“这里的地层不太规矩。像有人把几颗星球切开，又随手叠在一起。”"]
+        },
+        {
+          "id": "simon_pizza_history",
+          "lines": ["“指挥官，你这通电话救了我。我刚准备给自己讲第三遍地球披萨的历史。”"]
+        }
+      ],
       "canCommunicate": true,
       "lastContactTime": 0
     },
@@ -146,6 +230,48 @@
         }
       ],
       "diaryEntries": [],
+      "idleChatter": [
+        {
+          "id": "alice_sleeve_dust",
+          "lines": ["“你来得正好。我正在清理袖口上的灰，这颗星球显然没有基本礼仪。”"]
+        },
+        {
+          "id": "alice_trial_review",
+          "lines": ["“如果这是家族安排的试炼，我会给出差评。内容混乱，服务缺失。”"]
+        },
+        {
+          "id": "alice_not_afraid",
+          "lines": ["“我没有害怕。只是这里安静得很不体面，让人很难假装一切正常。”"]
+        },
+        {
+          "id": "alice_field_notes",
+          "lines": ["（你听到笔尖在纸面上停顿，随后笔记本被轻轻合上。）", "“我刚才在记录这里的风向、湿度和令人无法容忍的地面状况。别误会，这是观察，不是抱怨。”"]
+        },
+        {
+          "id": "alice_family_wrong",
+          "lines": ["“家里的人一定以为我撑不过第一天。很好，我喜欢他们判断错误。”"]
+        },
+        {
+          "id": "alice_clean_halls",
+          "lines": ["“我想念干净的走廊、热水，还有不会突然发出声音的天花板。”"]
+        },
+        {
+          "id": "alice_walk_back",
+          "lines": ["“如果我们回去，我要亲自告诉他们：我不是被保护出来的，是自己走回去的。”"]
+        },
+        {
+          "id": "alice_breathing_practice",
+          "lines": ["（她很轻地吸气，像是在强迫自己保持姿态。）", "“你打断了我练习冷静呼吸。没关系，和你通话大概也算一种训练。”"]
+        },
+        {
+          "id": "alice_soil_taste",
+          "lines": ["“我发现自己开始分辨泥土的味道了。请不要把这件事写进任何正式报告。”"]
+        },
+        {
+          "id": "alice_clear_goal",
+          "lines": ["“指挥官，下一步请给我一个明确目标。等待会让人显得很无助，我不喜欢。”"]
+        }
+      ],
       "canCommunicate": true,
       "lastContactTime": 0
     }

@@ -714,6 +714,7 @@ export function normalizeCrewMember(member: CrewMember, initialMember: CrewMembe
     personalityTags: member.personalityTags ?? initialMember.personalityTags,
     expertise: member.expertise ?? initialMember.expertise,
     diaryEntries: member.diaryEntries ?? initialMember.diaryEntries,
+    idleChatter: member.idleChatter ?? initialMember.idleChatter,
     currentTile: member.currentTile ?? initialMember.currentTile,
     location: getTileLocationLabel(defaultMapConfig, member.currentTile ?? initialMember.currentTile),
     coord: member.coord ?? initialMember.coord,
