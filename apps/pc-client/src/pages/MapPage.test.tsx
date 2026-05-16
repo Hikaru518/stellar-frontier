@@ -125,9 +125,9 @@ describe("MapPage", () => {
     renderMapPage({ initialSelectedTileId: "116-112" });
 
     expect(screen.getByText("地图详情")).toBeInTheDocument();
-    expect(screen.getByText("116-112")).toBeInTheDocument();
-    expect(screen.getAllByText("(-17,13)").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("116-112").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("奥德赛号坠毁点").length).toBeGreaterThan(0);
+    expect(screen.queryByText("(-17,13)")).not.toBeInTheDocument();
     expect(screen.queryByText("地图对象")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("当前可见地图对象")).not.toBeInTheDocument();
     expect(screen.queryByText("未知信号")).not.toBeInTheDocument();
@@ -159,7 +159,7 @@ describe("MapPage", () => {
     const readout = within(screen.getByLabelText("Feature 命中结果"));
     expect(screen.getByText(/\[TILE\] 116-112/)).toBeInTheDocument();
     expect(readout.getByText("发电机")).toBeInTheDocument();
-    expect(readout.getByText("IAFS坠毁点")).toBeInTheDocument();
+    expect(readout.getByText("奥德赛号坠毁点")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
     expect(readout.getByText("背景")).toBeInTheDocument();
   });

@@ -1,3 +1,4 @@
+import { buildCrewPortrait, getCrewPortraitImage } from "../components/CrewPortrait";
 import { FieldList, Panel, StatusTag } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { getDiaryAvailabilityLabel, getVisibleDiaryEntries } from "../diarySystem";
@@ -18,6 +19,7 @@ const attributeLabels: Array<[keyof CrewMember["attributes"], string]> = [
 export function CrewDetail({ member, eventLogs = [] }: { member: CrewMember; eventLogs?: EventLog[] }) {
   const diaryEntries = getVisibleDiaryEntries(member).sort((a, b) => a.gameSecond - b.gameSecond);
   const inventorySummary = formatInventorySummary(member.inventory);
+  const portraitImage = getCrewPortraitImage(member);
   const memberEventLogs = eventLogs
     .filter((log) => log.visibility === "player_visible" && log.crew_ids.includes(member.id))
     .slice()
@@ -26,6 +28,18 @@ export function CrewDetail({ member, eventLogs = [] }: { member: CrewMember; eve
 
   return (
     <div className="crew-detail">
+      <Panel title="队员头像">
+        <div className="console-call-portrait-block console-crew-detail-portrait" aria-label={`${member.name} 头像`}>
+          {portraitImage ? (
+            <img className="console-crew-portrait-image" src={portraitImage.src} alt="" />
+          ) : (
+            buildCrewPortrait(member, false).map((line, index) => (
+              <p key={`detail-portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
+            ))
+          )}
+        </div>
+      </Panel>
+
       <Panel title="背景档案">
         <FieldList
           rows={[

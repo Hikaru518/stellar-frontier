@@ -33,10 +33,10 @@ describe("mapSystem", () => {
     expect(getDisplayCoord({ row: 3, col: 5 }, { row: 1, col: 1 })).toEqual({ displayX: 4, displayY: -2 });
   });
 
-  it("uses feature labels or tile ids with origin-relative location labels", () => {
-    expect(getTileLocationLabel(defaultMapConfig, "126-126")).toBe("126-126 (-3,3)");
-    expect(getTileLocationLabel(defaultMapConfig, "115-111")).toBe("IAFS坠毁点 (-18,14)");
-    expect(getTileLocationLabel(defaultMapConfig, "116-112")).toBe("IAFS坠毁点 (-17,13)");
+  it("uses feature labels or tile ids with block-based location labels", () => {
+    expect(getTileLocationLabel(defaultMapConfig, "126-126")).toBe("126-126");
+    expect(getTileLocationLabel(defaultMapConfig, "115-111")).toBe("奥德赛号坠毁点 / 115-111");
+    expect(getTileLocationLabel(defaultMapConfig, "116-112")).toBe("奥德赛号坠毁点 / 116-112");
   });
 
   it("allows movement to any authored tile inside the 256x256 map bounds", () => {

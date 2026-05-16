@@ -38,7 +38,7 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
         name: "麦克",
         role: "神秘幸存者",
         currentTile: "116-112",
-        location: "IAFS坠毁点",
+        location: "奥德赛号坠毁点",
         coord: "(-17,13)",
         status: "待命中。",
         statusTone: "neutral",
@@ -259,7 +259,7 @@ describe("App", () => {
       ],
     });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
-    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "116-112", location: "IAFS坠毁点 (-17,13)" });
+    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "116-112", location: "奥德赛号坠毁点 / 116-112" });
     expect(saved.map.mapObjects).toBeUndefined();
     expect(saved.map.featuresById).toMatchObject({
       iafs_generator: { status: "damaged" },
@@ -400,18 +400,22 @@ describe("App", () => {
     });
   });
 
-  it("normalizes renamed crew display names from compatible saves", () => {
+  it("normalizes renamed crew display text from compatible saves", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
       JSON.stringify(createSavedCrashSiteState({
-        crew: [{ ...createSavedCrashSiteState().crew[0], name: "Mike" }],
+        crew: [
+          { ...createSavedCrashSiteState().crew[0], name: "Mike" },
+          { ...initialCrew.find((member) => member.id === "alice")!, role: "离家的千金宇航员" },
+        ],
       })),
     );
 
     render(<App />);
 
     const saved = readSavedState();
-    expect((saved?.crew as Array<{ id: string; name: string }>).find((member) => member.id === "mike")?.name).toBe("麦克");
+    expect((saved?.crew as Array<{ id: string; name: string; role: string }>).find((member) => member.id === "mike")?.name).toBe("麦克");
+    expect((saved?.crew as Array<{ id: string; name: string; role: string }>).find((member) => member.id === "alice")?.role).toBe("离家的千金");
   });
 
   it("treats current-schema saves without quest state as incompatible", () => {
@@ -487,6 +491,18 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "麦克 角色背包" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "麦克 角色档案" })).toBeNull();
     expect(screen.getByText("NO CARRIED ITEMS.")).toBeInTheDocument();
+  });
+
+  it("opens crew status with the shared call portrait", () => {
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "查看状态" }));
+
+    expect(screen.getByRole("heading", { name: "麦克 角色档案" })).toBeInTheDocument();
+    const portrait = screen.getByLabelText("麦克 头像");
+    expect(portrait).toBeInTheDocument();
+    expect(screen.getAllByText("] CREW PORTRAIT").length).toBeGreaterThan(0);
+    expect(portrait.querySelector("img")).toHaveAttribute("src", expect.stringContaining("mike-portrait.png"));
   });
 
   it("uses the console map entry to open the map without creating crew actions", () => {
@@ -935,11 +951,10 @@ describe("App", () => {
     expect(screen.queryByText(targetFeature.name)).toBeNull();
   });
 
-  it("wraps call portrait profile copy to 40 console columns", () => {
+  it("keeps crew profile copy out of the call portrait panel", () => {
     const baseMember = createCallPageCrewMember("mike", "2-3");
     const member = {
       ...baseMember,
-      role: "角".repeat(18),
       voiceTone: "界".repeat(18),
       personalityTags: ["标".repeat(18)],
       profile: {
@@ -974,8 +989,8 @@ describe("App", () => {
     );
 
     expect(screen.queryByText(`VOICE: ${"界".repeat(18)}`)).toBeNull();
-    expect(screen.getByText(`VOICE: ${"界".repeat(16)}`)).toBeInTheDocument();
-    expect(screen.getByText("界".repeat(2))).toBeInTheDocument();
+    expect(screen.queryByText(`TAGS: ${"标".repeat(18)}`)).toBeNull();
+    expect(screen.queryByText(`INTRO: ${"自".repeat(18)}`)).toBeNull();
   });
 
   it("plays runtime call transcript lines before showing event options", () => {
@@ -1025,26 +1040,29 @@ describe("App", () => {
         />,
       );
 
-      const transcript = screen.getByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
+      const transcript = screen.getByText("[ LIVE TRANSCRIPT ]").closest("section");
+      expect(transcript).toBeInTheDocument();
       expect(transcript).toHaveTextContent("第");
       expect(transcript).not.toHaveTextContent("第一行通讯。");
       expect(transcript).not.toHaveTextContent("后续信号。");
       expect(screen.queryByRole("button", { name: "收到。" })).toBeNull();
-      expect(screen.getByText("LIVE TRANSCRIPT 未完成，点击文本区继续接收。")).toBeInTheDocument();
+      expect(screen.getByText("LIVE TRANSCRIPT 未完成，继续接收后解锁事件选项。")).toBeInTheDocument();
+      const receiveButton = screen.getByRole("button", { name: "继续接收" });
 
-      fireEvent.click(transcript);
+      fireEvent.click(receiveButton);
       expect(transcript).toHaveTextContent("第一行通讯。");
       expect(transcript).not.toHaveTextContent("后续信号。");
       expect(screen.queryByRole("button", { name: "收到。" })).toBeNull();
 
-      fireEvent.click(transcript);
+      fireEvent.click(receiveButton);
       expect(transcript).toHaveTextContent("第一行通讯。");
       expect(transcript).toHaveTextContent("后");
       expect(transcript).not.toHaveTextContent("后续信号。");
       expect(screen.queryByRole("button", { name: "收到。" })).toBeNull();
 
-      fireEvent.click(transcript);
+      fireEvent.click(receiveButton);
       expect(transcript).toHaveTextContent("后续信号。");
+      expect(screen.queryByRole("button", { name: "继续接收" })).toBeNull();
       const optionButton = screen.getByRole("button", { name: "收到。" });
       expect(optionButton).toBeEnabled();
       fireEvent.click(optionButton);
@@ -1166,7 +1184,7 @@ describe("App", () => {
     );
 
     expect(screen.getByText("麦克 正在等待新的行动指令。")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "继续接收" })).toBeNull();
   });
 });
 
@@ -1369,13 +1387,13 @@ function openMikeCallFromTask(): void {
 }
 
 function advanceRuntimeTranscript(maxClicks = 20): void {
-  const transcript = screen.queryByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
-  if (!transcript) {
+  const receiveButton = screen.queryByRole("button", { name: "继续接收" });
+  if (!receiveButton) {
     return;
   }
 
   for (let index = 0; index < maxClicks; index += 1) {
-    fireEvent.click(transcript);
+    fireEvent.click(receiveButton);
   }
 }
 

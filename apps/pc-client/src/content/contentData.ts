@@ -100,6 +100,11 @@ export interface CrewProfile {
   selfIntro: string;
 }
 
+export interface CrewPortraitDefinition {
+  image: string;
+  alt?: string;
+}
+
 export interface ExpertiseRuleEffect {
   type: "surveyBonus";
   resourceId: string;
@@ -137,6 +142,7 @@ export interface CrewDefinition {
   skills: string[];
   inventory: Array<{ itemId: string; quantity: number }>;
   profile: CrewProfile;
+  portrait?: CrewPortraitDefinition;
   voiceTone: string;
   personalityTags: string[];
   expertise: ExpertiseDefinition[];

@@ -751,7 +751,7 @@ export function MapPage({
             )}
           </section>
 
-          <section className="console-side-panel">
+          <section className="console-side-panel console-map-trace-panel">
             <div className="console-column-header">
               <span>map trace</span>
             </div>

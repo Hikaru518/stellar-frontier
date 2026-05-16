@@ -24,6 +24,10 @@
         "experience": "关于他的过去没有可靠记录。",
         "selfIntro": "我先走，别问太多。"
       },
+      "portrait": {
+        "image": "mike-portrait.png",
+        "alt": "麦克的低分辨率 CRT 头像"
+      },
       "voiceTone": "简短、克制、信息很少。",
       "personalityTags": ["神秘", "寡言", "谨慎"],
       "expertise": [],
@@ -66,6 +70,10 @@
         "experience": "前半生辗转在不同星球的矿井里工作，熟悉塌方、毒气、设备故障和临时工程抢修。退休后他把积蓄投进远航名额，想把自己珍藏的地球故事、老歌和矿井见闻带到更远的地方。",
         "selfIntro": "我挖过的坑比你走过的门还多。别急，先看岩层，再谈英雄主义。"
       },
+      "portrait": {
+        "image": "simon-portrait.png",
+        "alt": "西蒙的低分辨率 CRT 头像"
+      },
       "voiceTone": "慢、稳、直接，带老矿工的经验判断；不爱讲大道理，但会固执地推销他理解的地球文化。",
       "personalityTags": ["实干", "老派", "节俭", "矿井直觉", "地球文化执念"],
       "expertise": [
@@ -87,7 +95,7 @@
     {
       "crewId": "alice",
       "name": "爱丽丝",
-      "role": "离家的千金宇航员",
+      "role": "离家的千金",
       "currentTile": "116-112",
       "status": "idle",
       "statusTone": "neutral",
@@ -118,6 +126,10 @@
         "originProfession": "家族继承人候选 / 见习宇航员",
         "experience": "出身显赫家族，从小接受精英教育、礼仪训练和航天预备课程。她主动离开家族安排，加入远航小队，想证明自己不是只能继承姓氏的人。她对底层生活和普通人情世故常常判断失准，但在高压场景里能迅速抓住关键问题。",
         "selfIntro": "别把我当装饰品。我来这里，是为了证明我自己配得上我的名字。"
+      },
+      "portrait": {
+        "image": "alice-portrait.png",
+        "alt": "爱丽丝的低分辨率 CRT 头像"
       },
       "voiceTone": "傲慢、挑剔、用词讲究；平时容易命令别人，关键时刻会突然变得清醒而果断。",
       "personalityTags": ["骄横", "我行我素", "常识欠缺", "冷静果断", "证明欲强"],

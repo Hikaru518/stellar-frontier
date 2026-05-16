@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { GameConsoleLayout } from "../components/Layout";
+import { buildCrewPortrait, getCrewPortraitImage } from "../components/CrewPortrait";
 import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
 import type { CrewId, CrewMember, MapTile, SystemLog } from "../data/gameData";
 import type { EventLog, CrewActionState, RuntimeCall } from "../events/types";
@@ -200,6 +201,7 @@ function CrewStatusScreen({
   eventLogs: EventLog[];
 }) {
   const timingText = actionView.blockingReason ?? actionView.timingText;
+  const portraitImage = getCrewPortraitImage(member);
   const recentLogs = eventLogs
     .filter((log) => log.visibility === "player_visible" && log.crew_ids.includes(member.id))
     .slice()
@@ -208,9 +210,31 @@ function CrewStatusScreen({
 
   return (
     <>
+      <section className="console-screen-block console-crew-status-identity-grid">
+        <div>
+          <p className="console-screen-command">] RUN CREW-STATUS.BAS</p>
+          <p className="console-screen-line console-screen-line-cyan">CREW: {member.name.toUpperCase()} / ROLE: {member.role.toUpperCase()}</p>
+          <p className="console-screen-section">[ PROFILE ]</p>
+          <p>ORIGIN ........ {member.profile.originWorld.toUpperCase()}</p>
+          <p>PROFESSION .... {member.profile.originProfession.toUpperCase()}</p>
+          <p>VOICE ......... {member.voiceTone.toUpperCase()}</p>
+          <p>TAGS .......... {(member.personalityTags.join(" / ") || "NONE").toUpperCase()}</p>
+          <p>INTRO ......... {member.profile.selfIntro.toUpperCase()}</p>
+        </div>
+        <div className="console-call-portrait-block console-crew-status-portrait" aria-label={`${member.name} 头像`}>
+          <p className="console-screen-command">] CREW PORTRAIT</p>
+          {portraitImage ? (
+            <img className="console-crew-portrait-image console-crew-portrait-image-compact" src={portraitImage.src} alt="" />
+          ) : (
+            buildCrewPortrait(member, false).map((line, index) => (
+              <p key={`status-portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
+            ))
+          )}
+        </div>
+      </section>
       <section className="console-screen-block">
         <p className="console-screen-command">] RUN CREW-STATUS.BAS</p>
-        <p className="console-screen-line console-screen-line-cyan">CREW: {member.name.toUpperCase()} / ROLE: {member.role.toUpperCase()}</p>
+        <p className="console-screen-line console-screen-line-cyan">STATUS DATA / ACTION CHANNEL</p>
       </section>
       <section className="console-screen-block">
         <p className="console-screen-section">[ FIELD CONDITION ]</p>
@@ -219,14 +243,6 @@ function CrewStatusScreen({
         {timingText ? <p>TIMER ......... {timingText.toUpperCase()}</p> : null}
         <p>LOCATION ...... {member.location.toUpperCase()}</p>
         <p>LINK .......... {member.canCommunicate ? "ONLINE" : "OFFLINE"}</p>
-      </section>
-      <section className="console-screen-block">
-        <p className="console-screen-section">[ PROFILE ]</p>
-        <p>ORIGIN ........ {member.profile.originWorld.toUpperCase()}</p>
-        <p>PROFESSION .... {member.profile.originProfession.toUpperCase()}</p>
-        <p>VOICE ......... {member.voiceTone.toUpperCase()}</p>
-        <p>TAGS .......... {(member.personalityTags.join(" / ") || "NONE").toUpperCase()}</p>
-        <p>INTRO ......... {member.profile.selfIntro.toUpperCase()}</p>
       </section>
       <section className="console-screen-block">
         <p className="console-screen-section">[ ATTRIBUTES ]</p>

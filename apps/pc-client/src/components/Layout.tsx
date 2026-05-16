@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { SystemLog, Tone } from "../data/gameData";
 import {
   PERFORMANCE_DIAGNOSTIC_SOURCES,
@@ -54,6 +54,9 @@ interface GameConsoleLayoutProps {
   children: ReactNode;
 }
 
+const GAME_CONSOLE_STAGE_WIDTH = 1600;
+const GAME_CONSOLE_STAGE_HEIGHT = 900;
+
 export function ConsoleShell({ title, subtitle, children, gameTimeLabel, actions }: ConsoleShellProps) {
   return (
     <main className="console-shell">
@@ -84,6 +87,12 @@ export function GameConsoleLayout({
   const screenRef = useRef<HTMLDivElement | null>(null);
   const performanceMonitor = useConsolePerformanceSnapshot();
   const [isPerformancePanelOpen, setIsPerformancePanelOpen] = useState(false);
+  const stageScale = useGameConsoleStageScale();
+  const stageStyle = {
+    "--game-console-stage-width": `${GAME_CONSOLE_STAGE_WIDTH}px`,
+    "--game-console-stage-height": `${GAME_CONSOLE_STAGE_HEIGHT}px`,
+    "--game-console-stage-scale": stageScale.toFixed(4),
+  } as CSSProperties;
 
   useEffect(() => {
     const screen = screenRef.current;
@@ -125,93 +134,127 @@ export function GameConsoleLayout({
   }, []);
 
   return (
-    <main className="game-console-shell">
-      <header className="game-console-topbar">
-        <div className="game-console-titleblock">
-          <p className="game-console-kicker">stellar frontier / game console direction</p>
-          <h1>{title}</h1>
-        </div>
-        <div className="game-console-status-cluster">
-          <div className="game-console-status-copy">
-            <div className="game-console-status-strip">
-              {gameTimeLabel ? (
-                <div className="console-status-card console-status-card-wide">
-                  <span>time</span>
-                  <strong>{gameTimeLabel}</strong>
+    <div className="game-console-viewport" style={stageStyle}>
+      <div className="game-console-stage">
+        <main className="game-console-shell">
+          <header className="game-console-topbar">
+            <div className="game-console-titleblock">
+              <p className="game-console-kicker">stellar frontier / game console direction</p>
+              <h1>{title}</h1>
+            </div>
+            <div className="game-console-status-cluster">
+              <div className="game-console-status-copy">
+                <div className="game-console-status-strip">
+                  {gameTimeLabel ? (
+                    <div className="console-status-card console-status-card-wide">
+                      <span>time</span>
+                      <strong>{gameTimeLabel}</strong>
+                    </div>
+                  ) : null}
+                  {statusItems.map((item) => (
+                    <div key={item.label} className="console-status-card">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </div>
+                  ))}
                 </div>
-              ) : null}
-              {statusItems.map((item) => (
-                <div key={item.label} className="console-status-card">
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </div>
-              ))}
-            </div>
-            {subtitle ? <p className="console-status-summary">{subtitle}</p> : null}
-          </div>
-          <ConsolePerformanceStatusButton
-            isOpen={isPerformancePanelOpen}
-            snapshot={performanceMonitor.snapshot}
-            onToggle={() => setIsPerformancePanelOpen((value) => !value)}
-          />
-        </div>
-      </header>
-
-      <section className="game-console-main">
-        <aside className="game-console-left">
-          <section className="console-column-panel">
-            <div className="console-column-header">
-              <span>interface view</span>
-            </div>
-            <div className="console-nav-list">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`console-nav-button ${item.active ? "console-nav-button-active" : ""}`}
-                  onClick={item.onClick}
-                >
-                  <span className="console-nav-label">
-                    {item.label}
-                    {item.attention ? <span className="console-nav-attention" aria-label="有更新">*</span> : null}
-                  </span>
-                  {item.meta ? <span className="console-nav-meta">{item.meta}</span> : null}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="console-column-panel">
-            <div className="console-column-header">
-              <span>crew list</span>
-            </div>
-            {crewPanel}
-          </section>
-        </aside>
-
-        <section className="game-console-center">
-          <div className="console-display-case">
-            <div className="console-display-bezel">
-              <div ref={screenRef} className="console-display-screen" data-glitch="off">
-                {isPerformancePanelOpen ? (
-                  <ConsolePerformanceDetails
-                    diagnostics={performanceMonitor.diagnostics}
-                    snapshot={performanceMonitor.snapshot}
-                  />
-                ) : (
-                  children
-                )}
+                {subtitle ? <p className="console-status-summary">{subtitle}</p> : null}
               </div>
+              <ConsolePerformanceStatusButton
+                isOpen={isPerformancePanelOpen}
+                snapshot={performanceMonitor.snapshot}
+                onToggle={() => setIsPerformancePanelOpen((value) => !value)}
+              />
             </div>
-          </div>
-        </section>
+          </header>
 
-        <aside className="game-console-right">{rightPanel}</aside>
-      </section>
+          <section className="game-console-main">
+            <aside className="game-console-left">
+              <section className="console-column-panel">
+                <div className="console-column-header">
+                  <span>interface view</span>
+                </div>
+                <div className="console-nav-list">
+                  {navItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`console-nav-button ${item.active ? "console-nav-button-active" : ""}`}
+                      onClick={item.onClick}
+                    >
+                      <span className="console-nav-label">
+                        {item.label}
+                        {item.attention ? <span className="console-nav-attention" aria-label="有更新">*</span> : null}
+                      </span>
+                      {item.meta ? <span className="console-nav-meta">{item.meta}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              </section>
 
-      <footer className="game-console-bottom">{bottomBar}</footer>
-    </main>
+              <section className="console-column-panel">
+                <div className="console-column-header">
+                  <span>crew list</span>
+                </div>
+                {crewPanel}
+              </section>
+            </aside>
+
+            <section className="game-console-center">
+              <div className="console-display-case">
+                <div className="console-display-bezel">
+                  <div ref={screenRef} className="console-display-screen" data-glitch="off">
+                    {isPerformancePanelOpen ? (
+                      <ConsolePerformanceDetails
+                        diagnostics={performanceMonitor.diagnostics}
+                        snapshot={performanceMonitor.snapshot}
+                      />
+                    ) : (
+                      children
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <aside className="game-console-right">{rightPanel}</aside>
+          </section>
+
+          <footer className="game-console-bottom">{bottomBar}</footer>
+        </main>
+      </div>
+    </div>
   );
+}
+
+function useGameConsoleStageScale() {
+  const [scale, setScale] = useState(() => getGameConsoleStageScale());
+
+  useEffect(() => {
+    const updateScale = () => setScale(getGameConsoleStageScale());
+
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    window.visualViewport?.addEventListener("resize", updateScale);
+
+    return () => {
+      window.removeEventListener("resize", updateScale);
+      window.visualViewport?.removeEventListener("resize", updateScale);
+    };
+  }, []);
+
+  return scale;
+}
+
+function getGameConsoleStageScale() {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const fitScale = Math.min(viewportWidth / GAME_CONSOLE_STAGE_WIDTH, viewportHeight / GAME_CONSOLE_STAGE_HEIGHT);
+  return Math.min(1, Math.max(0.4, fitScale));
 }
 
 type PerformanceTone = "stable" | "busy" | "lag";

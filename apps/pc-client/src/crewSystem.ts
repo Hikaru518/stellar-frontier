@@ -704,7 +704,8 @@ export function normalizeCrewMember(member: CrewMember, initialMember: CrewMembe
     id: member.id ?? initialMember.id,
     // Crew names are authored content, not player-editable state; keep compatible saves aligned with content renames.
     name: initialMember.name,
-    role: member.role ?? initialMember.role,
+    // Crew roles are authored display text, not player-editable state; keep compatible saves aligned with content renames.
+    role: initialMember.role,
     attributes: hasCurrentAttributes ? member.attributes : initialMember.attributes,
     skills: member.skills ?? initialMember.skills,
     inventory: member.inventory ?? initialMember.inventory,
