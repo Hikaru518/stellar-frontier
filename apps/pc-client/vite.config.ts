@@ -13,7 +13,7 @@ const pkg = JSON.parse(
 process.env.VITE_APP_VERSION = pkg.version;
 
 export default defineConfig({
-  base: process.env.NODE_ENV === "production" ? "/stellar-frontier/" : "/",
+  base: process.env.VITE_BUILD_TARGET === "desktop" ? "./" : process.env.NODE_ENV === "production" ? "/stellar-frontier/" : "/",
   define: {
     global: "globalThis",
     __APP_VERSION__: JSON.stringify(pkg.version),
