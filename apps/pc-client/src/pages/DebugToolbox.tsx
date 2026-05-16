@@ -42,7 +42,7 @@ export function DebugToolbox({
     <Modal title="Debug toolbox / 作弊菜单" onClose={onClose}>
       <div className="debug-toolbox">
         <Panel title="时间倍率">
-          <p className="muted-text">仅用于验收。它不会伪装成正式玩法。</p>
+          <p className="muted-text">正式默认流速为 8x；这里仅用于验收时临时切换。</p>
           <div className="debug-multiplier-row" role="group" aria-label="时间倍率">
             {multipliers.map((value) => (
               <button

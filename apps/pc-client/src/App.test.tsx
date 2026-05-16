@@ -674,7 +674,7 @@ describe("App", () => {
       vi.advanceTimersByTime(1000);
     });
 
-    expect(screen.getByText("第 1 日 00 小时 00 分钟 01 秒")).toBeInTheDocument();
+    expect(screen.getByText("第 1 日 00 小时 00 分钟 08 秒")).toBeInTheDocument();
   });
 
   it("does not expose a DOM event bypass for phone basic action intents", () => {

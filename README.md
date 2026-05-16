@@ -147,8 +147,8 @@ https://<用户名>.github.io/stellar-frontier/
 - **地图**：以 content-authored `256 x 256` explicit tiles 作为玩法事实源，并用 JSON 驱动的 console radar 表现层展示地形、区域、遮罩、队员位置和路线选择。地图入口开局离线，需先修复奥德赛号雷达装置；解锁后地图只读，不直接下达指令。从通话进入时只标记候选目的地，最终仍需回到通话确认。临时战争迷雾 / `3 x 3` 探索限制已取消，后续会单独设计。
 - **人物详情**：展示背景档案、5 维轻量属性、自由性格标签、专长以及关键节点日记，并按通讯/失联/找回状态控制日记可见性。
 - **本地 Game Editor**：独立 `apps/editor` 工具，包含 Event Editor 与 Map Editor；Map Editor 维护 `content/maps/*.json` 的 explicit gameplay tile、origin、初始 discovered、地块对象、特殊状态和 radar glyph/tone。
-- **Debug toolbox / 作弊菜单**：调整时间倍率（`1x` / `2x` / `4x` / `8x`）、队员移动速度倍率、日志面板和重置浏览器存档，仅用于开发与验收；正式玩家版不会显示。
-- **全局时间**：游戏内时间从开始新游戏起持续推进；玩家关闭游戏后世界停止，再次进入时从保存的 `elapsedGameSeconds` 继续。
+- **Debug toolbox / 作弊菜单**：临时调整时间倍率（`1x` / `2x` / `4x` / `8x`）、队员移动速度倍率、日志面板和重置浏览器存档，仅用于开发与验收；正式玩家版不会显示。
+- **全局时间**：游戏内时间从开始新游戏起以默认 `8x` 持续推进；玩家关闭游戏后世界停止，再次进入时从保存的 `elapsedGameSeconds` 继续。
 
 ## 目录结构
 
