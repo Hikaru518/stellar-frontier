@@ -1134,16 +1134,18 @@ describe("App", () => {
         />,
       );
 
-      const transcript = screen.getByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
+      const transcript = document.querySelector<HTMLElement>(".console-call-dialogue-line");
+      expect(transcript).not.toBeNull();
+      const continueReceiveButton = screen.getByRole("button", { name: "继续接收" });
       act(() => {
         vi.advanceTimersByTime(42 * 7);
       });
 
-      expect(transcript.textContent).toMatch(/麦克 骰出了 \d{2}_/);
+      expect(transcript?.textContent).toMatch(/麦克 骰出了 \d{2}_/);
       expect(transcript).not.toHaveTextContent("麦克 骰出了 12，加上");
       expect(screen.queryByRole("button", { name: "[感知]继续。" })).toBeNull();
 
-      fireEvent.click(transcript);
+      fireEvent.click(continueReceiveButton);
       expect(transcript).toHaveTextContent(rollText);
       const optionButton = screen.getByRole("button", { name: "[感知]继续。" });
       expect(optionButton).toBeEnabled();

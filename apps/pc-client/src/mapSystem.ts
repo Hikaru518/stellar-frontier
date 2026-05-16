@@ -77,13 +77,12 @@ export function getTileAreaName(config: MapConfigDefinition, tileId: string, map
 
 export function getTileLocationLabel(config: MapConfigDefinition, tileId: string, map?: Pick<RuntimeMapState, "discoveredTileIds" | "tilesById" | "featuresById">) {
   const tile = getTile(config, tileId);
-  const origin = getOrigin(config);
-  if (!tile || !origin) {
+  if (!tile) {
     return tileId;
   }
 
   const label = getTileFeatureLabel(config, tileId, map) ?? tileId;
-  return `${label} ${formatDisplayCoord(getDisplayCoord(tile, origin))}`;
+  return label === tileId ? tileId : `${label} / ${tileId}`;
 }
 
 export function canMoveToTile(config: MapConfigDefinition, _runtimeMap: RuntimeMapState, tileId: string) {

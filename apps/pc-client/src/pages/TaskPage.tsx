@@ -5,6 +5,8 @@ import { deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSyst
 import type { CrewId, CrewMember, MapTile, SystemLog } from "../data/gameData";
 import type { CrewActionState, RuntimeCall } from "../events/types";
 import type { QuestCategoryFilter, QuestDetailView, QuestEntryStatus, QuestSidebarView, QuestStatusFilter, TodoView } from "../questSystem";
+import { defaultMapConfig } from "../content/contentData";
+import { getTileLocationLabel } from "../mapSystem";
 
 interface TaskPageProps {
   view: QuestSidebarView;
@@ -136,7 +138,7 @@ export function TaskPage({
                       {member.canCommunicate ? "在线" : "失联"}
                     </span>
                   </div>
-                  <p>{member.location}</p>
+                  <p>{getTileLocationLabel(defaultMapConfig, member.currentTile)}</p>
                   <p>{actionView.statusText}</p>
                   {timingText ? <p>{timingText}</p> : null}
                 </div>
@@ -147,7 +149,7 @@ export function TaskPage({
                   <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => handleOpenCrewInventory(member)}>
                     查看背包
                   </button>
-                  <button type="button" className="console-crew-button" onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate && !member.hasIncoming}>
+                  <button type="button" className={`console-crew-button ${hasRuntimeCall || member.hasIncoming ? "console-crew-button-incoming" : ""}`} onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate && !member.hasIncoming}>
                     {hasRuntimeCall || member.hasIncoming ? "接通" : "通话"}
                   </button>
                 </div>

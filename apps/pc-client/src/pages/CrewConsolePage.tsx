@@ -98,6 +98,7 @@ export function CrewConsolePage({
             const isStatusActive = mode === "status" && selectedCrew?.id === member.id;
             const isInventoryActive = mode === "inventory" && selectedCrew?.id === member.id;
             const timingText = actionView.blockingReason ?? actionView.timingText;
+            const locationLabel = getTileLocationLabel(defaultMapConfig, member.currentTile);
             return (
               <article key={member.id} className={`console-crew-card ${incoming || member.hasIncoming ? "console-crew-card-alert" : ""}`}>
                 <div className="console-crew-avatar">{member.name.slice(0, 1)}</div>
@@ -109,7 +110,7 @@ export function CrewConsolePage({
                       {member.canCommunicate ? "在线" : "失联"}
                     </span>
                   </div>
-                  <p>{member.location}</p>
+                  <p>{locationLabel}</p>
                   <p>{actionView.statusText}</p>
                   {timingText ? <p>{timingText}</p> : null}
                 </div>
@@ -128,7 +129,7 @@ export function CrewConsolePage({
                   >
                     查看背包
                   </button>
-                  <button type="button" className="console-crew-button" onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate && !member.hasIncoming}>
+                  <button type="button" className={`console-crew-button ${incoming || member.hasIncoming ? "console-crew-button-incoming" : ""}`} onClick={() => onStartCall(member.id)} disabled={!member.canCommunicate && !member.hasIncoming}>
                     {incoming || member.hasIncoming ? "接通" : "通话"}
                   </button>
                 </div>
@@ -241,7 +242,7 @@ function CrewStatusScreen({
         <p>STATUS ........ {member.status.toUpperCase()}</p>
         <p>ACTION ........ {actionView.actionTitle.toUpperCase()}</p>
         {timingText ? <p>TIMER ......... {timingText.toUpperCase()}</p> : null}
-        <p>LOCATION ...... {member.location.toUpperCase()}</p>
+        <p>LOCATION ...... {getTileLocationLabel(defaultMapConfig, member.currentTile).toUpperCase()}</p>
         <p>LINK .......... {member.canCommunicate ? "ONLINE" : "OFFLINE"}</p>
       </section>
       <section className="console-screen-block">

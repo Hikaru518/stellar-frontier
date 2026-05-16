@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildCallView, type CallActionTargetView, type CallFeatureContextView } from "../callActions";
-import { buildCrewPortrait, getCrewPortraitImage } from "../components/CrewPortrait";
 import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
@@ -96,7 +95,6 @@ export function CallPage({
 }: CallPageProps) {
   const latestLog = logs[logs.length - 1];
   const member = crew.find((item) => item.id === call?.crewId);
-  const crewPortraitImage = member ? getCrewPortraitImage(member) : null;
   const runtimeCall = call?.runtimeCallId ? activeCalls[call.runtimeCallId] : null;
   const isRuntimeContext = Boolean(call?.runtimeCallId);
   const runtimeCallClosed = isRuntimeContext && (!runtimeCall || !isRuntimeCallActive(runtimeCall, elapsedGameSeconds));
@@ -170,7 +168,7 @@ export function CallPage({
       : null;
 
     return {
-      scene: "通话画面 / 状态确认 / 当前坐标回传",
+      scene: "通话画面 / 状态确认 / 当前区块回传",
       lines: [
         memberActionView.actionStatus === "idle"
           ? `${member.name} 正在等待新的行动指令。`
@@ -543,16 +541,6 @@ export function CallPage({
                   <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
                 ))}
               </div>
-              <div className="console-call-portrait-block">
-                <p className="console-screen-command">] CREW PORTRAIT</p>
-                {crewPortraitImage ? (
-                  <img className="console-crew-portrait-image" src={crewPortraitImage.src} alt={crewPortraitImage.alt} />
-                ) : (
-                  buildCrewPortrait(member, callView.isRuntime).map((line, index) => (
-                    <p key={`portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
-                  ))
-                )}
-              </div>
             </section>
             <section className="console-screen-block">
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
@@ -578,7 +566,7 @@ export function CallPage({
               <p className="console-screen-line console-screen-line-amber">{callView.meta}</p>
               {!callView.isRuntime ? (
                 <p className="console-call-note-line">
-                  {call.selectingMoveTarget ? "地图已进入候选坐标标记模式，确认仍需在右侧完成。" : "移动、调查、修复等行动都在右侧控制区提交。"}
+                  {call.selectingMoveTarget ? "地图已进入候选区块标记模式，确认仍需在右侧完成。" : "移动、调查、修复等行动都在右侧控制区提交。"}
                 </p>
               ) : (
                 <p className="console-call-note-line">事件图像只是快照回传，真正推进由右侧选项完成。</p>
@@ -760,10 +748,12 @@ function MoveConfirmPanel({
           <dt>目标</dt>
           <dd>{formatMoveTargetLabel(targetTile, map)}</dd>
         </div>
-        <div>
-          <dt>路线</dt>
-          <dd>{preview.canMove ? formatVisibleMoveRoute(preview, map) : preview.reason}</dd>
-        </div>
+        {!preview.canMove ? (
+          <div>
+            <dt>限制</dt>
+            <dd>{preview.reason}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>预计耗时</dt>
           <dd>{preview.canMove ? formatDuration(preview.totalDurationSeconds) : "不可达"}</dd>
@@ -889,14 +879,6 @@ function formatMoveTargetLabel(tile: MapTile | undefined, map: GameMapState) {
 
 function formatMoveTargetShortLabel(tile: MapTile | undefined, map: GameMapState) {
   return tile ? getTileLocationLabel(defaultMapConfig, tile.id, map) : "未知目标";
-}
-
-function formatVisibleMoveRoute(preview: NonNullable<ReturnType<typeof createMovePreview>>, map: GameMapState) {
-  return preview.steps
-    .map((step) => {
-      return `${getTileLocationLabel(defaultMapConfig, step.tileId, map)} ${step.terrain}`;
-    })
-    .join(" -> ");
 }
 
 function isRuntimeCallActive(call: RuntimeCall, elapsedGameSeconds: number) {

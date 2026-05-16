@@ -90,10 +90,10 @@ describe("MapPage", () => {
     });
   });
 
-  it("uses center-origin display coordinates for the function layer", () => {
+  it("uses block ids for the function layer readout", () => {
     renderMapPage();
 
-    expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("129-129").length).toBeGreaterThan(0);
   });
 
   it("keeps the map debug layer off by default and toggles it on demand", () => {
@@ -183,14 +183,14 @@ describe("MapPage", () => {
     expect(within(screen.getByLabelText("Feature 命中结果")).getByText("散落的物资")).toBeInTheDocument();
   });
 
-  it("keeps tile terrain and weather readout for blank tiles without visible features", () => {
+  it("hides tile terrain and weather readout for masked blank tiles", () => {
     renderMapPage({ viewportState: { zoom: RADAR_WORLD_SIZE / MIN_VISIBLE_CELLS, center: { x: 39, y: 39 } } });
 
     focusMapTile("1-1", { left: 0, top: 0, width: MIN_VISIBLE_CELLS, height: MIN_VISIBLE_CELLS });
 
-    expect(screen.getByText(/\[TILE\] 1-1 \/ 平原 \/ 晴朗/)).toBeInTheDocument();
-    expect(screen.getByText(/\[FEATURE\] 无可见 Feature/)).toBeInTheDocument();
-    expect(screen.getAllByText("野外").length).toBeGreaterThan(0);
+    expect(screen.getByText(/\[TILE\] 1-1 \/ 未知 \/ 未知/)).toBeInTheDocument();
+    expect(screen.getByText(/\[FEATURE\] 未知/)).toBeInTheDocument();
+    expect(screen.getAllByText("未知区域").length).toBeGreaterThan(0);
   });
 
   it("shows call map actions in the upper details panel instead of the trace panel", () => {
@@ -204,9 +204,9 @@ describe("MapPage", () => {
 
     expect(detailPanel).toBeTruthy();
     expect(tracePanel).toBeTruthy();
-    expect(within(detailPanel as HTMLElement).getByRole("button", { name: "标记当前坐标" })).toBeInTheDocument();
+    expect(within(detailPanel as HTMLElement).getByRole("button", { name: "标记当前区块" })).toBeInTheDocument();
     expect(within(detailPanel as HTMLElement).getByRole("button", { name: "返回当前通话" })).toBeInTheDocument();
-    expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "标记当前坐标" })).not.toBeInTheDocument();
+    expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "标记当前区块" })).not.toBeInTheDocument();
     expect(within(tracePanel as HTMLElement).queryByRole("button", { name: "返回当前通话" })).not.toBeInTheDocument();
   });
 
@@ -219,10 +219,25 @@ describe("MapPage", () => {
     });
 
     focusMapTile("130-130");
-    fireEvent.click(screen.getByRole("button", { name: "标记当前坐标" }));
+    fireEvent.click(screen.getByRole("button", { name: "标记当前区块" }));
 
     expect(onSelectMoveTarget).toHaveBeenCalledTimes(1);
     expect(onSelectMoveTarget).toHaveBeenCalledWith("130-130");
+  });
+
+  it("prevents marking masked coordinates from a call", () => {
+    const onSelectMoveTarget = vi.fn();
+    renderMapPage({
+      returnTarget: "call",
+      moveSelectionCrewId: initialCrew[0].id,
+      onSelectMoveTarget,
+      viewportState: { zoom: RADAR_WORLD_SIZE / MIN_VISIBLE_CELLS, center: { x: 39, y: 39 } },
+    });
+
+    focusMapTile("1-1", { left: 0, top: 0, width: MIN_VISIBLE_CELLS, height: MIN_VISIBLE_CELLS });
+
+    expect(screen.getByRole("button", { name: "未知区域不可标记" })).toBeDisabled();
+    expect(onSelectMoveTarget).not.toHaveBeenCalled();
   });
 });
 

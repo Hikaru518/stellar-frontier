@@ -7,7 +7,8 @@ import type { CrewId, CrewMember, GameMapState, MapReturnTarget, MapTile, System
 import { deriveCrewActionViewModel, isTilePassable, type CrewActionViewModel } from "../crewSystem";
 import type { CrewActionState, RuntimeCall } from "../events/types";
 import { buildFeatureTileIndex, expandFeatureFootprint, getVisibleFeaturesAtTile } from "../mapFeatureSystem";
-import { parseTileId } from "../mapSystem";
+import { getTileLocationLabel, parseTileId } from "../mapSystem";
+import { IS_DEV_UI_ENABLED } from "../runtimeMode";
 
 const RADAR = defaultMapConfig.radar;
 const RADAR_WORLD = RADAR.world;
@@ -82,10 +83,12 @@ interface MapDebugLayerData {
 }
 
 interface MapCrewMarker extends FocusCoord {
+  markerId: string;
   tileId: string;
   label: string;
   iconUrl: string;
   iconId: string;
+  moveTargetTileId?: string;
 }
 
 interface MapIconMarker extends FocusCoord {
@@ -172,11 +175,13 @@ export function MapPage({
   const [zoom, setZoom] = useState(() => clamp(viewportState?.zoom ?? 1, MIN_ZOOM, MAX_ZOOM));
   const [center, setCenter] = useState<FocusCoord>(() => clampCoord(viewportState?.center ?? initialFocus));
   const [dragging, setDragging] = useState(false);
-  const showRenderLayer = layerVisibility.render;
-  const showMaskLayer = layerVisibility.mask;
-  const showFunctionalLayer = layerVisibility.functional;
-  const showCrewLayer = layerVisibility.crew;
-  const showDebugLayer = layerVisibility.debug;
+  const [hoveredCrewMarkerId, setHoveredCrewMarkerId] = useState<string | null>(null);
+  const playerOperationTraceLines = traceLines.filter((line) => line.startsWith("[FOCUS]") || line.startsWith("[SELECT]"));
+  const showRenderLayer = IS_DEV_UI_ENABLED ? layerVisibility.render : true;
+  const showMaskLayer = IS_DEV_UI_ENABLED ? layerVisibility.mask : true;
+  const showFunctionalLayer = IS_DEV_UI_ENABLED && layerVisibility.functional;
+  const showCrewLayer = IS_DEV_UI_ENABLED ? layerVisibility.crew : true;
+  const showDebugLayer = IS_DEV_UI_ENABLED && layerVisibility.debug;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const functionCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -188,13 +193,18 @@ export function MapPage({
   const featureTileIndex = useMemo(() => buildFeatureTileIndex(defaultMapConfig), []);
   const focusTileId = useMemo(() => tileIdFromRadarCoord(focusCoord), [focusCoord]);
   const focusConfigTile = configTileById.get(focusTileId);
-  const visibleFocusFeatures = useMemo(
-    () => getVisibleFeaturesAtTile(defaultMapConfig, featureTileIndex, map, focusTileId),
-    [featureTileIndex, focusTileId, map],
-  );
+  const mapIconMarkers = useMemo(() => getMapIconMarkers(map), [map]);
+  const mapMaskReveals = useMemo(() => getMapMaskReveals(map, crew, crewActions, mapIconMarkers), [crew, crewActions, map, mapIconMarkers]);
+  const isFocusRevealed = isCoordRevealedByMask(focusCoord, mapMaskReveals);
+  const visibleFocusFeatures = useMemo(() => {
+    if (!isFocusRevealed) {
+      return [];
+    }
+    return getVisibleFeaturesAtTile(defaultMapConfig, featureTileIndex, map, focusTileId);
+  }, [featureTileIndex, focusTileId, isFocusRevealed, map]);
   const backgroundFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable !== true), [visibleFocusFeatures]);
   const investigatableFocusFeatures = useMemo(() => visibleFocusFeatures.filter((feature) => feature.investigatable === true), [visibleFocusFeatures]);
-  const focusLabel = useMemo(() => getRadarFocusLabel(backgroundFocusFeatures), [backgroundFocusFeatures]);
+  const focusLabel = useMemo(() => (isFocusRevealed ? getRadarFocusLabel(backgroundFocusFeatures) : "未知区域"), [backgroundFocusFeatures, isFocusRevealed]);
   const focusDisplayCoord = useMemo(() => formatDisplayCoord(focusCoord), [focusCoord]);
   const viewport = useMemo(() => getViewport(center, zoom), [center, zoom]);
   const terrainImageStyle = useMemo(
@@ -206,9 +216,32 @@ export function MapPage({
     [viewport],
   );
   const mapDebugData = useMemo(() => getMapDebugData(tiles, map), [map, tiles]);
-  const crewMarkers = useMemo(() => getMapCrewMarkers(crew), [crew]);
-  const mapIconMarkers = useMemo(() => getMapIconMarkers(map), [map]);
-  const mapMaskReveals = useMemo(() => getMapMaskReveals(map, crew, crewActions, mapIconMarkers), [crew, crewActions, map, mapIconMarkers]);
+  const crewMarkers = useMemo(() => getMapCrewMarkers(crew, crewActions), [crew, crewActions]);
+  const hoveredMoveTargetCoord = useMemo(() => {
+    const targetTileId = crewMarkers.find((marker) => marker.markerId === hoveredCrewMarkerId)?.moveTargetTileId;
+    return targetTileId ? radarCoordFromTileId(targetTileId) : null;
+  }, [crewMarkers, hoveredCrewMarkerId]);
+  const focusMarkerStyle = useMemo(
+    () => ({
+      left: `${((focusCoord.x - viewport.left) / viewport.width) * 100}%`,
+      top: `${((focusCoord.y - viewport.top) / viewport.height) * 100}%`,
+      width: `${(1 / viewport.width) * 100}%`,
+      height: `${(1 / viewport.height) * 100}%`,
+    }),
+    [focusCoord, viewport],
+  );
+  const moveTargetMarkerStyle = useMemo(
+    () =>
+      hoveredMoveTargetCoord
+        ? {
+            left: `${((hoveredMoveTargetCoord.x - viewport.left) / viewport.width) * 100}%`,
+            top: `${((hoveredMoveTargetCoord.y - viewport.top) / viewport.height) * 100}%`,
+            width: `${(1 / viewport.width) * 100}%`,
+            height: `${(1 / viewport.height) * 100}%`,
+          }
+        : undefined,
+    [hoveredMoveTargetCoord, viewport],
+  );
   const mapIconSizePercent = useMemo(() => `${(MAP_ICON_WORLD_SIZE / viewport.width) * 100}%`, [viewport.width]);
   const crewIconSizePercent = useMemo(() => `${(CREW_ICON_WORLD_SIZE / viewport.width) * 100}%`, [viewport.width]);
   const mapCallReturnActions = returnTarget === "call" ? (
@@ -217,12 +250,17 @@ export function MapPage({
         <button
           type="button"
           className="console-crew-button"
+          disabled={!isFocusRevealed}
           onClick={() => {
+            if (!isFocusRevealed) {
+              pushTrace(`[SELECT] ${focusTileId} / 未知区域不可标记`);
+              return;
+            }
             pushTrace(`[SELECT] ${focusTileId} / ${focusLabel}`);
             onSelectMoveTarget(focusTileId);
           }}
         >
-          标记当前坐标
+          {isFocusRevealed ? "标记当前区块" : "未知区域不可标记"}
         </button>
       ) : null}
       <button type="button" className="console-crew-button console-crew-button-secondary" onClick={onReturnFromMap}>
@@ -249,9 +287,9 @@ export function MapPage({
   );
 
   useEffect(() => {
-    const line = `[FOCUS] ${focusDisplayCoord} / ${focusLabel}`;
+    const line = `[FOCUS] ${focusTileId} / ${focusLabel}`;
     setTraceLines((current) => (current[0] === line ? current : [line, ...current].slice(0, 10)));
-  }, [focusDisplayCoord, focusLabel]);
+  }, [focusLabel, focusTileId]);
 
   useEffect(() => {
     onViewportStateChange?.({ zoom, center });
@@ -678,7 +716,7 @@ export function MapPage({
       gameTimeLabel={gameTimeLabel}
       statusItems={[
         { label: "signal", value: `${Object.keys(activeCalls).length} 路` },
-        { label: "focus", value: focusDisplayCoord },
+        { label: "block", value: focusTileId },
         { label: "target", value: moveSelectionMember ? moveSelectionMember.name : focusLabel },
         { label: "mode", value: "RADAR" },
       ]}
@@ -705,7 +743,7 @@ export function MapPage({
                       {member.canCommunicate ? "在线" : "失联"}
                     </span>
                   </div>
-                  <p>{member.location}</p>
+                  <p>{getTileLocationLabel(defaultMapConfig, member.currentTile, map)}</p>
                   <p>{actionView.statusText}</p>
                   {timingText ? <p>{timingText}</p> : null}
                 </div>
@@ -716,7 +754,7 @@ export function MapPage({
                   <button type="button" className="console-crew-button console-crew-button-secondary" onClick={() => handleOpenCrewInventory(member)}>
                     查看背包
                   </button>
-                  <button type="button" className="console-crew-button" onClick={() => onStartCall(member.id)} disabled={!actionView.canStartCall}>
+                  <button type="button" className={`console-crew-button ${hasCallEntry ? "console-crew-button-incoming" : ""}`} onClick={() => onStartCall(member.id)} disabled={!actionView.canStartCall}>
                     {hasCallEntry ? "接通" : "通话"}
                   </button>
                 </div>
@@ -735,10 +773,9 @@ export function MapPage({
             <FieldList
               rows={[
                 ["区块", focusTileId],
-                ["坐标", focusDisplayCoord],
-                ["区域", focusLabel],
-                ["地形", focusConfigTile?.terrain ?? "未知地形"],
-                ["天气", focusConfigTile?.weather ?? "未知天气"],
+                ["区域", isFocusRevealed ? focusLabel : "未知"],
+                ["地形", isFocusRevealed ? (focusConfigTile?.terrain ?? "未知地形") : "未知"],
+                ["天气", isFocusRevealed ? (focusConfigTile?.weather ?? "未知天气") : "未知"],
               ]}
             />
             {visibleFocusFeatures.length ? (
@@ -747,7 +784,7 @@ export function MapPage({
                 {investigatableFocusFeatures.length ? <FeatureHitGroup label="可调查" features={investigatableFocusFeatures} map={map} /> : null}
               </div>
             ) : (
-              <p className="console-map-trace-line">[FEATURE] 无可见 Feature</p>
+              <p className="console-map-trace-line">[FEATURE] {isFocusRevealed ? "无可见 Feature" : "未知"}</p>
             )}
           </section>
 
@@ -756,72 +793,84 @@ export function MapPage({
               <span>map trace</span>
             </div>
             <div className="console-map-trace">
-              <p className="console-map-trace-lead">
-                {RADAR.trace.layerNotice}
-              </p>
-              <div className="console-layer-toggle-list">
-                <button
-                  type="button"
-                  className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => toggleLayer("render", "render")}
-                >
-                  显示渲染层
-                </button>
-                <button
-                  type="button"
-                  className={`console-layer-toggle ${showMaskLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => toggleLayer("mask", "mask")}
-                >
-                  显示遮罩层
-                </button>
-                <button
-                  type="button"
-                  className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => toggleLayer("functional", "function")}
-                >
-                  显示功能层
-                </button>
-                <button
-                  type="button"
-                  className={`console-layer-toggle ${showCrewLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => toggleLayer("crew", "crew")}
-                >
-                  显示队员层
-                </button>
-                <button
-                  type="button"
-                  className={`console-layer-toggle ${showDebugLayer ? "console-layer-toggle-active" : ""}`}
-                  onClick={() => toggleLayer("debug", "debug")}
-                >
-                  显示调试层
-                </button>
-              </div>
-              <p className="console-map-trace-lead">
-                {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
-              </p>
-              <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
-              <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
-              <p className="console-map-trace-line">
-                [TILE] {focusTileId} / {focusConfigTile?.terrain ?? "未知地形"} / {focusConfigTile?.weather ?? "未知天气"}
-              </p>
-              <p className="console-map-trace-line">
-                [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.investigatableUnrevealed}=unrevealed / {MAP_DEBUG_SYMBOLS.investigatableRevealed}=revealed
-              </p>
-              <p className="console-map-trace-line">
-                [DEBUG] bg blue-&gt;yellow / orange=unrevealed / white=revealed
-              </p>
-              <p className="console-map-trace-line">[CREW] cyan marker=当前队员位置 / label=姓名或同格人数</p>
-              <p className="console-map-trace-line">
-                [MASK] landing + route + key-point signal / {mapMaskReveals.length} sources
-              </p>
-              {traceLines.length ? (
-                traceLines.map((line, index) => (
+              {IS_DEV_UI_ENABLED ? (
+                <>
+                <p className="console-map-trace-lead">
+                  {RADAR.trace.layerNotice}
+                </p>
+                <div className="console-layer-toggle-list">
+                  <button
+                    type="button"
+                    className={`console-layer-toggle ${showRenderLayer ? "console-layer-toggle-active" : ""}`}
+                    onClick={() => toggleLayer("render", "render")}
+                  >
+                    显示渲染层
+                  </button>
+                  <button
+                    type="button"
+                    className={`console-layer-toggle ${showMaskLayer ? "console-layer-toggle-active" : ""}`}
+                    onClick={() => toggleLayer("mask", "mask")}
+                  >
+                    显示遮罩层
+                  </button>
+                  <button
+                    type="button"
+                    className={`console-layer-toggle ${showFunctionalLayer ? "console-layer-toggle-active" : ""}`}
+                    onClick={() => toggleLayer("functional", "function")}
+                  >
+                    显示功能层
+                  </button>
+                  <button
+                    type="button"
+                    className={`console-layer-toggle ${showCrewLayer ? "console-layer-toggle-active" : ""}`}
+                    onClick={() => toggleLayer("crew", "crew")}
+                  >
+                    显示队员层
+                  </button>
+                  <button
+                    type="button"
+                    className={`console-layer-toggle ${showDebugLayer ? "console-layer-toggle-active" : ""}`}
+                    onClick={() => toggleLayer("debug", "debug")}
+                  >
+                    显示调试层
+                  </button>
+                </div>
+                <p className="console-map-trace-lead">
+                  {returnTarget === "call" ? RADAR.trace.callMode : RADAR.trace.controlMode}
+                </p>
+                <p className="console-map-trace-line">{RADAR.trace.worldLine}</p>
+                <p className="console-map-trace-line">{RADAR.trace.jsonLine}</p>
+                <p className="console-map-trace-line">
+                  [TILE] {focusTileId} / {isFocusRevealed ? (focusConfigTile?.terrain ?? "未知地形") : "未知"} / {isFocusRevealed ? (focusConfigTile?.weather ?? "未知天气") : "未知"}
+                </p>
+                <p className="console-map-trace-line">
+                  [DEBUG] {MAP_DEBUG_SYMBOLS.blocked}=blocked / {MAP_DEBUG_SYMBOLS.investigatableUnrevealed}=unrevealed / {MAP_DEBUG_SYMBOLS.investigatableRevealed}=revealed
+                </p>
+                <p className="console-map-trace-line">
+                  [DEBUG] bg blue-&gt;yellow / orange=unrevealed / white=revealed
+                </p>
+                <p className="console-map-trace-line">[CREW] cyan marker=当前队员位置 / label=姓名或同格人数</p>
+                <p className="console-map-trace-line">
+                  [MASK] landing + route + key-point signal / {mapMaskReveals.length} sources
+                </p>
+                {traceLines.length ? (
+                  traceLines.map((line, index) => (
+                    <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
+                      {line}
+                    </p>
+                  ))
+                ) : (
+                  <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
+                )}
+                </>
+              ) : playerOperationTraceLines.length ? (
+                playerOperationTraceLines.map((line, index) => (
                   <p key={`${index}-${line}`} className={index === 0 ? "console-map-trace-line console-map-trace-line-active" : "console-map-trace-line"}>
                     {line}
                   </p>
                 ))
               ) : (
-                <p className="console-map-trace-line">{RADAR.trace.emptyLine}</p>
+                <p className="console-map-trace-line">暂无操作记录。</p>
               )}
             </div>
           </section>
@@ -838,7 +887,11 @@ export function MapPage({
         <div className="console-screen-header">
           <span>crt situation map</span>
           <strong>卫星雷达地图 / retro lofi field</strong>
-          <span>render + function + crew + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
+          <span>
+            {IS_DEV_UI_ENABLED
+              ? `render + function + crew + debug / ${RADAR_WORLD.width} x ${RADAR_WORLD.height}`
+              : `render + mask + crew / ${RADAR_WORLD.width} x ${RADAR_WORLD.height}`}
+          </span>
         </div>
 
         <div className="console-map-stage-frame">
@@ -901,12 +954,12 @@ export function MapPage({
               </div>
             ) : null}
 
-            {showCrewLayer ? (
-              <div className="console-retro-map-crew-layer" aria-hidden="true">
-                <canvas ref={crewCanvasRef} className="console-retro-map-crew-canvas" />
-                <div className="console-retro-map-crew-icon-layer">
-                  {crewMarkers.map((marker) => {
-                    if (!isCoordInsideViewport(marker, viewport)) {
+          {showCrewLayer ? (
+            <div className="console-retro-map-crew-layer" aria-hidden="true">
+              <canvas ref={crewCanvasRef} className="console-retro-map-crew-canvas" />
+              <div className="console-retro-map-crew-icon-layer">
+                {crewMarkers.map((marker) => {
+                  if (!isCoordInsideViewport(marker, viewport)) {
                       return null;
                     }
 
@@ -917,12 +970,17 @@ export function MapPage({
                         style={{
                           left: `${((marker.x - viewport.left + 0.5) / viewport.width) * 100}%`,
                           top: `${((marker.y - viewport.top + 0.5) / viewport.height) * 100}%`,
-                          width: `clamp(18px, ${crewIconSizePercent}, 42px)`,
-                        }}
-                        data-crew-icon-id={marker.iconId}
-                      >
-                        <img src={marker.iconUrl} alt="" className="console-retro-map-crew-icon" draggable={false} />
-                      </span>
+                        width: `clamp(18px, ${crewIconSizePercent}, 42px)`,
+                      }}
+                      data-crew-icon-id={marker.iconId}
+                      data-moving={marker.moveTargetTileId ? "true" : "false"}
+                      onPointerEnter={() => setHoveredCrewMarkerId(marker.markerId)}
+                      onPointerLeave={() => setHoveredCrewMarkerId((current) => (current === marker.markerId ? null : current))}
+                      onFocus={() => setHoveredCrewMarkerId(marker.markerId)}
+                      onBlur={() => setHoveredCrewMarkerId((current) => (current === marker.markerId ? null : current))}
+                    >
+                      <img src={marker.iconUrl} alt="" className="console-retro-map-crew-icon" draggable={false} />
+                    </span>
                     );
                   })}
                 </div>
@@ -934,16 +992,25 @@ export function MapPage({
                 <canvas ref={debugCanvasRef} className="console-retro-map-debug-canvas" />
               </div>
             ) : null}
+
+            {isCoordInsideViewport(focusCoord, viewport) ? (
+              <span className="console-retro-map-focus-marker" style={focusMarkerStyle} aria-hidden="true" />
+            ) : null}
+            {hoveredMoveTargetCoord && moveTargetMarkerStyle && isCoordInsideViewport(hoveredMoveTargetCoord, viewport) ? (
+              <span className="console-retro-map-move-target-marker" style={moveTargetMarkerStyle} aria-hidden="true" />
+            ) : null}
           </div>
 
-          <div className="console-ascii-map-readout">
-            <span>focus {focusDisplayCoord}</span>
-            <span>render {showRenderLayer ? "ON" : "OFF"}</span>
-            <span>mask {showMaskLayer ? "ON" : "OFF"}</span>
-            <span>function {showFunctionalLayer ? "ON" : "OFF"}</span>
-            <span>crew {showCrewLayer ? "ON" : "OFF"}</span>
-            <span>debug {showDebugLayer ? "ON" : "OFF"}</span>
-          </div>
+          {IS_DEV_UI_ENABLED ? (
+            <div className="console-ascii-map-readout">
+              <span>block {focusTileId}</span>
+              <span>render {showRenderLayer ? "ON" : "OFF"}</span>
+              <span>mask {showMaskLayer ? "ON" : "OFF"}</span>
+              <span>function {showFunctionalLayer ? "ON" : "OFF"}</span>
+              <span>crew {showCrewLayer ? "ON" : "OFF"}</span>
+              <span>debug {showDebugLayer ? "ON" : "OFF"}</span>
+            </div>
+          ) : null}
         </div>
       </div>
     </GameConsoleLayout>
@@ -989,7 +1056,7 @@ function getMapDebugData(tiles: MapTile[], map: Pick<GameMapState, "featuresById
   };
 }
 
-function getMapCrewMarkers(crew: CrewMember[]): MapCrewMarker[] {
+function getMapCrewMarkers(crew: CrewMember[], crewActions: Record<string, CrewActionState>): MapCrewMarker[] {
   const membersByTileId = new Map<string, CrewMember[]>();
   for (const member of crew) {
     const members = membersByTileId.get(member.currentTile) ?? [];
@@ -1002,17 +1069,34 @@ function getMapCrewMarkers(crew: CrewMember[]): MapCrewMarker[] {
     if (!firstMember || !parseTileId(tileId)) {
       return [];
     }
+    const crewIds = members.map((member) => member.id);
+    const movingTargetTileId = members.map((member) => getMoveTargetTileId(findActiveMoveActionForCrew(crewActions, member.id))).find((targetTileId) => targetTileId !== undefined);
 
     return [
       {
+        markerId: `${tileId}:${crewIds.join("/")}`,
         tileId,
         ...radarCoordFromTileId(tileId),
         label: members.length === 1 ? firstMember.name : `${members.length}人 ${members.map((member) => member.name).join("/")}`,
         iconUrl: getCrewMapIconUrl(),
         iconId: "crew-group",
+        moveTargetTileId: movingTargetTileId,
       },
     ];
   });
+}
+
+function getMoveTargetTileId(action: CrewActionState | undefined) {
+  if (!action || action.type !== "move" || action.status !== "active") {
+    return undefined;
+  }
+
+  const routeTarget = action.path_tile_ids?.[action.path_tile_ids.length - 1];
+  return action.target_tile_id ?? action.to_tile_id ?? routeTarget;
+}
+
+function findActiveMoveActionForCrew(crewActions: Record<string, CrewActionState>, crewId: CrewId) {
+  return Object.values(crewActions).find((action) => action.crew_id === crewId && action.type === "move" && action.status === "active");
 }
 
 function getCrewMapIconUrl() {

@@ -2144,6 +2144,20 @@ blockquote {
   color: #d8b37c;
 }
 
+.console-crew-button-incoming {
+  border-color: rgba(255, 198, 86, 0.82);
+  background:
+    linear-gradient(90deg, rgba(255, 198, 86, 0.2), rgba(30, 18, 8, 0.78)),
+    repeating-linear-gradient(0deg, rgba(255, 198, 86, 0.09) 0 1px, transparent 1px 4px),
+    #21180f;
+  color: #ffc656;
+  box-shadow:
+    0 0 0 1px rgba(255, 198, 86, 0.16) inset,
+    0 0 10px rgba(255, 198, 86, 0.26);
+  animation: incomingCallPulse 1.25s steps(2, end) infinite;
+  text-shadow: 0 0 7px rgba(255, 198, 86, 0.74);
+}
+
 .console-crew-button-active-call {
   border-color: rgba(120, 255, 154, 0.48);
   background: rgba(14, 40, 22, 0.92);
@@ -2164,10 +2178,41 @@ blockquote {
   color: #baffcc;
 }
 
+.console-crew-button-incoming:hover:not(:disabled) {
+  border-color: rgba(255, 215, 131, 0.96);
+  background:
+    linear-gradient(90deg, rgba(255, 198, 86, 0.28), rgba(40, 23, 8, 0.84)),
+    repeating-linear-gradient(0deg, rgba(255, 198, 86, 0.12) 0 1px, transparent 1px 4px),
+    #2b1c0e;
+  color: #ffd783;
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 131, 0.2) inset,
+    0 0 14px rgba(255, 198, 86, 0.36);
+}
+
 .console-crew-button-active-panel:hover:not(:disabled) {
   border-color: rgba(150, 255, 180, 0.72);
   background: rgba(18, 52, 28, 0.96);
   color: #baffcc;
+}
+
+@keyframes incomingCallPulse {
+  0%,
+  100% {
+    border-color: rgba(255, 198, 86, 0.72);
+    box-shadow:
+      0 0 0 1px rgba(255, 198, 86, 0.12) inset,
+      0 0 8px rgba(255, 198, 86, 0.2);
+    color: #ffc656;
+  }
+
+  50% {
+    border-color: rgba(255, 220, 144, 1);
+    box-shadow:
+      0 0 0 1px rgba(255, 220, 144, 0.3) inset,
+      0 0 18px rgba(255, 198, 86, 0.5);
+    color: #ffe09a;
+  }
 }
 
 .console-display-case {
@@ -2520,7 +2565,30 @@ blockquote {
 .console-retro-map-crew-icon-layer {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.console-retro-map-focus-marker {
+  position: absolute;
+  z-index: 6;
+  border: 1px solid rgba(255, 215, 131, 0.98);
+  background: rgba(255, 215, 131, 0.92);
+  box-shadow: 0 0 8px rgba(255, 215, 131, 0.52);
+  pointer-events: none;
+}
+
+.console-retro-map-move-target-marker {
+  position: absolute;
+  z-index: 7;
+  border: 1px solid rgba(125, 255, 177, 0.98);
+  background:
+    repeating-linear-gradient(0deg, rgba(125, 255, 177, 0.22) 0 1px, transparent 1px 3px),
+    rgba(125, 255, 177, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(6, 26, 12, 0.9),
+    0 0 9px rgba(125, 255, 177, 0.85),
+    0 0 18px rgba(125, 255, 177, 0.38);
   pointer-events: none;
 }
 
@@ -2582,7 +2650,9 @@ blockquote {
 
 .console-map-trace {
   display: grid;
+  align-content: start;
   gap: 10px;
+  grid-auto-rows: min-content;
 }
 
 .console-map-trace-panel {

@@ -22,7 +22,7 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await startNormalMikeCall(page);
 
-  await expect(page.getByText(/地点：奥德赛号坠毁点 \(0,0\)/)).toBeVisible();
+  await expect(page.getByText(/地点：奥德赛号坠毁点 \/ 129-129/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "发电机" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "调查当前区域" }).click();

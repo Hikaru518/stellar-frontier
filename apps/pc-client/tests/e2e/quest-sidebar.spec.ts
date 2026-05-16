@@ -60,7 +60,7 @@ test("shows completion result for completed crash-site quest from authored conte
   await page.getByRole("button", { name: /任务/ }).click();
 
   await expect(page.getByText("奥德赛号坠毁点已稳定").first()).toBeVisible();
-  await expect(page.getByText("麦克完成了 奥德赛号坠毁点的初步调查与关键设备修复。").first()).toBeVisible();
+  await expect(page.getByText("麦克完成了奥德赛号坠毁点的初步调查与关键设备修复。").first()).toBeVisible();
   await expect(page.getByText("发电机恢复基础供能。").first()).toBeVisible();
   await expect(page.getByText("维生系统重新上线。").first()).toBeVisible();
   await expect(page.getByText("穿梭机核心进入可评估状态。").first()).toBeVisible();
@@ -73,7 +73,7 @@ test("completes a quest todo through the crash-site event and preserves it after
   await page.goto("/");
   await page.getByRole("button", { name: /任务/ }).click();
 
-  await expect(page.getByText("调查 奥德赛号坠毁点").first()).toBeVisible();
+  await expect(page.getByText("调查奥德赛号坠毁点").first()).toBeVisible();
   await expect(page.getByText("维修奥德赛号发电机")).toHaveCount(0);
 
   await startNormalMikeCall(page);
@@ -93,7 +93,7 @@ test("completes a quest todo through the crash-site event and preserves it after
 
   await page.reload();
   await page.getByRole("button", { name: /任务/ }).click();
-  const surveyTodo = page.locator(".console-task-todo").filter({ hasText: "调查 奥德赛号坠毁点" });
+  const surveyTodo = page.locator(".console-task-todo").filter({ hasText: "调查奥德赛号坠毁点" });
   await expect(surveyTodo.getByText("已完成")).toBeVisible();
   await expect(page.getByText("维修奥德赛号发电机").first()).toBeVisible();
   await expect(page.getByText("维修维生系统").first()).toBeVisible();
@@ -104,7 +104,7 @@ test("quest navigation opens map context without starting calls or movement", as
   await page.goto("/");
   await page.getByRole("button", { name: /任务/ }).click();
 
-  await page.getByRole("button", { name: "查看 奥德赛号坠毁点" }).first().click();
+  await page.getByRole("button", { name: "查看奥德赛号坠毁点" }).first().click();
   await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
   await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();

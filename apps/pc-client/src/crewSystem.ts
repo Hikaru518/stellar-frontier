@@ -380,14 +380,14 @@ export function advanceCrewMovement(
     nextMember = updateCrewTile(nextMember, arrivedTileId, arrivedTile);
 
     if (routeStepIndex >= action.route.length) {
-      const targetCoord = arrivedTile?.coord ?? arrivedTileId;
+      const targetLabel = getTileLocationLabel(defaultMapConfig, arrivedTileId);
       nextMember = {
         ...nextMember,
-        status: `位于 ${targetCoord}，待命中。`,
+        status: `位于 ${targetLabel}，待命中。`,
         statusTone: "neutral" as Tone,
         activeAction: undefined,
       };
-      nextLogs = appendMovementLog(nextLogs, `${nextMember.name} 抵达 ${targetCoord}，移动行动完成。`, "neutral", elapsedGameSeconds);
+      nextLogs = appendMovementLog(nextLogs, `${nextMember.name} 抵达 ${targetLabel}，移动行动完成。`, "neutral", elapsedGameSeconds);
       break;
     }
 
@@ -397,7 +397,7 @@ export function advanceCrewMovement(
     stepFinishTime = stepStartedAt + nextStepDuration;
     nextMember = {
       ...nextMember,
-      status: `位于 ${nextMember.coord}，正在前往 ${getTargetLabel(action.targetTile, tiles)}，剩余 ${formatDuration(
+      status: `位于 ${getTileLocationLabel(defaultMapConfig, nextMember.currentTile)}，正在前往 ${getTargetLabel(action.targetTile)}，剩余 ${formatDuration(
         getRemainingSeconds(action.finishTime, elapsedGameSeconds),
       )}。`,
       statusTone: "muted" as Tone,
@@ -467,10 +467,10 @@ export function advanceCrewMoveAction(
     nextMember = updateCrewTile(nextMember, arrivedTileId, arrivedTile);
 
     if (routeStepIndex >= route.length) {
-      const targetCoord = arrivedTile?.coord ?? arrivedTileId;
+      const targetLabel = getTileLocationLabel(defaultMapConfig, arrivedTileId);
       nextMember = {
         ...nextMember,
-        status: `位于 ${targetCoord}，待命中。`,
+        status: `位于 ${targetLabel}，待命中。`,
         statusTone: "neutral" as Tone,
         activeAction: undefined,
       };
@@ -487,7 +487,7 @@ export function advanceCrewMoveAction(
           step_durations_seconds: stepDurations,
         },
       };
-      nextLogs = appendMovementLog(nextLogs, `${nextMember.name} 抵达 ${targetCoord}，移动行动完成。`, "neutral", elapsedGameSeconds);
+      nextLogs = appendMovementLog(nextLogs, `${nextMember.name} 抵达 ${targetLabel}，移动行动完成。`, "neutral", elapsedGameSeconds);
       arrived = true;
       break;
     }
@@ -715,7 +715,7 @@ export function normalizeCrewMember(member: CrewMember, initialMember: CrewMembe
     expertise: member.expertise ?? initialMember.expertise,
     diaryEntries: member.diaryEntries ?? initialMember.diaryEntries,
     currentTile: member.currentTile ?? initialMember.currentTile,
-    location: member.location ?? initialMember.location,
+    location: getTileLocationLabel(defaultMapConfig, member.currentTile ?? initialMember.currentTile),
     coord: member.coord ?? initialMember.coord,
     status: member.status ?? initialMember.status,
     statusTone: member.statusTone ?? initialMember.statusTone,
@@ -942,13 +942,12 @@ function updateCrewTile(member: CrewMember, tileId: string, tile?: MapTile) {
   };
 }
 
-function getTargetLabel(targetTileId: string | undefined, tiles: MapTile[]) {
+function getTargetLabel(targetTileId: string | undefined) {
   if (!targetTileId) {
     return "未知目标";
   }
 
-  const tile = getTile(tiles, targetTileId);
-  return tile?.coord ?? targetTileId;
+  return getTileLocationLabel(defaultMapConfig, targetTileId);
 }
 
 function toActiveActionType(type: CrewActionState["type"]): ActiveAction["actionType"] {
@@ -1097,10 +1096,9 @@ function getCrewActionStatusText(action: CrewActionState, tiles: MapTile[], memb
   }
 }
 
-function getCrewActionTargetLabel(action: CrewActionState, tiles: MapTile[], member: CrewMember) {
+function getCrewActionTargetLabel(action: CrewActionState, _tiles: MapTile[], member: CrewMember) {
   const targetTileId = action.target_tile_id ?? action.to_tile_id ?? action.from_tile_id ?? member.currentTile;
-  const tile = targetTileId ? getTile(tiles, targetTileId) : undefined;
-  return tile?.coord ?? targetTileId ?? member.coord;
+  return targetTileId ? getTileLocationLabel(defaultMapConfig, targetTileId) : getTileLocationLabel(defaultMapConfig, member.currentTile);
 }
 
 function getCrewActionTimingText(action: CrewActionState, elapsedGameSeconds: number) {
