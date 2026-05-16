@@ -16,6 +16,10 @@ Local Playwright browser downloads should use `common/temp/playwright-browsers` 
 
 Treat phone-origin typed events as untrusted until they pass the PC boundary. Runtime gameplay commands must be validated before heartbeat/fallback state changes or gameplay dispatch, and tests should cover spoofed client IDs, replayed sequences, and any non-transport bypass path.
 
+## Mobile Companion Visual Rewrites
+
+Mobile client visual redesigns may reorganize JSX and class names to match the low-fidelity console design language, but they must preserve the PC-authoritative gameplay boundary and existing dual-device protocol semantics. Treat pairing, token parsing, Yuan terminal acquisition, typed event dispatch, payload validation, fallback behavior, and PC settlement as out of scope unless a separate task contract explicitly changes them.
+
 ## Event Manifest Tests
 
 Editor manifest tests should not hard-code legacy domain ordering or overwrite copied `content/` with a manifest that references files not present in the same fixture. Prefer either current manifest-driven assertions or fully self-contained manifest + asset fixtures.
