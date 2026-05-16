@@ -4,7 +4,7 @@ import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
 import { createMovePreview, deriveCrewActionViewModel, type CrewActionViewModel } from "../crewSystem";
 import type { ActionOption, CallContext, CrewId, CrewMember, GameMapState, GameState, MapTile, SystemLog } from "../data/gameData";
-import type { RuntimeCall } from "../events/types";
+import type { RenderedLine, RuntimeCall } from "../events/types";
 import { getTileLocationLabel } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
 
@@ -17,6 +17,7 @@ type CallActionOption = ActionOption & {
 interface CallView {
   scene: string;
   lines: string[];
+  renderedLines: RenderedLine[];
   meta: string;
   actions: CallActionOption[];
   actionGroups: CallActionGroupView[];
@@ -36,6 +37,16 @@ interface RuntimeTranscriptPlaybackState {
   callId: string | null;
   lineIndex: number;
   charIndex: number;
+  rollAnimation: RuntimeTranscriptRollAnimationState | null;
+}
+
+interface RuntimeTranscriptRollAnimationState {
+  lineIndex: number;
+  startIndex: number;
+  endIndex: number;
+  finalText: string;
+  seed: string;
+  ticksRemaining: number;
 }
 
 interface CallPageProps {
@@ -61,6 +72,7 @@ interface CallPageProps {
 }
 
 const RUNTIME_TRANSCRIPT_STEP_MS = 42;
+const RUNTIME_TRANSCRIPT_ROLL_TICKS = 6;
 
 export function CallPage({
   call,
@@ -122,6 +134,7 @@ export function CallPage({
         return {
           scene: "通话画面 / 事件快照不可用",
           lines: ["当前没有可处理的 runtime call。请返回任务页或控制台继续操作。"],
+          renderedLines: [],
           meta: "事件通话已关闭",
           actions: [],
           actionGroups: [],
@@ -134,10 +147,11 @@ export function CallPage({
       return {
         scene: "通话中的图片 / runtime call / 已渲染快照",
         lines: runtimeCall.rendered_lines.length ? runtimeCall.rendered_lines.map((line) => line.text) : ["通讯内容为空。"],
+        renderedLines: runtimeCall.rendered_lines,
         meta: `事件：${runtimeCall.event_id} / 节点：${runtimeCall.event_node_id}`,
         actions: runtimeCall.available_options.map((option) => ({
           id: option.option_id,
-          label: option.text,
+          label: option.display_tag ? `[${option.display_tag}]${option.text}` : option.text,
         })),
         actionGroups: [],
         featureContexts: [],
@@ -162,6 +176,7 @@ export function CallPage({
           ? `${member.name} 正在等待新的行动指令。`
           : `${member.name} 当前状态：${memberActionView.statusText}`,
       ],
+      renderedLines: [],
       meta: `地点：${currentLocation} / 行动：${memberActionView.actionTitle}`,
       actions: [],
       actionGroups: normalCallView?.groups ?? [],
@@ -180,6 +195,7 @@ export function CallPage({
     callId: null,
     lineIndex: 0,
     charIndex: 0,
+    rollAnimation: null,
   });
   const activeRuntimeTranscriptLineIndex =
     runtimeTranscript.callId === runtimeTranscriptCallId ? Math.min(runtimeTranscript.lineIndex, Math.max(runtimeTranscriptLines.length - 1, 0)) : 0;
@@ -188,16 +204,18 @@ export function CallPage({
       ? runtimeTranscript.charIndex
       : initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine);
   const currentRuntimeTranscriptLine = runtimeTranscriptLines[activeRuntimeTranscriptLineIndex] ?? "";
+  const currentRuntimeTranscriptRenderedLine = callView?.renderedLines[activeRuntimeTranscriptLineIndex];
   const runtimeTranscriptComplete =
     runtimeTranscriptAnimationDisabled ||
     !runtimeTranscriptEnabled ||
-    runtimeTranscriptLines.length === 0 ||
-    (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
-      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length);
+	    runtimeTranscriptLines.length === 0 ||
+	    (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
+	      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length &&
+	      !runtimeTranscript.rollAnimation);
 
   useEffect(() => {
     if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId) {
-      setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0 });
+      setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0, rollAnimation: null });
       return;
     }
 
@@ -209,6 +227,7 @@ export function CallPage({
         callId: runtimeTranscriptCallId,
         lineIndex: 0,
         charIndex: initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine),
+        rollAnimation: null,
       };
     });
   }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptPlaybackEnabled]);
@@ -228,12 +247,48 @@ export function CallPage({
         if (current.callId !== runtimeTranscriptCallId || current.lineIndex !== activeRuntimeTranscriptLineIndex) {
           return current;
         }
+        const lineAnimation = currentRuntimeTranscriptRenderedLine?.animation;
+        if (current.rollAnimation && current.rollAnimation.lineIndex === current.lineIndex) {
+          if (current.rollAnimation.ticksRemaining > 0) {
+            return {
+              ...current,
+              rollAnimation: {
+                ...current.rollAnimation,
+                ticksRemaining: current.rollAnimation.ticksRemaining - 1,
+              },
+            };
+          }
+          return {
+            ...current,
+            charIndex: Math.min(current.charIndex + 1, currentRuntimeTranscriptLine.length),
+            rollAnimation: null,
+          };
+        }
+        if (
+          lineAnimation?.type === "d20_roll" &&
+          current.charIndex >= lineAnimation.start_index &&
+          current.charIndex < lineAnimation.end_index
+        ) {
+          return {
+            ...current,
+            charIndex: lineAnimation.end_index,
+            rollAnimation: {
+              lineIndex: current.lineIndex,
+              startIndex: lineAnimation.start_index,
+              endIndex: lineAnimation.end_index,
+              finalText: lineAnimation.final_text,
+              seed: lineAnimation.seed,
+              ticksRemaining: RUNTIME_TRANSCRIPT_ROLL_TICKS,
+            },
+          };
+        }
         if (current.charIndex >= currentRuntimeTranscriptLine.length) {
           return current;
         }
         return {
           ...current,
           charIndex: current.charIndex + 1,
+          rollAnimation: null,
         };
       });
     }, RUNTIME_TRANSCRIPT_STEP_MS);
@@ -243,6 +298,7 @@ export function CallPage({
     activeRuntimeTranscriptCharIndex,
     activeRuntimeTranscriptLineIndex,
     currentRuntimeTranscriptLine.length,
+    currentRuntimeTranscriptRenderedLine?.animation,
     runtimeTranscriptCallId,
     runtimeTranscriptPlaybackEnabled,
     runtimeTranscriptLines.length,
@@ -263,6 +319,7 @@ export function CallPage({
           callId: runtimeTranscriptCallId,
           lineIndex,
           charIndex: currentLine.length,
+          rollAnimation: null,
         };
       }
 
@@ -272,6 +329,7 @@ export function CallPage({
           callId: runtimeTranscriptCallId,
           lineIndex: lineIndex + 1,
           charIndex: initialRuntimeTranscriptCharCount(nextLine),
+          rollAnimation: null,
         };
       }
 
@@ -279,6 +337,7 @@ export function CallPage({
         callId: runtimeTranscriptCallId,
         lineIndex,
         charIndex,
+        rollAnimation: null,
       };
     });
   };
@@ -510,6 +569,7 @@ export function CallPage({
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
               {runtimeTranscriptPlaybackEnabled
                 ? renderRuntimeTranscriptLines({
+                    renderedLines: callView.renderedLines,
                     lines: callView.lines,
                     activeCallId: runtimeTranscriptCallId,
                     playback: runtimeTranscript,
@@ -574,11 +634,13 @@ function isRuntimeTranscriptAnimationDisabled() {
 }
 
 function renderRuntimeTranscriptLines({
+  renderedLines,
   lines,
   activeCallId,
   playback,
   complete,
 }: {
+  renderedLines: RenderedLine[];
   lines: string[];
   activeCallId: string | null;
   playback: RuntimeTranscriptPlaybackState;
@@ -592,7 +654,9 @@ function renderRuntimeTranscriptLines({
   const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialRuntimeTranscriptCharCount(lines[0]);
   return lines.slice(0, activeLineIndex + 1).map((line, index) => {
     const isCurrentLine = index === activeLineIndex;
-    const renderedText = isCurrentLine ? line.slice(0, Math.min(activeCharIndex, line.length)) : line;
+    const renderedText = isCurrentLine
+      ? renderRuntimeTranscriptLineText(line, Math.min(activeCharIndex, line.length), playback.rollAnimation, renderedLines[index])
+      : line;
     return (
       <p key={`runtime-transcript-${index}-${line}`} className="console-call-dialogue-line">
         {renderedText}
@@ -600,6 +664,37 @@ function renderRuntimeTranscriptLines({
       </p>
     );
   });
+}
+
+function renderRuntimeTranscriptLineText(
+  line: string,
+  charIndex: number,
+  rollAnimation: RuntimeTranscriptRollAnimationState | null,
+  renderedLine: RenderedLine | undefined,
+) {
+  const animation = renderedLine?.animation;
+  if (
+    animation?.type !== "d20_roll" ||
+    !rollAnimation ||
+    rollAnimation.ticksRemaining <= 0 ||
+    rollAnimation.startIndex !== animation.start_index
+  ) {
+    return line.slice(0, charIndex);
+  }
+
+  const prefix = line.slice(0, animation.start_index);
+  return `${prefix}${scrambleDigits(rollAnimation.finalText.length, rollAnimation.seed, rollAnimation.ticksRemaining)}`;
+}
+
+function scrambleDigits(length: number, seed: string, tick: number) {
+  let hash = 2166136261;
+  const input = `${seed}:${tick}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return Array.from({ length }, (_value, index) => String(Math.abs(hash + index * 17) % 10)).join("");
 }
 
 function FeatureContextPanel({ features }: { features: CallFeatureContextView[] }) {

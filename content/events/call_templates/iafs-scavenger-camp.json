@@ -168,7 +168,7 @@
     {
       "schema_version": "event-program-model-v1",
       "id": "iafs_scavenger_sentry_line_contact.call.sentry_challenge",
-      "version": 2,
+      "version": 3,
       "domain": "iafs-scavenger-camp",
       "event_definition_id": "iafs_scavenger_sentry_line_contact",
       "node_id": "sentry_challenge",
@@ -285,6 +285,16 @@
               "priority": 0
             }
           ]
+        },
+        "opt_heir_handkerchief": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "heir_handkerchief",
+              "text": "展示自己的家徽手帕。",
+              "priority": 0
+            }
+          ]
         }
       },
       "fallback_order": ["default"],
@@ -347,6 +357,61 @@
             {
               "id": "ack_observe",
               "text": "指示队员继续保持距离，并记录听到的内容。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.observe_partial_failure",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "observe_partial_failure",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "rustle_caught",
+            "text": "{{crew_display_name}}：我听到几个词，像是“后帐”和“巡查队”，但我刚调整位置，他已经看过来了。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_spots_delay",
+              "text": "陌生男子：别装没听见。我给过你开口的机会，现在按我说的报名字。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_marks_fragments",
+              "text": "{{crew_display_name}}：线内确实有麻烦，但我只拿到碎片。继续沉默会让他直接拉警铃。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_observe_failure": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_observe_failure",
+              "text": "记录偷听失败和听到的碎片。",
               "priority": 0
             }
           ]
@@ -432,6 +497,61 @@
             {
               "id": "ack_threaten",
               "text": "继续呼叫，确认队员状态。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.threaten_control",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "threaten_control",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "threat_control_opening",
+            "text": "{{crew_display_name}}：我压住了他的手。他还在警铃绳旁边，但没有继续拉近。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_yields_space",
+              "text": "陌生男子：行，线外别动。你有三句话，说清楚你们是谁。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_keeps_pressure",
+              "text": "{{crew_display_name}}：他退了一点，局面还紧，但至少警铃没响。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_threaten_success": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_threaten_success",
+              "text": "确认保持压力，但不要越线。",
               "priority": 0
             }
           ]
@@ -532,6 +652,116 @@
             {
               "id": "ack_chat",
               "text": "确认继续试探哨卫反应。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.chat_suspicion",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "chat_suspicion",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "chat_probe_misread",
+            "text": "{{crew_display_name}}：我换了个轻松点的说法，但他听出来我在套话。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_suspicion",
+              "text": "陌生男子：别绕圈子。你知道线里有事，还是有人叫你来探口风？",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_warning",
+              "text": "{{crew_display_name}}：他开始怀疑我们有情报来源。再追问会把门关死。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_chat_failure": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_chat_failure",
+              "text": "确认停止套话，记录哨卫起疑。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_line_contact.call.heir_handkerchief_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_line_contact",
+      "node_id": "heir_handkerchief_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "heir_mark_shown",
+            "text": "{{crew_display_name}}：我把手帕展开给他看了。家徽没有藏起来，他能看清。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_recognizes_heir",
+              "text": "陌生男子：……这种纹样不是拾荒货。你站在那里别动，我让能认这个的人过来。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_reports_pause",
+              "text": "{{crew_display_name}}：他没有放我进线，但态度变了。至少现在不是普通盘问。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_heir_handkerchief": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_heir_handkerchief",
+              "text": "确认保持在线外，等待能认家徽的人。",
               "priority": 0
             }
           ]

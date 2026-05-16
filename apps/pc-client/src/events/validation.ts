@@ -378,6 +378,12 @@ function validateNodeReferences(context: DefinitionContext, node: EventNode, nod
       });
       validateTransitionRef(context, node.default_next_node_id, `${nodePath}.default_next_node_id`);
       break;
+    case "skill_check":
+      validateTransitionRef(context, node.success_node_id, `${nodePath}.success_node_id`);
+      validateTransitionRef(context, node.failure_node_id, `${nodePath}.failure_node_id`);
+      validateEffectRefs(context, node.success_effect_refs ?? [], `${nodePath}.success_effect_refs`);
+      validateEffectRefs(context, node.failure_effect_refs ?? [], `${nodePath}.failure_effect_refs`);
+      break;
     case "random":
       node.branches.forEach((branch, branchIndex) => {
         const branchPath = `${nodePath}.branches[${branchIndex}]`;
@@ -741,6 +747,10 @@ function collectNodeTransitions(node: EventNode, nodePath: string, transitions: 
         pushTransition(node.id, branch.next_node_id, `${nodePath}.branches[${branchIndex}].next_node_id`, transitions);
       });
       pushTransition(node.id, node.default_next_node_id, `${nodePath}.default_next_node_id`, transitions);
+      break;
+    case "skill_check":
+      pushTransition(node.id, node.success_node_id, `${nodePath}.success_node_id`, transitions);
+      pushTransition(node.id, node.failure_node_id, `${nodePath}.failure_node_id`, transitions);
       break;
     case "random":
       node.branches.forEach((branch, branchIndex) => {

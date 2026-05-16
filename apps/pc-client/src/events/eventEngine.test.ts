@@ -383,19 +383,34 @@ describe("event engine trigger intake", () => {
       expect(callText).toContain("灰白包巾");
       expect(callText).toContain("管枪式自制武器");
       expect(callText).toContain("先别急，我看得见他的手");
-      expect(callText).toContain("不要紧指挥官，我现在隐藏得很好。啊……！");
-      expect(callText).toContain("（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）");
-      expect(callText).toContain("陌生男子：站住！线外说话，手别乱动。");
-      expect(call?.available_options.map((option) => option.option_id)).toEqual([
-        "opt_observe",
-        "opt_threaten",
-        "opt_negotiate",
-        "opt_chat",
-      ]);
-    }
-  });
+	      expect(callText).toContain("不要紧指挥官，我现在隐藏得很好。啊……！");
+	      expect(callText).toContain("（通讯另一端突然传来另一个陌生男子的声音，是命令式的语气）");
+	      expect(callText).toContain("陌生男子：站住！线外说话，手别乱动。");
+	      expect(call?.available_options).toEqual([
+	        expect.objectContaining({
+	          option_id: "opt_observe",
+	          display_tag: "感知",
+	          check_preview: expect.objectContaining({ attribute: "perception", attribute_label: "感知", dc: 10, die_sides: 20 }),
+	        }),
+	        expect.objectContaining({
+	          option_id: "opt_threaten",
+	          display_tag: "体能",
+	          check_preview: expect.objectContaining({ attribute: "strength", attribute_label: "体能", dc: 14, die_sides: 20 }),
+	        }),
+	        expect.objectContaining({
+	          option_id: "opt_negotiate",
+	        }),
+	        expect.objectContaining({
+	          option_id: "opt_chat",
+	          display_tag: "智力",
+	          check_preview: expect.objectContaining({ attribute: "intelligence", attribute_label: "智力", dc: 12, die_sides: 20 }),
+	        }),
+	      ]);
+	      expect(call?.available_options.find((option) => option.option_id === "opt_negotiate")?.display_tag).toBeUndefined();
+	    }
+	  });
 
-  it("routes the authored scavenger camp observe choice through eavesdropping", () => {
+	  it("routes the authored scavenger camp observe choice through eavesdropping", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -410,28 +425,103 @@ describe("event engine trigger intake", () => {
       call_id: challengeCallId,
       option_id: "opt_observe",
       occurred_at: 12015,
-    });
-    const eavesdropCallId = eavesdrop.event?.active_call_id ?? "";
-    const eavesdropText = eavesdrop.state.active_calls[eavesdropCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
-    const ended = selectCallOption({
-      state: eavesdrop.state,
-      index: indexResult.index,
+	    });
+	    const eavesdropCallId = eavesdrop.event?.active_call_id ?? "";
+	    const eavesdropCall = eavesdrop.state.active_calls[eavesdropCallId];
+	    const eavesdropText = eavesdrop.state.active_calls[eavesdropCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const ended = selectCallOption({
+	      state: eavesdrop.state,
+	      index: indexResult.index,
       call_id: eavesdropCallId,
       option_id: "ack_observe",
       occurred_at: 12025,
     });
 
-    expect(eavesdrop.errors).toEqual([]);
-    expect(eavesdrop.event?.current_node_id).toBe("observe_eavesdrop");
-    expect(eavesdropText).toContain("霜湾的人不能再留在后帐");
-    expect(eavesdropText).toContain("烬炉的人不会认账");
-    expect(ended.errors).toEqual([]);
+	    expect(eavesdrop.errors).toEqual([]);
+	    expect(eavesdrop.event?.current_node_id).toBe("observe_eavesdrop");
+	    expect(eavesdrop.event?.check_results.sentry_observe).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_observe",
+	        attribute: "perception",
+	        attribute_label: "感知",
+	        die_sides: 20,
+	        roll: 7,
+	        modifier: 4,
+	        total: 11,
+	        dc: 10,
+	        outcome: "success",
+	        next_node_id: "observe_eavesdrop",
+	      }),
+	    );
+	    expect(eavesdropCall?.rendered_lines[0]).toEqual(
+	      expect.objectContaining({
+	        text: "麦克 骰出了 7，加上 感知 数值 4，最终结果是 11. 判定要求是 10. 检定成功。",
+	        animation: expect.objectContaining({ type: "d20_roll", final_text: "7" }),
+	      }),
+	    );
+	    expect(eavesdropText).toContain("霜湾的人不能再留在后帐");
+	    expect(eavesdropText).toContain("烬炉的人不会认账");
+	    expect(ended.errors).toEqual([]);
     expect(ended.event?.status).toBe("resolved");
     expect(ended.event?.result_key).toBe("scavenger_sentry_observed");
-    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("observe");
-  });
+	    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("observe");
+	  });
 
-  it("routes the authored scavenger camp threat choice into temporary contact loss", () => {
+	  it("shows Alice's family handkerchief option and routes it without consuming the item", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116", "alice"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12000, "alice"),
+	    });
+	    const challengeCallId = started.event?.active_call_id ?? "";
+	    const call = started.state.active_calls[challengeCallId];
+
+	    expect(started.errors).toEqual([]);
+	    expect(call?.available_options.map((option) => option.option_id)).toEqual([
+	      "opt_observe",
+	      "opt_threaten",
+	      "opt_negotiate",
+	      "opt_chat",
+	      "opt_heir_handkerchief",
+	    ]);
+	    expect(call?.available_options.find((option) => option.option_id === "opt_heir_handkerchief")).toEqual(
+	      expect.objectContaining({
+	        display_tag: "家族继承人候选",
+	        text: "展示自己的家徽手帕。",
+	      }),
+	    );
+
+	    const reply = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: challengeCallId,
+	      option_id: "opt_heir_handkerchief",
+	      occurred_at: 12015,
+	    });
+	    const replyCallId = reply.event?.active_call_id ?? "";
+	    const replyText = reply.state.active_calls[replyCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const ended = selectCallOption({
+	      state: reply.state,
+	      index: indexResult.index,
+	      call_id: replyCallId,
+	      option_id: "ack_heir_handkerchief",
+	      occurred_at: 12025,
+	    });
+
+	    expect(reply.errors).toEqual([]);
+	    expect(reply.event?.current_node_id).toBe("heir_handkerchief_reply");
+	    expect(replyText).toContain("家徽没有藏起来");
+	    expect(replyText).toContain("我让能认这个的人过来");
+	    expect(ended.errors).toEqual([]);
+	    expect(ended.event?.status).toBe("resolved");
+	    expect(ended.event?.result_key).toBe("scavenger_sentry_heir_handkerchief");
+	    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("heir_handkerchief");
+	    expect(ended.state.inventories.inv_alice.items).toEqual([{ item_id: "monogrammed_handkerchief", quantity: 1 }]);
+	  });
+
+	  it("routes the authored scavenger camp threat choice into temporary contact loss", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -446,22 +536,43 @@ describe("event engine trigger intake", () => {
       call_id: challengeCallId,
       option_id: "opt_threaten",
       occurred_at: 12015,
-    });
-    const backlashCallId = backlash.event?.active_call_id ?? "";
-    const backlashText = backlash.state.active_calls[backlashCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
-    const ended = selectCallOption({
-      state: backlash.state,
-      index: indexResult.index,
+	    });
+	    const backlashCallId = backlash.event?.active_call_id ?? "";
+	    const backlashCall = backlash.state.active_calls[backlashCallId];
+	    const backlashText = backlash.state.active_calls[backlashCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+	    const ended = selectCallOption({
+	      state: backlash.state,
+	      index: indexResult.index,
       call_id: backlashCallId,
       option_id: "ack_threaten",
       occurred_at: 12025,
     });
 
-    expect(backlash.errors).toEqual([]);
-    expect(backlash.event?.current_node_id).toBe("threaten_backlash");
-    expect(backlashText).toContain("她在压线，还要我们把人叫出来");
-    expect(backlashText).toContain("别让这路信号继续往外传");
-    expect(ended.errors).toEqual([]);
+	    expect(backlash.errors).toEqual([]);
+	    expect(backlash.event?.current_node_id).toBe("threaten_backlash");
+	    expect(backlash.event?.check_results.sentry_threaten).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_threaten",
+	        attribute: "strength",
+	        attribute_label: "体能",
+	        die_sides: 20,
+	        roll: 1,
+	        modifier: 2,
+	        total: 3,
+	        dc: 14,
+	        outcome: "failure",
+	        next_node_id: "threaten_backlash",
+	      }),
+	    );
+	    expect(backlashCall?.rendered_lines[0]).toEqual(
+	      expect.objectContaining({
+	        text: "麦克 骰出了 1，加上 体能 数值 2，最终结果是 3. 判定要求是 14. 检定失败。",
+	        animation: expect.objectContaining({ type: "d20_roll", final_text: "1" }),
+	      }),
+	    );
+	    expect(backlashText).toContain("她在压线，还要我们把人叫出来");
+	    expect(backlashText).toContain("别让这路信号继续往外传");
+	    expect(ended.errors).toEqual([]);
     expect(ended.event?.status).toBe("resolved");
     expect(ended.event?.result_key).toBe("scavenger_sentry_threatened_contact_lost");
     expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("threaten");
@@ -469,13 +580,13 @@ describe("event engine trigger intake", () => {
     expect(ended.state.crew.mike.condition_tags).toContain("iafs_scavenger_signal_lost");
   });
 
-  it("records the authored scavenger camp negotiate and chat opening choices", () => {
+	  it("records the authored scavenger camp negotiate and chat opening choices", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
-    const choices = [
-      ["opt_negotiate", "ack_negotiate", "negotiate_reply", "scavenger_sentry_negotiated", "negotiate"],
-      ["opt_chat", "ack_chat", "chat_reply", "scavenger_sentry_chatted", "chat"],
-    ] as const;
+	    const choices = [
+	      ["opt_negotiate", "ack_negotiate", "negotiate_reply", "scavenger_sentry_negotiated", "negotiate"],
+	      ["opt_chat", "ack_chat_failure", "chat_suspicion", "scavenger_sentry_chat_suspicion", "chat_failed"],
+	    ] as const;
 
     for (const [optionId, ackOptionId, replyNodeId, resultKey, flagValue] of choices) {
       const started = processTrigger({
@@ -500,9 +611,25 @@ describe("event engine trigger intake", () => {
         occurred_at: 12025,
       });
 
-      expect(reply.errors).toEqual([]);
-      expect(reply.event?.current_node_id).toBe(replyNodeId);
-      expect(ended.errors).toEqual([]);
+	      expect(reply.errors).toEqual([]);
+	      expect(reply.event?.current_node_id).toBe(replyNodeId);
+	      if (optionId === "opt_chat") {
+	        expect(reply.event?.check_results.sentry_chat).toEqual(
+	          expect.objectContaining({
+	            node_id: "check_chat",
+	            attribute: "intelligence",
+	            attribute_label: "智力",
+	            die_sides: 20,
+	            roll: 3,
+	            modifier: 5,
+	            total: 8,
+	            dc: 12,
+	            outcome: "failure",
+	            next_node_id: "chat_suspicion",
+	          }),
+	        );
+	      }
+	      expect(ended.errors).toEqual([]);
       expect(ended.event?.status).toBe("resolved");
       expect(ended.event?.result_key).toBe(resultKey);
       expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe(flagValue);
@@ -1085,36 +1212,58 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
   };
 }
 
-function createAuthoredScavengerCampState(tileId: string): GraphRunnerGameState {
-  const state = createAuthoredCrashSiteState();
-  const [row, col] = tileId.split("-").map(Number);
+	function createAuthoredScavengerCampState(tileId: string, crewId = "mike"): GraphRunnerGameState {
+	  const state = createAuthoredCrashSiteState();
+	  const [row, col] = tileId.split("-").map(Number);
+	  const scavengerCrew =
+	    crewId === "mike"
+	      ? state.crew.mike
+	      : {
+	          ...crew(crewId),
+	          display_name: crewId === "alice" ? "爱丽丝" : crewId,
+	          inventory_id: `inv_${crewId}`,
+	        };
 
-  return {
-    ...state,
-    elapsed_game_seconds: 12000,
-    crew: {
-      ...state.crew,
-      mike: {
-        ...state.crew.mike,
-        tile_id: tileId,
-        status: "idle",
-        current_action_id: null,
-        communication_state: "available",
-      },
-    },
-    tiles: {
-      ...state.tiles,
-      [tileId]: {
+	  return {
+	    ...state,
+	    elapsed_game_seconds: 12000,
+	    crew: {
+	      ...state.crew,
+	      [crewId]: {
+	        ...scavengerCrew,
+	        tile_id: tileId,
+	        status: "idle",
+	        current_action_id: null,
+	        communication_state: "available",
+	      },
+	    },
+	    inventories: {
+	      ...state.inventories,
+	      ...(crewId === "alice"
+	        ? {
+	            inv_alice: {
+	              id: "inv_alice",
+	              owner_type: "crew" as const,
+	              owner_id: "alice",
+	              items: [{ item_id: "monogrammed_handkerchief", quantity: 1 }],
+	              resources: {},
+	            },
+	          }
+	        : {}),
+	    },
+	    tiles: {
+	      ...state.tiles,
+	      [tileId]: {
         id: tileId,
         coordinates: { x: col, y: row },
         terrain_type: "plain",
         tags: ["iafs", "ashfrost", "scavenger_camp"],
         danger_tags: [],
-        discovery_state: "visited",
-        survey_state: "unsurveyed",
-        visibility: "visible",
-        current_crew_ids: ["mike"],
-        resource_nodes: [],
+	        discovery_state: "visited",
+	        survey_state: "unsurveyed",
+	        visibility: "visible",
+	        current_crew_ids: [crewId],
+	        resource_nodes: [],
         site_objects: [],
         buildings: [],
         event_marks: [],
@@ -1171,13 +1320,13 @@ function triggerContext(occurredAt: number): TriggerContext {
   };
 }
 
-function scavengerArrivalContext(tileId: string, occurredAt: number): TriggerContext {
-  return {
-    ...triggerContext(occurredAt),
-    source: "crew_action",
-    crew_id: "mike",
-    tile_id: tileId,
-    action_id: "move:mike:scavenger-camp",
+	function scavengerArrivalContext(tileId: string, occurredAt: number, crewId = "mike"): TriggerContext {
+	  return {
+	    ...triggerContext(occurredAt),
+	    source: "crew_action",
+	    crew_id: crewId,
+	    tile_id: tileId,
+	    action_id: `move:${crewId}:scavenger-camp`,
     payload: {
       action_type: "move",
       target_tile_id: tileId,
@@ -1343,6 +1492,7 @@ function runtimeEvent(id: string, definitionId: string, status: GraphRunnerGameS
     active_call_id: null,
     selected_options: {},
     random_results: {},
+    check_results: {},
     blocking_claim_ids: [],
     created_at: 100,
     updated_at: 100,

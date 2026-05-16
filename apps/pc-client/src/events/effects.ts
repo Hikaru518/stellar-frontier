@@ -1144,6 +1144,7 @@ function spawnEvent(effect: Effect, context: EffectExecutionContext, path: strin
     objective_ids: [],
     selected_options: {},
     random_results: {},
+    check_results: {},
     blocking_claim_ids: [],
     created_at: now(context),
     updated_at: now(context),

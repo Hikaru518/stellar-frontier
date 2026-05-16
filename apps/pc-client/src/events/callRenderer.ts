@@ -10,6 +10,7 @@ import type {
   RuntimeCall,
   RuntimeCallOption,
   RuntimeEvent,
+  SkillCheckResult,
   TextVariant,
   TextVariantGroup,
   TriggerContext,
@@ -51,13 +52,16 @@ export function renderRuntimeCall(input: RenderRuntimeCallInput): RenderRuntimeC
     active_event_id: input.event.id,
   };
   const errors: CallRendererError[] = [];
-  const renderedLines = renderLineGroups(
-    [input.template.opening_lines, ...(input.template.body_lines ?? [])],
-    context,
-    renderContextSnapshot,
-    crewId,
-    errors,
-  );
+  const renderedLines = [
+    ...renderSkillCheckResultLines(input.event, input.node.id, renderContextSnapshot, crewId),
+    ...renderLineGroups(
+      [input.template.opening_lines, ...(input.template.body_lines ?? [])],
+      context,
+      renderContextSnapshot,
+      crewId,
+      errors,
+    ),
+  ];
   const availableOptions = renderOptions(input.node.options, input.template, context, renderContextSnapshot, errors);
 
   return {
@@ -132,6 +136,8 @@ function renderOptions(
       template_variant_id: variant.id,
       text: renderText(variant.text, renderContextSnapshot),
       is_default: option.is_default ?? false,
+      ...(option.display_tag ? { display_tag: option.display_tag } : {}),
+      ...(option.check_preview ? { check_preview: option.check_preview } : {}),
     });
   }
 
@@ -174,6 +180,54 @@ function conditionsPass(
 ): boolean {
   const result = evaluateConditions(conditions, context, path);
   return result.passed && result.errors.length === 0;
+}
+
+function renderSkillCheckResultLines(
+  event: RuntimeEvent,
+  currentNodeId: Id,
+  renderContextSnapshot: JsonObject,
+  speakerCrewId: Id,
+) {
+  const matches = Object.values(event.check_results ?? {}).filter((result) => result.next_node_id === currentNodeId);
+  const result = matches[matches.length - 1];
+  if (!result) {
+    return [];
+  }
+
+  const crewName = stringValue(renderContextSnapshot.crew_display_name) ?? speakerCrewId;
+  const text = formatSkillCheckResultLine(crewName, result);
+  const finalText = String(result.roll);
+  const marker = `骰出了 ${finalText}`;
+  const markerIndex = text.indexOf(marker);
+  const startIndex = markerIndex >= 0 ? markerIndex + "骰出了 ".length : text.indexOf(finalText);
+  const endIndex = startIndex >= 0 ? startIndex + finalText.length : -1;
+
+  return [
+    {
+      template_variant_id: `skill_check:${result.node_id}`,
+      text,
+      speaker_crew_id: speakerCrewId,
+      animation:
+        startIndex >= 0 && endIndex > startIndex
+          ? {
+              type: "d20_roll" as const,
+              start_index: startIndex,
+              end_index: endIndex,
+              final_text: finalText,
+              seed: result.seed,
+            }
+          : null,
+    },
+  ];
+}
+
+function formatSkillCheckResultLine(crewName: string, result: SkillCheckResult) {
+  const outcome = result.outcome === "success" ? "成功" : "失败";
+  return `${crewName} 骰出了 ${result.roll}，加上 ${result.attribute_label} 数值 ${result.modifier}，最终结果是 ${result.total}. 判定要求是 ${result.dc}. 检定${outcome}。`;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function buildRenderContextSnapshot(input: RenderRuntimeCallInput, crewId: Id): JsonObject {

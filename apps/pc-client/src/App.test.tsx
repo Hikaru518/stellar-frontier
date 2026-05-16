@@ -1034,6 +1034,88 @@ describe("App", () => {
     }
   });
 
+  it("animates runtime d20 roll digits and prefixes tagged event options", () => {
+    vi.useFakeTimers();
+    try {
+      const member = createCallPageCrewMember("mike", "2-3");
+      const map = createMapWithDiscoveredTiles("2-3");
+      const gameState = createCallPageGameState(member, map);
+      const rollText = "麦克 骰出了 12，加上 感知 数值 3，最终结果是 15. 判定要求是 10. 检定成功。";
+      const onDecision = vi.fn();
+      const runtimeCall = createRuntimeCall({
+        id: "runtime-call-check",
+        crew_id: member.id,
+        status: "connected",
+        connected_at: 0,
+        rendered_lines: [
+          {
+            template_variant_id: "skill_check:check_observe",
+            text: rollText,
+            speaker_crew_id: member.id,
+            animation: {
+              type: "d20_roll",
+              start_index: "麦克 骰出了 ".length,
+              end_index: "麦克 骰出了 12".length,
+              final_text: "12",
+              seed: "roll-seed",
+            },
+          },
+        ],
+        available_options: [
+          {
+            option_id: "continue",
+            template_variant_id: "continue-default",
+            text: "继续。",
+            is_default: true,
+            display_tag: "感知",
+          },
+        ],
+      }) as RuntimeCall;
+
+      render(
+        <CallPage
+          call={{ crewId: member.id, type: "normal", settled: false, runtimeCallId: runtimeCall.id }}
+          crew={[member]}
+          tiles={initialTiles}
+          activeCalls={{ [runtimeCall.id]: runtimeCall }}
+          elapsedGameSeconds={0}
+          gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+          hasQuestUpdates={false}
+          gameState={gameState}
+          logs={initialLogs}
+          onDecision={onDecision}
+          onEndCall={vi.fn()}
+          onConfirmMove={vi.fn()}
+          onClearMoveTarget={vi.fn()}
+          onOpenMap={vi.fn()}
+          onOpenControl={vi.fn()}
+          onOpenTask={vi.fn()}
+          onStartCall={vi.fn()}
+          onShowCrewStatus={vi.fn()}
+          onShowCrewInventory={vi.fn()}
+        />,
+      );
+
+      const transcript = screen.getByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
+      act(() => {
+        vi.advanceTimersByTime(42 * 7);
+      });
+
+      expect(transcript.textContent).toMatch(/麦克 骰出了 \d{2}_/);
+      expect(transcript).not.toHaveTextContent("麦克 骰出了 12，加上");
+      expect(screen.queryByRole("button", { name: "[感知]继续。" })).toBeNull();
+
+      fireEvent.click(transcript);
+      expect(transcript).toHaveTextContent(rollText);
+      const optionButton = screen.getByRole("button", { name: "[感知]继续。" });
+      expect(optionButton).toBeEnabled();
+      fireEvent.click(optionButton);
+      expect(onDecision).toHaveBeenCalledWith("continue");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps normal call transcript text immediately visible", () => {
     const member = createCallPageCrewMember("mike", "2-3");
     const map = createMapWithDiscoveredTiles("2-3");
@@ -1422,6 +1504,7 @@ function createVolcanicObjectiveState() {
             ash_trace_call: "assign_probe",
           },
           random_results: {},
+          check_results: {},
           blocking_claim_ids: [],
           created_at: 480,
           updated_at: 480,
