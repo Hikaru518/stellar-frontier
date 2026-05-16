@@ -1,0 +1,36 @@
+name: Build Web Play ZIP
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-web-zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: node common/scripts/install-run-rush.js install
+
+      - name: Validate content data
+        run: node common/scripts/install-run-rush.js validate-content
+
+      - name: Build web play ZIP
+        run: npm run package:web:zip
+
+      - name: Upload web play ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellar-frontier-web-play-zip
+          path: apps/pc-client/release/web-zip/stellar-frontier-web.zip
+          if-no-files-found: error
