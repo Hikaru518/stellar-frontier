@@ -97,7 +97,7 @@ describe("mapObjects content", () => {
   });
 
   it("keeps crash-site objects in features and applies the wider start zone terrain bounds", () => {
-    const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "129-129");
+    const crashTile = defaultMapJson.tiles.find((tile) => tile.id === "116-112");
     const clearedOldRingTileIds = [
       "127-128",
       "127-129",

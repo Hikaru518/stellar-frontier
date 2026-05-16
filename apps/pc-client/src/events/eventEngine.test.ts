@@ -110,7 +110,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "game_start",
         source: "time_system",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         payload: { phase: "new_game" },
       },
     });
@@ -187,7 +187,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         action_id: "act_survey_crash_site",
         payload: { action_type: "survey" },
       },
@@ -208,7 +208,7 @@ describe("event engine trigger intake", () => {
 
     const quest = selected.state.quest_state?.quests.regroup_after_crash;
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["129-129"]?.revealedObjectIds).toEqual([]);
+    expect(selected.state.map?.tilesById?.["116-112"]?.revealedObjectIds).toEqual([]);
     expect(selected.state.map?.featuresById).toMatchObject({
       iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
       iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
@@ -220,7 +220,7 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
-  it("reveals the authored scattered supplies object after surveying tile 133-134", () => {
+  it("reveals the authored scattered supplies object after surveying tile 120-117", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -231,7 +231,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "133-134",
+        tile_id: "120-117",
         action_id: "act_survey_supplies",
         payload: { action_type: "survey" },
       },
@@ -251,7 +251,7 @@ describe("event engine trigger intake", () => {
     });
 
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["133-134"]?.revealedObjectIds).toEqual([]);
+    expect(selected.state.map?.tilesById?.["120-117"]?.revealedObjectIds).toEqual([]);
     expect(selected.state.map?.featuresById?.iafs_scattered_supplies).toMatchObject({
       id: "iafs_scattered_supplies",
       status: "unsearched",
@@ -665,7 +665,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "133-134",
+        tile_id: "120-117",
         action_id: "iafs_scattered_supplies:search",
         event_definition_id: "iafs_scattered_supplies_search",
         payload: {
@@ -707,7 +707,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "call",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         action_id: "iafs_generator:inspect",
         payload: {
           action_type: "inspect",
@@ -754,7 +754,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         action_id: "repair:mike:iafs_generator:0",
         payload: { action_type: "repair", feature_id: "iafs_generator", repair_result: "success" },
       },
@@ -794,7 +794,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         action_id: "repair:mike:iafs_generator:0",
         payload: { action_type: "repair", feature_id: "iafs_generator", repair_result: "failure" },
       },
@@ -1130,14 +1130,14 @@ function createAuthoredCrashSiteState(
       mike: {
         ...crew("mike"),
         display_name: "麦克",
-        tile_id: "129-129",
+        tile_id: "116-112",
         inventory_id: "inv_mike",
       },
     },
     tiles: {
-      "129-129": {
-        id: "129-129",
-        coordinates: { x: 129, y: 129 },
+      "116-112": {
+        id: "116-112",
+        coordinates: { x: 116, y: 112 },
         terrain_type: "crash_site",
         tags: ["iafs", "crash_site"],
         danger_tags: [],
@@ -1154,7 +1154,7 @@ function createAuthoredCrashSiteState(
     },
     map: {
       tilesById: {
-        "129-129": { revealedObjectIds: [] },
+        "116-112": { revealedObjectIds: [] },
       },
       featuresById: {
         iafs_generator: { id: "iafs_generator", status: "damaged", revealed: false },
@@ -1171,9 +1171,9 @@ function createAuthoredCrashSiteState(
 function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGameState {
   const state = createAuthoredCrashSiteState();
   const suppliesTile = {
-    ...state.tiles["129-129"],
-    id: "133-134",
-    coordinates: { x: 133, y: 134 },
+    ...state.tiles["116-112"],
+    id: "120-117",
+    coordinates: { x: 120, y: 117 },
     terrain_type: "south_pass",
     tags: ["iafs", "supplies"],
     current_crew_ids: ["mike"],
@@ -1186,18 +1186,18 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
       ...state.crew,
       mike: {
         ...state.crew.mike,
-        tile_id: "133-134",
+        tile_id: "120-117",
       },
     },
     tiles: {
       ...state.tiles,
-      "133-134": suppliesTile,
+      "120-117": suppliesTile,
     },
     map: {
       ...state.map,
       tilesById: {
         ...state.map?.tilesById,
-        "133-134": { revealedObjectIds: [] },
+        "120-117": { revealedObjectIds: [] },
       },
       featuresById: {
         ...state.map?.featuresById,

@@ -37,9 +37,9 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
         id: "mike",
         name: "麦克",
         role: "神秘幸存者",
-        currentTile: "129-129",
+        currentTile: "116-112",
         location: "IAFS坠毁点",
-        coord: "(0,0)",
+        coord: "(-17,13)",
         status: "待命中。",
         statusTone: "neutral",
         attributes: { physical: 3, agility: 3, intellect: 3, perception: 3, luck: 3 },
@@ -63,10 +63,10 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
       rows: 256,
       cols: 256,
       originTileId: "129-129",
-      discoveredTileIds: ["129-129"],
+      discoveredTileIds: ["116-112"],
       investigationReportsById: {},
       tilesById: {
-        "129-129": {
+        "116-112": {
           discovered: true,
           investigated: true,
           revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
@@ -80,10 +80,10 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
     },
     tiles: [
       {
-        id: "129-129",
-        coord: "(0,0)",
-        row: 129,
-        col: 129,
+        id: "116-112",
+        coord: "(-17,13)",
+        row: 116,
+        col: 112,
         terrain: "平原",
         crew: ["mike"],
         status: "已发现",
@@ -114,7 +114,7 @@ function createFeatureRepairCrashSiteState(overrides: Record<string, unknown> = 
     map: {
       ...(base.map as Record<string, unknown>),
       tilesById: {
-        "129-129": {
+        "116-112": {
           discovered: true,
           investigated: true,
           revealedObjectIds: [],
@@ -241,24 +241,25 @@ describe("App", () => {
       cols: 256,
       originTileId: "129-129",
       discoveredTileIds: [
-        "128-128",
-        "128-129",
-        "128-130",
-        "129-128",
         "129-129",
-        "129-130",
-        "129-131",
-        "130-128",
-        "130-129",
-        "130-130",
-        "130-131",
-        "131-128",
-        "131-129",
-        "131-130",
+        "115-111",
+        "115-112",
+        "115-113",
+        "116-111",
+        "116-112",
+        "116-113",
+        "116-114",
+        "117-111",
+        "117-112",
+        "117-113",
+        "117-114",
+        "118-111",
+        "118-112",
+        "118-113",
       ],
     });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
-    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "129-129", location: "IAFS坠毁点 (0,0)" });
+    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "116-112", location: "IAFS坠毁点 (-17,13)" });
     expect(saved.map.mapObjects).toBeUndefined();
     expect(saved.map.featuresById).toMatchObject({
       iafs_generator: { status: "damaged" },
@@ -450,7 +451,7 @@ describe("App", () => {
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(saved.elapsedGameSeconds).toBe(0);
     expect(saved.map.originTileId).toBe("129-129");
-    expect((saved.crew as Array<{ currentTile: string }>)[0]?.currentTile).toBe("129-129");
+    expect((saved.crew as Array<{ currentTile: string }>)[0]?.currentTile).toBe("116-112");
   });
 
   it("shows task tracking with crew controls and opens an empty inventory return", () => {
@@ -542,13 +543,13 @@ describe("App", () => {
 
   it("settles arrival event checks against runtime map state without crashing", () => {
     vi.useFakeTimers();
-    const mikeTargetTileId = "129-130";
+    const mikeTargetTileId = "116-113";
     const action = eventCrewAction({
       id: "mike-initial-move",
       crew_id: "mike",
       source: "player_command",
       type: "move",
-      from_tile_id: "129-129",
+      from_tile_id: "116-112",
       to_tile_id: mikeTargetTileId,
       target_tile_id: mikeTargetTileId,
       path_tile_ids: [mikeTargetTileId],
@@ -566,7 +567,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
-        crew: [{ id: "mike", currentTile: "129-129", hasIncoming: false }],
+        crew: [{ id: "mike", currentTile: "116-112", hasIncoming: false }],
         tiles: initialTiles,
         map: createInitialMapState(),
         logs: initialLogs,
@@ -619,7 +620,7 @@ describe("App", () => {
       status: "正在维修发电机。",
       activeAction: expect.objectContaining({
         actionType: "repair",
-        targetTile: "129-129",
+        targetTile: "116-112",
         params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
       }),
     });
@@ -678,7 +679,7 @@ describe("App", () => {
           map: {
             ...(createSavedCrashSiteState().map as Record<string, unknown>),
             tilesById: {
-              "129-129": {
+              "116-112": {
                 discovered: true,
                 investigated: true,
                 revealedObjectIds: [],
@@ -733,7 +734,7 @@ describe("App", () => {
         occurred_at: 0,
         source: "call",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         action_id: "iafs_generator:inspect",
         event_id: null,
         event_definition_id: "iafs_generator_inspect_damaged",
@@ -798,9 +799,9 @@ describe("App", () => {
           parent_event_id: null,
           objective_id: null,
           action_request_id: null,
-          from_tile_id: "129-129",
+          from_tile_id: "116-112",
           to_tile_id: null,
-          target_tile_id: "129-129",
+          target_tile_id: "116-112",
           path_tile_ids: [],
           started_at: 0,
           ends_at: 180,
