@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { advanceRuntimeEvent, startRuntimeEvent, type GraphRunnerGameState } from "./graphRunner";
-import { createEmptyEventRuntimeState, type EventDefinition, type EventNode, type TriggerContext } from "./types";
+import { createEmptyEventRuntimeState, type CrewState, type EventDefinition, type EventNode, type TriggerContext } from "./types";
 
 describe("event graph runner", () => {
   it("starts at the entry node and advances through branch and call option mappings", () => {
@@ -84,13 +84,52 @@ describe("event graph runner", () => {
     );
     expect(first.event.status).toBe("resolved");
   });
+
+  it("resolves skill check nodes with deterministic d20 results", () => {
+    const definition = eventDefinition([
+      skillCheckNode("roll_sentry", 25, "success_end", "failure_end"),
+      endNode("success_end", "resolved", "passed"),
+      endNode("failure_end", "resolved", "failed"),
+    ]);
+    const context = {
+      ...triggerContext(),
+      call_id: "evt_skill:signal_call:call",
+      selected_option_id: "opt_observe",
+    };
+
+    const first = startRuntimeEvent(createState(), definition, context, { event_id: "evt_skill" });
+    const second = startRuntimeEvent(createState(), definition, context, { event_id: "evt_skill" });
+
+    expect(first.errors).toEqual([]);
+    expect(second.errors).toEqual([]);
+    expect(first.event.check_results.sentry_observe).toEqual(second.event.check_results.sentry_observe);
+    expect(first.event.check_results.sentry_observe).toEqual(
+      expect.objectContaining({
+        node_id: "roll_sentry",
+        attribute: "perception",
+        attribute_label: "感知",
+        die_sides: 20,
+        modifier: 4,
+        dc: 25,
+        outcome: "failure",
+        next_node_id: "failure_end",
+        seed: "evt_skill:roll_sentry:evt_skill:signal_call:call:opt_observe:sentry_observe",
+      }),
+    );
+    expect(first.event.check_results.sentry_observe.roll).toBeGreaterThanOrEqual(1);
+    expect(first.event.check_results.sentry_observe.roll).toBeLessThanOrEqual(20);
+    expect(first.event.check_results.sentry_observe.total).toBe(first.event.check_results.sentry_observe.roll + 4);
+    expect(first.event.result_key).toBe("failed");
+  });
 });
 
 function createState(flags: Record<string, boolean | number | string> = {}): GraphRunnerGameState {
   return {
     ...createEmptyEventRuntimeState(),
     elapsed_game_seconds: 120,
-    crew: {},
+    crew: {
+      amy: crew("amy"),
+    },
     tiles: {},
     world_flags: Object.fromEntries(
       Object.entries(flags).map(([key, value]) => [
@@ -104,6 +143,33 @@ function createState(flags: Record<string, boolean | number | string> = {}): Gra
         },
       ]),
     ) as GraphRunnerGameState["world_flags"],
+  };
+}
+
+function crew(id: string): CrewState {
+  return {
+    id,
+    display_name: "Amy",
+    tile_id: "2-3",
+    status: "idle",
+    attributes: {
+      strength: 2,
+      agility: 3,
+      intelligence: 5,
+      perception: 4,
+      luck: 3,
+    },
+    personality_tags: [],
+    expertise_tags: [],
+    condition_tags: [],
+    communication_state: "available",
+    current_action_id: null,
+    blocking_event_id: null,
+    blocking_call_id: null,
+    background_event_ids: [],
+    inventory_id: `inv_${id}`,
+    diary_entry_ids: [],
+    event_history_keys: [],
   };
 }
 
@@ -244,6 +310,20 @@ function randomNode(id: string, firstNodeId: string, secondNodeId: string): Even
       { id: "clear", weight: 1, next_node_id: firstNodeId },
       { id: "storm", weight: 1, next_node_id: secondNodeId },
     ],
+  };
+}
+
+function skillCheckNode(id: string, dc: number, successNodeId: string, failureNodeId: string): EventNode {
+  return {
+    ...baseNode(id, "skill_check"),
+    type: "skill_check",
+    attribute: "perception",
+    attribute_label: "感知",
+    dc,
+    die_sides: 20,
+    store_result_as: "sentry_observe",
+    success_node_id: successNodeId,
+    failure_node_id: failureNodeId,
   };
 }
 

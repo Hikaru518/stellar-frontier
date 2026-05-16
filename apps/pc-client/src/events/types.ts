@@ -225,6 +225,7 @@ export type EventNodeType =
   | "call"
   | "wait"
   | "check"
+  | "skill_check"
   | "random"
   | "action_request"
   | "objective"
@@ -252,6 +253,17 @@ export interface CallOption {
   requirements?: Condition[];
   effect_refs?: Id[];
   is_default?: boolean;
+  display_tag?: string;
+  check_preview?: SkillCheckPreview;
+}
+
+export type SkillCheckAttribute = "strength" | "agility" | "intelligence" | "perception" | "luck";
+
+export interface SkillCheckPreview {
+  attribute: SkillCheckAttribute;
+  attribute_label: string;
+  dc: number;
+  die_sides?: number;
 }
 
 export interface WaitNode extends EventNodeBase {
@@ -280,6 +292,19 @@ export interface CheckBranch {
   conditions: Condition[];
   next_node_id: Id;
   effect_refs?: Id[];
+}
+
+export interface SkillCheckNode extends EventNodeBase {
+  type: "skill_check";
+  attribute: SkillCheckAttribute;
+  attribute_label: string;
+  dc: number;
+  die_sides: number;
+  store_result_as: string;
+  success_node_id: Id;
+  failure_node_id: Id;
+  success_effect_refs?: Id[];
+  failure_effect_refs?: Id[];
 }
 
 export interface RandomNode extends EventNodeBase {
@@ -361,6 +386,7 @@ export type EventNode =
   | CallNode
   | WaitNode
   | CheckNode
+  | SkillCheckNode
   | RandomNode
   | ActionRequestNode
   | ObjectiveNode
@@ -514,6 +540,22 @@ export interface RandomResult {
   seed: string;
 }
 
+export type SkillCheckOutcome = "success" | "failure";
+
+export interface SkillCheckResult {
+  node_id: Id;
+  attribute: SkillCheckAttribute;
+  attribute_label: string;
+  die_sides: number;
+  roll: number;
+  modifier: number;
+  total: number;
+  dc: number;
+  outcome: SkillCheckOutcome;
+  seed: string;
+  next_node_id: Id;
+}
+
 export interface RuntimeEvent {
   id: Id;
   event_definition_id: Id;
@@ -530,6 +572,7 @@ export interface RuntimeEvent {
   active_call_id?: Id | null;
   selected_options: Record<Id, Id>;
   random_results: Record<string, RandomResult>;
+  check_results: Record<string, SkillCheckResult>;
   blocking_claim_ids: Id[];
   created_at: GameSeconds;
   updated_at: GameSeconds;
@@ -565,6 +608,15 @@ export interface RenderedLine {
   template_variant_id: Id;
   text: string;
   speaker_crew_id: Id;
+  animation?: RenderedLineAnimation | null;
+}
+
+export interface RenderedLineAnimation {
+  type: "d20_roll";
+  start_index: number;
+  end_index: number;
+  final_text: string;
+  seed: string;
 }
 
 export interface RuntimeCallOption {
@@ -572,6 +624,8 @@ export interface RuntimeCallOption {
   template_variant_id: Id;
   text: string;
   is_default: boolean;
+  display_tag?: string;
+  check_preview?: SkillCheckPreview;
 }
 
 export type ObjectiveStatus = "available" | "assigned" | "in_progress" | "completed" | "failed" | "expired" | "cancelled";

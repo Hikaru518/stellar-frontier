@@ -109,7 +109,7 @@
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | `string` | 当前事件定义内唯一节点 ID。 |
-| `type` | `enum` | `call`、`wait`、`check`、`random`、`action_request`、`objective`、`spawn_event`、`log_only`、`end`。 |
+| `type` | `enum` | `call`、`wait`、`check`、`skill_check`、`random`、`action_request`、`objective`、`spawn_event`、`log_only`、`end`。 |
 | `title` | `string` | 节点可读标题。 |
 | `description` | `string` | 节点用途说明，属于内容说明，不是编辑器注释。 |
 | `requirements` | `condition[]` | 进入节点前必须满足的条件。 |
@@ -128,6 +128,7 @@
 | `call` | `call_template_id`、`speaker_crew_ref`、`urgency`、`delivery`、`options`、`option_node_mapping`、`on_missed`、`expires_in_seconds` | 创建 runtime call。通话只展示文本和收集 `option_id`，不直接结算事件。 |
 | `wait` | `duration_seconds`、`wake_trigger_type`、`next_node_id`、`set_next_wakeup_at`、`crew_action_during_wait`、`interrupt_policy`、`on_interrupted` | 把事件推进交给时间系统，可占用队员行动或只后台计时。 |
 | `check` | `branches`、`default_next_node_id`、`evaluation_order` | 执行确定性条件分支，当前按 `first_match`。 |
+| `skill_check` | `attribute`、`attribute_label`、`dc`、`die_sides`、`store_result_as`、`success_node_id`、`failure_node_id`、`success_effect_refs`、`failure_effect_refs` | 执行玩家可见 `d20 + 队员属性 >= DC` 检定，结果保存到 `event.check_results`，再进入成功或失败节点。 |
 | `random` | `seed_scope`、`branches`、`default_next_node_id`、`store_result_as` | 执行受控随机分支，随机结果保存到 `event.random_results`。 |
 | `action_request` | `request_id`、`action_type`、`target_crew_ref`、`target_tile_ref`、`action_params`、`completion_trigger`、`on_*_node_id`、`expires_in_seconds` | 请求或等待一个具体队员行动；行动仍由 crew action state 执行。 |
 | `objective` | `objective_template`、`mode`、`on_created_node_id`、`on_completed_node_id`、`on_failed_node_id`、`expires_in_seconds`、`parent_event_link` | 创建独立运行时目标，完成后回写 parent event。 |
@@ -157,6 +158,15 @@
 变体匹配规则：先过滤 `when` 全部通过的 variant，再按 `priority`、`fallback_order` 匹配精度和 `id` 稳定顺序选择；没有命中时必须使用 `default` variant。`option_lines` 缺少节点 `option_id` 或出现节点不存在的 `option_id` 时校验失败。
 
 通话文本约定：队员台词在 `opening_lines` / `body_lines` 中使用 `{{crew_display_name}}：` 前缀，并在 `render_context_fields` 声明 `crew_display_name`；NPC 台词直接写明确说话人，例如 `陌生男子：...`；没有说话人的解释性内容单独写成括号行，例如 `（通讯另一端传来陌生声音）`。`option_lines` 展示的是玩家作为指挥官选择的意图或命令，不写成队员/NPC 的具体回复；选项后的具体回复需要通过后续 `call` 节点进入新的 `LIVE TRANSCRIPT`。
+
+`call.options[]` 可额外携带展示字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `display_tag` | `string` | UI 选项前缀，例如 `[感知]` 或 `[家族继承人候选]`；不参与逻辑推进。 |
+| `check_preview` | `object` | 检定预览，字段为 `attribute`、`attribute_label`、`dc`、可选 `die_sides`；当前用于玩家可见检定标签和未来预览。 |
+
+`display_tag` 和 `check_preview` 不替代 `option_id`。玩家选择后 runtime 仍只提交稳定 `option_id`，事件图仍由 `option_node_mapping` 决定下游。
 
 ### 3.7 `condition`
 
@@ -223,6 +233,7 @@ runtime `event` 是某个 `event_definition` 在一局游戏中的实例。
 | `active_call_id` | `string | null` | 当前未结束的 call。 |
 | `selected_options` | `Record<node_id, option_id>` | 玩家在各 call 节点选择的逻辑选项。 |
 | `random_results` | `Record<key, random_result>` | 随机节点结果。 |
+| `check_results` | `Record<key, skill_check_result>` | 玩家可见检定结果。 |
 | `blocking_claim_ids` | `string[]` | 本事件持有的行动/通讯占用锁。 |
 | `created_at` / `updated_at` | `number` | 创建与最后推进时的游戏秒。 |
 | `deadline_at` / `next_wakeup_at` | `number | null` | 事件最终期限和下次时间唤醒点。 |
@@ -249,9 +260,11 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 | `selected_option_id` | `string | null` | 玩家选择的逻辑 `option_id`。 |
 | `blocking_claim_id` | `string | null` | 占用通讯或行动时的锁 ID。 |
 
-`rendered_line` 字段：`template_variant_id`、`text`、`speaker_crew_id`。
+`skill_check_result` 字段：`node_id`、`attribute`、`attribute_label`、`die_sides`、`roll`、`modifier`、`total`、`dc`、`outcome`、`seed`、`next_node_id`。其中 `outcome` 为 `success` 或 `failure`。
 
-`call_option_runtime` 字段：`option_id`、`template_variant_id`、`text`、`is_default`。
+`rendered_line` 字段：`template_variant_id`、`text`、`speaker_crew_id`、可选 `animation`。`animation.type = d20_roll` 时，`start_index`、`end_index`、`final_text` 和 `seed` 标记投掷值数字动画范围。
+
+`call_option_runtime` 字段：`option_id`、`template_variant_id`、`text`、`is_default`、可选 `display_tag`、可选 `check_preview`。
 
 长期保留规则：active call 可保存渲染结果；event resolved 后删除完整 call；player save 可通过 `event_log.summary` 说明关键选择，但不保存完整台词、隐藏选项或调试记录。
 
@@ -307,6 +320,7 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 - **call node**：创建 runtime `call`，渲染文本和可见选项；玩家选择回写 `selected_option_id`，event 按 `option_node_mapping` 推进。
 - **wait node**：写入 `next_wakeup_at`；时间系统到点后发出 `time_wakeup` 或 `event_node_finished`。
 - **check node**：按顺序执行确定性分支；命中第一条进入下游，否则进入默认节点。
+- **skill_check node**：读取主队员属性，用确定性 seed 投掷 d20，计算 `roll + modifier >= dc`；结果写入 `event.check_results[store_result_as]`，执行成功或失败 effect refs，再进入对应节点。下一段 runtime call 会把检定结果作为第一行 transcript 展示。
 - **random node**：按条件过滤分支，再按权重抽取；结果写入 `event.random_results`。
 - **action_request node**：创建或等待 `crew_action_state`；行动完成后由 `action_complete` 推进事件。
 - **objective node**：创建独立 `objective`；玩家可派任意符合条件的队员完成，完成后用 `objective_completed` 推进 parent event。
@@ -343,7 +357,7 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 - 每个非终点节点必须至少有一条退出路径。
 - 每个可达路径必须能到达 terminal node。
 - `call.options[].id` 必须全部出现在 `option_node_mapping`。
-- `check.branches[].next_node_id`、`random.branches[].next_node_id`、`auto_next_node_id` 必须存在。
+- `check.branches[].next_node_id`、`skill_check.success_node_id`、`skill_check.failure_node_id`、`random.branches[].next_node_id`、`auto_next_node_id` 必须存在。
 - 当前禁止 `parallel` 和 `join` 节点。
 
 ### Template 校验
@@ -383,9 +397,9 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 - dry-run 必须验证 effect target、handler params、history writes 和 event_log 输出。
 - dry-run 不要求覆盖所有 variant；variant 覆盖率报告属于编辑器级后续扩展。
 
-## 7. 五个样例事件覆盖矩阵
+## 7. 样例事件覆盖矩阵
 
-五个样例事件用于验证模型覆盖面，不要求在本文写成完整 JSON。
+以下样例事件用于验证模型覆盖面，不要求在本文写成完整 JSON。
 
 | 样例 | 触发与节点 | 覆盖模型 | 验证点 |
 | --- | --- | --- | --- |
@@ -394,6 +408,7 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 | `mountain_signal_probe` 等待节点与时间压力 | `arrival` 或 `action_complete`；`call -> wait -> check/random -> call -> end`。 | `next_wakeup_at`、`time_wakeup`、`event_node_finished`、`crew_action_state.event_waiting`。 | 等待是事件图一等节点，时间系统能推进事件。 |
 | `volcanic_ash_trace` 跨队员 objective | `action_complete`；`call -> objective -> wait/waiting_objective -> end`。 | runtime `objective`、任意符合条件队员执行、`objective_completed`、parent event 回写。 | 事件能生成独立目标；Mike、Amy 或 Garry 完成行动后推进 parent event。 |
 | `lost_relic_argument` 长期角色和世界后果 | `arrival` 或 `action_complete`；`call -> wait -> call -> check -> 多个 end`。 | `call_template` 变体、`personality_tags` 改变、`site_objects` 删除、`world_flags`、`spawn_event` / `unlock_event_definition`、日记追加。 | 最终选项能改变角色、地图、后续事件池和玩家可见摘要。 |
+| `iafs_scavenger_sentry_line_contact` 玩家可见检定 | `arrival`；`call -> skill_check -> call -> end`，非检定选项仍可 `call -> call -> end`。 | `display_tag`、`check_preview`、`check_results`、`RenderedLine.animation`、条件可见选项。 | 检定选项可见、结果 transcript 可见，成功/失败分支不同，爱丽丝家徽选项只在条件满足时出现。 |
 
 ## 8. 模型边界与后续扩展
 
@@ -401,7 +416,7 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 
 后续模型扩展记录：
 
-- **Runtime / Model**：`parallel` 和 `join` 节点。当前固定 9 类节点，不支持多活跃节点和汇合；未来若要支持并行事件阶段，需要扩展 `event_graph.graph_rules`、runtime `current_node_ids` 和 join 校验。
+- **Runtime / Model**：`parallel` 和 `join` 节点。当前固定 10 类节点，不支持多活跃节点和汇合；未来若要支持并行事件阶段，需要扩展 `event_graph.graph_rules`、runtime `current_node_ids` 和 join 校验。
 - **Editor Quality**：编辑器级覆盖率、质量、概率和 variant 报告。包括 variant 命中率、隐藏选项报告、事件池概率分析、不可见分支报告、文本长度报告和质量评分；这些不进入运行时资产。
 
 ## 来源
@@ -409,3 +424,4 @@ runtime `call` 是一次通讯表现。玩家存档只保存活跃 call；事件
 | 日期 | 来源 |
 | --- | --- |
 | 2026-04-27 | `docs/plans/2026-04-27-15-33/event-program-model-player-journey-game-model-spec.md` |
+| 2026-05-16 | `docs/plans/2026-05-16-14-41/player-visible-skill-check-design.md` |

@@ -3,7 +3,7 @@ import type { EventContentIndex } from "./contentIndex";
 import { renderRuntimeCall } from "./callRenderer";
 import { executeEffects, type EffectGameState } from "./effects";
 import { createObjectiveFromNode } from "./objectives";
-import { pickWeightedBranch } from "./random";
+import { pickWeightedBranch, stableRandom } from "./random";
 import type {
   ActionRequestNode,
   CallNode,
@@ -19,6 +19,8 @@ import type {
   RandomNode,
   RuntimeCall,
   RuntimeEvent,
+  SkillCheckResult,
+  SkillCheckNode,
   SpawnEventNode,
   TriggerContext,
 } from "./types";
@@ -33,6 +35,7 @@ export type GraphRunnerErrorCode =
   | "call_render_failed"
   | "missing_option"
   | "missing_transition"
+  | "skill_check_failed"
   | "progression_limit";
 
 export interface GraphRunnerError {
@@ -84,6 +87,7 @@ export function startRuntimeEvent(
     active_call_id: null,
     selected_options: {},
     random_results: {},
+    check_results: {},
     blocking_claim_ids: [],
     created_at: triggerContext.occurred_at,
     updated_at: triggerContext.occurred_at,
@@ -280,6 +284,8 @@ function resolveEnteredNode(
       return waitForTime(state, event, node, triggerContext);
     case "check":
       return resolveCheckNode(state, definition, event, node, triggerContext, options);
+    case "skill_check":
+      return resolveSkillCheckNode(state, definition, event, node, triggerContext, options);
     case "random":
       return resolveRandomNode(state, definition, event, node, triggerContext, options);
     case "action_request":
@@ -287,7 +293,7 @@ function resolveEnteredNode(
     case "objective":
       return enterObjectiveNode(state, event, node, triggerContext);
     case "spawn_event":
-      return enterSpawnEventNode(state, event, node, definition, triggerContext);
+      return enterSpawnEventNode(state, event, node, definition, triggerContext, options);
     case "log_only":
       return runEffectsAndContinue(state, definition, event, node, node.effect_refs ?? [], node.auto_next_node_id ?? node.next_node_id, triggerContext, options);
     case "end":
@@ -471,6 +477,67 @@ function resolveRandomNode(
   );
 }
 
+function resolveSkillCheckNode(
+  state: GraphRunnerGameState,
+  definition: EventDefinition,
+  event: RuntimeEvent,
+  node: SkillCheckNode,
+  triggerContext: TriggerContext,
+  options: GraphRunnerOptions,
+): GraphRunnerResult & { next_node_id?: Id | null } {
+  const crewId = event.primary_crew_id ?? triggerContext.crew_id ?? null;
+  const crew = crewId ? state.crew[crewId] : undefined;
+  const modifier = crew?.attributes[node.attribute];
+  if (!crewId || !crew || typeof modifier !== "number") {
+    return {
+      state,
+      event,
+      errors: [
+        {
+          code: "skill_check_failed",
+          event_id: event.id,
+          node_id: node.id,
+          path: `nodes.${node.id}.attribute`,
+          message: `Skill check ${node.id} cannot read ${node.attribute} for crew ${crewId ?? "<missing>"}.`,
+        },
+      ],
+      transitions: [],
+      next_node_id: null,
+    };
+  }
+
+  const seed = skillCheckSeed(node, event, triggerContext);
+  const roll = Math.floor(stableRandom(seed) * node.die_sides) + 1;
+  const total = roll + modifier;
+  const outcome = total >= node.dc ? "success" : "failure";
+  const nextNodeId = outcome === "success" ? node.success_node_id : node.failure_node_id;
+  const checkResult: SkillCheckResult = {
+    node_id: node.id,
+    attribute: node.attribute,
+    attribute_label: node.attribute_label,
+    die_sides: node.die_sides,
+    roll,
+    modifier,
+    total,
+    dc: node.dc,
+    outcome,
+    seed,
+    next_node_id: nextNodeId,
+  };
+  const eventWithResult: RuntimeEvent = {
+    ...event,
+    check_results: {
+      ...(event.check_results ?? {}),
+      [node.store_result_as]: checkResult,
+    },
+    updated_at: now(triggerContext, state),
+  };
+  const stateWithResult = upsertEvent(state, eventWithResult);
+  const effectRefs = outcome === "success" ? node.success_effect_refs ?? [] : node.failure_effect_refs ?? [];
+
+  return runEffectsAndContinue(stateWithResult, definition, eventWithResult, node, effectRefs, nextNodeId, triggerContext, options);
+}
+
 function waitForCall(
   state: GraphRunnerGameState,
   event: RuntimeEvent,
@@ -479,7 +546,8 @@ function waitForCall(
   options: GraphRunnerOptions,
 ): GraphRunnerResult & { next_node_id?: Id | null } {
   const callId = event.active_call_id ?? `${event.id}:${node.id}:call`;
-  const call = state.active_calls[callId] ?? renderCall(state, event, node, triggerContext, options);
+  const existingCall = state.active_calls[callId];
+  const call = existingCall && existingCall.status !== "ended" ? existingCall : renderCall(state, event, node, triggerContext, options);
   if (Array.isArray(call)) {
     return { state, event, errors: call, transitions: [], next_node_id: null };
   }
@@ -611,14 +679,82 @@ function enterSpawnEventNode(
   node: SpawnEventNode,
   definition: EventDefinition,
   triggerContext: TriggerContext,
+  options: GraphRunnerOptions,
 ): GraphRunnerResult & { next_node_id?: Id | null } {
   const childEventId = `${event.id}:${node.id}:child`;
+  const childDefinition = options.content_index?.definitionsById.get(node.event_definition_id);
+  if (!childDefinition) {
+    return {
+      state,
+      event,
+      errors: [
+        {
+          code: "missing_node",
+          event_id: event.id,
+          node_id: node.id,
+          path: `nodes.${node.id}.event_definition_id`,
+          message: `Spawn event ${node.id} references missing event definition ${node.event_definition_id}.`,
+        },
+      ],
+      transitions: [],
+      next_node_id: null,
+    };
+  }
+
+  const parentEvent = {
+    ...event,
+    child_event_ids: node.parent_event_link && !event.child_event_ids.includes(childEventId) ? [...event.child_event_ids, childEventId] : event.child_event_ids,
+  };
+  const stateWithParent = upsertEvent(state, parentEvent);
+
+  if (node.spawn_policy === "immediate") {
+    const childTriggerContext: TriggerContext = {
+      ...runtimeTriggerContext(triggerContext, parentEvent, node.id),
+      trigger_type: "event_node_finished",
+      source: "event_node",
+      event_id: childEventId,
+      event_definition_id: childDefinition.id,
+      crew_id: parentEvent.primary_crew_id ?? triggerContext.crew_id ?? null,
+      tile_id: parentEvent.primary_tile_id ?? triggerContext.tile_id ?? null,
+      payload: {
+        ...(typeof triggerContext.payload === "object" && triggerContext.payload ? triggerContext.payload : {}),
+        parent_event_id: parentEvent.id,
+        spawn_node_id: node.id,
+      },
+    };
+    const childResult = startRuntimeEvent(stateWithParent, childDefinition, childTriggerContext, {
+      ...options,
+      event_id: childEventId,
+      parent_event_id: node.parent_event_link ? parentEvent.id : null,
+    });
+    if (childResult.errors.length > 0) {
+      return {
+        state: childResult.state,
+        event: childResult.state.active_events[parentEvent.id] ?? parentEvent,
+        errors: childResult.errors,
+        transitions: [],
+        next_node_id: null,
+      };
+    }
+
+    return runEffectsAndContinue(
+      childResult.state,
+      definition,
+      childResult.state.active_events[parentEvent.id] ?? parentEvent,
+      node,
+      [],
+      node.next_node_id,
+      triggerContext,
+      options,
+    );
+  }
+
   const childEvent: RuntimeEvent = {
     id: childEventId,
     event_definition_id: node.event_definition_id,
-    event_definition_version: 1,
-    status: node.spawn_policy === "immediate" ? "active" : "waiting_time",
-    current_node_id: "entry",
+    event_definition_version: childDefinition.version,
+    status: "waiting_time",
+    current_node_id: childDefinition.event_graph.entry_node_id,
     primary_crew_id: event.primary_crew_id,
     related_crew_ids: [],
     primary_tile_id: event.primary_tile_id,
@@ -629,6 +765,7 @@ function enterSpawnEventNode(
     active_call_id: null,
     selected_options: {},
     random_results: {},
+    check_results: {},
     blocking_claim_ids: [],
     created_at: now(triggerContext, state),
     updated_at: now(triggerContext, state),
@@ -639,12 +776,8 @@ function enterSpawnEventNode(
     result_key: null,
     result_summary: null,
   };
-  const parentEvent = {
-    ...event,
-    child_event_ids: node.parent_event_link && !event.child_event_ids.includes(childEventId) ? [...event.child_event_ids, childEventId] : event.child_event_ids,
-  };
-  const nextState = upsertEvent(upsertEvent(state, childEvent), parentEvent);
-  return runEffectsAndContinue(nextState, definition, parentEvent, node, [], node.next_node_id, triggerContext, {});
+  const nextState = upsertEvent(upsertEvent(stateWithParent, childEvent), parentEvent);
+  return runEffectsAndContinue(nextState, definition, parentEvent, node, [], node.next_node_id, triggerContext, options);
 }
 
 function enterEndNode(
@@ -835,6 +968,16 @@ function randomSeed(node: RandomNode, event: RuntimeEvent, triggerContext: Trigg
   }
 }
 
+function skillCheckSeed(node: SkillCheckNode, event: RuntimeEvent, triggerContext: TriggerContext): string {
+  return [
+    event.id,
+    node.id,
+    triggerContext.call_id ?? "",
+    triggerContext.selected_option_id ?? "",
+    node.store_result_as,
+  ].join(":");
+}
+
 function findNode(definition: EventDefinition, nodeId: Id): EventNode | undefined {
   return definition.event_graph.nodes.find((node) => node.id === nodeId);
 }
@@ -926,6 +1069,7 @@ function createPlaceholderEvent(eventId: Id, definition: EventDefinition, trigge
     objective_ids: [],
     selected_options: {},
     random_results: {},
+    check_results: {},
     blocking_claim_ids: [],
     created_at: now(triggerContext, createEmptyRunnerState()),
     updated_at: now(triggerContext, createEmptyRunnerState()),

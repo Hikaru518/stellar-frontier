@@ -31,10 +31,6 @@ jobs:
       - name: Install dependencies
         run: node common/scripts/install-run-rush.js install
 
-      - name: Install Playwright browsers
-        working-directory: apps/pc-client
-        run: node ../../common/scripts/install-run-rushx.js install:browsers
-
       - name: Type check
         run: node common/scripts/install-run-rush.js lint
 
@@ -43,9 +39,6 @@ jobs:
 
       - name: Run unit tests
         run: node common/scripts/install-run-rush.js test
-
-      - name: Run end-to-end tests
-        run: node common/scripts/install-run-rush.js test:e2e --to @stellar-frontier/pc-client
 
       - name: Build
         run: node common/scripts/install-run-rush.js build

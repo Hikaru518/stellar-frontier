@@ -37,9 +37,9 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
         id: "mike",
         name: "麦克",
         role: "神秘幸存者",
-        currentTile: "129-129",
+        currentTile: "116-112",
         location: "IAFS坠毁点",
-        coord: "(0,0)",
+        coord: "(-17,13)",
         status: "待命中。",
         statusTone: "neutral",
         attributes: { physical: 3, agility: 3, intellect: 3, perception: 3, luck: 3 },
@@ -63,10 +63,10 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
       rows: 256,
       cols: 256,
       originTileId: "129-129",
-      discoveredTileIds: ["129-129"],
+      discoveredTileIds: ["116-112"],
       investigationReportsById: {},
       tilesById: {
-        "129-129": {
+        "116-112": {
           discovered: true,
           investigated: true,
           revealedObjectIds: ["iafs_generator", "iafs_life_support", "iafs_shuttle_core"],
@@ -80,10 +80,10 @@ function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
     },
     tiles: [
       {
-        id: "129-129",
-        coord: "(0,0)",
-        row: 129,
-        col: 129,
+        id: "116-112",
+        coord: "(-17,13)",
+        row: 116,
+        col: 112,
         terrain: "平原",
         crew: ["mike"],
         status: "已发现",
@@ -114,7 +114,7 @@ function createFeatureRepairCrashSiteState(overrides: Record<string, unknown> = 
     map: {
       ...(base.map as Record<string, unknown>),
       tilesById: {
-        "129-129": {
+        "116-112": {
           discovered: true,
           investigated: true,
           revealedObjectIds: [],
@@ -241,24 +241,25 @@ describe("App", () => {
       cols: 256,
       originTileId: "129-129",
       discoveredTileIds: [
-        "128-128",
-        "128-129",
-        "128-130",
-        "129-128",
         "129-129",
-        "129-130",
-        "129-131",
-        "130-128",
-        "130-129",
-        "130-130",
-        "130-131",
-        "131-128",
-        "131-129",
-        "131-130",
+        "115-111",
+        "115-112",
+        "115-113",
+        "116-111",
+        "116-112",
+        "116-113",
+        "116-114",
+        "117-111",
+        "117-112",
+        "117-113",
+        "117-114",
+        "118-111",
+        "118-112",
+        "118-113",
       ],
     });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
-    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "129-129", location: "IAFS坠毁点 (0,0)" });
+    expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "116-112", location: "IAFS坠毁点 (-17,13)" });
     expect(saved.map.mapObjects).toBeUndefined();
     expect(saved.map.featuresById).toMatchObject({
       iafs_generator: { status: "damaged" },
@@ -314,6 +315,25 @@ describe("App", () => {
       statusTone: "muted",
     });
     expect(restoredMike?.conditions).not.toContain("iafs_scavenger_signal_lost");
+  });
+
+  it("syncs runtime crew location changes back to visible crew state", () => {
+    const state = createSavedCrashSiteState() as unknown as GameState;
+    const eventState = toEventEngineState(state);
+    eventState.crew.mike = {
+      ...eventState.crew.mike,
+      tile_id: "90-116",
+    };
+
+    const syncedState = mergeEventRuntimeState(state, eventState);
+    const syncedMike = syncedState.crew.find((member) => member.id === "mike");
+    const expectedLocation = getTileLocationLabel(defaultMapConfig, "90-116", state.map);
+
+    expect(syncedMike).toMatchObject({
+      currentTile: "90-116",
+      coord: expectedLocation,
+      location: expectedLocation,
+    });
   });
 
   it("migrates legacy map object status into matching feature runtime state", () => {
@@ -450,7 +470,7 @@ describe("App", () => {
     const saved = JSON.parse(window.localStorage.getItem(GAME_SAVE_KEY) ?? "{}");
     expect(saved.elapsedGameSeconds).toBe(0);
     expect(saved.map.originTileId).toBe("129-129");
-    expect((saved.crew as Array<{ currentTile: string }>)[0]?.currentTile).toBe("129-129");
+    expect((saved.crew as Array<{ currentTile: string }>)[0]?.currentTile).toBe("116-112");
   });
 
   it("shows task tracking with crew controls and opens an empty inventory return", () => {
@@ -542,13 +562,13 @@ describe("App", () => {
 
   it("settles arrival event checks against runtime map state without crashing", () => {
     vi.useFakeTimers();
-    const mikeTargetTileId = "129-130";
+    const mikeTargetTileId = "116-113";
     const action = eventCrewAction({
       id: "mike-initial-move",
       crew_id: "mike",
       source: "player_command",
       type: "move",
-      from_tile_id: "129-129",
+      from_tile_id: "116-112",
       to_tile_id: mikeTargetTileId,
       target_tile_id: mikeTargetTileId,
       path_tile_ids: [mikeTargetTileId],
@@ -566,7 +586,7 @@ describe("App", () => {
       GAME_SAVE_KEY,
       JSON.stringify(createCompatibleSavedGameState({
         elapsedGameSeconds: 0,
-        crew: [{ id: "mike", currentTile: "129-129", hasIncoming: false }],
+        crew: [{ id: "mike", currentTile: "116-112", hasIncoming: false }],
         tiles: initialTiles,
         map: createInitialMapState(),
         logs: initialLogs,
@@ -619,7 +639,7 @@ describe("App", () => {
       status: "正在维修发电机。",
       activeAction: expect.objectContaining({
         actionType: "repair",
-        targetTile: "129-129",
+        targetTile: "116-112",
         params: expect.objectContaining({ target_feature_id: "iafs_generator" }),
       }),
     });
@@ -678,7 +698,7 @@ describe("App", () => {
           map: {
             ...(createSavedCrashSiteState().map as Record<string, unknown>),
             tilesById: {
-              "129-129": {
+              "116-112": {
                 discovered: true,
                 investigated: true,
                 revealedObjectIds: [],
@@ -733,7 +753,7 @@ describe("App", () => {
         occurred_at: 0,
         source: "call",
         crew_id: "mike",
-        tile_id: "129-129",
+        tile_id: "116-112",
         action_id: "iafs_generator:inspect",
         event_id: null,
         event_definition_id: "iafs_generator_inspect_damaged",
@@ -798,9 +818,9 @@ describe("App", () => {
           parent_event_id: null,
           objective_id: null,
           action_request_id: null,
-          from_tile_id: "129-129",
+          from_tile_id: "116-112",
           to_tile_id: null,
-          target_tile_id: "129-129",
+          target_tile_id: "116-112",
           path_tile_ids: [],
           started_at: 0,
           ends_at: 180,
@@ -1029,6 +1049,88 @@ describe("App", () => {
       expect(optionButton).toBeEnabled();
       fireEvent.click(optionButton);
       expect(onDecision).toHaveBeenCalledWith("acknowledge");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("animates runtime d20 roll digits and prefixes tagged event options", () => {
+    vi.useFakeTimers();
+    try {
+      const member = createCallPageCrewMember("mike", "2-3");
+      const map = createMapWithDiscoveredTiles("2-3");
+      const gameState = createCallPageGameState(member, map);
+      const rollText = "麦克 骰出了 12，加上 感知 数值 3，最终结果是 15. 判定要求是 10. 检定成功。";
+      const onDecision = vi.fn();
+      const runtimeCall = createRuntimeCall({
+        id: "runtime-call-check",
+        crew_id: member.id,
+        status: "connected",
+        connected_at: 0,
+        rendered_lines: [
+          {
+            template_variant_id: "skill_check:check_observe",
+            text: rollText,
+            speaker_crew_id: member.id,
+            animation: {
+              type: "d20_roll",
+              start_index: "麦克 骰出了 ".length,
+              end_index: "麦克 骰出了 12".length,
+              final_text: "12",
+              seed: "roll-seed",
+            },
+          },
+        ],
+        available_options: [
+          {
+            option_id: "continue",
+            template_variant_id: "continue-default",
+            text: "继续。",
+            is_default: true,
+            display_tag: "感知",
+          },
+        ],
+      }) as RuntimeCall;
+
+      render(
+        <CallPage
+          call={{ crewId: member.id, type: "normal", settled: false, runtimeCallId: runtimeCall.id }}
+          crew={[member]}
+          tiles={initialTiles}
+          activeCalls={{ [runtimeCall.id]: runtimeCall }}
+          elapsedGameSeconds={0}
+          gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
+          hasQuestUpdates={false}
+          gameState={gameState}
+          logs={initialLogs}
+          onDecision={onDecision}
+          onEndCall={vi.fn()}
+          onConfirmMove={vi.fn()}
+          onClearMoveTarget={vi.fn()}
+          onOpenMap={vi.fn()}
+          onOpenControl={vi.fn()}
+          onOpenTask={vi.fn()}
+          onStartCall={vi.fn()}
+          onShowCrewStatus={vi.fn()}
+          onShowCrewInventory={vi.fn()}
+        />,
+      );
+
+      const transcript = screen.getByRole("button", { name: "LIVE TRANSCRIPT，点击继续接收" });
+      act(() => {
+        vi.advanceTimersByTime(42 * 7);
+      });
+
+      expect(transcript.textContent).toMatch(/麦克 骰出了 \d{2}_/);
+      expect(transcript).not.toHaveTextContent("麦克 骰出了 12，加上");
+      expect(screen.queryByRole("button", { name: "[感知]继续。" })).toBeNull();
+
+      fireEvent.click(transcript);
+      expect(transcript).toHaveTextContent(rollText);
+      const optionButton = screen.getByRole("button", { name: "[感知]继续。" });
+      expect(optionButton).toBeEnabled();
+      fireEvent.click(optionButton);
+      expect(onDecision).toHaveBeenCalledWith("continue");
     } finally {
       vi.useRealTimers();
     }
@@ -1422,6 +1524,7 @@ function createVolcanicObjectiveState() {
             ash_trace_call: "assign_probe",
           },
           random_results: {},
+          check_results: {},
           blocking_claim_ids: [],
           created_at: 480,
           updated_at: 480,

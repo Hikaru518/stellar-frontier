@@ -101,7 +101,9 @@ function validateDefinition(context: DefinitionContext): void {
   validateTerminalNodes(context);
   validateTransitionTargets(context, transitions);
   validateReachability(context, transitions);
-  validateAcyclicGraph(context, transitions);
+  if (context.definition.event_graph.graph_rules.acyclic) {
+    validateAcyclicGraph(context, transitions);
+  }
   validateTerminalPaths(context, transitions);
 
   context.definition.event_graph.nodes.forEach((node, nodeIndex) => {
@@ -137,16 +139,6 @@ function validateDefinition(context: DefinitionContext): void {
 
 function validateGraphRules({ definition, definitionIndex, issues }: DefinitionContext): void {
   const rules = definition.event_graph.graph_rules;
-
-  if (!rules.acyclic) {
-    addDefinitionIssue(
-      issues,
-      definition,
-      "unsupported_graph_rule",
-      `event_definitions[${definitionIndex}].event_graph.graph_rules.acyclic`,
-      `Event definition ${definition.id} must require acyclic event graphs.`,
-    );
-  }
 
   if (rules.max_active_nodes !== 1) {
     addDefinitionIssue(
@@ -377,6 +369,12 @@ function validateNodeReferences(context: DefinitionContext, node: EventNode, nod
         });
       });
       validateTransitionRef(context, node.default_next_node_id, `${nodePath}.default_next_node_id`);
+      break;
+    case "skill_check":
+      validateTransitionRef(context, node.success_node_id, `${nodePath}.success_node_id`);
+      validateTransitionRef(context, node.failure_node_id, `${nodePath}.failure_node_id`);
+      validateEffectRefs(context, node.success_effect_refs ?? [], `${nodePath}.success_effect_refs`);
+      validateEffectRefs(context, node.failure_effect_refs ?? [], `${nodePath}.failure_effect_refs`);
       break;
     case "random":
       node.branches.forEach((branch, branchIndex) => {
@@ -741,6 +739,10 @@ function collectNodeTransitions(node: EventNode, nodePath: string, transitions: 
         pushTransition(node.id, branch.next_node_id, `${nodePath}.branches[${branchIndex}].next_node_id`, transitions);
       });
       pushTransition(node.id, node.default_next_node_id, `${nodePath}.default_next_node_id`, transitions);
+      break;
+    case "skill_check":
+      pushTransition(node.id, node.success_node_id, `${nodePath}.success_node_id`, transitions);
+      pushTransition(node.id, node.failure_node_id, `${nodePath}.failure_node_id`, transitions);
       break;
     case "random":
       node.branches.forEach((branch, branchIndex) => {

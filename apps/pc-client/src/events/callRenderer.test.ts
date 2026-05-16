@@ -54,6 +54,75 @@ describe("runtime call renderer", () => {
       },
     ]);
   });
+
+  it("carries visible check option tags and prepends skill check result metadata", () => {
+    const node = {
+      ...callNode(),
+      options: [
+        {
+          id: "press_on",
+          display_tag: "感知",
+          check_preview: {
+            attribute: "perception" as const,
+            attribute_label: "感知",
+            dc: 15,
+            die_sides: 20,
+          },
+        },
+      ],
+      option_node_mapping: { press_on: "success_end" },
+    };
+    const result = renderRuntimeCall({
+      state: createState(),
+      event: {
+        ...runtimeEvent(),
+        check_results: {
+          sentry_observe: {
+            node_id: "check_observe",
+            attribute: "perception",
+            attribute_label: "感知",
+            die_sides: 20,
+            roll: 14,
+            modifier: 4,
+            total: 18,
+            dc: 15,
+            outcome: "success",
+            seed: "evt_test:check_observe:call:opt_observe:sentry_observe",
+            next_node_id: "signal_call",
+          },
+        },
+      },
+      node,
+      template: callTemplate(),
+      trigger_context: triggerContext(200),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.call.available_options).toEqual([
+      expect.objectContaining({
+        option_id: "press_on",
+        display_tag: "感知",
+        check_preview: {
+          attribute: "perception",
+          attribute_label: "感知",
+          dc: 15,
+          die_sides: 20,
+        },
+      }),
+    ]);
+    expect(result.call.rendered_lines[0]).toEqual({
+      template_variant_id: "skill_check:check_observe",
+      text: "Amy 骰出了 14，加上 感知 数值 4，最终结果是 18. 判定要求是 15. 检定成功。",
+      speaker_crew_id: "amy",
+      animation: {
+        type: "d20_roll",
+        start_index: "Amy 骰出了 ".length,
+        end_index: "Amy 骰出了 14".length,
+        final_text: "14",
+        seed: "evt_test:check_observe:call:opt_observe:sentry_observe",
+      },
+    });
+  });
 });
 
 function createState(): GraphRunnerGameState {
@@ -111,6 +180,7 @@ function runtimeEvent(): RuntimeEvent {
     active_call_id: null,
     selected_options: { previous_call: "scan" },
     random_results: {},
+    check_results: {},
     blocking_claim_ids: [],
     created_at: 180,
     updated_at: 190,

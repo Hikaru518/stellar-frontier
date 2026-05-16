@@ -73,6 +73,33 @@ describe("validateEventContentLibrary", () => {
     });
   });
 
+  it("allows cyclic graphs when the event explicitly opts out of acyclic validation", () => {
+    const call = minimalCallNode({
+      option_node_mapping: {
+        accept: "call",
+        decline: "end",
+      },
+    });
+    const definition = minimalEventDefinition({
+      nodes: [call, minimalEndNode()],
+      edges: [
+        { from_node_id: "call", to_node_id: "call", via: "accept" },
+        { from_node_id: "call", to_node_id: "end", via: "decline" },
+      ],
+      graphOverrides: {
+        graph_rules: {
+          acyclic: false,
+          max_active_nodes: 1,
+          allow_parallel_nodes: false,
+        },
+      },
+    });
+
+    const issues = validateEventContentLibrary(minimalLibrary({ definitions: [definition] }));
+
+    expect(issues.filter((issue) => issue.code === "cycle_detected" || issue.code === "unsupported_graph_rule")).toEqual([]);
+  });
+
   it("reports nodes that cannot reach a terminal node", () => {
     const waitNode: EventNode = {
       id: "wait_forever",
@@ -247,6 +274,7 @@ function expectIssue(
 interface GraphOverrides {
   entry_node_id?: string;
   terminal_node_ids?: string[];
+  graph_rules?: EventDefinition["event_graph"]["graph_rules"];
 }
 
 function minimalLibrary({
@@ -320,7 +348,7 @@ function minimalEventDefinition({
       nodes,
       edges,
       terminal_node_ids: graphOverrides.terminal_node_ids ?? ["end"],
-      graph_rules: {
+      graph_rules: graphOverrides.graph_rules ?? {
         acyclic: true,
         max_active_nodes: 1,
         allow_parallel_nodes: false,
