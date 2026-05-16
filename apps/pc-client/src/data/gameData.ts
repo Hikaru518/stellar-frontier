@@ -5,6 +5,7 @@ import {
   type CrewProfile,
   type DiaryEntryDefinition,
   type ExpertiseDefinition,
+  type IdleChatterDefinition,
   type FeatureRuntimeState,
 } from "../content/contentData";
 import type { EventMark, EventRuntimeState } from "../events/types";
@@ -82,6 +83,7 @@ export interface CrewMember {
   personalityTags: string[];
   expertise: ExpertiseDefinition[];
   diaryEntries: DiaryEntryDefinition[];
+  idleChatter: IdleChatterDefinition[];
   conditions: string[];
   hasIncoming: boolean;
   canCommunicate: boolean;
@@ -152,6 +154,8 @@ export interface CallContext {
   settled: boolean;
   result?: string;
   runtimeCallId?: string;
+  idleChatterId?: string;
+  idleChatterLines?: string[];
   selectingMoveTarget?: boolean;
   selectedTargetTileId?: string;
 }
@@ -328,6 +332,7 @@ function createInitialCrewMember(member: CrewDefinition): CrewMember {
     personalityTags: member.personalityTags,
     expertise: member.expertise,
     diaryEntries: member.diaryEntries,
+    idleChatter: member.idleChatter,
     conditions: [],
     hasIncoming: false,
     canCommunicate: member.canCommunicate,

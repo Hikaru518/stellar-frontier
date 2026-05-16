@@ -61,6 +61,7 @@ function createMember(overrides: Partial<CrewMember> = {}): CrewMember {
     personalityTags: [],
     expertise: [],
     diaryEntries: [],
+    idleChatter: [],
     conditions: [],
     hasIncoming: false,
     canCommunicate: true,

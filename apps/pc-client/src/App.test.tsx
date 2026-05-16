@@ -20,9 +20,17 @@ function readSavedState() {
 }
 
 function getMikeCrewCard() {
-  const card = Array.from(document.querySelectorAll("article.console-crew-card")).find((element) => element.textContent?.includes("麦克"));
+  return getCrewCard("麦克");
+}
+
+function getCrewCard(name: string) {
+  const card = Array.from(document.querySelectorAll("article.console-crew-card")).find((element) => element.textContent?.includes(name));
   expect(card).not.toBeNull();
   return card as HTMLElement;
+}
+
+function getIdleChatterFlagKeys(saved: Record<string, unknown> | null) {
+  return Object.keys((saved?.world_flags ?? {}) as Record<string, unknown>).filter((key) => key.startsWith("idle_chatter_seen_"));
 }
 
 function createSavedCrashSiteState(overrides: Record<string, unknown> = {}) {
@@ -132,9 +140,11 @@ describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.useRealTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     defaultMapConfig.features = originalMapFeatures;
   });
 
@@ -165,6 +175,124 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "结束通话" })).toBeNull();
     expect(screen.queryByText("事件通话没有强制倒计时。")).toBeNull();
     expect(screen.queryByText(/\[CALL\] 选择后只提交 option_id/)).toBeNull();
+  });
+
+  it("shows idle chatter on eligible normal calls and records the seen flag", () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0.49).mockReturnValueOnce(0);
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+    advanceRuntimeTranscript();
+
+    expect(screen.getByText("麦克：……听得到。我刚才在确认周围的脚印，不全是我们的。")).toBeInTheDocument();
+    const saved = readSavedState();
+    expect(saved?.world_flags).toMatchObject({
+      idle_chatter_seen_mike_mike_watch_footprints: expect.objectContaining({ value: true, value_type: "boolean" }),
+    });
+  });
+
+  it("animates idle chatter with atmosphere lines and crew speaker labels before showing actions", () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0.49).mockReturnValueOnce(0.6);
+    const simon = initialCrew.find((member) => member.id === "simon");
+    expect(simon).toBeDefined();
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState({ crew: [simon] })));
+
+    render(<App />);
+
+    fireEvent.click(within(getCrewCard("西蒙")).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByText("LIVE TRANSCRIPT 未完成，点击文本区继续接收。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "移动到指定区域" })).toBeNull();
+
+    advanceRuntimeTranscript();
+
+    expect(screen.getByText("（金属片被翻动，又被小心放回布袋里。）")).toBeInTheDocument();
+    expect(screen.getByText("西蒙：我刚才差点把一块废铁收起来。退休这么久，还是见不得东西浪费。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "移动到指定区域" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "调查当前区域" })).toBeInTheDocument();
+  });
+
+  it("skips already seen idle chatter lines", () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0.49).mockReturnValueOnce(0);
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          world_flags: {
+            idle_chatter_seen_mike_mike_watch_footprints: {
+              key: "idle_chatter_seen_mike_mike_watch_footprints",
+              value: true,
+              value_type: "boolean",
+              created_at: 0,
+              updated_at: 0,
+            },
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+    advanceRuntimeTranscript();
+
+    expect(screen.queryByText("麦克：……听得到。我刚才在确认周围的脚印，不全是我们的。")).toBeNull();
+    expect(screen.getByText("麦克：没事。我只是想了一下，如果这里真有回去的路，它不会摆在明面上。")).toBeInTheDocument();
+    expect(readSavedState()?.world_flags).toMatchObject({
+      idle_chatter_seen_mike_mike_route_hidden: expect.objectContaining({ value: true }),
+    });
+  });
+
+  it("keeps the normal idle call line when idle chatter misses its chance", () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0.5);
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+
+    expect(screen.getByText("麦克 正在等待新的行动指令。")).toBeInTheDocument();
+    expect(getIdleChatterFlagKeys(readSavedState())).toEqual([]);
+  });
+
+  it("does not trigger idle chatter for runtime event calls", () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
+
+    expect(randomSpy).not.toHaveBeenCalled();
+    expect(getIdleChatterFlagKeys(readSavedState())).toEqual([]);
+  });
+
+  it("does not trigger idle chatter while the crew has an active crew action", () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    window.localStorage.setItem(
+      GAME_SAVE_KEY,
+      JSON.stringify(
+        createSavedCrashSiteState({
+          crew_actions: {
+            "mike:move:active": eventCrewAction({
+              id: "mike:move:active",
+              crew_id: "mike",
+              from_tile_id: "129-129",
+              target_tile_id: "129-130",
+            }),
+          },
+        }),
+      ),
+    );
+
+    render(<App />);
+
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+
+    expect(randomSpy).not.toHaveBeenCalled();
+    expect(screen.getByText(/麦克 当前状态：/)).toBeInTheDocument();
+    expect(getIdleChatterFlagKeys(readSavedState())).toEqual([]);
   });
 
   it("opens the global debug toolbox from the floating entry", () => {

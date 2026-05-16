@@ -32,7 +32,7 @@ interface CallActionGroupView {
 
 const CREW_PORTRAIT_PROFILE_LINE_WIDTH = 40;
 
-interface RuntimeTranscriptPlaybackState {
+interface TranscriptPlaybackState {
   callId: string | null;
   lineIndex: number;
   charIndex: number;
@@ -157,11 +157,13 @@ export function CallPage({
 
     return {
       scene: "通话画面 / 状态确认 / 当前坐标回传",
-      lines: [
-        memberActionView.actionStatus === "idle"
-          ? `${member.name} 正在等待新的行动指令。`
-          : `${member.name} 当前状态：${memberActionView.statusText}`,
-      ],
+      lines: call.idleChatterLines?.length
+        ? formatIdleChatterLines(member, call.idleChatterLines)
+        : [
+            memberActionView.actionStatus === "idle"
+              ? `${member.name} 正在等待新的行动指令。`
+              : `${member.name} 当前状态：${memberActionView.statusText}`,
+          ],
       meta: `地点：${currentLocation} / 行动：${memberActionView.actionTitle}`,
       actions: [],
       actionGroups: normalCallView?.groups ?? [],
@@ -171,64 +173,70 @@ export function CallPage({
     };
   }, [activeCalls, call, elapsedGameSeconds, gameState, member, memberActionView, runtimeCall, tiles]);
   const runtimeTranscriptCallId = callView?.isRuntime && runtimeCall ? runtimeCall.id : null;
-  const runtimeTranscriptEnabled = Boolean(callView?.isRuntime && runtimeTranscriptCallId && !callClosed);
-  const runtimeTranscriptAnimationDisabled = isRuntimeTranscriptAnimationDisabled();
-  const runtimeTranscriptPlaybackEnabled = runtimeTranscriptEnabled && !runtimeTranscriptAnimationDisabled;
-  const runtimeTranscriptLines = runtimeTranscriptEnabled ? callView?.lines ?? [] : [];
-  const firstRuntimeTranscriptLine = runtimeTranscriptLines[0];
-  const [runtimeTranscript, setRuntimeTranscript] = useState<RuntimeTranscriptPlaybackState>({
+  const idleChatterTranscriptKey =
+    !callView?.isRuntime && call?.idleChatterId && call.idleChatterLines?.length
+      ? `idle:${call.crewId}:${call.idleChatterId}`
+      : null;
+  const animatedTranscriptKey = runtimeTranscriptCallId ?? idleChatterTranscriptKey;
+  const animatedTranscriptEnabled = Boolean(animatedTranscriptKey && !callClosed);
+  const transcriptAnimationDisabled = isRuntimeTranscriptAnimationDisabled();
+  const animatedTranscriptPlaybackEnabled = animatedTranscriptEnabled && !transcriptAnimationDisabled;
+  const animatedTranscriptLines = animatedTranscriptPlaybackEnabled ? callView?.lines ?? [] : [];
+  const firstAnimatedTranscriptLine = animatedTranscriptLines[0];
+  const [transcriptPlayback, setTranscriptPlayback] = useState<TranscriptPlaybackState>({
     callId: null,
     lineIndex: 0,
     charIndex: 0,
   });
-  const activeRuntimeTranscriptLineIndex =
-    runtimeTranscript.callId === runtimeTranscriptCallId ? Math.min(runtimeTranscript.lineIndex, Math.max(runtimeTranscriptLines.length - 1, 0)) : 0;
-  const activeRuntimeTranscriptCharIndex =
-    runtimeTranscript.callId === runtimeTranscriptCallId
-      ? runtimeTranscript.charIndex
-      : initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine);
-  const currentRuntimeTranscriptLine = runtimeTranscriptLines[activeRuntimeTranscriptLineIndex] ?? "";
-  const runtimeTranscriptComplete =
-    runtimeTranscriptAnimationDisabled ||
-    !runtimeTranscriptEnabled ||
-    runtimeTranscriptLines.length === 0 ||
-    (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
-      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length);
+  const activeAnimatedTranscriptLineIndex =
+    transcriptPlayback.callId === animatedTranscriptKey ? Math.min(transcriptPlayback.lineIndex, Math.max(animatedTranscriptLines.length - 1, 0)) : 0;
+  const activeAnimatedTranscriptCharIndex =
+    transcriptPlayback.callId === animatedTranscriptKey
+      ? transcriptPlayback.charIndex
+      : initialTranscriptCharCount(firstAnimatedTranscriptLine);
+  const currentAnimatedTranscriptLine = animatedTranscriptLines[activeAnimatedTranscriptLineIndex] ?? "";
+  const animatedTranscriptComplete =
+    transcriptAnimationDisabled ||
+    !animatedTranscriptEnabled ||
+    animatedTranscriptLines.length === 0 ||
+    (activeAnimatedTranscriptLineIndex >= animatedTranscriptLines.length - 1 &&
+      activeAnimatedTranscriptCharIndex >= currentAnimatedTranscriptLine.length);
+  const shouldGateCallActions = animatedTranscriptEnabled && !animatedTranscriptComplete;
 
   useEffect(() => {
-    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId) {
-      setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0 });
+    if (!animatedTranscriptPlaybackEnabled || !animatedTranscriptKey) {
+      setTranscriptPlayback({ callId: null, lineIndex: 0, charIndex: 0 });
       return;
     }
 
-    setRuntimeTranscript((current) => {
-      if (current.callId === runtimeTranscriptCallId) {
+    setTranscriptPlayback((current) => {
+      if (current.callId === animatedTranscriptKey) {
         return current;
       }
       return {
-        callId: runtimeTranscriptCallId,
+        callId: animatedTranscriptKey,
         lineIndex: 0,
-        charIndex: initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine),
+        charIndex: initialTranscriptCharCount(firstAnimatedTranscriptLine),
       };
     });
-  }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptPlaybackEnabled]);
+  }, [animatedTranscriptKey, animatedTranscriptPlaybackEnabled, firstAnimatedTranscriptLine]);
 
   useEffect(() => {
     if (
-      !runtimeTranscriptPlaybackEnabled ||
-      !runtimeTranscriptCallId ||
-      runtimeTranscriptLines.length === 0 ||
-      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length
+      !animatedTranscriptPlaybackEnabled ||
+      !animatedTranscriptKey ||
+      animatedTranscriptLines.length === 0 ||
+      activeAnimatedTranscriptCharIndex >= currentAnimatedTranscriptLine.length
     ) {
       return;
     }
 
     const timer = window.setInterval(() => {
-      setRuntimeTranscript((current) => {
-        if (current.callId !== runtimeTranscriptCallId || current.lineIndex !== activeRuntimeTranscriptLineIndex) {
+      setTranscriptPlayback((current) => {
+        if (current.callId !== animatedTranscriptKey || current.lineIndex !== activeAnimatedTranscriptLineIndex) {
           return current;
         }
-        if (current.charIndex >= currentRuntimeTranscriptLine.length) {
+        if (current.charIndex >= currentAnimatedTranscriptLine.length) {
           return current;
         }
         return {
@@ -240,55 +248,55 @@ export function CallPage({
 
     return () => window.clearInterval(timer);
   }, [
-    activeRuntimeTranscriptCharIndex,
-    activeRuntimeTranscriptLineIndex,
-    currentRuntimeTranscriptLine.length,
-    runtimeTranscriptCallId,
-    runtimeTranscriptPlaybackEnabled,
-    runtimeTranscriptLines.length,
+    activeAnimatedTranscriptCharIndex,
+    activeAnimatedTranscriptLineIndex,
+    animatedTranscriptKey,
+    animatedTranscriptLines.length,
+    animatedTranscriptPlaybackEnabled,
+    currentAnimatedTranscriptLine.length,
   ]);
 
-  const handleRuntimeTranscriptAdvance = () => {
-    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId || runtimeTranscriptLines.length === 0) {
+  const handleTranscriptAdvance = () => {
+    if (!animatedTranscriptPlaybackEnabled || !animatedTranscriptKey || animatedTranscriptLines.length === 0) {
       return;
     }
 
-    setRuntimeTranscript((current) => {
-      const lineIndex = current.callId === runtimeTranscriptCallId ? Math.min(current.lineIndex, runtimeTranscriptLines.length - 1) : 0;
-      const charIndex = current.callId === runtimeTranscriptCallId ? current.charIndex : initialRuntimeTranscriptCharCount(runtimeTranscriptLines[0]);
-      const currentLine = runtimeTranscriptLines[lineIndex] ?? "";
+    setTranscriptPlayback((current) => {
+      const lineIndex = current.callId === animatedTranscriptKey ? Math.min(current.lineIndex, animatedTranscriptLines.length - 1) : 0;
+      const charIndex = current.callId === animatedTranscriptKey ? current.charIndex : initialTranscriptCharCount(animatedTranscriptLines[0]);
+      const currentLine = animatedTranscriptLines[lineIndex] ?? "";
 
       if (charIndex < currentLine.length) {
         return {
-          callId: runtimeTranscriptCallId,
+          callId: animatedTranscriptKey,
           lineIndex,
           charIndex: currentLine.length,
         };
       }
 
-      if (lineIndex < runtimeTranscriptLines.length - 1) {
-        const nextLine = runtimeTranscriptLines[lineIndex + 1];
+      if (lineIndex < animatedTranscriptLines.length - 1) {
+        const nextLine = animatedTranscriptLines[lineIndex + 1];
         return {
-          callId: runtimeTranscriptCallId,
+          callId: animatedTranscriptKey,
           lineIndex: lineIndex + 1,
-          charIndex: initialRuntimeTranscriptCharCount(nextLine),
+          charIndex: initialTranscriptCharCount(nextLine),
         };
       }
 
       return {
-        callId: runtimeTranscriptCallId,
+        callId: animatedTranscriptKey,
         lineIndex,
         charIndex,
       };
     });
   };
 
-  const handleRuntimeTranscriptKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+  const handleTranscriptKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
     event.preventDefault();
-    handleRuntimeTranscriptAdvance();
+    handleTranscriptAdvance();
   };
 
   if (!call || !member || !callView || !memberActionView) {
@@ -430,7 +438,7 @@ export function CallPage({
             <div className="console-call-action-groups">
               <section className="console-call-action-group">
                 <h3>事件选项</h3>
-                {runtimeTranscriptComplete ? (
+                {animatedTranscriptComplete ? (
                   <div className="console-call-option-list">
                     {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
                   </div>
@@ -441,14 +449,21 @@ export function CallPage({
             </div>
           ) : (
             <div className="console-call-action-groups">
-              {callView.actionGroups.map((group) => (
-                <section key={group.title} className="console-call-action-group">
-                  <h3>{group.title}</h3>
-                  <div className="console-call-option-list">
-                    {group.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
-                  </div>
+              {shouldGateCallActions ? (
+                <section className="console-call-action-group">
+                  <h3>基础行动</h3>
+                  <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，点击文本区继续接收。</p>
                 </section>
-              ))}
+              ) : (
+                callView.actionGroups.map((group) => (
+                  <section key={group.title} className="console-call-action-group">
+                    <h3>{group.title}</h3>
+                    <div className="console-call-option-list">
+                      {group.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
+                    </div>
+                  </section>
+                ))
+              )}
             </div>
           )}
 
@@ -500,20 +515,20 @@ export function CallPage({
               </div>
             </section>
             <section
-              className={`console-screen-block ${runtimeTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
-              onClick={runtimeTranscriptPlaybackEnabled ? handleRuntimeTranscriptAdvance : undefined}
-              onKeyDown={runtimeTranscriptPlaybackEnabled ? handleRuntimeTranscriptKeyDown : undefined}
-              role={runtimeTranscriptPlaybackEnabled ? "button" : undefined}
-              tabIndex={runtimeTranscriptPlaybackEnabled ? 0 : undefined}
-              aria-label={runtimeTranscriptPlaybackEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
+              className={`console-screen-block ${animatedTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
+              onClick={animatedTranscriptPlaybackEnabled ? handleTranscriptAdvance : undefined}
+              onKeyDown={animatedTranscriptPlaybackEnabled ? handleTranscriptKeyDown : undefined}
+              role={animatedTranscriptPlaybackEnabled ? "button" : undefined}
+              tabIndex={animatedTranscriptPlaybackEnabled ? 0 : undefined}
+              aria-label={animatedTranscriptPlaybackEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
             >
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
-              {runtimeTranscriptPlaybackEnabled
+              {animatedTranscriptPlaybackEnabled
                 ? renderRuntimeTranscriptLines({
                     lines: callView.lines,
-                    activeCallId: runtimeTranscriptCallId,
-                    playback: runtimeTranscript,
-                    complete: runtimeTranscriptComplete,
+                    activeCallId: animatedTranscriptKey,
+                    playback: transcriptPlayback,
+                    complete: animatedTranscriptComplete,
                   })
                 : (call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
                     <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
@@ -565,12 +580,33 @@ function renderActionButton(action: CallActionOption, callClosed: boolean, onDec
   );
 }
 
-function initialRuntimeTranscriptCharCount(line: string | undefined) {
+function initialTranscriptCharCount(line: string | undefined) {
   return line && line.length > 0 ? 1 : 0;
 }
 
 function isRuntimeTranscriptAnimationDisabled() {
   return typeof window !== "undefined" && window.localStorage.getItem("stellar-frontier-e2e-disable-animation") === "1";
+}
+
+function formatIdleChatterLines(member: CrewMember, lines: string[]) {
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (isAtmosphereLine(trimmed)) {
+      return trimmed;
+    }
+    return `${member.name}：${stripOuterDialogueQuotes(trimmed)}`;
+  });
+}
+
+function isAtmosphereLine(line: string) {
+  return line.startsWith("（");
+}
+
+function stripOuterDialogueQuotes(line: string) {
+  if ((line.startsWith("“") && line.endsWith("”")) || (line.startsWith("\"") && line.endsWith("\""))) {
+    return line.slice(1, -1);
+  }
+  return line;
 }
 
 function renderRuntimeTranscriptLines({
@@ -581,7 +617,7 @@ function renderRuntimeTranscriptLines({
 }: {
   lines: string[];
   activeCallId: string | null;
-  playback: RuntimeTranscriptPlaybackState;
+  playback: TranscriptPlaybackState;
   complete: boolean;
 }) {
   if (!lines.length) {
@@ -589,7 +625,7 @@ function renderRuntimeTranscriptLines({
   }
 
   const activeLineIndex = playback.callId === activeCallId ? Math.min(playback.lineIndex, lines.length - 1) : 0;
-  const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialRuntimeTranscriptCharCount(lines[0]);
+  const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialTranscriptCharCount(lines[0]);
   return lines.slice(0, activeLineIndex + 1).map((line, index) => {
     const isCurrentLine = index === activeLineIndex;
     const renderedText = isCurrentLine ? line.slice(0, Math.min(activeCharIndex, line.length)) : line;

@@ -154,6 +154,24 @@
         }
       }
     },
+    "idleChatterEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lines"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "lines": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/localizedText"
+          }
+        }
+      }
+    },
     "inventoryEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -186,7 +204,8 @@
         "voiceTone",
         "personalityTags",
         "expertise",
-        "diaryEntries"
+        "diaryEntries",
+        "idleChatter"
       ],
       "properties": {
         "crewId": {
@@ -250,6 +269,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/diaryEntry"
+          }
+        },
+        "idleChatter": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idleChatterEntry"
           }
         },
         "canCommunicate": {
