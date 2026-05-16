@@ -173,7 +173,7 @@ function App() {
   const [currentCall, setCurrentCall] = useState<CallContext | null>(null);
   const [preCallPage, setPreCallPage] = useState<PageId>("control");
   const [mapReturnTarget, setMapReturnTarget] = useState<MapReturnTarget>("control");
-  const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(1);
+  const [timeMultiplier, setTimeMultiplier] = useState<TimeMultiplier>(DEFAULT_TIME_MULTIPLIER);
   const [debugOpen, setDebugOpen] = useState(false);
   const [questSidebarCollapsed, setQuestSidebarCollapsed] = useState(true);
   const [questStatusFilter, setQuestStatusFilter] = useState<QuestStatusFilter>("all");
@@ -1147,6 +1147,8 @@ function App() {
 }
 
 export default App;
+
+const DEFAULT_TIME_MULTIPLIER: TimeMultiplier = 8;
 
 function isRadarMapAvailable(state: Pick<GameState, "map">): boolean {
   const radarFeature = defaultMapFeatureById.get(RADAR_MAP_UNLOCK_FEATURE_ID);
