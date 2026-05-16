@@ -20,11 +20,6 @@
       "tags": ["app", "mobile-client"]
     },
     {
-      "packageName": "@stellar-frontier/desktop-client",
-      "projectFolder": "apps/desktop-client",
-      "tags": ["app", "desktop-client"]
-    },
-    {
       "packageName": "@stellar-frontier/editor",
       "projectFolder": "apps/editor",
       "tags": ["tool", "editor"]

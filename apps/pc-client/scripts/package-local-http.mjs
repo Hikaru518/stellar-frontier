@@ -180,7 +180,7 @@ run(process.execPath, [
   "run",
   "--filter",
   "@stellar-frontier/pc-client",
-  "build:desktop",
+  "build:local-http",
 ]);
 
 rmSync(releaseRoot, { recursive: true, force: true });

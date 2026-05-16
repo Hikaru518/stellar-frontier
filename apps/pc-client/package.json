@@ -7,7 +7,7 @@
     "dev": "vite",
     "production": "tsc -b && vite build && vite preview",
     "build": "tsc -b && vite build",
-    "build:desktop": "tsc -b && vite build --base=./",
+    "build:local-http": "tsc -b && vite build --base=./",
     "package:local-http": "node scripts/package-local-http.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
