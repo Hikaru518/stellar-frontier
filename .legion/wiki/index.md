@@ -9,6 +9,7 @@
 - [Task: Dual-Device Play Accessibility](tasks/dual-device-play-accessibility.md)
 - [Task: Fix IAFS Editor Manifest Tests](tasks/fix-iafs-editor-manifest-tests.md)
 - [Task: Mobile Communication Device Gameplay](tasks/mobile-communication-device-gameplay.md)
+- [Task: Mobile Terminal Visual Redesign](tasks/mobile-terminal-visual-redesign.md)
 - [Task: README / AGENTS / Wiki Maintenance](tasks/readme-agents-wiki-maintenance.md)
 
 ## Current Query Path

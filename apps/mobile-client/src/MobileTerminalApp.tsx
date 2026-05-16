@@ -150,74 +150,165 @@ export function MobileTerminalApp() {
     sendPhoneEvent(pairing, terminalRef.current, sequenceRef, "phone.choice.select", { ...option.payload, clientRequestId });
   }
 
+  const statusChips = [
+    { label: "链路", value: formatConnectionStatus(connectionStatus), tone: formatConnectionTone(connectionStatus) },
+    { label: "短码", value: pairing?.code ?? "等待 PC 显示", tone: undefined },
+    { label: "路径", value: selected.selected, tone: undefined },
+  ];
+  const messageStack = selectedThread?.messages?.length ? selectedThread.messages : [{ id: "empty", text: snapshot.body ?? "PC 尚未下发通讯内容。" }];
+  const taskSummary = snapshot.taskSummary ?? [];
+  const recentEvents = snapshot.recentEvents ?? [];
+  const pendingChoiceList = Object.values(pendingChoices);
+
   return (
-    <main className="mobile-terminal-shell mobile-chat-shell">
-      <p className="eyebrow">Stellar Frontier / 私人通讯终端</p>
-      <h1>{pairing ? "移动通讯设备" : "等待配对"}</h1>
+    <main className="mobile-terminal-shell" data-paired={pairing ? "true" : "false"}>
+      <header className="terminal-hero">
+        <div className="terminal-title-block">
+          <p className="eyebrow">Stellar Frontier / Handset Relay</p>
+          <h1>{pairing ? "移动通讯设备" : "等待配对"}</h1>
+          <p className="terminal-subtitle">PC 权威端保持结算；本机只提交通讯 intent。</p>
+        </div>
+
+        <div className="terminal-idplate" aria-label="配对状态摘要">
+          {statusChips.map((chip) => (
+            <span key={chip.label} className={`status-chip ${chip.tone ? `status-chip-${chip.tone}` : ""}`}>
+              <span className="status-chip-label">{chip.label}</span> <strong>{chip.value}</strong>
+            </span>
+          ))}
+        </div>
+      </header>
+
       {emergencyThread ? (
-        <section className="terminal-card terminal-card-alert emergency-call-panel" aria-label="紧急来电">
-          <p className="eyebrow">高优先级来电</p>
-          <h2>{emergencyThread.title}</h2>
-          <p>{emergencyThread.preview}</p>
-          <div className="terminal-actions">
+        <section className="terminal-module terminal-module-alert emergency-call-panel" aria-label="紧急来电">
+          <div className="module-header">
+            <div>
+              <p className="eyebrow">Priority Interrupt</p>
+              <h2>{emergencyThread.title}</h2>
+            </div>
+            <span className="priority-badge priority-badge-emergency">紧急</span>
+          </div>
+          <p className="emergency-preview">{emergencyThread.preview}</p>
+          <div className="terminal-actions emergency-actions">
             <button type="button" onClick={() => acknowledgePrivateSignal("answer")}>接听</button>
             <button type="button" onClick={() => setSelectedThreadId(emergencyThread.id)}>查看选项</button>
           </div>
         </section>
       ) : null}
 
-      <section className="terminal-card connection-strip">
-        <span>{formatConnectionStatus(connectionStatus)}</span>
-        <span>短码 {pairing?.code ?? "等待 PC 显示"}</span>
-        <span>{selected.selected}</span>
-      </section>
-
-      <section className="terminal-card chat-layout">
+      <section className="terminal-module chat-layout">
         <aside className="thread-list" aria-label="消息列表">
-          <h2>消息</h2>
-          {threads.map((thread) => (
-            <button key={thread.id} type="button" className={`thread-row ${selectedThread?.id === thread.id ? "thread-row-active" : ""}`} onClick={() => setSelectedThreadId(thread.id)}>
-              <strong>{thread.title}</strong>
-              <span>{thread.preview}</span>
-              {thread.priority === "emergency" ? <em>紧急</em> : null}
-            </button>
-          ))}
-        </aside>
+          <div className="module-header compact-header">
+            <div>
+              <p className="eyebrow">Message Bus</p>
+              <h2>消息</h2>
+            </div>
+            <span className="count-badge">{threads.length.toString().padStart(2, "0")}</span>
+          </div>
 
-        <section className="chat-thread" aria-label="会话线程">
-          <h2>{selectedThread?.title ?? "等待通讯"}</h2>
-          {(selectedThread?.messages?.length ? selectedThread.messages : [{ id: "empty", text: snapshot.body ?? "PC 尚未下发通讯内容。" }]).map((message) => (
-            <article key={message.id} className="chat-bubble">
-              {message.speaker ? <span>{message.speaker}</span> : null}
-              <p>{message.text}</p>
-            </article>
-          ))}
-          <div className="structured-options">
-            {selectedThread?.options?.map((option) => (
-              <button key={option.id} type="button" disabled={option.disabled} onClick={() => sendChoice(option)}>
-                {option.label}
+          <div className="thread-stack">
+            {threads.map((thread) => (
+              <button key={thread.id} type="button" className={`thread-row ${selectedThread?.id === thread.id ? "thread-row-active" : ""}`} onClick={() => setSelectedThreadId(thread.id)}>
+                <span className="thread-row-topline">
+                  <strong>{thread.title}</strong>
+                  <em className={`priority-badge priority-badge-${thread.priority ?? "normal"}`}>{formatThreadPriority(thread.priority)}</em>
+                </span>
+                <span className="thread-preview">{thread.preview}</span>
               </button>
             ))}
           </div>
-          {Object.values(pendingChoices).map((choice) => (
-            <p key={choice.clientRequestId} className="pending-line">{choice.label}: {formatPending(choice)}</p>
-          ))}
+        </aside>
+
+        <section className="chat-thread" aria-label="会话线程">
+          <div className="module-header thread-header">
+            <div>
+              <p className="eyebrow">Selected Thread</p>
+              <h2>{selectedThread?.title ?? "等待通讯"}</h2>
+            </div>
+            <span className="priority-badge priority-badge-command">PC 结算</span>
+          </div>
+
+          <div className="message-stream">
+            {messageStack.map((message, index) => (
+              <article key={message.id} className="chat-bubble">
+                <span className="message-index">{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  {message.speaker ? <span className="message-speaker">{message.speaker}</span> : null}
+                  <p>{message.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="structured-options" aria-label="可提交选项">
+            {selectedThread?.options?.length ? (
+              selectedThread.options.map((option) => (
+                <button key={option.id} type="button" disabled={option.disabled} onClick={() => sendChoice(option)}>
+                  <span>提交</span>
+                  <strong>{option.label}</strong>
+                </button>
+              ))
+            ) : (
+              <p className="empty-options">当前线程没有可在手机端提交的结构化选项。</p>
+            )}
+          </div>
+
+          {pendingChoiceList.length ? (
+            <div className="pending-stack" aria-label="待确认指令">
+              {pendingChoiceList.map((choice) => (
+                <p key={choice.clientRequestId} className={`pending-line pending-line-${choice.status}`}>{choice.label}: {formatPending(choice)}</p>
+              ))}
+            </div>
+          ) : null}
         </section>
       </section>
 
-      <section className="terminal-card terminal-card-muted">
-        <h2>任务摘要 / 近期事件</h2>
-        <p>{(snapshot.taskSummary ?? []).join(" / ") || "等待 PC 同步任务摘要。"}</p>
-        <p>{(snapshot.recentEvents ?? []).join(" / ") || "暂无近期事件。"}</p>
-        <p>{localFeedback}</p>
+      <section className="terminal-module terminal-feed">
+        <div className="module-header compact-header">
+          <div>
+            <p className="eyebrow">Ops Feed</p>
+            <h2>任务摘要 / 近期事件</h2>
+          </div>
+          <span className="count-badge">LOG</span>
+        </div>
+        <div className="feed-grid">
+          <article>
+            <h3>任务摘要</h3>
+            <p>{taskSummary.join(" / ") || "等待 PC 同步任务摘要。"}</p>
+          </article>
+          <article>
+            <h3>近期事件</h3>
+            <p>{recentEvents.join(" / ") || "暂无近期事件。"}</p>
+          </article>
+          <article className="feedback-line">
+            <h3>本机反馈</h3>
+            <p>{localFeedback}</p>
+          </article>
+        </div>
       </section>
 
-      <section className="terminal-card terminal-card-muted">
-        <h2>实时连接状态</h2>
-        <p>{yuanBackedDualDevicePlan.summary}</p>
-        <p>局域网升级：{realtimeLink.webRtcUpgrade.kind} / {realtimeLink.webRtcUpgrade.label}</p>
-        <p>公网兜底：{realtimeLink.publicFallback.kind} / {realtimeLink.publicFallback.label}</p>
-        <p>enableWebRTC=true；游戏结算仍由 PC 完成。</p>
+      <section className="terminal-module terminal-telemetry">
+        <div className="module-header compact-header">
+          <div>
+            <p className="eyebrow">Transport Scope</p>
+            <h2>实时连接状态</h2>
+          </div>
+          <span className="priority-badge priority-badge-command">只读诊断</span>
+        </div>
+        <p className="telemetry-summary">{yuanBackedDualDevicePlan.summary}</p>
+        <dl className="telemetry-list">
+          <div>
+            <dt>局域网升级</dt>
+            <dd>{realtimeLink.webRtcUpgrade.kind} / {realtimeLink.webRtcUpgrade.label}</dd>
+          </div>
+          <div>
+            <dt>公网兜底</dt>
+            <dd>{realtimeLink.publicFallback.kind} / {realtimeLink.publicFallback.label}</dd>
+          </div>
+          <div>
+            <dt>结算边界</dt>
+            <dd>enableWebRTC=true；游戏结算仍由 PC 完成。</dd>
+          </div>
+        </dl>
       </section>
     </main>
   );
@@ -287,6 +378,19 @@ function formatConnectionStatus(status: MobileConnectionStatus) {
   if (status === "connecting") return "连接中";
   if (status === "disconnected") return "已断开 / 等待 PC fallback";
   return "手动输入或扫码加入";
+}
+
+function formatConnectionTone(status: MobileConnectionStatus) {
+  if (status === "connected") return "online";
+  if (status === "connecting") return "syncing";
+  if (status === "disconnected") return "alert";
+  return "manual";
+}
+
+function formatThreadPriority(priority: MobileThread["priority"]) {
+  if (priority === "emergency") return "紧急";
+  if (priority === "call") return "通话";
+  return "常规";
 }
 
 function formatPending(choice: PendingChoice) {

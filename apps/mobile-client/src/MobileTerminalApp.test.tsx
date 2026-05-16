@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { MobileTerminalApp } from "./MobileTerminalApp";
 
 describe("MobileTerminalApp", () => {
   afterEach(() => {
+    cleanup();
     window.history.pushState({}, "", "/");
   });
 
@@ -14,7 +15,7 @@ describe("MobileTerminalApp", () => {
     expect(screen.getAllByText(/yuan-wss/).length).toBeGreaterThan(0);
     expect(screen.getByText("实时连接状态")).toBeInTheDocument();
     expect(screen.getByText(/局域网升级/)).toBeInTheDocument();
-    expect(screen.getByText(/公网兜底/)).toBeInTheDocument();
+    expect(screen.getAllByText(/公网兜底/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/enableWebRTC=true/).length).toBeGreaterThan(0);
     expect(screen.getByText(/游戏结算仍由 PC 完成/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "消息" })).toBeInTheDocument();
@@ -34,6 +35,8 @@ describe("MobileTerminalApp", () => {
     render(<MobileTerminalApp />);
 
     expect(screen.getByRole("heading", { name: "移动通讯设备" })).toBeInTheDocument();
-    expect(screen.getByText(/短码 ABCDEF/)).toBeInTheDocument();
+    const pairingSummary = screen.getByLabelText("配对状态摘要");
+    expect(within(pairingSummary).getByText("短码")).toBeInTheDocument();
+    expect(within(pairingSummary).getByText("ABCDEF")).toBeInTheDocument();
   });
 });
