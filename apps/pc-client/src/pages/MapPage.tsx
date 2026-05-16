@@ -841,98 +841,100 @@ export function MapPage({
           <span>render + function + crew + debug / {RADAR_WORLD.width} x {RADAR_WORLD.height}</span>
         </div>
 
-        <div
-          ref={stageRef}
-          className={`console-ascii-map-stage ${dragging ? "console-ascii-map-stage-dragging" : ""}`}
-          aria-label="地形地图"
-          data-focus-tile-id={focusTileId}
-          role="application"
-          onClick={handleStageClick}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          onWheel={handleWheel}
-        >
-          {showRenderLayer ? (
-            <div className="console-terrain-map-render-layer" aria-hidden="true">
-              <img src={iafsTerrainBaseUrl} alt="" className="console-terrain-map-image" style={terrainImageStyle} draggable={false} />
-            </div>
-          ) : null}
+        <div className="console-map-stage-frame">
+          <div
+            ref={stageRef}
+            className={`console-ascii-map-stage ${dragging ? "console-ascii-map-stage-dragging" : ""}`}
+            aria-label="地形地图"
+            data-focus-tile-id={focusTileId}
+            role="application"
+            onClick={handleStageClick}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onWheel={handleWheel}
+          >
+            {showRenderLayer ? (
+              <div className="console-terrain-map-render-layer" aria-hidden="true">
+                <img src={iafsTerrainBaseUrl} alt="" className="console-terrain-map-image" style={terrainImageStyle} draggable={false} />
+              </div>
+            ) : null}
 
-          {showRenderLayer && showMaskLayer ? (
-            <div className="console-terrain-map-mask-layer" aria-hidden="true">
-              <canvas ref={maskCanvasRef} className="console-terrain-map-mask-canvas" style={terrainImageStyle} />
-            </div>
-          ) : null}
+            {showRenderLayer && showMaskLayer ? (
+              <div className="console-terrain-map-mask-layer" aria-hidden="true">
+                <canvas ref={maskCanvasRef} className="console-terrain-map-mask-canvas" style={terrainImageStyle} />
+              </div>
+            ) : null}
 
-          {showFunctionalLayer ? (
-            <div className="console-retro-map-function-layer" aria-hidden="true">
-              <canvas ref={functionCanvasRef} className="console-retro-map-function-canvas" />
-            </div>
-          ) : null}
+            {showFunctionalLayer ? (
+              <div className="console-retro-map-function-layer" aria-hidden="true">
+                <canvas ref={functionCanvasRef} className="console-retro-map-function-canvas" />
+              </div>
+            ) : null}
 
-          {showRenderLayer ? (
-            <div className="console-terrain-map-icon-layer" aria-hidden="true">
-              {mapIconMarkers.map((marker) => {
-                if (!isCoordInsideViewport(marker, viewport)) {
-                  return null;
-                }
-                const isMasked = showMaskLayer && !isCoordRevealedByMask(marker, mapMaskReveals);
-
-                return (
-                  <span
-                    key={marker.iconId}
-                    className={`console-retro-map-icon-anchor ${isMasked ? "console-retro-map-icon-anchor-masked" : ""}`}
-                    style={{
-                      left: `${((marker.x - viewport.left) / viewport.width) * 100}%`,
-                      top: `${((marker.y - viewport.top) / viewport.height) * 100}%`,
-                      width: `clamp(18px, ${mapIconSizePercent}, 54px)`,
-                    }}
-                    data-feature-id={marker.featureId}
-                    data-icon-id={marker.iconId}
-                    data-label={marker.label}
-                  >
-                    <img src={marker.iconUrl} alt="" className="console-retro-map-icon" draggable={false} />
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {showCrewLayer ? (
-            <div className="console-retro-map-crew-layer" aria-hidden="true">
-              <canvas ref={crewCanvasRef} className="console-retro-map-crew-canvas" />
-              <div className="console-retro-map-crew-icon-layer">
-                {crewMarkers.map((marker) => {
+            {showRenderLayer ? (
+              <div className="console-terrain-map-icon-layer" aria-hidden="true">
+                {mapIconMarkers.map((marker) => {
                   if (!isCoordInsideViewport(marker, viewport)) {
                     return null;
                   }
+                  const isMasked = showMaskLayer && !isCoordRevealedByMask(marker, mapMaskReveals);
 
                   return (
                     <span
-                      key={`${marker.tileId}-${marker.iconId}`}
-                      className="console-retro-map-crew-icon-anchor"
+                      key={marker.iconId}
+                      className={`console-retro-map-icon-anchor ${isMasked ? "console-retro-map-icon-anchor-masked" : ""}`}
                       style={{
-                        left: `${((marker.x - viewport.left + 0.5) / viewport.width) * 100}%`,
-                        top: `${((marker.y - viewport.top + 0.5) / viewport.height) * 100}%`,
-                        width: `clamp(18px, ${crewIconSizePercent}, 42px)`,
+                        left: `${((marker.x - viewport.left) / viewport.width) * 100}%`,
+                        top: `${((marker.y - viewport.top) / viewport.height) * 100}%`,
+                        width: `clamp(18px, ${mapIconSizePercent}, 54px)`,
                       }}
-                      data-crew-icon-id={marker.iconId}
+                      data-feature-id={marker.featureId}
+                      data-icon-id={marker.iconId}
+                      data-label={marker.label}
                     >
-                      <img src={marker.iconUrl} alt="" className="console-retro-map-crew-icon" draggable={false} />
+                      <img src={marker.iconUrl} alt="" className="console-retro-map-icon" draggable={false} />
                     </span>
                   );
                 })}
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {showDebugLayer ? (
-            <div className="console-retro-map-debug-layer" aria-hidden="true">
-              <canvas ref={debugCanvasRef} className="console-retro-map-debug-canvas" />
-            </div>
-          ) : null}
+            {showCrewLayer ? (
+              <div className="console-retro-map-crew-layer" aria-hidden="true">
+                <canvas ref={crewCanvasRef} className="console-retro-map-crew-canvas" />
+                <div className="console-retro-map-crew-icon-layer">
+                  {crewMarkers.map((marker) => {
+                    if (!isCoordInsideViewport(marker, viewport)) {
+                      return null;
+                    }
+
+                    return (
+                      <span
+                        key={`${marker.tileId}-${marker.iconId}`}
+                        className="console-retro-map-crew-icon-anchor"
+                        style={{
+                          left: `${((marker.x - viewport.left + 0.5) / viewport.width) * 100}%`,
+                          top: `${((marker.y - viewport.top + 0.5) / viewport.height) * 100}%`,
+                          width: `clamp(18px, ${crewIconSizePercent}, 42px)`,
+                        }}
+                        data-crew-icon-id={marker.iconId}
+                      >
+                        <img src={marker.iconUrl} alt="" className="console-retro-map-crew-icon" draggable={false} />
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {showDebugLayer ? (
+              <div className="console-retro-map-debug-layer" aria-hidden="true">
+                <canvas ref={debugCanvasRef} className="console-retro-map-debug-canvas" />
+              </div>
+            ) : null}
+          </div>
 
           <div className="console-ascii-map-readout">
             <span>focus {focusDisplayCoord}</span>
