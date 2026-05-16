@@ -99,6 +99,7 @@ if (eventContentIndexResult.errors.length > 0) {
 const eventContentIndex = eventContentIndexResult.index;
 const CURRENT_AREA_SURVEY_EMPTY_RESULT = "当前地点没有可触发的调查事件。";
 const MOBILE_FALLBACK_AFTER_MS = 10000;
+const IDLE_CHATTER_TRIGGER_CHANCE = 0.5;
 const defaultMapTileById = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile]));
 const defaultMapFeatureById = new Map(defaultMapConfig.features.map((feature) => [feature.id, feature]));
 const SCAVENGER_SIGNAL_LOST_CONDITION = "iafs_scavenger_signal_lost";
@@ -610,12 +611,16 @@ function App() {
     }
 
     const type = runtimeCall && isUrgentRuntimeCallState(runtimeCall) ? "emergency" : "normal";
+    const idleChatter = selectIdleChatterForNormalCall(gameState, member, runtimeCall);
     if (page !== "call" && page !== "ending") {
       setPreCallPage(page);
     }
-    setCurrentCall({ crewId, type, settled: false, runtimeCallId: runtimeCall?.id });
+    setCurrentCall({ crewId, type, settled: false, runtimeCallId: runtimeCall?.id, idleChatterId: idleChatter?.id, idleChatterLines: idleChatter?.lines });
     setGameState((state) => ({
       ...state,
+      world_flags: idleChatter
+        ? withIdleChatterSeenFlag(state.world_flags, state.elapsedGameSeconds, crewId, idleChatter.id)
+        : state.world_flags,
       crew: state.crew.map((item) => (item.id === crewId ? { ...item, hasIncoming: false } : item)),
       logs: appendLogEntry(
         state.logs,
@@ -1603,6 +1608,44 @@ function selectActiveCrewActionForCrew(crewActions: Record<Id, CrewActionState>,
   return Object.values(crewActions)
     .filter((action) => action.crew_id === crewId && action.status === "active" && (!actionType || action.type === actionType))
     .sort((left, right) => (right.started_at ?? 0) - (left.started_at ?? 0) || right.id.localeCompare(left.id))[0];
+}
+
+function selectIdleChatterForNormalCall(state: GameState, member: CrewMember, runtimeCall: RuntimeCall | undefined) {
+  if (runtimeCall || member.unavailable || !member.canCommunicate || selectActiveCrewActionForCrew(state.crew_actions, member.id)) {
+    return null;
+  }
+
+  const candidates = member.idleChatter.filter((chatter) => !isIdleChatterSeen(state.world_flags, member.id, chatter.id));
+  if (candidates.length === 0 || Math.random() >= IDLE_CHATTER_TRIGGER_CHANCE) {
+    return null;
+  }
+
+  return candidates[Math.floor(Math.random() * candidates.length)] ?? null;
+}
+
+function isIdleChatterSeen(worldFlags: GameState["world_flags"], crewId: CrewId, chatterId: string) {
+  return worldFlags[getIdleChatterSeenFlagKey(crewId, chatterId)]?.value === true;
+}
+
+function withIdleChatterSeenFlag(worldFlags: GameState["world_flags"], elapsedGameSeconds: number, crewId: CrewId, chatterId: string): GameState["world_flags"] {
+  const key = getIdleChatterSeenFlagKey(crewId, chatterId);
+  const existing = worldFlags[key];
+  const flag: WorldFlag = {
+    key,
+    value: true,
+    value_type: "boolean",
+    created_at: existing?.created_at ?? elapsedGameSeconds,
+    updated_at: elapsedGameSeconds,
+    tags: ["idle_chatter", crewId],
+  };
+  return {
+    ...worldFlags,
+    [key]: flag,
+  };
+}
+
+function getIdleChatterSeenFlagKey(crewId: CrewId, chatterId: string) {
+  return `idle_chatter_seen_${crewId}_${chatterId}`;
 }
 
 function completeCrewActionState(action: CrewActionState, elapsedGameSeconds: number): CrewActionState {
