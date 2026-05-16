@@ -16,6 +16,7 @@
     "editor:helper": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor helper",
     "editor:build": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor build",
     "editor:test": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/editor test",
+    "package:desktop:win": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/desktop-client package:win",
     "preview": "node common/scripts/install-run-rush-pnpm.js run --filter @stellar-frontier/pc-client preview",
     "rush:update": "node common/scripts/install-run-rush.js update",
     "build": "node common/scripts/install-run-rush.js build",

@@ -6,6 +6,7 @@ common/temp/
 # Build outputs
 dist/
 build/
+release/
 coverage/
 playwright-report/
 test-results/
