@@ -7,6 +7,17 @@ import type { ActionOption, CallContext, CrewId, CrewMember, GameMapState, GameS
 import type { RenderedLine, RuntimeCall } from "../events/types";
 import { getTileLocationLabel } from "../mapSystem";
 import { formatDuration, getRemainingSeconds } from "../timeSystem";
+import actionMoveRouteImageUrl from "../../../../content/assets/actions/iafs/action-move-route.png";
+import actionRepairSiteImageUrl from "../../../../content/assets/actions/iafs/action-repair-site.png";
+import actionStandbyListenImageUrl from "../../../../content/assets/actions/iafs/action-standby-listen.png";
+import actionSurveyScanImageUrl from "../../../../content/assets/actions/iafs/action-survey-scan.png";
+import emptySurveyImageUrl from "../../../../content/assets/events/iafs/empty-survey.png";
+import lifeSupportModuleImageUrl from "../../../../content/assets/events/iafs/life-support-module.png";
+import odysseyCrashSiteImageUrl from "../../../../content/assets/events/iafs/odyssey-crash-site.png";
+import powerNodeImageUrl from "../../../../content/assets/events/iafs/power-node.png";
+import scatteredSuppliesImageUrl from "../../../../content/assets/events/iafs/scattered-supplies.png";
+import scavengerCampOutskirtsImageUrl from "../../../../content/assets/events/iafs/scavenger-camp-outskirts.png";
+import sentryLineStandoffImageUrl from "../../../../content/assets/events/iafs/sentry-line-standoff.png";
 
 type CallActionOption = ActionOption & {
   target?: CallActionTargetView;
@@ -29,6 +40,12 @@ interface CallView {
 interface CallActionGroupView {
   title: string;
   actions: CallActionOption[];
+}
+
+interface CallSceneImage {
+  src: string;
+  alt: string;
+  caption: string;
 }
 
 interface TranscriptPlaybackState {
@@ -218,6 +235,7 @@ export function CallPage({
       activeAnimatedTranscriptCharIndex >= currentAnimatedTranscriptLine.length &&
       !transcriptPlayback.rollAnimation);
   const shouldGateCallActions = animatedTranscriptEnabled && !animatedTranscriptComplete;
+  const callSceneImage = callView ? getCallSceneImage(callView) : null;
 
   useEffect(() => {
     if (!animatedTranscriptPlaybackEnabled || !animatedTranscriptKey) {
@@ -564,13 +582,20 @@ export function CallPage({
             <section className="console-screen-block console-call-visual-grid">
               <div className="console-call-art-block">
                 <p className="console-screen-command">] OPEN SIGNAL-CAPTURE.BAS</p>
-                {buildCallAsciiScene(callView, member, callClosed).map((line, index) => (
-                  <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
-                ))}
+                {callSceneImage ? (
+                  <figure className="console-call-scene-frame">
+                    <img className="console-call-scene-image" src={callSceneImage.src} alt={callSceneImage.alt} />
+                    <figcaption className="console-call-scene-caption">{callSceneImage.caption}</figcaption>
+                  </figure>
+                ) : (
+                  buildCallAsciiScene(callView, member, callClosed).map((line, index) => (
+                    <p key={`scene-${index}-${line}`} className="console-call-art-line">{line}</p>
+                  ))
+                )}
               </div>
             </section>
             <section
-              className={`console-screen-block ${animatedTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
+              className={`console-screen-block console-call-transcript-block ${animatedTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
               onClick={animatedTranscriptPlaybackEnabled ? handleTranscriptAdvance : undefined}
               onKeyDown={animatedTranscriptPlaybackEnabled ? handleTranscriptKeyDown : undefined}
               role={animatedTranscriptPlaybackEnabled ? "button" : undefined}
@@ -829,6 +854,126 @@ function MoveConfirmPanel({
       </div>
     </div>
   );
+}
+
+function getCallSceneImage(callView: CallView): CallSceneImage | null {
+  if (!callView.isRuntime) {
+    return getFieldLinkSceneImage(callView);
+  }
+
+  const sceneKey = `${callView.meta} ${callView.lines.join(" ")}`.toLowerCase();
+  const sceneImageRules: Array<{ needles: string[]; image: CallSceneImage }> = [
+    {
+      needles: ["iafs_scattered_supplies", "散落物资", "散落补给", "货舱", "补给箱", "supplies"],
+      image: {
+        src: scatteredSuppliesImageUrl,
+        alt: "散落补给与货舱残骸的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / SCATTERED SUPPLIES",
+      },
+    },
+    {
+      needles: ["iafs_default_survey_nothing_found", "调查未发现", "没有发现", "无发现", "nothing_found"],
+      image: {
+        src: emptySurveyImageUrl,
+        alt: "无发现区域勘察的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / EMPTY SURVEY",
+      },
+    },
+    {
+      needles: ["iafs_generator", "发电机", "主供电", "供电回路", "动力节点", "generator"],
+      image: {
+        src: powerNodeImageUrl,
+        alt: "发电机与动力节点的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / POWER NODE",
+      },
+    },
+    {
+      needles: ["iafs_life_support", "维生", "生命维持", "循环泵", "空气循环", "life_support"],
+      image: {
+        src: lifeSupportModuleImageUrl,
+        alt: "生命维持模块与医疗舱的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / LIFE SUPPORT",
+      },
+    },
+    {
+      needles: ["iafs_scavenger_sentry", "哨卫", "哨线", "岗哨", "警铃", "sentry"],
+      image: {
+        src: sentryLineStandoffImageUrl,
+        alt: "拾荒者哨戒线对峙的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / SENTRY LINE",
+      },
+    },
+    {
+      needles: ["iafs_scavenger_camp", "拾荒者", "营地", "村落", "帐篷", "scavenger_camp"],
+      image: {
+        src: scavengerCampOutskirtsImageUrl,
+        alt: "拾荒者营地外围的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / CAMP OUTSKIRTS",
+      },
+    },
+    {
+      needles: ["奥德赛号", "坠毁", "crash"],
+      image: {
+        src: odysseyCrashSiteImageUrl,
+        alt: "奥德赛号坠毁点的队员现场回传画面",
+        caption: "REMOTE SNAPSHOT / ODYSSEY CRASH SITE",
+      },
+    },
+  ];
+
+  for (const rule of sceneImageRules) {
+    if (rule.needles.some((needle) => sceneKey.includes(needle))) {
+      return rule.image;
+    }
+  }
+
+  return null;
+}
+
+function getFieldLinkSceneImage(callView: CallView): CallSceneImage | null {
+  const sceneKey = `${callView.meta} ${callView.lines.join(" ")}`.toLowerCase();
+  const actionImageRules: Array<{ needles: string[]; image: CallSceneImage }> = [
+    {
+      needles: ["移动至", "正在前往", "移动剩余", "move"],
+      image: {
+        src: actionMoveRouteImageUrl,
+        alt: "荒原路线前进中的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / ROUTE NAVIGATION",
+      },
+    },
+    {
+      needles: ["调查当前区域", "正在调查", "区域扫描", "survey"],
+      image: {
+        src: actionSurveyScanImageUrl,
+        alt: "区域扫描调查中的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / AREA SCAN",
+      },
+    },
+    {
+      needles: ["修复", "维修", "repair"],
+      image: {
+        src: actionRepairSiteImageUrl,
+        alt: "维修现场的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / REPAIR SITE",
+      },
+    },
+    {
+      needles: ["原地待命", "待命中", "正在等待", "standby", "idle"],
+      image: {
+        src: actionStandbyListenImageUrl,
+        alt: "原地驻留监听中的队员现场回传画面",
+        caption: "FIELD SNAPSHOT / STANDBY LISTEN",
+      },
+    },
+  ];
+
+  for (const rule of actionImageRules) {
+    if (rule.needles.some((needle) => sceneKey.includes(needle))) {
+      return rule.image;
+    }
+  }
+
+  return null;
 }
 
 function buildCallAsciiScene(callView: CallView, member: CrewMember, callClosed: boolean) {
