@@ -1,4 +1,4 @@
-name: Build Windows Local HTTP Package
+name: Build Web Play ZIP
 
 on:
   workflow_dispatch:
@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  build-local-http-package:
-    runs-on: windows-latest
+  build-web-zip:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -25,12 +25,12 @@ jobs:
       - name: Validate content data
         run: node common/scripts/install-run-rush.js validate-content
 
-      - name: Build local HTTP package
-        run: npm run package:local-http:win
+      - name: Build web play ZIP
+        run: npm run package:web:zip
 
-      - name: Upload local HTTP package
+      - name: Upload web play ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: stellar-frontier-windows-local-http
-          path: apps/pc-client/release/local-http/stellar-frontier-local-http
+          name: stellar-frontier-web-play-zip
+          path: apps/pc-client/release/web-zip/stellar-frontier-web.zip
           if-no-files-found: error
