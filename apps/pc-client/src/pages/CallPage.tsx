@@ -72,6 +72,7 @@ interface CallPageProps {
   elapsedGameSeconds: number;
   gameTimeLabel: string;
   hasQuestUpdates: boolean;
+  isMapAvailable: boolean;
   gameState: GameState;
   logs: SystemLog[];
   onDecision: (actionId: string) => void;
@@ -97,6 +98,7 @@ export function CallPage({
   elapsedGameSeconds,
   gameTimeLabel,
   hasQuestUpdates,
+  isMapAvailable,
   gameState,
   logs,
   onDecision,
@@ -384,7 +386,7 @@ export function CallPage({
         navItems={[
           { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
           { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
-          { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
+          { id: "map", label: "地图", meta: isMapAvailable ? "map" : "offline", onClick: onOpenMap, disabled: !isMapAvailable, disabledReason: "修复雷达装置后可用" },
         ]}
         crewPanel={<div className="console-crew-stack" />}
         rightPanel={<section className="console-side-panel console-right-empty" aria-hidden="true" />}
@@ -429,7 +431,7 @@ export function CallPage({
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
         { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
-        { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
+        { id: "map", label: "地图", meta: isMapAvailable ? "map" : "offline", onClick: onOpenMap, disabled: !isMapAvailable, disabledReason: "修复雷达装置后可用" },
       ]}
       crewPanel={
         <div className="console-crew-stack">

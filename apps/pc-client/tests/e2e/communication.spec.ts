@@ -1,4 +1,4 @@
-import { expect, mikeCard, startNormalMikeCall, test } from "./support/appTest";
+import { createRadarUnlockedRevealedCrashSiteMap, expect, installSave, mikeCard, startNormalMikeCall, test } from "./support/appTest";
 
 test("opens basic normal-call actions for the current 麦克 baseline", async ({ page }) => {
   await page.goto("/");
@@ -14,6 +14,9 @@ test("opens basic normal-call actions for the current 麦克 baseline", async ({
 });
 
 test("opens the call map submenu and returns to the active 麦克 call", async ({ page }) => {
+  await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+  });
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();

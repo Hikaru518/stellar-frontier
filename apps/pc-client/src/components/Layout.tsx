@@ -39,6 +39,8 @@ interface GameConsoleNavItem {
   meta?: string;
   active?: boolean;
   attention?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
   onClick?: () => void;
 }
 
@@ -180,6 +182,8 @@ export function GameConsoleLayout({
                       key={item.id}
                       type="button"
                       className={`console-nav-button ${item.active ? "console-nav-button-active" : ""}`}
+                      disabled={item.disabled}
+                      title={item.disabled ? item.disabledReason : undefined}
                       onClick={item.onClick}
                     >
                       <span className="console-nav-label">

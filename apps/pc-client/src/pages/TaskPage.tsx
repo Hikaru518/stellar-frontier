@@ -20,6 +20,7 @@ interface TaskPageProps {
   tiles: MapTile[];
   gameTimeLabel: string;
   hasQuestUpdates: boolean;
+  isMapAvailable: boolean;
   logs: SystemLog[];
   onStatusFilterChange: (filter: QuestStatusFilter) => void;
   onCategoryFilterChange: (filter: QuestCategoryFilter) => void;
@@ -46,6 +47,7 @@ export function TaskPage({
   tiles,
   gameTimeLabel,
   hasQuestUpdates,
+  isMapAvailable,
   logs,
   onStatusFilterChange,
   onCategoryFilterChange,
@@ -119,7 +121,7 @@ export function TaskPage({
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
         { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, active: true },
-        { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
+        { id: "map", label: "地图", meta: isMapAvailable ? "map" : "offline", onClick: onOpenMap, disabled: !isMapAvailable, disabledReason: "修复雷达装置后可用" },
       ]}
       crewPanel={
         <div className="console-crew-stack">

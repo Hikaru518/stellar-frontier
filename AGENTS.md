@@ -112,7 +112,7 @@ cd apps/pc-client && node ../../common/scripts/install-run-rushx.js install:brow
 - **日记可见性**：日记按 `已传回 / 未传回 / 失联锁定 / 找回解锁` 四态控制可见性。
 - **手机私人终端基础**：通讯台可生成 QR 码 / 短手输码配对入口；手机 companion 通过 URL 参数加入，PC 与手机都实例化真实 Yuan `Terminal(enable_WebRTC: true)`，通过 Yuan service 传输心跳、私密来电、已读和接听 typed events；PC 仍是唯一权威游戏状态，并提供 fallback。
 - **Yuan 链路语义**：Yuan WSS 是稳定公网 baseline；WebRTC DataChannel 是机会性局域网升级。`enable_WebRTC: true` 只表示允许协商，不保证当前消息已经走 DataChannel；真实升级需要双方 terminal info 同步、对端消息触发 offer/answer、ICE 候选连通，并需要 Yuan tunnel metric / 调试钩子来确认。
-- **PC 地图**：Phaser 地图默认打开完整 `8 x 8` 地图，显示 Map Editor 保存的视觉层、队员位置、路线预览、选中框和地块详情。当前不使用临时战争迷雾 / `3 x 3` 探索限制；移动选点可选择任意合法 authored tile，但最终指令仍必须回到通话确认。
+- **PC 地图**：地图入口开局离线，必须先修复奥德赛号雷达装置；修复后地图打开完整 `8 x 8` 地图，显示 Map Editor 保存的视觉层、队员位置、路线预览、选中框和地块详情。当前不使用临时战争迷雾 / `3 x 3` 探索限制；移动选点可选择任意合法 authored tile，但最终指令仍必须回到通话确认。
 - **本地 Game Editor**：`apps/editor` 已包含 Event Editor 与 Map Editor。Map Editor 可新建 / 选择地图，编辑地形、天气、环境、地块对象、特殊状态、origin / initial discovered 标记、视觉层和 tileset palette，并通过 localhost helper 保存到 `content/maps/*.json`。
 - **存档**：以 `localStorage`（key `stellar-frontier-save-v2`）保存全量游戏状态；Debug toolbox 提供重置入口。
 
@@ -131,7 +131,7 @@ cd apps/pc-client && node ../../common/scripts/install-run-rushx.js install:brow
 - 关系系统、士气系统、好感度或团队氛围联动。
 - 程序生成角色 / 随机背景。
 - 控制中心中的研究台（科技树）、星际贸易、星际之门等模块的实质交互。
-- 战争迷雾 / 探索可见性：当前完整显示地图并允许完整地图选点；未知区域、粗略信号、队员回传、已调查等层级留到后续单独设计。
+- 战争迷雾 / 探索可见性：雷达装置修复后当前完整显示地图并允许完整地图选点；未知区域、粗略信号、队员回传、已调查等层级留到后续单独设计。
 - 完整的"经过每个移动地块"事件触发；MVP 仅在抵达 / 完成时检查。
 - Yuan WebRTC DataChannel 的 UI 实时可观测性、TURN/STUN 生产配置、Yuan Host 生产部署与鉴权 hardening。
 
@@ -149,7 +149,7 @@ cd apps/pc-client && node ../../common/scripts/install-run-rushx.js install:brow
 ## 约束与假设
 
 - **平台**：PC 与手机端都是浏览器应用；PC 仍持有权威 `GameState` 并依赖 `localStorage` 持久化；Stellar 不维护专属 server 组件，跨设备 transport 依赖外部 Yuan Host。
-- **网格**：星球地图为可配置网格，默认 `8 x 8`。当前 PC 地图完整显示整张地图；移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
+- **网格**：星球地图为可配置网格，默认 `8 x 8`。当前 PC 地图在雷达装置修复后完整显示整张地图；移动使用曼哈顿路径，每格默认 `60 秒`，再叠加地形耗时。
 - **指令通道**：移动、原地待命、停止当前行动、调查当前区域四类基础行动必须经"通讯台 → 通话"发出；剧情动作由结构化事件选项提供；地图与控制中心都不直接下达指令。
 - **行动并行性**：每名队员同一时间只能执行一个主行动；移动中改派必须先停止当前行动。
 - **数据来源唯一**：所有页面共享同一个 `GameState`；不存在页面独立的时间或状态。

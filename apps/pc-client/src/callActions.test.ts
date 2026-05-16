@@ -216,7 +216,7 @@ describe("buildCallView", () => {
       tile,
       gameState: createFeatureState("damaged", { member }),
     });
-    expect(findGroup(damagedView, "发电机")?.actions).toEqual(
+    expect(findGroup(damagedView, "雷达装置")?.actions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: "iafs_generator:repair",
@@ -231,7 +231,7 @@ describe("buildCallView", () => {
       tile,
       gameState: createFeatureState("repaired", { member }),
     });
-    const repairedFeatureActions = findGroup(repairedView, "发电机")?.actions ?? [];
+    const repairedFeatureActions = findGroup(repairedView, "雷达装置")?.actions ?? [];
     expect(repairedFeatureActions).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", featureId: "iafs_generator" })]),
     );
@@ -252,7 +252,7 @@ describe("buildCallView", () => {
 
     try {
       repairAction.display_when_unavailable = "disabled";
-      repairAction.unavailable_hint = "发电机已经修复。";
+      repairAction.unavailable_hint = "雷达装置已经修复。";
 
       const member = createMember({ currentTile: "116-112" });
       const view = buildCallView({
@@ -260,12 +260,12 @@ describe("buildCallView", () => {
         tile: createTile("116-112"),
         gameState: createFeatureState("repaired", { member }),
       });
-      const action = findGroup(view, "发电机")?.actions.find((entry) => entry.id === "iafs_generator:repair");
+      const action = findGroup(view, "雷达装置")?.actions.find((entry) => entry.id === "iafs_generator:repair");
 
       expect(action).toMatchObject({
         id: "iafs_generator:repair",
         disabled: true,
-        disabledReason: "发电机已经修复。",
+        disabledReason: "雷达装置已经修复。",
         featureId: "iafs_generator",
       });
     } finally {

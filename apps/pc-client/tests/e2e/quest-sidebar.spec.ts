@@ -1,4 +1,4 @@
-import { answerMikeIncomingCall, createCompatibleMap, expect, GAME_SAVE_KEY, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
+import { answerMikeIncomingCall, createCompatibleMap, createRadarUnlockedRevealedCrashSiteMap, expect, GAME_SAVE_KEY, idleMike, installSave, readSave, startNormalMikeCall, test, type Page } from "./support/appTest";
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -58,30 +58,32 @@ test("shows completion result for completed crash-site quest from authored conte
   });
   await page.goto("/");
   await page.getByRole("button", { name: /任务/ }).click();
+  await page.getByRole("button", { name: /重整坠毁现场/ }).click();
 
   await expect(page.getByText("奥德赛号坠毁点已稳定").first()).toBeVisible();
   await expect(page.getByText("麦克完成了奥德赛号坠毁点的初步调查与关键设备修复。").first()).toBeVisible();
-  await expect(page.getByText("发电机恢复基础供能。").first()).toBeVisible();
+  await expect(page.getByText("雷达装置恢复地形扫描。").first()).toBeVisible();
   await expect(page.getByText("维生系统重新上线。").first()).toBeVisible();
   await expect(page.getByText("穿梭机核心进入可评估状态。").first()).toBeVisible();
 });
 
 test("completes a quest todo through the crash-site event and preserves it after reload", async ({ page }) => {
   await installSave(page, {
+    crew: [idleMike("116-112")],
     map: createCrashSiteSurveyMap(),
   });
   await page.goto("/");
   await page.getByRole("button", { name: /任务/ }).click();
 
   await expect(page.getByText("调查奥德赛号坠毁点").first()).toBeVisible();
-  await expect(page.getByText("维修奥德赛号发电机")).toHaveCount(0);
+  await expect(page.getByText("维修奥德赛号雷达装置")).toHaveCount(0);
 
   await startNormalMikeCall(page);
   await page.getByRole("button", { name: "调查当前区域" }).click();
   await page.clock.runFor(45_000);
   await answerMikeIncomingCall(page);
   await expect(
-    page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。").first(),
+    page.getByText("这里还有几套能辨认出来的关键设施，雷达装置、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。").first(),
   ).toBeVisible();
   await page.getByRole("button", { name: "确认标记这些可用设施。" }).click();
 
@@ -95,23 +97,47 @@ test("completes a quest todo through the crash-site event and preserves it after
   await page.getByRole("button", { name: /任务/ }).click();
   const surveyTodo = page.locator(".console-task-todo").filter({ hasText: "调查奥德赛号坠毁点" });
   await expect(surveyTodo.getByText("已完成")).toBeVisible();
-  await expect(page.getByText("维修奥德赛号发电机").first()).toBeVisible();
+  await expect(page.getByText("维修奥德赛号雷达装置").first()).toBeVisible();
   await expect(page.getByText("维修维生系统").first()).toBeVisible();
   await expect(page.getByText("维修穿梭机核心").first()).toBeVisible();
 });
 
-test("quest navigation opens map context without starting calls or movement", async ({ page }) => {
+test("quest navigation locates Mike before the radar map is repaired", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /任务/ }).click();
 
-  await page.getByRole("button", { name: "查看奥德赛号坠毁点" }).first().click();
-  await expect(page.getByRole("heading", { name: "卫星雷达地图" })).toBeVisible();
-  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
-  await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
+  await page.getByRole("button", { name: "联系麦克调查坠毁点" }).first().click();
+  await expect(page.getByText("[NAV] 任务导航：已定位 麦克，需手动点击通话。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "任务追踪" })).toBeVisible();
   expect((await readSave(page)).crew_actions).toEqual({});
 });
 
+test("reveals the local residents main quest after radar repair", async ({ page }) => {
+  const questState = createInitialQuestStateForE2e();
+  questState.quests.regroup_after_crash.todos.repair_generator.status = "completed";
+  questState.quests.regroup_after_crash.todos.repair_generator.completed_at = 120;
+  questState.updated_quest_ids = ["contact_local_residents"];
+
+  await installSave(page, {
+    elapsedGameSeconds: 120,
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+    quest_state: questState,
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: /任务/ }).click();
+
+  await expect(page.getByText("UNFINISHED 2 / MAIN 2")).toBeVisible();
+  await expect(page.getByText("RECENT UPDATE: 与当地居民联系")).toBeVisible();
+  await expect(page.getByRole("button", { name: /与当地居民联系 UPDATED/ })).toBeVisible();
+  await expect(page.getByText("雷达装置修复后，奥德赛号北侧出现疑似智慧文明活动信号。需要派队员前往北侧信号源外围，寻找能沟通的当地居民。").first()).toBeVisible();
+  await expect(page.getByText("前往北侧信号源").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看北侧信号源外围" })).toBeVisible();
+});
+
 test("task page layout leaves core controls reachable on task, call, and map pages", async ({ page }) => {
+  await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+  });
   await page.goto("/");
   await page.getByRole("button", { name: /任务/ }).click();
   await expectConsoleLayoutHasRoom(page);
@@ -138,7 +164,7 @@ async function expectConsoleLayoutHasRoom(page: Page) {
 function createCrashSiteSurveyMap() {
   return createCompatibleMap({
     tilesById: {
-      "129-129": {
+      "116-112": {
         discovered: true,
         investigated: false,
         revealedSpecialStateIds: [],

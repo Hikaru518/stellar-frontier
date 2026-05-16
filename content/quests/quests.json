@@ -13,7 +13,7 @@
       "nodes": [
         {
           "id": "crash_site_unsecured",
-          "description": "奥德赛号坠毁区域尚未完成调查。先让队员在 116-112 执行调查，确认还有哪些关键装置可用。"
+          "description": "奥德赛号坠毁区域尚未完成调查。先让麦克在坠毁点执行调查，确认还有哪些关键装置可用。"
         },
         {
           "id": "regrouping_situation",
@@ -21,7 +21,7 @@
         },
         {
           "id": "repair_targets_revealed",
-          "description": "奥德赛号坠毁区域调查完成，发电机、维生系统和穿梭机核心已经显露。下一步是逐项维修这些装置。"
+          "description": "奥德赛号坠毁区域调查完成，雷达装置、维生系统和穿梭机核心已经显露。下一步是逐项维修这些装置。"
         },
         {
           "id": "crash_site_stabilized",
@@ -29,7 +29,7 @@
           "title": "奥德赛号坠毁点已稳定",
           "summary": "麦克完成了奥德赛号坠毁点的初步调查与关键设备修复。",
           "outcomes": [
-            "发电机恢复基础供能。",
+            "雷达装置恢复地形扫描。",
             "维生系统重新上线。",
             "穿梭机核心进入可评估状态。"
           ]
@@ -39,19 +39,19 @@
         {
           "id": "survey_crash_site",
           "title": "调查奥德赛号坠毁点",
-          "description": "在 116-112 完成一次区域调查，确认奥德赛号坠毁点周边是否还有可用模块。",
+          "description": "让麦克在奥德赛号坠毁点完成一次区域调查，确认周边是否还有可用模块。",
           "navigation": [
             {
-              "type": "tile",
-              "label": "查看奥德赛号坠毁点",
-              "tile_id": "116-112"
+              "type": "crew",
+              "label": "联系麦克调查坠毁点",
+              "crew_id": "mike"
             }
           ]
         },
         {
           "id": "repair_generator",
-          "title": "维修奥德赛号发电机",
-          "description": "修复发电机，使奥德赛号坠毁点恢复稳定供能。",
+          "title": "维修奥德赛号雷达装置",
+          "description": "修复雷达装置，使控制台地图恢复可用。",
           "visible_after_node": "repair_targets_revealed"
         },
         {
@@ -65,6 +65,55 @@
           "title": "维修穿梭机核心",
           "description": "修复穿梭机核心，为后续撤离或回收行动保留可能性。",
           "visible_after_node": "repair_targets_revealed"
+        }
+      ]
+    },
+    {
+      "id": "contact_local_residents",
+      "category": "main",
+      "title": "与当地居民联系",
+      "summary": "雷达装置恢复后，奥德赛号北侧出现疑似智慧文明活动信号，需要寻找当地居民了解情况。",
+      "description": "雷达回传显示奥德赛号北侧存在规整热源、重复活动轨迹和可能的人造结构。先派队员靠近北侧信号源，确认能否与当地居民建立安全接触。",
+      "initial_node_id": "north_signal_detected",
+      "visible_after_quest_todo": {
+        "quest_id": "regroup_after_crash",
+        "todo_id": "repair_generator"
+      },
+      "nodes": [
+        {
+          "id": "north_signal_detected",
+          "description": "雷达装置修复后，奥德赛号北侧出现疑似智慧文明活动信号。需要派队员前往北侧信号源外围，寻找能沟通的当地居民。"
+        },
+        {
+          "id": "settlement_outer_contact",
+          "description": "队员已经抵达北侧信号源外围，确认那里存在有组织的拾荒村落。下一步是谨慎建立沟通，获取当地形势。"
+        }
+      ],
+      "todos": [
+        {
+          "id": "investigate_north_signal",
+          "title": "前往北侧信号源",
+          "description": "让一名队员前往北侧疑似智慧文明活动区外围，确认是否存在当地居民。",
+          "navigation": [
+            {
+              "type": "tile",
+              "label": "查看北侧信号源外围",
+              "tile_id": "93-116"
+            }
+          ]
+        },
+        {
+          "id": "establish_safe_contact",
+          "title": "与当地居民建立安全接触",
+          "description": "确认北侧有人活动后，保持通讯并寻找安全的沟通窗口。",
+          "visible_after_node": "settlement_outer_contact",
+          "navigation": [
+            {
+              "type": "tile",
+              "label": "查看拾荒营地哨线",
+              "tile_id": "92-116"
+            }
+          ]
         }
       ]
     }

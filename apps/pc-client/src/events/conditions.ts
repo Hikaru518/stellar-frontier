@@ -1,4 +1,5 @@
 import { defaultMapConfig, type FeatureRuntimeState } from "../content/contentData";
+import { expandFeatureFootprint } from "../mapFeatureSystem";
 import { getFeatureRuntimeStatus } from "../mapSystem";
 import type {
   CompareOp,
@@ -108,6 +109,20 @@ const builtInConditionHandlers: Record<string, ConditionHandler> = {
     const read = readField(context.trigger_context, field.value);
     return pass(read.ok && Object.is(read.value, params.value));
   },
+  trigger_tile_has_feature({ context, condition, path, params }) {
+    const featureId = readStringParam(params, "feature_id", `${path}.params.feature_id`, condition.handler_type ?? "handler");
+    if (featureId.errors.length > 0) {
+      return featureId;
+    }
+
+    const read = readField(context.trigger_context, "tile_id");
+    if (!read.ok || typeof read.value !== "string") {
+      return pass(false);
+    }
+
+    const feature = defaultMapConfig.features.find((candidate) => candidate.id === featureId.value);
+    return pass(Boolean(feature && expandFeatureFootprint(feature, defaultMapConfig).includes(read.value)));
+  },
   object_status_equals({ context, condition, path, params }) {
     const objectId = readStringParam(params, "object_id", `${path}.params.object_id`, condition.handler_type ?? "handler");
     if (objectId.errors.length > 0) {
@@ -156,6 +171,17 @@ const builtInHandlerDefinitions: Record<string, HandlerDefinition> = {
     kind: "condition",
     description: "Checks whether a runtime map object's status_enum equals the requested value.",
     params_schema_ref: "#/$defs/object_status_equals_params",
+    allowed_target_types: [],
+    deterministic: true,
+    uses_random: false,
+    failure_policy: "fail_event",
+    sample_fixtures: [],
+  },
+  trigger_tile_has_feature: {
+    handler_type: "trigger_tile_has_feature",
+    kind: "condition",
+    description: "Checks whether trigger_context.tile_id belongs to the requested map feature footprint.",
+    params_schema_ref: "#/$defs/trigger_tile_has_feature_params",
     allowed_target_types: [],
     deterministic: true,
     uses_random: false,

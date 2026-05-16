@@ -102,6 +102,9 @@ const MOBILE_FALLBACK_AFTER_MS = 10000;
 const IDLE_CHATTER_TRIGGER_CHANCE = 0.5;
 const defaultMapTileById = new Map(defaultMapConfig.tiles.map((tile) => [tile.id, tile]));
 const defaultMapFeatureById = new Map(defaultMapConfig.features.map((feature) => [feature.id, feature]));
+const RADAR_MAP_UNLOCK_FEATURE_ID = "iafs_generator";
+const RADAR_MAP_LOCKED_REASON = "修复雷达装置后可用";
+const RADAR_MAP_LOCKED_LOG = "卫星雷达地图离线：修复奥德赛号雷达装置后可用。";
 const SCAVENGER_SIGNAL_LOST_CONDITION = "iafs_scavenger_signal_lost";
 const SCAVENGER_SIGNAL_LOST_STATUS = "失联。最后信号停在拾荒营地哨线。";
 
@@ -196,6 +199,7 @@ function App() {
   const returnHomeCompleted = gameState.world_flags.return_home_completed?.value === true;
   const returnHomeCompletedAt = getWorldFlagNumber(gameState, "return_home_completed_at");
   const completedAtLabel = formatGameTime(returnHomeCompletedAt ?? elapsedGameSeconds);
+  const isMapAvailable = isRadarMapAvailable(gameState);
   const mobileFallback = shouldEnablePcFallback({ transport: mobileSession.status === "offline" ? "offline" : "yuan-wss", lastHeartbeatAt: mobileSession.lastHeartbeatAt, fallbackAfterMs: mobileSession.fallbackAfterMs }, nowMs);
   const mobileMode: MobileMode = typeof mobileSession.lastHeartbeatAt === "number" && !mobileFallback ? "active" : mobileFallback ? "fallback" : "waiting";
   const activeMobileCalls = getActiveRuntimeCalls(gameState, elapsedGameSeconds);
@@ -238,6 +242,10 @@ function App() {
     if (entry.type === "page") {
       setQuestNavigationHint(null);
       setMapReturnTarget("control");
+      if (entry.page === "map") {
+        openMap("control");
+        return;
+      }
       navigateToPage(entry.page);
       return;
     }
@@ -245,6 +253,11 @@ function App() {
     if (entry.type === "tile") {
       if (!tiles.some((tile) => tile.id === entry.tile_id)) {
         setQuestNavigationHint({ type: "unavailable", label: entry.label });
+        return;
+      }
+      if (!isRadarMapAvailable(gameStateRef.current)) {
+        setQuestNavigationHint({ type: "unavailable", label: RADAR_MAP_LOCKED_REASON });
+        appendLog(RADAR_MAP_LOCKED_LOG, "muted");
         return;
       }
       setQuestNavigationHint({ type: "tile", tileId: entry.tile_id, label: entry.label });
@@ -352,6 +365,14 @@ function App() {
   }, [returnHomeCompleted]);
 
   useEffect(() => {
+    if (page === "map" && !isMapAvailable) {
+      setMapReturnTarget("control");
+      setQuestNavigationHint({ type: "unavailable", label: RADAR_MAP_LOCKED_REASON });
+      setPage("control");
+    }
+  }, [isMapAvailable, page]);
+
+  useEffect(() => {
     if (!currentCall) {
       return;
     }
@@ -451,6 +472,12 @@ function App() {
   }
 
   function openMap(returnTarget: MapReturnTarget) {
+    if (!isRadarMapAvailable(gameStateRef.current)) {
+      setMapReturnTarget(returnTarget);
+      setQuestNavigationHint({ type: "unavailable", label: RADAR_MAP_LOCKED_REASON });
+      appendLog(RADAR_MAP_LOCKED_LOG, "muted");
+      return;
+    }
     setMapReturnTarget(returnTarget);
     navigateToPage("map");
   }
@@ -665,6 +692,20 @@ function App() {
     }
 
     if (actionId === "universal:move") {
+      if (!isRadarMapAvailable(gameStateRef.current)) {
+        setCurrentCall((call) =>
+          call
+            ? {
+                ...call,
+                selectingMoveTarget: false,
+                selectedTargetTileId: undefined,
+                result: "卫星雷达地图离线，修复奥德赛号雷达装置后才能标记候选目的地。",
+              }
+            : call,
+        );
+        appendLog(RADAR_MAP_LOCKED_LOG, "muted");
+        return;
+      }
       setCurrentCall((call) =>
         call
           ? {
@@ -960,6 +1001,7 @@ function App() {
           tiles={tiles}
           gameTimeLabel={gameTimeLabel}
           hasQuestUpdates={hasQuestUpdates}
+          isMapAvailable={isMapAvailable}
           logs={logs}
           onStatusFilterChange={setQuestStatusFilter}
           onCategoryFilterChange={setQuestCategoryFilter}
@@ -984,6 +1026,7 @@ function App() {
           elapsedGameSeconds={elapsedGameSeconds}
           gameTimeLabel={gameTimeLabel}
           hasQuestUpdates={hasQuestUpdates}
+          isMapAvailable={isMapAvailable}
           gameState={gameState}
           logs={logs}
           onDecision={handleDecision}
@@ -1042,6 +1085,7 @@ function App() {
           logs={logs}
           gameTimeLabel={gameTimeLabel}
           hasQuestUpdates={hasQuestUpdates}
+          isMapAvailable={isMapAvailable}
           selectedCrewId={crewConsoleView.crewId}
           mode={crewConsoleView.mode}
           onOpenControl={openControlOverview}
@@ -1067,6 +1111,7 @@ function App() {
         tiles={tiles}
         gameTimeLabel={gameTimeLabel}
         hasQuestUpdates={hasQuestUpdates}
+        isMapAvailable={isMapAvailable}
         runtimeCallCrewIds={activeRuntimeCallCrewIds}
         onOpenStation={openStation}
         onOpenMap={() => openMap("control")}
@@ -1102,6 +1147,11 @@ function App() {
 }
 
 export default App;
+
+function isRadarMapAvailable(state: Pick<GameState, "map">): boolean {
+  const radarFeature = defaultMapFeatureById.get(RADAR_MAP_UNLOCK_FEATURE_ID);
+  return Boolean(radarFeature && getFeatureRuntimeStatus(state.map, radarFeature) === "repaired");
+}
 
 function createInitialGameState(): GameState {
   const saved = loadGameSave<SavedGameState>(isCompatibleGameSaveState);

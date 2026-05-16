@@ -62,23 +62,7 @@ describe("minimal content baseline", () => {
 
     expect(defaultMapConfig.size).toEqual({ rows: 256, cols: 256 });
     expect(defaultMapConfig.originTileId).toBe("129-129");
-    expect(defaultMapConfig.initialDiscoveredTileIds).toEqual([
-      "129-129",
-      "115-111",
-      "115-112",
-      "115-113",
-      "116-111",
-      "116-112",
-      "116-113",
-      "116-114",
-      "117-111",
-      "117-112",
-      "117-113",
-      "117-114",
-      "118-111",
-      "118-112",
-      "118-113",
-    ]);
+    expect(defaultMapConfig.initialDiscoveredTileIds).toEqual(crashSiteStartRectangleTileIds());
     expect(defaultMapConfig.tiles).toHaveLength(65536);
     expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")).not.toHaveProperty("objectIds");
     expect(defaultMapConfig.radar.glyphRows).toHaveLength(256);
@@ -94,3 +78,14 @@ describe("minimal content baseline", () => {
     });
   });
 });
+
+function crashSiteStartRectangleTileIds() {
+  const tileIds: string[] = [];
+  for (let row = 110; row <= 118; row += 1) {
+    for (let col = 108; col <= 117; col += 1) {
+      tileIds.push(`${row}-${col}`);
+    }
+  }
+  tileIds.push("129-129");
+  return tileIds;
+}

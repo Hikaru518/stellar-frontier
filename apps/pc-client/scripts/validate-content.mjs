@@ -445,6 +445,22 @@ function validateQuestContentReferences(questFiles, data, maps) {
   const crewIds = new Set(data["content/crew/crew.json"].crew.map((member) => member.crewId));
   const tileIds = new Set(Object.values(maps).flatMap((map) => (Array.isArray(map.tiles) ? map.tiles.map((tile) => tile.id) : [])));
   const questIds = new Set();
+  const questIndex = new Map();
+
+  for (const questFile of Object.values(questFiles)) {
+    if (questFile.schema_version !== "quests.v1" || !Array.isArray(questFile.quests)) {
+      continue;
+    }
+
+    for (const quest of questFile.quests) {
+      if (!addUnique(questIds, quest.id)) {
+        hasError = report(`Duplicate quest id: ${quest.id}`) || hasError;
+      }
+      questIndex.set(quest.id, {
+        todos: new Set((quest.todos ?? []).map((todo) => todo.id)),
+      });
+    }
+  }
 
   for (const [dataPath, questFile] of Object.entries(questFiles)) {
     if (questFile.schema_version !== "quests.v1" || !Array.isArray(questFile.quests)) {
@@ -453,12 +469,9 @@ function validateQuestContentReferences(questFiles, data, maps) {
 
     for (const quest of questFile.quests) {
       const questPath = `${dataPath}/quests/${quest.id ?? "<missing>"}`;
-      if (!addUnique(questIds, quest.id)) {
-        hasError = report(`Duplicate quest id: ${quest.id}`) || hasError;
-      }
-
       hasError = validateQuestNodes(quest.nodes, quest.initial_node_id, questPath) || hasError;
       hasError = validateQuestCompletedNode(quest.nodes, quest.completed_node_id, questPath) || hasError;
+      hasError = validateQuestTodoVisibility(quest.visible_after_quest_todo, questPath, questIndex) || hasError;
       hasError = validateQuestNavigation(quest.navigation, questPath, crewIds, tileIds) || hasError;
       hasError = validateQuestTodos(quest.todos, questPath, new Set((quest.nodes ?? []).map((node) => node.id)), crewIds, tileIds) || hasError;
 
@@ -478,6 +491,23 @@ function validateQuestContentReferences(questFiles, data, maps) {
   }
 
   return hasError;
+}
+
+function validateQuestTodoVisibility(condition, contextPath, questIndex) {
+  if (!condition) {
+    return false;
+  }
+
+  const referencedQuest = questIndex.get(condition.quest_id);
+  if (!referencedQuest) {
+    return report(`Unknown visible_after_quest_todo quest_id at ${contextPath}: ${condition.quest_id}`);
+  }
+
+  if (!referencedQuest.todos.has(condition.todo_id)) {
+    return report(`Unknown visible_after_quest_todo todo_id at ${contextPath}: ${condition.todo_id}`);
+  }
+
+  return false;
 }
 
 function validateQuestTodos(todos, contextPath, nodeIds, crewIds, tileIds) {

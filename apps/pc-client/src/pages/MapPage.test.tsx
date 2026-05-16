@@ -30,6 +30,12 @@ describe("MapPage", () => {
     expect(screen.queryByText("最近更新")).not.toBeInTheDocument();
   });
 
+  it("keeps the crash-site marker visible when any crash-site footprint tile is discovered", () => {
+    const { container } = renderMapPage();
+
+    expect(container.querySelector('[data-icon-id="crash-site"]')).not.toBeNull();
+  });
+
   it("keeps crew action buttons visible in the left rail", () => {
     renderMapPage();
 
@@ -158,13 +164,13 @@ describe("MapPage", () => {
 
     const readout = within(screen.getByLabelText("Feature 命中结果"));
     expect(screen.getByText(/\[TILE\] 116-112/)).toBeInTheDocument();
-    expect(readout.getByText("发电机")).toBeInTheDocument();
+    expect(readout.getByText("雷达装置")).toBeInTheDocument();
     expect(readout.getByText("奥德赛号坠毁点")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
     expect(readout.getByText("背景")).toBeInTheDocument();
   });
 
-  it("shows the moved 2x2 scattered supplies footprint", () => {
+  it("shows the moved 5x3 scattered supplies footprint", () => {
     const map = createInitialMapState();
     map.featuresById = {
       ...map.featuresById,
@@ -172,14 +178,14 @@ describe("MapPage", () => {
     };
     renderMapPage({ map });
 
-    focusMapTile("120-117");
+    focusMapTile("101-121");
 
     const readout = within(screen.getByLabelText("Feature 命中结果"));
     expect(readout.getByText("散落的物资")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
     expect(readout.queryByText("背景")).not.toBeInTheDocument();
 
-    focusMapTile("121-118");
+    focusMapTile("105-123");
     expect(within(screen.getByLabelText("Feature 命中结果")).getByText("散落的物资")).toBeInTheDocument();
   });
 

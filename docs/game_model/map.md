@@ -11,7 +11,7 @@
 | `scope` | 覆盖静态地图配置、视觉层、tileset registry、地图块层级、运行时地图状态、发现 / 调查状态、坐标转换、当前完整地图窗口、调查报告和存档 reset 边界。 |
 | `out_of_scope` | 不定义随机地图生成，不实现天气模拟，不定义对象级通用行动菜单，不重构事件系统语义，不定义正式战争迷雾。 |
 | `content_source_of_truth` | 地图静态内容来自 `content/maps/*.json`；tileset 元数据来自 `content/maps/tilesets/registry.json`；地块对象定义来自 `content/map-objects/*.json`。地形、区域名、天气、环境属性、地块对象引用、特殊状态与视觉层不保存在运行时状态里。 |
-| `runtime_source_of_truth` | 玩家调查状态、揭示对象、揭示状态、活跃状态和调查报告索引来自 `GameState.map`。`discoveredTileIds` 仍存在，但当前 PC 地图展示和移动选点不再用它裁剪范围。 |
+| `runtime_source_of_truth` | 玩家调查状态、揭示对象、揭示状态、活跃状态和调查报告索引来自 `GameState.map`。奥德赛号雷达装置对应的 feature 修复状态决定 PC 地图入口是否可用。`discoveredTileIds` 仍存在，但当前 PC 地图展示和移动选点不再用它裁剪范围。 |
 | `compatibility_policy` | 研发期不迁移旧地图视图或旧存档；当前事实源统一为地图配置和 `GameState.map`。 |
 | `save_policy` | 固定 `4 x 4` 旧存档与配置驱动地图不兼容；读取时应 reset 或使用新的 save 版本 / save key。 |
 
@@ -245,7 +245,7 @@ displayY = origin.row - tile.row;
 
 ## 6. 地图窗口模型
 
-当前玩家可见窗口是完整地图窗口：地图页与通话移动目标列表按 `MapConfig.size.rows / cols` 枚举全部合法 tile，并把这些 cell 作为可查看、可点选的目标。`apps/pc-client/src/mapSystem.ts` 中仍保留 `getVisibleTileWindow` 和 `frontier` / `unknownHole` 状态，作为未来战争迷雾设计的候选基础；当前玩家路径使用 `getFullTileWindow`。
+当前玩家可见窗口是完整地图窗口，但只有在奥德赛号雷达装置修复后才能进入地图页或通话移动选点。地图页与通话移动目标列表按 `MapConfig.size.rows / cols` 枚举全部合法 tile，并把这些 cell 作为可查看、可点选的目标。`apps/pc-client/src/mapSystem.ts` 中仍保留 `getVisibleTileWindow` 和 `frontier` / `unknownHole` 状态，作为未来战争迷雾设计的候选基础；当前玩家路径使用 `getFullTileWindow`。
 
 当前完整地图窗口：
 
@@ -380,7 +380,7 @@ type InvestigationReport = {
 - 事件系统与特殊状态联调：明确状态来源、持续时间、过期、刷新、揭示和日志规则。
 - 事件系统与环境属性联调：温度、湿度、磁场、辐射等结构化读数可进入事件条件。
 - 地点剧情动作元数据扩展：当前基础行动只包含移动、待命、停止和调查；未来如果需要每个对象覆盖耗时、消耗或工具需求，应通过结构化事件或目标模型扩展。
-- 战争迷雾 / 探索窗口：当前 PC 地图完整显示并允许选择任意合法 authored tile；后续若恢复探索限制，需要同步更新窗口模型、移动目标规则、信息隐藏、事件触发和 UI 文案。
+- 战争迷雾 / 探索窗口：当前 PC 地图在雷达装置修复后完整显示并允许选择任意合法 authored tile；后续若恢复探索限制，需要同步更新窗口模型、移动目标规则、信息隐藏、事件触发和 UI 文案。
 
 ## 来源
 
