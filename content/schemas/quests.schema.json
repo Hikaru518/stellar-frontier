@@ -55,6 +55,9 @@
         "completed_node_id": {
           "$ref": "#/$defs/id"
         },
+        "visible_after_quest_todo": {
+          "$ref": "#/$defs/quest_todo_visibility_condition"
+        },
         "nodes": {
           "type": "array",
           "minItems": 1,
@@ -76,6 +79,19 @@
         },
         "navigation": {
           "$ref": "#/$defs/navigation_entries"
+        }
+      }
+    },
+    "quest_todo_visibility_condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quest_id", "todo_id"],
+      "properties": {
+        "quest_id": {
+          "$ref": "#/$defs/id"
+        },
+        "todo_id": {
+          "$ref": "#/$defs/id"
         }
       }
     },

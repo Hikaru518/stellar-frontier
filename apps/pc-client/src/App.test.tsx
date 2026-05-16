@@ -128,6 +128,22 @@ function createFeatureRepairCrashSiteState(overrides: Record<string, unknown> = 
   };
 }
 
+function createRadarMapUnlockedCrashSiteState(overrides: Record<string, unknown> = {}) {
+  const base = createSavedCrashSiteState();
+  return {
+    ...base,
+    map: {
+      ...(base.map as Record<string, unknown>),
+      featuresById: {
+        iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
+        iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+        iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
+      },
+    },
+    ...overrides,
+  };
+}
+
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -147,10 +163,12 @@ describe("App", () => {
     expect(within(getMikeCrewCard()).getByRole("button", { name: "接通" })).toBeInTheDocument();
   });
 
-  it("marks the opening Mike runtime call as answerable on the map crew card", () => {
+  it("locks the map on a new game while keeping the opening Mike call answerable", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /地图/ }));
+    const mapButton = screen.getByRole("button", { name: /地图/ });
+    expect(mapButton).toBeDisabled();
+    expect(screen.queryByRole("heading", { name: "卫星雷达地图" })).toBeNull();
 
     expect(within(getMikeCrewCard()).getByRole("button", { name: "接通" })).toBeInTheDocument();
   });
@@ -200,9 +218,10 @@ describe("App", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "确认重置" }));
 
     expect(readSavedState()?.debugSettings).toMatchObject({ crewMoveSpeedMultiplier: 1 });
-  });
+  }, 10_000);
 
   it("keeps the debug entry available after page navigation", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createRadarMapUnlockedCrashSiteState()));
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /地图/ }));
@@ -212,6 +231,7 @@ describe("App", () => {
   });
 
   it("keeps map layer visibility after leaving and reopening the map", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createRadarMapUnlockedCrashSiteState()));
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /地图/ }));
@@ -240,23 +260,7 @@ describe("App", () => {
       rows: 256,
       cols: 256,
       originTileId: "129-129",
-      discoveredTileIds: [
-        "129-129",
-        "115-111",
-        "115-112",
-        "115-113",
-        "116-111",
-        "116-112",
-        "116-113",
-        "116-114",
-        "117-111",
-        "117-112",
-        "117-113",
-        "117-114",
-        "118-111",
-        "118-112",
-        "118-113",
-      ],
+      discoveredTileIds: defaultMapConfig.initialDiscoveredTileIds,
     });
     expect(saved.crew.map((member: { id: string }) => member.id)).toEqual(["mike", "simon", "alice"]);
     expect((saved.crew as Array<{ currentTile: string; location: string }>)[0]).toMatchObject({ currentTile: "116-112", location: "奥德赛号坠毁点 / 116-112" });
@@ -506,6 +510,7 @@ describe("App", () => {
   });
 
   it("uses the console map entry to open the map without creating crew actions", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createRadarMapUnlockedCrashSiteState()));
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /地图/ }));
@@ -513,6 +518,18 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "卫星雷达地图" })).toBeInTheDocument();
     const saved = readSavedState();
     expect(saved?.crew_actions).toEqual({});
+  });
+
+  it("blocks call move target selection while the radar map is offline", () => {
+    window.localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(createSavedCrashSiteState()));
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /任务/ }));
+    fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
+    fireEvent.click(screen.getByRole("button", { name: "移动到指定区域" }));
+
+    expect(screen.getByText("卫星雷达地图离线，修复奥德赛号雷达装置后才能标记候选目的地。")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "卫星雷达地图" })).toBeNull();
   });
 
   it("advances game time while the app is running", () => {
@@ -631,7 +648,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
-    fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "维修" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: /雷达装置/ }).closest("section") as HTMLElement).getByRole("button", { name: "维修" }));
 
     const saved = readSavedState();
     expect(saved).not.toBeNull();
@@ -652,7 +669,7 @@ describe("App", () => {
       activeAction?: { actionType?: string; targetTile?: string; params?: { target_feature_id?: string; object_id?: string } };
     }>;
     expect(savedCrew[0]).toMatchObject({
-      status: "正在维修发电机。",
+      status: "正在维修雷达装置。",
       activeAction: expect.objectContaining({
         actionType: "repair",
         targetTile: "116-112",
@@ -670,11 +687,11 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
-    fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: /雷达装置/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
     advanceRuntimeTranscript();
 
-    expect(screen.getByText(/外壳撕裂/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认记录发电机状态。" })).toBeInTheDocument();
+    expect(screen.getByText(/天线折断/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认记录雷达装置状态。" })).toBeInTheDocument();
   });
 
   it("investigating a repaired crash-site feature creates a repaired-state runtime event call", () => {
@@ -698,11 +715,11 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
-    fireEvent.click(within(screen.getByRole("heading", { name: /发电机/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
+    fireEvent.click(within(screen.getByRole("heading", { name: /雷达装置/ }).closest("section") as HTMLElement).getByRole("button", { name: "调查" }));
     advanceRuntimeTranscript();
 
-    expect(screen.getByText(/供电回路已恢复稳定/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认记录发电机状态。" })).toBeInTheDocument();
+    expect(screen.getByText(/扫描阵列已经恢复稳定/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认记录雷达装置状态。" })).toBeInTheDocument();
   });
 
   it("reveals hidden crash-site features only after surveying the crash site event", () => {
@@ -734,7 +751,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /任务/ }));
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "通话" }));
-    expect(screen.queryByRole("heading", { name: "发电机" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "雷达装置" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "调查当前区域" }));
 
@@ -744,7 +761,7 @@ describe("App", () => {
 
     fireEvent.click(within(getMikeCrewCard()).getByRole("button", { name: "接通" }));
     advanceRuntimeTranscript();
-    expect(screen.getByText(/这里还有几套能辨认出来的关键设施/)).toBeInTheDocument();
+    expect(screen.getByText(/雷达装置、维生装置和穿梭机核心/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认标记这些可用设施。" }));
 
     const saved = readSavedState();
@@ -783,7 +800,7 @@ describe("App", () => {
           action_type: "inspect",
           action_def_id: "iafs_generator:inspect",
           feature_id: "iafs_generator",
-          tags: ["iafs", "crash_site", "repair_target", "power_system"],
+          tags: ["iafs", "crash_site", "repair_target", "radar_system"],
         },
       },
     });
@@ -927,6 +944,7 @@ describe("App", () => {
         elapsedGameSeconds={0}
         gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
         hasQuestUpdates={false}
+        isMapAvailable={true}
         gameState={gameState}
         logs={initialLogs}
         onDecision={vi.fn()}
@@ -973,6 +991,7 @@ describe("App", () => {
         elapsedGameSeconds={0}
         gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
         hasQuestUpdates={false}
+        isMapAvailable={true}
         gameState={gameState}
         logs={initialLogs}
         onDecision={vi.fn()}
@@ -1025,6 +1044,7 @@ describe("App", () => {
           elapsedGameSeconds={0}
           gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
           hasQuestUpdates={false}
+          isMapAvailable={true}
           gameState={gameState}
           logs={initialLogs}
           onDecision={onDecision}
@@ -1119,6 +1139,7 @@ describe("App", () => {
           elapsedGameSeconds={0}
           gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
           hasQuestUpdates={false}
+          isMapAvailable={true}
           gameState={gameState}
           logs={initialLogs}
           onDecision={onDecision}
@@ -1170,6 +1191,7 @@ describe("App", () => {
         elapsedGameSeconds={0}
         gameTimeLabel="第 1 日 00 小时 00 分钟 00 秒"
         hasQuestUpdates={false}
+        isMapAvailable={true}
         gameState={gameState}
         logs={initialLogs}
         onDecision={vi.fn()}

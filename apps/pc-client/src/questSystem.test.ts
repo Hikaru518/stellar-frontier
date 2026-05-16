@@ -238,6 +238,54 @@ describe("questSystem", () => {
     expect(repairView.selectedQuest?.subquests).toEqual([]);
   });
 
+  it("hides quest entries until a referenced quest todo is completed", () => {
+    const visibilityDefinitions: QuestDefinition[] = [
+      {
+        id: "repair_quest",
+        category: "main",
+        title: "Repair Quest",
+        summary: "Repair summary",
+        description: "Repair description",
+        initial_node_id: "repair",
+        nodes: [{ id: "repair", description: "Repair the critical systems" }],
+        todos: [
+          { id: "repair_radar", title: "Repair radar" },
+          { id: "repair_other", title: "Repair other system" },
+        ],
+      },
+      {
+        id: "contact_quest",
+        category: "main",
+        title: "Contact Quest",
+        summary: "Contact summary",
+        description: "Contact description",
+        initial_node_id: "signal_detected",
+        visible_after_quest_todo: { quest_id: "repair_quest", todo_id: "repair_radar" },
+        nodes: [{ id: "signal_detected", description: "Investigate the signal" }],
+        todos: [{ id: "investigate_signal", title: "Investigate signal" }],
+      },
+    ];
+    const initial = createInitialQuestState(visibilityDefinitions, 0);
+
+    const initialView = buildQuestSidebarView({ state: initial, definitions: visibilityDefinitions });
+    expect(initialView.list.map((quest) => quest.id)).toEqual(["repair_quest"]);
+    expect(initialView.collapsedSummary).toMatchObject({ incompleteCount: 1, mainIncompleteCount: 1 });
+
+    const radarRepaired = applyQuestProgress({
+      state: initial,
+      definitions: visibilityDefinitions,
+      operation: "complete_todo",
+      quest_id: "repair_quest",
+      todo_id: "repair_radar",
+      occurred_at: 10,
+    }).state;
+
+    const visibleView = buildQuestSidebarView({ state: radarRepaired, definitions: visibilityDefinitions });
+    expect(Object.keys(radarRepaired.quests)).toEqual(["repair_quest", "contact_quest"]);
+    expect(visibleView.list.map((quest) => quest.id)).toEqual(["repair_quest", "contact_quest"]);
+    expect(visibleView.collapsedSummary).toMatchObject({ incompleteCount: 2, mainIncompleteCount: 2 });
+  });
+
   it("exposes completion result only after a quest is completed", () => {
     const initial = createInitialQuestState(questDefinitions, 0);
 

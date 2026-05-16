@@ -113,7 +113,9 @@ export async function startNormalMikeCall(page: Page) {
 }
 
 export async function answerMikeIncomingCall(page: Page) {
-  await mikeCard(page).getByRole("button", { name: "接通" }).click();
+  const connectButton = mikeCard(page).getByRole("button", { name: "接通" });
+  await expect(connectButton).toBeVisible();
+  await connectButton.click();
 }
 
 export async function completeOpeningMikeCall(page: Page) {
@@ -213,6 +215,22 @@ export function createRevealedCrashSiteMap() {
     },
     featuresById: {
       iafs_generator: { id: "iafs_generator", status: "damaged", revealed: true },
+      iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
+      iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
+    },
+  });
+}
+
+export function createRadarUnlockedRevealedCrashSiteMap() {
+  return createCompatibleMap({
+    tilesById: {
+      [MAP_ORIGIN_TILE_ID]: {
+        discovered: true,
+        investigated: true,
+      },
+    },
+    featuresById: {
+      iafs_generator: { id: "iafs_generator", status: "repaired", revealed: true },
       iafs_life_support: { id: "iafs_life_support", status: "damaged", revealed: true },
       iafs_shuttle_core: { id: "iafs_shuttle_core", status: "damaged", revealed: true },
     },

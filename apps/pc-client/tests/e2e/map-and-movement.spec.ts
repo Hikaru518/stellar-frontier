@@ -1,5 +1,5 @@
 import {
-  createRevealedCrashSiteMap,
+  createRadarUnlockedRevealedCrashSiteMap,
   expect,
   findSavedCrew,
   GAME_SAVE_KEY,
@@ -15,7 +15,17 @@ import {
 
 test.describe.configure({ timeout: 75_000 });
 
-test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) => {
+test("keeps the JSON-driven 256x256 radar map locked on a new game", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("button", { name: /地图/ })).toBeDisabled();
+  await expect(page.getByText("SATELLITE RADAR MAP .......... OFFLINE / REPAIR RADAR")).toBeVisible();
+});
+
+test("shows the JSON-driven 256x256 radar map after the radar is repaired", async ({ page }) => {
+  await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+  });
   await page.goto("/");
 
   await page.getByRole("button", { name: /地图/ }).click();
@@ -38,10 +48,13 @@ test("shows the JSON-driven 256x256 radar map on a new game", async ({ page }) =
   await expect(stage.locator(".console-retro-map-debug-canvas")).toHaveCount(1);
   await expect(page.getByText("[JSON] radar glyph/tone/regions loaded from content/maps/ascii/default-map-radar.json")).toBeVisible();
   await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] 129-129 \/ 奥德赛号坠毁点/)).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] 129-129 \/ 野外/)).toBeVisible();
 });
 
 test("renders the console terrain layer inside a stable fixed map viewport", async ({ page }) => {
+  await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+  });
   await page.goto("/");
 
   await page.getByRole("button", { name: /地图/ }).click();
@@ -89,47 +102,51 @@ test("renders the console terrain layer inside a stable fixed map viewport", asy
   expect(lowerRightPaintedPixels).toBeGreaterThan(0);
 });
 
-test("shows revealed crash-site feature hits on the occupied origin tile", async ({ page }) => {
+test("shows revealed crash-site feature hits on the radar tile", async ({ page }) => {
   await installSave(page, {
-    map: createRevealedCrashSiteMap(),
+    map: createRadarUnlockedRevealedCrashSiteMap(),
   });
 
   await page.goto("/");
   await page.getByRole("button", { name: /地图/ }).click();
-  await selectMapTile(page, "129-129");
+  await selectMapTile(page, "116-112");
 
-  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "129-129");
-  await expect(page.getByText("[TILE] 129-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] 129-129 \/ 奥德赛号坠毁点/)).toBeVisible();
+  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "116-112");
+  await expect(page.getByText("[TILE] 116-112 / 平原 / 晴朗")).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] 116-112 \/ 奥德赛号坠毁点/)).toBeVisible();
   const featureReadout = page.locator('[aria-label="Feature 命中结果"]');
   await expect(featureReadout.getByText("背景")).toBeVisible();
   await expect(featureReadout.getByText("奥德赛号坠毁点")).toBeVisible();
   await expect(featureReadout.getByText("可调查")).toBeVisible();
-  await expect(featureReadout.getByText("发电机")).toBeVisible();
+  await expect(featureReadout.getByText("雷达装置")).toBeVisible();
   await expect(featureReadout.getByText("维生装置")).toBeVisible();
   await expect(featureReadout.getByText("穿梭机核心")).toBeVisible();
-  await expect(featureReadout.getByText("damaged")).toHaveCount(3);
+  await expect(featureReadout.getByText("damaged")).toHaveCount(2);
+  await expect(featureReadout.getByText("repaired")).toBeVisible();
   await expect(page.getByText(/麦克/)).toBeVisible();
 });
 
 test("clicking a Feature footprint shows the Feature name and underlying tile id", async ({ page }) => {
   await installSave(page, {
-    map: createRevealedCrashSiteMap(),
+    map: createRadarUnlockedRevealedCrashSiteMap(),
   });
 
   await page.goto("/");
   await page.getByRole("button", { name: /地图/ }).click();
-  await selectMapTile(page, "130-129");
+  await selectMapTile(page, "116-112");
 
-  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "130-129");
-  await expect(page.getByText("[TILE] 130-129 / 平原 / 晴朗")).toBeVisible();
-  await expect(page.getByText(/\[FOCUS\] 130-129 \/ 南侧通道/)).toBeVisible();
+  await expect(page.locator(".console-ascii-map-stage")).toHaveAttribute("data-focus-tile-id", "116-112");
+  await expect(page.getByText("[TILE] 116-112 / 平原 / 晴朗")).toBeVisible();
+  await expect(page.getByText(/\[FOCUS\] 116-112 \/ 奥德赛号坠毁点/)).toBeVisible();
   const featureReadout = page.locator('[aria-label="Feature 命中结果"]');
   await expect(featureReadout.getByText("奥德赛号坠毁点")).toBeVisible();
-  await expect(featureReadout.getByText("南侧通道")).toBeVisible();
+  await expect(featureReadout.getByText("雷达装置")).toBeVisible();
 });
 
 test("moves 麦克 after selecting a target tile from the console radar and confirming in call", async ({ page }) => {
+  await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+  });
   await page.goto("/");
 
   await startNormalMikeCall(page);
@@ -139,7 +156,7 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
   await selectMapTile(page, "129-130");
   await page.getByRole("button", { name: "标记当前区块" }).click();
   await expect(page.getByRole("heading", { name: "麦克 通话界面" })).toBeVisible();
-  const confirmMoveButton = page.getByRole("button", { name: /确认请求 麦克 前往 奥德赛号坠毁点 \/ 129-130/ });
+  const confirmMoveButton = page.getByRole("button", { name: /确认请求 麦克 前往 129-130/ });
   await expect(confirmMoveButton).toBeVisible();
   await confirmMoveButton.click();
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
@@ -151,13 +168,16 @@ test("moves 麦克 after selecting a target tile from the console radar and conf
   }, GAME_SAVE_KEY);
 
   await startNormalMikeCall(page);
-  await expect(page.getByText(/地点：奥德赛号坠毁点 \/ 129-130/)).toBeVisible();
+  await expect(page.getByText(/地点：129-130/)).toBeVisible();
 
   await page.getByRole("button", { name: /地图/ }).click();
   await expect(page.locator(".console-ascii-map-stage")).toBeVisible();
 });
 
 test("debug crew move speed accelerates confirmed movement", async ({ page }) => {
+  await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
+  });
   await page.goto("/");
   await setDebugCrewMoveSpeedMultiplier(page, "4x");
 
@@ -165,7 +185,7 @@ test("debug crew move speed accelerates confirmed movement", async ({ page }) =>
   await page.getByRole("button", { name: "移动到指定区域" }).click();
   await selectMapTile(page, "129-130");
   await page.getByRole("button", { name: "标记当前区块" }).click();
-  await page.getByRole("button", { name: /确认请求 麦克 前往 奥德赛号坠毁点 \/ 129-130/ }).click();
+  await page.getByRole("button", { name: /确认请求 麦克 前往 129-130/ }).click();
 
   await page.clock.runFor(16_000);
   await page.waitForFunction((key) => {
@@ -227,6 +247,7 @@ test("keeps the console radar stable while accelerated game time completes a mov
   page.on("pageerror", (error) => consoleFailures.push(error.message));
 
   await installSave(page, {
+    map: createRadarUnlockedRevealedCrashSiteMap(),
     crew: [idleMike("129-129", { status: "正在前往 奥德赛号坠毁点东缘。", statusTone: "muted" })],
     crew_actions: {
       "mike-move-129-130": runtimeCrewAction({

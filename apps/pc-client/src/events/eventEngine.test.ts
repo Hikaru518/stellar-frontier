@@ -111,7 +111,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "game_start",
         source: "time_system",
         crew_id: "mike",
-        tile_id: "116-112",
+        tile_id: "114-112",
         payload: { phase: "new_game" },
       },
     });
@@ -221,7 +221,7 @@ describe("event engine trigger intake", () => {
     expect(selected.state.crew_actions).toEqual({});
   });
 
-  it("reveals the authored scattered supplies object after surveying tile 120-117", () => {
+  it("reveals the authored scattered supplies object after surveying tile 101-121", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -232,7 +232,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "120-117",
+        tile_id: "101-121",
         action_id: "act_survey_supplies",
         payload: { action_type: "survey" },
       },
@@ -252,7 +252,7 @@ describe("event engine trigger intake", () => {
     });
 
     expect(selected.errors).toEqual([]);
-    expect(selected.state.map?.tilesById?.["120-117"]?.revealedObjectIds).toEqual([]);
+    expect(selected.state.map?.tilesById?.["101-121"]?.revealedObjectIds).toEqual([]);
     expect(selected.state.map?.featuresById?.iafs_scattered_supplies).toMatchObject({
       id: "iafs_scattered_supplies",
       status: "unsearched",
@@ -278,6 +278,11 @@ describe("event engine trigger intake", () => {
       expect(started.candidate_report?.selected_event_definition_ids).toEqual(["iafs_scavenger_camp_outer_discovery"]);
       expect(callText).toContain("拾荒者住出来的地方");
       expect(callText).toContain("旧舱板、岩片和遮风布");
+      expect(started.state.quest_state?.quests.contact_local_residents?.current_node_id).toBe("settlement_outer_contact");
+      expect(started.state.quest_state?.quests.contact_local_residents?.todos.investigate_north_signal).toMatchObject({
+        status: "completed",
+        completed_at: 11880,
+      });
       expect(started.state.active_calls[callId]?.available_options.map((option) => option.option_id)).toEqual([
         "opt_approach",
         "opt_standby",
@@ -1050,7 +1055,7 @@ describe("event engine trigger intake", () => {
         trigger_type: "action_complete",
         source: "crew_action",
         crew_id: "mike",
-        tile_id: "120-117",
+        tile_id: "101-121",
         action_id: "iafs_scattered_supplies:search",
         event_definition_id: "iafs_scattered_supplies_search",
         payload: {
@@ -1150,9 +1155,12 @@ describe("event engine trigger intake", () => {
     expect(result.errors).toEqual([]);
     expect(result.event?.event_definition_id).toBe("iafs_generator_repair_complete");
     expect(result.event?.status).toBe("waiting_call");
-    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("麦克：发电机这边修好了。");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("麦克：雷达装置这边修好了。");
+    expect(result.state.active_calls[callId]?.rendered_lines[1]?.text).toContain("雷达往北侧扫到一组规整热源和重复脉冲");
     expect(quest?.todos.repair_generator).toMatchObject({ status: "completed", completed_at: 360 });
     expect(quest?.status).toBe("completed");
+    expect(result.state.quest_state?.quests.contact_local_residents?.status).toBe("incomplete");
+    expect(result.state.quest_state?.updated_quest_ids[0]).toBe("contact_local_residents");
 
     const selected = selectCallOption({
       state: result.state,
@@ -1190,7 +1198,7 @@ describe("event engine trigger intake", () => {
     expect(result.errors).toEqual([]);
     expect(result.event?.event_definition_id).toBe("iafs_generator_repair_failed");
     expect(result.event?.status).toBe("waiting_call");
-    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("麦克：发电机这边还没修起来。");
+    expect(result.state.active_calls[callId]?.rendered_lines[0]?.text).toBe("麦克：雷达装置这边还没修起来。");
     expect(quest?.todos.repair_generator?.status).not.toBe("completed");
   });
 
@@ -1599,8 +1607,8 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
   const state = createAuthoredCrashSiteState();
   const suppliesTile = {
     ...state.tiles["116-112"],
-    id: "120-117",
-    coordinates: { x: 120, y: 117 },
+    id: "101-121",
+    coordinates: { x: 101, y: 121 },
     terrain_type: "south_pass",
     tags: ["iafs", "supplies"],
     current_crew_ids: ["mike"],
@@ -1613,18 +1621,18 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
       ...state.crew,
       mike: {
         ...state.crew.mike,
-        tile_id: "120-117",
+        tile_id: "101-121",
       },
     },
     tiles: {
       ...state.tiles,
-      "120-117": suppliesTile,
+      "101-121": suppliesTile,
     },
     map: {
       ...state.map,
       tilesById: {
         ...state.map?.tilesById,
-        "120-117": { revealedObjectIds: [] },
+        "101-121": { revealedObjectIds: [] },
       },
       featuresById: {
         ...state.map?.featuresById,

@@ -20,6 +20,7 @@ interface CrewConsolePageProps {
   logs: SystemLog[];
   gameTimeLabel: string;
   hasQuestUpdates: boolean;
+  isMapAvailable: boolean;
   selectedCrewId: CrewId | null;
   mode: CrewConsoleMode;
   onOpenControl: () => void;
@@ -40,6 +41,7 @@ export function CrewConsolePage({
   logs,
   gameTimeLabel,
   hasQuestUpdates,
+  isMapAvailable,
   selectedCrewId,
   mode,
   onOpenControl,
@@ -88,7 +90,7 @@ export function CrewConsolePage({
       navItems={[
         { id: "control", label: "控制台", meta: "main", onClick: onOpenControl },
         { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenTask },
-        { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
+        { id: "map", label: "地图", meta: isMapAvailable ? "map" : "offline", onClick: onOpenMap, disabled: !isMapAvailable, disabledReason: "修复雷达装置后可用" },
       ]}
       crewPanel={
         <div className="console-crew-stack">

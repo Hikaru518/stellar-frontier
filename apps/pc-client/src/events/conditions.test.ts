@@ -136,6 +136,37 @@ describe("structured condition evaluator", () => {
     ).toBe(false);
   });
 
+  it("checks whether the trigger tile belongs to a map feature footprint", () => {
+    const context = createContext(createState(), {
+      trigger_context: {
+        ...triggerContext(),
+        tile_id: "114-112",
+      },
+    });
+
+    expect(
+      evaluateCondition(
+        {
+          type: "handler_condition",
+          handler_type: "trigger_tile_has_feature",
+          params: { feature_id: "iafs_crash_site" },
+        },
+        context,
+      ),
+    ).toEqual({ passed: true, errors: [] });
+
+    expect(
+      evaluateCondition(
+        {
+          type: "handler_condition",
+          handler_type: "trigger_tile_has_feature",
+          params: { feature_id: "iafs_crash_site" },
+        },
+        createContext(createState(), { trigger_context: { ...triggerContext(), tile_id: "1-1" } }),
+      ).passed,
+    ).toBe(false);
+  });
+
   it("checks all available communicable crew are at the requested tile", () => {
     const baseState = createState();
     const amy = (baseState.crew as Record<string, Record<string, unknown>>).amy;

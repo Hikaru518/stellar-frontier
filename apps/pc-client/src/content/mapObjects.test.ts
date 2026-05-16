@@ -114,8 +114,22 @@ describe("mapObjects content", () => {
       "132-129",
       "132-130",
     ];
-    const boundaryMountainTileIds = ["113-108", "113-127", "113-131", "113-149", "144-108", "144-127", "144-131", "144-149", "114-108", "143-149"];
-    const obstacleTileIds = ["122-119", "123-137", "132-124", "135-138"];
+    const convertedStartZoneMountainTileIds = [
+      "113-108",
+      "113-127",
+      "113-131",
+      "113-149",
+      "144-108",
+      "144-127",
+      "144-131",
+      "144-149",
+      "114-108",
+      "143-149",
+      "122-119",
+      "123-137",
+      "132-124",
+      "135-138",
+    ];
     const coldPassTileIds = ["113-128", "113-129", "113-130"];
     const redPathTileIds = ["144-128", "144-129", "144-130"];
 
@@ -127,14 +141,9 @@ describe("mapObjects content", () => {
       expect(tile?.terrain).not.toBe("山");
     }
 
-    for (const tileId of boundaryMountainTileIds) {
+    for (const tileId of convertedStartZoneMountainTileIds) {
       const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.terrain).toBe("山");
-    }
-
-    for (const tileId of obstacleTileIds) {
-      const tile = defaultMapJson.tiles.find((entry) => entry.id === tileId);
-      expect(tile?.terrain).toBe("山");
+      expect(tile?.terrain).toBe("平原");
     }
 
     for (const tileId of coldPassTileIds) {

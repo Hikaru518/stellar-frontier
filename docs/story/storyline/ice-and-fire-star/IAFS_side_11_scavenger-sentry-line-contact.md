@@ -5,7 +5,7 @@
 - event_id:
   - `iafs_scavenger_camp_outer_discovery`
   - `iafs_scavenger_sentry_line_contact`
-- line_type: `side`
+- line_type: `side_with_mainline_hook`
 - unique_id: `11`
 - source_anchor: `IAFS_story.md` -> `### 支线 03：灰烬拾荒者（交界带）` / 拾荒营地前置接触
 - target_file: `IAFS_side_11_scavenger-sentry-line-contact.md`
@@ -14,6 +14,7 @@
 ## Narrative Intent
 
 - 把拾荒营地从地图上的单点，扩成“远看发现村落 -> 靠近哨线被拦”的两段式遭遇。
+- 奥德赛号雷达装置修复后，雷达回报北侧疑似智慧文明活动，并解锁主线任务“与当地居民联系”；本事件承接这条主线的第一处北侧接触点。
 - 外围阶段让队员主动打给指挥官，报告这是一个贫穷但有人组织的拾荒者村落，并请求下一步指示。
 - 哨线阶段先由队员描述哨卫外貌、武器和接近动作，再让白噪发出拦截台词。
 - 观察路线只让玩家听见“两派搜人”的片段；强硬路线让队员临时失联。不在本事件完整揭露难民、证据或后续庇护线真相。
@@ -43,6 +44,7 @@
   - `opt_approach`: 继续接近，靠到外线可喊话的位置。
   - `opt_standby`: 先别靠近，原地继续观察。
 - Consequence
+  - 完成主线任务 `contact_local_residents` 的 `investigate_north_signal` 待办，并把任务节点推进到 `settlement_outer_contact`。
   - 写入 `iafs_scavenger_outer_discovery_choice = approach | standby`。
   - `opt_approach` 会立即派队员继续走向哨位中心 tile `92-116`，抵达后自然触发哨线问话。
   - `opt_standby` 不创建移动行动，队员留在外围继续观察。
@@ -95,6 +97,7 @@
 
 ## Outcome & Mainline Coupling
 
-- 本事件不推进主线任务，也不强制玩家进入拾荒营地后续线。
+- 本事件现在承接“与当地居民联系”主线：外围发现会确认北侧信号源是有组织的拾荒村落，并推进该主线的第一阶段。
+- 它仍不强制玩家进入拾荒营地后续线；玩家可以在外围发现后选择保持距离，后续再决定是否靠近哨线。
 - 它把拾荒营地前置为灰烬霜带政治夹缝的世界观入口。
 - 后续事件可继续展开“拾荒营地是否庇护霜湾难民”的核心矛盾；已有“灰烬拾荒者”火锅支线更适合在玩家取得营地信任之后触发。

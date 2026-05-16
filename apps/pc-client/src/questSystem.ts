@@ -262,7 +262,10 @@ export function buildQuestSidebarView(input: BuildQuestSidebarViewInput): QuestS
   const categoryFilter = input.categoryFilter ?? "all";
   const normalizedState = normalizeQuestState(input.state, input.definitions, 0);
   const updatedQuestIds = new Set(normalizedState.updated_quest_ids);
-  const allItems = input.definitions.map((definition, index) => toQuestDetailView(definition, normalizedState.quests[definition.id], updatedQuestIds, index));
+  const allItems = input.definitions
+    .map((definition, index) => ({ definition, index }))
+    .filter(({ definition }) => isQuestVisible(definition, normalizedState))
+    .map(({ definition, index }) => toQuestDetailView(definition, normalizedState.quests[definition.id], updatedQuestIds, index));
   const filteredItems = sortQuestItems(
     allItems.filter((item) => statusFilter === "all" || item.status === statusFilter).filter((item) => categoryFilter === "all" || item.category === categoryFilter),
   );
@@ -295,6 +298,15 @@ function createQuestProgress(definition: QuestDefinition, occurredAt: number): Q
     todos: Object.fromEntries((definition.todos ?? []).map((todo) => [todo.id, createTodoProgress(todo.id, occurredAt)])),
     subquests: Object.fromEntries((definition.subquests ?? []).map((subquest) => [subquest.id, createSubquestProgress(subquest, occurredAt)])),
   };
+}
+
+function isQuestVisible(definition: QuestDefinition, state: QuestRuntimeState): boolean {
+  const condition = definition.visible_after_quest_todo;
+  if (!condition) {
+    return true;
+  }
+
+  return state.quests[condition.quest_id]?.todos[condition.todo_id]?.status === "completed";
 }
 
 function createSubquestProgress(definition: SubquestDefinition, occurredAt: number): SubquestProgress {

@@ -285,7 +285,7 @@ describe("map-object-action pipeline integration", () => {
     const member = createCrashSiteMember();
     const view = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
-    const generatorAction = findGroup(view, "发电机")?.actions.find((action) => action.id === "iafs_generator:repair");
+    const generatorAction = findGroup(view, "雷达装置")?.actions.find((action) => action.id === "iafs_generator:repair");
     const lifeSupportAction = findGroup(view, "维生装置")?.actions.find((action) => action.id === "iafs_life_support:repair");
     const shuttleCoreAction = findGroup(view, "穿梭机核心")?.actions.find((action) => action.id === "iafs_shuttle_core:repair");
 
@@ -351,7 +351,7 @@ describe("map-object-action pipeline integration", () => {
     const member = createCrashSiteMember();
     const damagedView = buildCallView({ member, tile: createCrashSiteTile(), gameState: createCrashSiteState() });
 
-    expect(findGroup(damagedView, "发电机")?.actions).toEqual(
+    expect(findGroup(damagedView, "雷达装置")?.actions).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", label: "调查" })]),
     );
 
@@ -370,7 +370,7 @@ describe("map-object-action pipeline integration", () => {
       }),
     });
 
-    expect(findGroup(repairedView, "发电机")?.actions).toEqual(
+    expect(findGroup(repairedView, "雷达装置")?.actions).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "iafs_generator:inspect", label: "调查" })]),
     );
   });

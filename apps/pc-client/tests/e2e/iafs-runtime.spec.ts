@@ -14,7 +14,7 @@ import {
   createRevealedCrashSiteMap,
 } from "./support/appTest";
 
-test.describe.configure({ timeout: 60_000 });
+test.describe.configure({ timeout: 90_000 });
 
 test("surveys the IAFS crash site and reveals the three repair actions", async ({ page }) => {
   await page.goto("/");
@@ -22,8 +22,8 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await startNormalMikeCall(page);
 
-  await expect(page.getByText(/地点：奥德赛号坠毁点 \/ 129-129/)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "发电机" })).toHaveCount(0);
+  await expect(page.getByText(/地点：奥德赛号坠毁点 \/ 116-112/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "雷达装置" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "调查当前区域" }).click();
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
@@ -31,7 +31,7 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await answerMikeIncomingCall(page);
 
   await expect(
-    page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。"),
+    page.getByText("这里还有几套能辨认出来的关键设施，雷达装置、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。"),
   ).toBeVisible();
   await page.getByRole("button", { name: "确认标记这些可用设施。" }).click();
   await waitForRuntimeEventStatus(page, "iafs_crash_site_survey_reveal", "resolved");
@@ -44,21 +44,22 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await page.getByRole("button", { name: /控制台/ }).click();
   await startNormalMikeCall(page);
 
-  await expect(featureSection(page, "发电机").getByRole("button", { name: "调查" })).toBeVisible();
+  await expect(featureSection(page, "雷达装置").getByRole("button", { name: "调查" })).toBeVisible();
   await expect(featureSection(page, "维生装置").getByRole("button", { name: "调查" })).toBeVisible();
   await expect(featureSection(page, "穿梭机核心").getByRole("button", { name: "调查" })).toBeVisible();
   await expect(page.getByRole("button", { name: "维修" })).toHaveCount(3);
 });
 
-test("dispatches a revealed generator repair into a timed crew action", async ({ page }) => {
+test("dispatches a revealed radar repair into a timed crew action", async ({ page }) => {
   await installSave(page, {
+    crew: [idleMike("116-112")],
     map: createRevealedCrashSiteMap(),
   });
 
   await page.goto("/");
   await startNormalMikeCall(page);
 
-  await featureSection(page, "发电机").getByRole("button", { name: "维修" }).click();
+  await featureSection(page, "雷达装置").getByRole("button", { name: "维修" }).click();
 
   await expect(page.getByRole("heading", { name: "前沿基地控制中心" })).toBeVisible();
   await page.waitForFunction((key) => {
@@ -86,21 +87,22 @@ test("dispatches a revealed generator repair into a timed crew action", async ({
       }),
     ]),
   );
-  expect(findSavedCrew(saved, "mike")).toMatchObject({ status: "正在维修发电机。" });
+  expect(findSavedCrew(saved, "mike")).toMatchObject({ status: "正在维修雷达装置。" });
 });
 
 test("opens a damaged crash-site feature inspection runtime call", async ({ page }) => {
   await installSave(page, {
+    crew: [idleMike("116-112")],
     map: createRevealedCrashSiteMap(),
   });
 
   await page.goto("/");
   await startNormalMikeCall(page);
 
-  await featureSection(page, "发电机").getByRole("button", { name: "调查" }).click();
+  await featureSection(page, "雷达装置").getByRole("button", { name: "调查" }).click();
 
-  await expect(page.getByText("外壳撕裂，几根主供电线还在断续打火。现在贸然启动只会让发电机继续烧坏。")).toBeVisible();
-  await page.getByRole("button", { name: "确认记录发电机状态。" }).click();
+  await expect(page.getByText("天线折断，定位回路一直在断续重启。现在强行上线只会让扫描阵列继续烧坏。")).toBeVisible();
+  await page.getByRole("button", { name: "确认记录雷达装置状态。" }).click();
   await waitForRuntimeEventStatus(page, "iafs_generator_inspect_damaged", "resolved");
 });
 

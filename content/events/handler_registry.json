@@ -23,6 +23,17 @@
       "sample_fixtures": []
     },
     {
+      "handler_type": "trigger_tile_has_feature",
+      "kind": "condition",
+      "description": "检查 trigger_context.tile_id 是否命中指定地图 Feature 的 footprint。",
+      "params_schema_ref": "#/$defs/trigger_tile_has_feature_params",
+      "allowed_target_types": [],
+      "deterministic": true,
+      "uses_random": false,
+      "failure_policy": "fail_event",
+      "sample_fixtures": []
+    },
+    {
       "handler_type": "feature_status_equals",
       "kind": "condition",
       "description": "检查运行时地图 Feature 状态是否等于预期值。",

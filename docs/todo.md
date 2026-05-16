@@ -88,7 +88,7 @@
 
 ## 战争迷雾 / 探索可见性重设计
 
-**当前状态**：PC 地图和通话移动选点已经取消临时 `3 x 3` / discovered frontier 限制，当前完整显示默认 `8 x 8` 地图，并允许选择任意合法 authored tile。`GameState.map.discoveredTileIds`、`initialDiscoveredTileIds` 和 `getVisibleTileWindow` 仍保留在代码与内容模型中，但不作为当前玩家可见范围或移动规则。
+**当前状态**：PC 地图和通话移动选点已经取消临时 `3 x 3` / discovered frontier 限制；雷达装置修复后完整显示默认 `8 x 8` 地图，并允许选择任意合法 authored tile。`GameState.map.discoveredTileIds`、`initialDiscoveredTileIds` 和 `getVisibleTileWindow` 仍保留在代码与内容模型中，但不作为当前玩家可见范围或移动规则。
 
 **后续要补充**：
 

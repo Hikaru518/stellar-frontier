@@ -392,6 +392,11 @@ export interface QuestTodoDefinition {
   navigation?: QuestNavigationEntry[];
 }
 
+export interface QuestVisibilityTodoCondition {
+  quest_id: string;
+  todo_id: string;
+}
+
 export interface QuestCompletionResultDefinition {
   title: string;
   summary: string;
@@ -416,6 +421,7 @@ export interface QuestDefinition {
   description: string;
   initial_node_id: string;
   completed_node_id?: string;
+  visible_after_quest_todo?: QuestVisibilityTodoCondition;
   nodes: QuestNodeDefinition[];
   todos?: QuestTodoDefinition[];
   subquests?: SubquestDefinition[];

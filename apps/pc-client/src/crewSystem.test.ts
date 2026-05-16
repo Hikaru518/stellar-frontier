@@ -210,7 +210,7 @@ describe("crewSystem", () => {
   });
 
   it("blocks move previews into mountain tiles", () => {
-    const preview = createMovePreview(crewMember("129-129"), "122-119", initialTiles);
+    const preview = createMovePreview(crewMember("1-1"), "1-2", [tile("1-1", "平原"), tile("1-2", "山")]);
 
     expect(preview.canMove).toBe(false);
     expect(preview.reason).toBe("当前无法前往 山。");

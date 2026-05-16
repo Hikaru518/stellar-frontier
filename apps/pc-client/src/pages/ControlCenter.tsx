@@ -21,6 +21,7 @@ interface ControlCenterProps {
   tiles: MapTile[];
   gameTimeLabel: string;
   hasQuestUpdates: boolean;
+  isMapAvailable: boolean;
   onOpenStation: () => void;
   onOpenMap: () => void;
   onStartCall: (crewId: CrewMember["id"]) => void;
@@ -43,6 +44,7 @@ export function ControlCenter({
   tiles,
   gameTimeLabel,
   hasQuestUpdates,
+  isMapAvailable,
   onOpenStation,
   onOpenMap,
   onStartCall,
@@ -78,7 +80,7 @@ export function ControlCenter({
   const navItems = [
     { id: "control", label: "控制台", meta: "main", active: true },
     { id: "task", label: "任务", meta: "task", attention: hasQuestUpdates, onClick: onOpenStation },
-    { id: "map", label: "地图", meta: "map", onClick: onOpenMap },
+    { id: "map", label: "地图", meta: isMapAvailable ? "map" : "offline", onClick: onOpenMap, disabled: !isMapAvailable, disabledReason: "修复雷达装置后可用" },
   ];
   return (
     <>
@@ -128,7 +130,7 @@ export function ControlCenter({
             <div className="console-screen-block">
               <p className="console-screen-section">[ FACILITIES ]</p>
               <p>1) COMMUNICATION STATION ......... {incomingCount ? "INCOMING" : "READY"}</p>
-              <p>2) SATELLITE RADAR MAP .......... ONLINE</p>
+              <p>2) SATELLITE RADAR MAP .......... {isMapAvailable ? "ONLINE" : "OFFLINE / REPAIR RADAR"}</p>
               <p>3) MISSION BOARD ................ {objectiveList.length ? "TRACKING" : "IDLE"}</p>
               <p>4) FIELD SUPPORT ................ {resources.baseIntegrity >= 70 ? "STABLE" : "RISK"}</p>
             </div>

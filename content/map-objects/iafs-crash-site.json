@@ -4,9 +4,9 @@
     {
       "id": "iafs_generator",
       "kind": "facility",
-      "name": "发电机",
-      "description": "坠毁现场的应急发电机组，外壳撕裂，仍有零星火花。",
-      "tags": ["iafs", "crash_site", "repair_target", "power_system"],
+      "name": "雷达装置",
+      "description": "坠毁现场的短距雷达与地形扫描组件，天线折断，定位回路离线。",
+      "tags": ["iafs", "crash_site", "repair_target", "radar_system"],
       "visibility": "hidden",
       "status_options": ["damaged", "repaired"],
       "initial_status": "damaged",

@@ -1299,16 +1299,15 @@ function isMapIconFeatureVisible(
   feature: MapFeatureDefinition,
   map: Pick<GameMapState, "discoveredTileIds" | "tilesById" | "featuresById">,
 ) {
-  const center = getFeatureCenterCoord(feature);
-  const tileId = center ? tileIdFromRadarCoord({ x: Math.round(center.x), y: Math.round(center.y) }) : null;
+  const tileIds = expandFeatureFootprint(feature, defaultMapConfig);
 
   switch (feature.visibility) {
     case "always":
       return true;
     case "onDiscovered":
-      return tileId ? Boolean(map.discoveredTileIds.includes(tileId) || map.tilesById[tileId]?.discovered) : false;
+      return tileIds.some((tileId) => map.discoveredTileIds.includes(tileId) || map.tilesById[tileId]?.discovered);
     case "onInvestigated":
-      return tileId ? Boolean(map.tilesById[tileId]?.investigated) : false;
+      return tileIds.some((tileId) => map.tilesById[tileId]?.investigated);
     case "hidden":
       return Boolean(map.featuresById?.[feature.id]?.revealed);
     default:
