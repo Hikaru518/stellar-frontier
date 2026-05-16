@@ -24,11 +24,12 @@ Implementation.
 - `npm run lint` passed.
 - `node ../../common/scripts/install-run-rushx.js test src/yuanHostConfig.test.ts` passed from `apps/pc-client`.
 - `node ../../common/scripts/install-run-rushx.js test --testTimeout=30000` passed from `apps/pc-client` with `49` files and `422` tests.
+- GitHub Actions `test-build` rerun passed for PR #55.
 - `git diff --check` passed.
 
 ## Caveat
 
-`npm run test` was executed and failed only because `@stellar-frontier/pc-client` hit variable existing 5s Vitest timeouts. The longer-timeout PC suite passed, so this is recorded as local timeout sensitivity rather than a regression from this change.
+`npm run test` was executed locally and failed only because `@stellar-frontier/pc-client` hit variable existing 5s Vitest timeouts. The longer-timeout PC suite passed, and GitHub Actions passed the default CI unit-test step, so this is recorded as local timeout sensitivity rather than a regression from this change.
 
 ## Review Result
 

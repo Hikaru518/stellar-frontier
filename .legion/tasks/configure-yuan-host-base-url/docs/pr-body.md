@@ -9,11 +9,12 @@
 - `npm run lint` PASS
 - `node ../../common/scripts/install-run-rushx.js test src/yuanHostConfig.test.ts` PASS from `apps/pc-client`
 - `node ../../common/scripts/install-run-rushx.js test --testTimeout=30000` PASS from `apps/pc-client` (`49` files / `422` tests)
+- GitHub Actions `test-build` PASS on rerun for PR #55
 - `git diff --check` PASS
 
 ## Caveat
 
-- `npm run test` was executed but failed on variable existing PC client 5s Vitest timeouts. No assertion failure tied to this change was observed; the PC suite passed with a longer timeout.
+- Local `npm run test` was executed but failed on variable existing PC client 5s Vitest timeouts. No assertion failure tied to this change was observed; the PC suite passed with a longer timeout and GitHub Actions passed the default CI unit-test step.
 
 ## Legion Evidence
 

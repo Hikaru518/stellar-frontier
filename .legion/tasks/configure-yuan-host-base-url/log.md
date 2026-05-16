@@ -15,3 +15,6 @@
 - Readiness review passed with the documented verification caveat and explicit security lens for fixed external plain-WS default.
 - Produced reviewer-facing walkthrough and PR body from existing implementation, verification, and review evidence.
 - Completed Legion wiki writeback: task summary, index entry, wiki log, and current Yuan Host default URL decision.
+- Committed and pushed branch `legion/configure-yuan-host-base-url-remote-host`; opened PR #55: `https://github.com/Hikaru518/stellar-frontier/pull/55`.
+- Attempted to enable auto-merge, but GitHub rejected it because repository auto-merge is disabled. User then explicitly instructed not to merge, so no manual merge or further auto-merge attempt will be made.
+- First PR check run was canceled during e2e. Reran the workflow; required `test-build` passed in `9m20s`, and `deploy` was skipped because this is a pull request.

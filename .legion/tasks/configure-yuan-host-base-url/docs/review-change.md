@@ -2,7 +2,7 @@
 
 ## Result
 
-PASS with verification caveat.
+PASS.
 
 ## Blocking Findings
 
@@ -20,12 +20,13 @@ Applied because this changes a protocol/trust-boundary default from origin-deriv
 
 Conclusion: no new authority or credential handling path was introduced. The accepted residual risk is that `ws://8.159.128.125:8888/` is plain WebSocket and can be blocked by HTTPS mixed-content policy or be unsuitable for production hardening. That risk is documented in `plan.md` and is out of scope for this task.
 
-## Verification Caveat
+## Verification Notes
 
 - `npm run lint` passed.
 - Targeted `yuanHostConfig` test passed.
 - PC client full tests passed with `--testTimeout=30000`.
-- Official `npm run test` was executed but failed on variable PC client 5s timeout failures in unrelated existing tests. No assertion failure tied to this change was observed.
+- Official local `npm run test` was executed but failed on variable PC client 5s timeout failures in unrelated existing tests. No assertion failure tied to this change was observed.
+- GitHub Actions `test-build` rerun passed, including CI unit tests, e2e tests, and build.
 
 ## Review Notes
 

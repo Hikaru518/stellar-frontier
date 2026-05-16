@@ -7,6 +7,8 @@
 - **Base ref**: `origin/main` (repository has no `origin/master`)
 - **Branch**: `legion/configure-yuan-host-base-url-remote-host`
 - **Worktree**: `.worktrees/configure-yuan-host-base-url`
+- **PR**: `https://github.com/Hikaru518/stellar-frontier/pull/55`
+- **PR state**: Open; required `test-build` check passed on rerun; user explicitly requested not to merge.
 
 ## Checklist
 
