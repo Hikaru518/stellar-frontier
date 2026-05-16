@@ -19,7 +19,7 @@ describe("minimal content baseline", () => {
     expect(crewDefinitions[0]).toMatchObject({
       crewId: "mike",
       name: "麦克",
-      currentTile: "129-129",
+      currentTile: "116-112",
       canCommunicate: true,
     });
     expect(crewDefinitions[1]).toMatchObject({
@@ -55,20 +55,21 @@ describe("minimal content baseline", () => {
     expect(defaultMapConfig.size).toEqual({ rows: 256, cols: 256 });
     expect(defaultMapConfig.originTileId).toBe("129-129");
     expect(defaultMapConfig.initialDiscoveredTileIds).toEqual([
-      "128-128",
-      "128-129",
-      "128-130",
-      "129-128",
       "129-129",
-      "129-130",
-      "129-131",
-      "130-128",
-      "130-129",
-      "130-130",
-      "130-131",
-      "131-128",
-      "131-129",
-      "131-130",
+      "115-111",
+      "115-112",
+      "115-113",
+      "116-111",
+      "116-112",
+      "116-113",
+      "116-114",
+      "117-111",
+      "117-112",
+      "117-113",
+      "117-114",
+      "118-111",
+      "118-112",
+      "118-113",
     ]);
     expect(defaultMapConfig.tiles).toHaveLength(65536);
     expect(defaultMapConfig.tiles.find((tile) => tile.id === "129-129")).not.toHaveProperty("objectIds");

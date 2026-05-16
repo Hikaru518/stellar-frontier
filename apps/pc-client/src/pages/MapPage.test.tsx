@@ -122,11 +122,11 @@ describe("MapPage", () => {
   });
 
   it("shows selected tile details in the right panel", () => {
-    renderMapPage();
+    renderMapPage({ initialSelectedTileId: "116-112" });
 
     expect(screen.getByText("地图详情")).toBeInTheDocument();
-    expect(screen.getByText("129-129")).toBeInTheDocument();
-    expect(screen.getAllByText("(0,0)").length).toBeGreaterThan(0);
+    expect(screen.getByText("116-112")).toBeInTheDocument();
+    expect(screen.getAllByText("(-17,13)").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IAFS坠毁点").length).toBeGreaterThan(0);
     expect(screen.queryByText("地图对象")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("当前可见地图对象")).not.toBeInTheDocument();
@@ -154,10 +154,10 @@ describe("MapPage", () => {
     };
     renderMapPage({ map });
 
-    focusMapTile("129-129");
+    focusMapTile("116-112");
 
     const readout = within(screen.getByLabelText("Feature 命中结果"));
-    expect(screen.getByText(/\[TILE\] 129-129/)).toBeInTheDocument();
+    expect(screen.getByText(/\[TILE\] 116-112/)).toBeInTheDocument();
     expect(readout.getByText("发电机")).toBeInTheDocument();
     expect(readout.getByText("IAFS坠毁点")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
@@ -172,14 +172,14 @@ describe("MapPage", () => {
     };
     renderMapPage({ map });
 
-    focusMapTile("133-134");
+    focusMapTile("120-117");
 
     const readout = within(screen.getByLabelText("Feature 命中结果"));
     expect(readout.getByText("散落的物资")).toBeInTheDocument();
     expect(readout.getByText("可调查")).toBeInTheDocument();
     expect(readout.queryByText("背景")).not.toBeInTheDocument();
 
-    focusMapTile("134-135");
+    focusMapTile("121-118");
     expect(within(screen.getByLabelText("Feature 命中结果")).getByText("散落的物资")).toBeInTheDocument();
   });
 

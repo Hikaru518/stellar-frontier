@@ -145,8 +145,8 @@ describe("buildCallView", () => {
   });
 
   it("uses feature runtime status when evaluating feature inline action visibility", () => {
-    const member = createMember({ currentTile: "129-129" });
-    const tile = createTile("129-129");
+    const member = createMember({ currentTile: "116-112" });
+    const tile = createTile("116-112");
 
     const damagedView = buildCallView({
       member,
@@ -191,10 +191,10 @@ describe("buildCallView", () => {
       repairAction.display_when_unavailable = "disabled";
       repairAction.unavailable_hint = "发电机已经修复。";
 
-      const member = createMember({ currentTile: "129-129" });
+      const member = createMember({ currentTile: "116-112" });
       const view = buildCallView({
         member,
-        tile: createTile("129-129"),
+        tile: createTile("116-112"),
         gameState: createFeatureState("repaired", { member }),
       });
       const action = findGroup(view, "发电机")?.actions.find((entry) => entry.id === "iafs_generator:repair");
@@ -318,7 +318,7 @@ function featureActionViews(view: ReturnType<typeof buildCallView>) {
 }
 
 function createFeatureState(status: "damaged" | "repaired", { member }: { member: CrewMember }): GameState {
-  const tile = createTile("129-129");
+  const tile = createTile("116-112");
   return createGameState({
     crew: [member],
     map: {

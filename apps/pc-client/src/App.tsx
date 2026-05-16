@@ -1170,7 +1170,7 @@ function bootstrapGameStartEvent(state: GameState): GameState {
       occurred_at: 0,
       source: "time_system",
       crew_id: "mike",
-      tile_id: "129-129",
+      tile_id: "116-112",
       payload: { phase: "new_game" },
     },
   });
