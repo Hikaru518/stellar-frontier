@@ -293,7 +293,7 @@ function resolveEnteredNode(
     case "objective":
       return enterObjectiveNode(state, event, node, triggerContext);
     case "spawn_event":
-      return enterSpawnEventNode(state, event, node, definition, triggerContext);
+      return enterSpawnEventNode(state, event, node, definition, triggerContext, options);
     case "log_only":
       return runEffectsAndContinue(state, definition, event, node, node.effect_refs ?? [], node.auto_next_node_id ?? node.next_node_id, triggerContext, options);
     case "end":
@@ -546,7 +546,8 @@ function waitForCall(
   options: GraphRunnerOptions,
 ): GraphRunnerResult & { next_node_id?: Id | null } {
   const callId = event.active_call_id ?? `${event.id}:${node.id}:call`;
-  const call = state.active_calls[callId] ?? renderCall(state, event, node, triggerContext, options);
+  const existingCall = state.active_calls[callId];
+  const call = existingCall && existingCall.status !== "ended" ? existingCall : renderCall(state, event, node, triggerContext, options);
   if (Array.isArray(call)) {
     return { state, event, errors: call, transitions: [], next_node_id: null };
   }
@@ -678,14 +679,82 @@ function enterSpawnEventNode(
   node: SpawnEventNode,
   definition: EventDefinition,
   triggerContext: TriggerContext,
+  options: GraphRunnerOptions,
 ): GraphRunnerResult & { next_node_id?: Id | null } {
   const childEventId = `${event.id}:${node.id}:child`;
+  const childDefinition = options.content_index?.definitionsById.get(node.event_definition_id);
+  if (!childDefinition) {
+    return {
+      state,
+      event,
+      errors: [
+        {
+          code: "missing_node",
+          event_id: event.id,
+          node_id: node.id,
+          path: `nodes.${node.id}.event_definition_id`,
+          message: `Spawn event ${node.id} references missing event definition ${node.event_definition_id}.`,
+        },
+      ],
+      transitions: [],
+      next_node_id: null,
+    };
+  }
+
+  const parentEvent = {
+    ...event,
+    child_event_ids: node.parent_event_link && !event.child_event_ids.includes(childEventId) ? [...event.child_event_ids, childEventId] : event.child_event_ids,
+  };
+  const stateWithParent = upsertEvent(state, parentEvent);
+
+  if (node.spawn_policy === "immediate") {
+    const childTriggerContext: TriggerContext = {
+      ...runtimeTriggerContext(triggerContext, parentEvent, node.id),
+      trigger_type: "event_node_finished",
+      source: "event_node",
+      event_id: childEventId,
+      event_definition_id: childDefinition.id,
+      crew_id: parentEvent.primary_crew_id ?? triggerContext.crew_id ?? null,
+      tile_id: parentEvent.primary_tile_id ?? triggerContext.tile_id ?? null,
+      payload: {
+        ...(typeof triggerContext.payload === "object" && triggerContext.payload ? triggerContext.payload : {}),
+        parent_event_id: parentEvent.id,
+        spawn_node_id: node.id,
+      },
+    };
+    const childResult = startRuntimeEvent(stateWithParent, childDefinition, childTriggerContext, {
+      ...options,
+      event_id: childEventId,
+      parent_event_id: node.parent_event_link ? parentEvent.id : null,
+    });
+    if (childResult.errors.length > 0) {
+      return {
+        state: childResult.state,
+        event: childResult.state.active_events[parentEvent.id] ?? parentEvent,
+        errors: childResult.errors,
+        transitions: [],
+        next_node_id: null,
+      };
+    }
+
+    return runEffectsAndContinue(
+      childResult.state,
+      definition,
+      childResult.state.active_events[parentEvent.id] ?? parentEvent,
+      node,
+      [],
+      node.next_node_id,
+      triggerContext,
+      options,
+    );
+  }
+
   const childEvent: RuntimeEvent = {
     id: childEventId,
     event_definition_id: node.event_definition_id,
-    event_definition_version: 1,
-    status: node.spawn_policy === "immediate" ? "active" : "waiting_time",
-    current_node_id: "entry",
+    event_definition_version: childDefinition.version,
+    status: "waiting_time",
+    current_node_id: childDefinition.event_graph.entry_node_id,
     primary_crew_id: event.primary_crew_id,
     related_crew_ids: [],
     primary_tile_id: event.primary_tile_id,
@@ -707,12 +776,8 @@ function enterSpawnEventNode(
     result_key: null,
     result_summary: null,
   };
-  const parentEvent = {
-    ...event,
-    child_event_ids: node.parent_event_link && !event.child_event_ids.includes(childEventId) ? [...event.child_event_ids, childEventId] : event.child_event_ids,
-  };
-  const nextState = upsertEvent(upsertEvent(state, childEvent), parentEvent);
-  return runEffectsAndContinue(nextState, definition, parentEvent, node, [], node.next_node_id, triggerContext, {});
+  const nextState = upsertEvent(upsertEvent(stateWithParent, childEvent), parentEvent);
+  return runEffectsAndContinue(nextState, definition, parentEvent, node, [], node.next_node_id, triggerContext, options);
 }
 
 function enterEndNode(

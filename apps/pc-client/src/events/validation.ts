@@ -101,7 +101,9 @@ function validateDefinition(context: DefinitionContext): void {
   validateTerminalNodes(context);
   validateTransitionTargets(context, transitions);
   validateReachability(context, transitions);
-  validateAcyclicGraph(context, transitions);
+  if (context.definition.event_graph.graph_rules.acyclic) {
+    validateAcyclicGraph(context, transitions);
+  }
   validateTerminalPaths(context, transitions);
 
   context.definition.event_graph.nodes.forEach((node, nodeIndex) => {
@@ -137,16 +139,6 @@ function validateDefinition(context: DefinitionContext): void {
 
 function validateGraphRules({ definition, definitionIndex, issues }: DefinitionContext): void {
   const rules = definition.event_graph.graph_rules;
-
-  if (!rules.acyclic) {
-    addDefinitionIssue(
-      issues,
-      definition,
-      "unsupported_graph_rule",
-      `event_definitions[${definitionIndex}].event_graph.graph_rules.acyclic`,
-      `Event definition ${definition.id} must require acyclic event graphs.`,
-    );
-  }
 
   if (rules.max_active_nodes !== 1) {
     addDefinitionIssue(

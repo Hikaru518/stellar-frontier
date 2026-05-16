@@ -77,6 +77,284 @@
     },
     {
       "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_heir_chief_invitation.call.chief_invitation",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_heir_chief_invitation",
+      "node_id": "chief_invitation",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "chief_invitation_opening",
+            "text": "（两分钟后，频道里传来另一个更年长的声音）陌生人：带家徽的人，村长愿意见你。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "sentry_waits",
+              "text": "{{crew_display_name}}：刚才那个哨卫还在旁边。他没有再催，但一直盯着我的手和装备。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "chief_invite_terms",
+              "text": "陌生人：你可以进来，也可以继续站在线外。进来就按我们的规矩走，不要把武器端在胸前。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "opt_accept_chief": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "accept_chief",
+              "text": "同意见村长。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_read_sentry": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "read_sentry",
+              "text": "观察哨兵的迟疑。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_decline_chief": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "decline_chief",
+              "text": "拒绝见村长，原地待命。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_heir_chief_invitation.call.sentry_doubts_read_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_heir_chief_invitation",
+      "node_id": "sentry_doubts_read_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "doubts_read",
+            "text": "{{crew_display_name}}：我看出来了。哨卫怕的不是家徽，是我们身上的武器和外来装备。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "shortage_read",
+              "text": "{{crew_display_name}}：他们盯着弹匣、滤芯和保温层看的时间太久。这里明显缺物资，尤其缺能防寒和维持装备的东西。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_sentry_doubts_read": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_sentry_doubts_read",
+              "text": "带着这条判断重新决定是否见村长。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_heir_chief_invitation.call.sentry_doubts_missed_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_heir_chief_invitation",
+      "node_id": "sentry_doubts_missed_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "doubts_missed",
+            "text": "{{crew_display_name}}：他确实迟疑，但我看不出更具体的东西。可能只是认出家徽后不敢乱动。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "choice_remains",
+              "text": "{{crew_display_name}}：邀请还在。要么进去见村长，要么我继续留在线外。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_sentry_doubts_missed": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_sentry_doubts_missed",
+              "text": "回到村长邀请的选择。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_heir_chief_invitation.call.accept_chief_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_heir_chief_invitation",
+      "node_id": "accept_chief_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "accept_chief_reply",
+            "text": "{{crew_display_name}}：明白。我会同意见村长，但先把频道保持打开。真正谈什么，等见到人再说。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [],
+      "option_lines": {
+        "ack_accept_chief": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_accept_chief",
+              "text": "确认准备见村长。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_heir_chief_invitation.call.decline_chief_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_heir_chief_invitation",
+      "node_id": "decline_chief_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "decline_chief_reply",
+            "text": "{{crew_display_name}}：收到。我先不进去。告诉他们我会留在线外，不越线，也不收起通讯。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "decline_wait",
+              "text": "陌生人：那你就等着。村长不是每次都会给第二次机会。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_decline_chief": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_decline_chief",
+              "text": "确认原地待命。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_chief_meeting_request.call.request_recorded",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_chief_meeting_request",
+      "node_id": "request_recorded",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "request_recorded",
+            "text": "{{crew_display_name}}：我会重新提出见村长。先只把请求递进去，后面等你的下一步指令。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [],
+      "option_lines": {
+        "ack_chief_meeting_requested": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_chief_meeting_requested",
+              "text": "确认已重新提出见村长。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
       "id": "iafs_scavenger_camp_outer_discovery.call.outer_approach_reply",
       "version": 1,
       "domain": "iafs-scavenger-camp",
@@ -762,6 +1040,281 @@
             {
               "id": "ack_heir_handkerchief",
               "text": "确认保持在线外，等待能认家徽的人。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_capture_callback.call.captive_callback",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_capture_callback",
+      "node_id": "captive_callback",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "captive_callback_opening",
+            "text": "（频道里先是三段短促白噪，随后{{crew_display_name}}的声音压得很低）{{crew_display_name}}：指挥官，能听见吗？我被他们关起来了。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "captive_location",
+              "text": "{{crew_display_name}}：位置应该在后帐边缘，离刚才的哨线不远。我听见布棚外有警铃片撞在一起，还有人守在门口。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "captive_support_request",
+              "text": "{{crew_display_name}}：他们还没决定怎么处理我。请派人支援，但别直接冲哨线，他们现在会把任何硬闯都当成攻击。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_captive_callback": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_captive_callback",
+              "text": "确认收到，标记后帐边缘的待救援状态。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_control_negotiation.call.control_parley",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_control_negotiation",
+      "node_id": "control_parley",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "control_parley_opening",
+            "text": "{{crew_display_name}}：哨卫被我压住了，警铃没响。线里又出来一个人，声音比刚才那个稳。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "soldier_steps_in",
+              "text": "陌生士兵：够了。你要见能做决定的人，可以。但首领不会站到线外给你审。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "room_demand",
+              "text": "陌生士兵：进村，进东侧那间屋。你放开岗哨，里面的人和你谈。你要是不肯，就继续站在这里耗到警铃响。",
+              "priority": 0
+            }
+          ]
+        },
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "crew_asks_command",
+              "text": "{{crew_display_name}}：他们想让我放弃已经控制住的哨位，进房间见首领。你决定我怎么走。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "opt_enter_room": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "enter_room",
+              "text": "同意进入房间和首领见面。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_enter_with_hostage": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "enter_with_hostage",
+              "text": "同意，但带上刚才控制住的哨卫做人质。",
+              "priority": 0
+            }
+          ]
+        },
+        "opt_leader_to_post": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "leader_to_post",
+              "text": "不同意，要求首领来哨站。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_control_negotiation.call.enter_room_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_control_negotiation",
+      "node_id": "enter_room_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "enter_room_accept",
+            "text": "{{crew_display_name}}：收到。我会放开岗哨，跟他们进东侧房间。频道保持开着，能传多少是多少。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "enter_room_risk",
+              "text": "陌生士兵：手放在看得见的地方。进门以后，别碰墙边的帘子，也别问不该问的人。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_enter_room": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_enter_room",
+              "text": "确认进入房间见首领。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_control_negotiation.call.enter_with_hostage_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_control_negotiation",
+      "node_id": "enter_with_hostage_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "enter_with_hostage_accept",
+            "text": "{{crew_display_name}}：我同意进村，但岗哨跟我一起走。他的手离不开我视线，警铃绳也离不开他。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "hostage_warning",
+              "text": "陌生士兵：你带着他进门，就是把刀架在谈判桌上。首领会记住这件事。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_enter_with_hostage": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_enter_with_hostage",
+              "text": "确认带着哨卫进村谈判。",
+              "priority": 0
+            }
+          ]
+        }
+      },
+      "fallback_order": ["default"],
+      "default_variant_required": true
+    },
+    {
+      "schema_version": "event-program-model-v1",
+      "id": "iafs_scavenger_sentry_control_negotiation.call.leader_to_post_reply",
+      "version": 1,
+      "domain": "iafs-scavenger-camp",
+      "event_definition_id": "iafs_scavenger_sentry_control_negotiation",
+      "node_id": "leader_to_post_reply",
+      "render_context_fields": ["crew_id", "crew_display_name"],
+      "opening_lines": {
+        "selection": "best_match",
+        "variants": [
+          {
+            "id": "leader_to_post_refusal",
+            "text": "{{crew_display_name}}：我拒绝进村。告诉他们，首领要谈，就来哨站谈。这里才是现在被控制住的位置。",
+            "priority": 0
+          }
+        ]
+      },
+      "body_lines": [
+        {
+          "selection": "first_match",
+          "variants": [
+            {
+              "id": "soldier_tension",
+              "text": "陌生士兵：你把路堵死了。那就站稳，别让岗哨摔倒，也别让线里的人误会你在杀人。",
+              "priority": 0
+            }
+          ]
+        }
+      ],
+      "option_lines": {
+        "ack_leader_to_post": {
+          "selection": "best_match",
+          "variants": [
+            {
+              "id": "ack_leader_to_post",
+              "text": "确认要求首领来哨站。",
               "priority": 0
             }
           ]

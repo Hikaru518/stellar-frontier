@@ -144,6 +144,68 @@ describe("buildCallView", () => {
     expect(view.groups.flatMap((group) => group.actions).map((action) => action.id)).not.toContain("runtime-option");
   });
 
+  it("shows the deferred scavenger chief meeting feature action until the request is recorded", () => {
+    const member = createMember({ id: "alice", currentTile: "92-116" });
+    const tile = createTile("92-116");
+    const baseState = createGameState({
+      crew: [member],
+      map: {
+        configId: defaultMapConfig.id,
+        configVersion: defaultMapConfig.version,
+        rows: defaultMapConfig.size.rows,
+        cols: defaultMapConfig.size.cols,
+        originTileId: defaultMapConfig.originTileId,
+        discoveredTileIds: [tile.id],
+        investigationReportsById: {},
+        tilesById: { [tile.id]: { discovered: true, investigated: false, revealedObjectIds: [] } },
+        mapObjects: {},
+      },
+      tiles: [tile],
+      world_flags: {
+        iafs_scavenger_chief_meeting_deferred: {
+          key: "iafs_scavenger_chief_meeting_deferred",
+          value: true,
+          value_type: "boolean",
+          created_at: 12185,
+          updated_at: 12185,
+          tags: ["iafs", "scavenger_camp", "chief"],
+        },
+      },
+    });
+
+    const view = buildCallView({ member, tile, gameState: baseState });
+    expect(featureActionViews(view)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "iafs_scavenger:meet_chief",
+          label: "去见村长",
+          featureId: "iafs_scavenger_outer_sentry_line",
+        }),
+      ]),
+    );
+
+    const requestedView = buildCallView({
+      member,
+      tile,
+      gameState: {
+        ...baseState,
+        world_flags: {
+          ...baseState.world_flags,
+          iafs_scavenger_chief_meeting_requested: {
+            key: "iafs_scavenger_chief_meeting_requested",
+            value: true,
+            value_type: "boolean",
+            created_at: 12500,
+            updated_at: 12500,
+            tags: ["iafs", "scavenger_camp", "chief"],
+          },
+        },
+      },
+    });
+
+    expect(featureActionViews(requestedView).find((action) => action.id === "iafs_scavenger:meet_chief")).toBeUndefined();
+  });
+
   it("uses feature runtime status when evaluating feature inline action visibility", () => {
     const member = createMember({ currentTile: "116-112" });
     const tile = createTile("116-112");

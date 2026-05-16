@@ -15,6 +15,7 @@ import {
   type EventDefinition,
   type EventNode,
   type ObjectiveNode,
+  type SpawnEventNode,
   type TriggerContext,
   type WaitNode,
 } from "./types";
@@ -518,10 +519,264 @@ describe("event engine trigger intake", () => {
 	    expect(ended.event?.status).toBe("resolved");
 	    expect(ended.event?.result_key).toBe("scavenger_sentry_heir_handkerchief");
 	    expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("heir_handkerchief");
+	    expect(ended.state.world_flags.iafs_scavenger_heir_chief_invitation_pending?.value).toBe(true);
 	    expect(ended.state.inventories.inv_alice.items).toEqual([{ item_id: "monogrammed_handkerchief", quantity: 1 }]);
+
+	    const invitationEvent = Object.values(ended.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_heir_chief_invitation",
+	    );
+	    expect(invitationEvent).toEqual(
+	      expect.objectContaining({
+	        current_node_id: "wait_for_invitation",
+	        status: "waiting_time",
+	        next_wakeup_at: 12145,
+	        parent_event_id: ended.event?.id,
+	      }),
+	    );
 	  });
 
-	  it("routes the authored scavenger camp threat choice into temporary contact loss", () => {
+	  it("delays the heir chief invitation and returns to the choice after reading sentry doubts", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116", "alice"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12001, "alice"),
+	    });
+	    const challengeCallId = started.event?.active_call_id ?? "";
+	    const reply = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: challengeCallId,
+	      option_id: "opt_heir_handkerchief",
+	      occurred_at: 12015,
+	    });
+	    const replyCallId = reply.event?.active_call_id ?? "";
+	    const delayed = selectCallOption({
+	      state: reply.state,
+	      index: indexResult.index,
+	      call_id: replyCallId,
+	      option_id: "ack_heir_handkerchief",
+	      occurred_at: 12025,
+	    });
+
+	    const early = processEventWakeups({ state: delayed.state, index: indexResult.index, elapsed_game_seconds: 12144 });
+	    expect(early.errors).toEqual([]);
+	    expect(Object.values(early.state.active_calls).some((call) => call.event_node_id === "chief_invitation")).toBe(false);
+
+	    const due = processEventWakeups({ state: delayed.state, index: indexResult.index, elapsed_game_seconds: 12145 });
+	    const invitationEvent = Object.values(due.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_heir_chief_invitation",
+	    );
+	    const invitationCallId = invitationEvent?.active_call_id ?? "";
+	    const invitationCall = due.state.active_calls[invitationCallId];
+
+	    expect(due.errors).toEqual([]);
+	    expect(invitationEvent).toEqual(expect.objectContaining({ current_node_id: "chief_invitation", status: "waiting_call" }));
+	    expect(invitationCall?.available_options.map((option) => option.text)).toEqual([
+	      "同意见村长。",
+	      "观察哨兵的迟疑。",
+	      "拒绝见村长，原地待命。",
+	    ]);
+	    expect(invitationCall?.available_options.find((option) => option.option_id === "opt_read_sentry")).toEqual(
+	      expect.objectContaining({
+	        display_tag: "感知",
+	        check_preview: expect.objectContaining({ attribute: "perception", attribute_label: "感知", dc: 12, die_sides: 20 }),
+	      }),
+	    );
+
+	    const readDoubts = selectCallOption({
+	      state: due.state,
+	      index: indexResult.index,
+	      call_id: invitationCallId,
+	      option_id: "opt_read_sentry",
+	      occurred_at: 12155,
+	    });
+	    const doubtsCallId = readDoubts.event?.active_call_id ?? "";
+	    const doubtsText = readDoubts.state.active_calls[doubtsCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+
+	    expect(readDoubts.errors).toEqual([]);
+	    expect(readDoubts.event?.current_node_id).toBe("sentry_doubts_read_reply");
+	    expect(readDoubts.event?.check_results.sentry_doubts).toEqual(
+	      expect.objectContaining({
+	        node_id: "check_sentry_doubts",
+	        attribute: "perception",
+	        attribute_label: "感知",
+	        die_sides: 20,
+	        roll: 17,
+	        modifier: 4,
+	        total: 21,
+	        dc: 12,
+	        outcome: "success",
+	        next_node_id: "sentry_doubts_read_reply",
+	      }),
+	    );
+	    expect(doubtsText).toContain("武器和外来装备");
+	    expect(doubtsText).toContain("这里明显缺物资");
+	    expect(readDoubts.state.world_flags.iafs_scavenger_sentry_doubts_read?.value).toBe(true);
+
+	    const returned = selectCallOption({
+	      state: readDoubts.state,
+	      index: indexResult.index,
+	      call_id: doubtsCallId,
+	      option_id: "ack_sentry_doubts_read",
+	      occurred_at: 12165,
+	    });
+	    const returnedCallId = returned.event?.active_call_id ?? "";
+	    const returnedOptions = returned.state.active_calls[returnedCallId]?.available_options.map((option) => option.text) ?? [];
+
+	    expect(returned.errors).toEqual([]);
+	    expect(returned.event?.current_node_id).toBe("chief_invitation");
+	    expect(returnedOptions).toEqual(["同意见村长。", "拒绝见村长，原地待命。"]);
+	  });
+
+	  it("returns to the heir chief invitation after a failed doubts read and can defer the meeting", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: createAuthoredScavengerCampState("92-116", "alice"),
+	      index: indexResult.index,
+	      context: scavengerArrivalContext("92-116", 12000, "alice"),
+	    });
+	    const challengeCallId = started.event?.active_call_id ?? "";
+	    const reply = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: challengeCallId,
+	      option_id: "opt_heir_handkerchief",
+	      occurred_at: 12015,
+	    });
+	    const replyCallId = reply.event?.active_call_id ?? "";
+	    const delayed = selectCallOption({
+	      state: reply.state,
+	      index: indexResult.index,
+	      call_id: replyCallId,
+	      option_id: "ack_heir_handkerchief",
+	      occurred_at: 12025,
+	    });
+	    const due = processEventWakeups({ state: delayed.state, index: indexResult.index, elapsed_game_seconds: 12145 });
+	    const invitationEvent = Object.values(due.state.active_events).find(
+	      (event) => event.event_definition_id === "iafs_scavenger_heir_chief_invitation",
+	    );
+	    const invitationCallId = invitationEvent?.active_call_id ?? "";
+
+	    const missed = selectCallOption({
+	      state: due.state,
+	      index: indexResult.index,
+	      call_id: invitationCallId,
+	      option_id: "opt_read_sentry",
+	      occurred_at: 12155,
+	    });
+	    const missedCallId = missed.event?.active_call_id ?? "";
+	    const missedText = missed.state.active_calls[missedCallId]?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+
+	    expect(missed.errors).toEqual([]);
+	    expect(missed.event?.current_node_id).toBe("sentry_doubts_missed_reply");
+	    expect(missed.event?.check_results.sentry_doubts).toEqual(
+	      expect.objectContaining({
+	        roll: 7,
+	        modifier: 4,
+	        total: 11,
+	        dc: 12,
+	        outcome: "failure",
+	        next_node_id: "sentry_doubts_missed_reply",
+	      }),
+	    );
+	    expect(missedText).toContain("看不出更具体的东西");
+	    expect(missed.state.world_flags.iafs_scavenger_sentry_doubts_read).toBeUndefined();
+
+	    const returned = selectCallOption({
+	      state: missed.state,
+	      index: indexResult.index,
+	      call_id: missedCallId,
+	      option_id: "ack_sentry_doubts_missed",
+	      occurred_at: 12165,
+	    });
+	    const returnedCallId = returned.event?.active_call_id ?? "";
+	    expect(returned.state.active_calls[returnedCallId]?.available_options.map((option) => option.option_id)).toEqual([
+	      "opt_accept_chief",
+	      "opt_read_sentry",
+	      "opt_decline_chief",
+	    ]);
+
+	    const declined = selectCallOption({
+	      state: returned.state,
+	      index: indexResult.index,
+	      call_id: returnedCallId,
+	      option_id: "opt_decline_chief",
+	      occurred_at: 12175,
+	    });
+	    const declineCallId = declined.event?.active_call_id ?? "";
+	    const ended = selectCallOption({
+	      state: declined.state,
+	      index: indexResult.index,
+	      call_id: declineCallId,
+	      option_id: "ack_decline_chief",
+	      occurred_at: 12185,
+	    });
+
+	    expect(declined.errors).toEqual([]);
+	    expect(declined.event?.current_node_id).toBe("decline_chief_reply");
+	    expect(ended.errors).toEqual([]);
+	    expect(ended.event?.status).toBe("resolved");
+	    expect(ended.event?.result_key).toBe("scavenger_chief_meeting_deferred");
+	    expect(ended.state.world_flags.iafs_scavenger_chief_meeting_deferred?.value).toBe(true);
+	    expect(ended.state.world_flags.iafs_scavenger_chief_meeting_intent?.value).toBe("deferred");
+	  });
+
+	  it("records only meeting request flags when the deferred chief meeting action is selected later", () => {
+	    const indexResult = buildEventContentIndex(eventContentLibrary);
+	    expect(indexResult.errors).toEqual([]);
+	    const started = processTrigger({
+	      state: {
+	        ...createAuthoredScavengerCampState("92-116", "alice"),
+	        world_flags: {
+	          iafs_scavenger_chief_meeting_deferred: {
+	            key: "iafs_scavenger_chief_meeting_deferred",
+	            value: true,
+	            value_type: "boolean",
+	            created_at: 12185,
+	            updated_at: 12185,
+	            tags: ["iafs", "scavenger_camp", "chief"],
+	          },
+	        },
+	      },
+	      index: indexResult.index,
+	      context: {
+	        ...triggerContext(12500),
+	        trigger_type: "action_complete",
+	        source: "call",
+	        crew_id: "alice",
+	        tile_id: "92-116",
+	        action_id: "iafs_scavenger:meet_chief",
+	        payload: { action_type: "meet_chief", action_def_id: "iafs_scavenger:meet_chief" },
+	      },
+	    });
+	    const requestCallId = started.event?.active_call_id ?? "";
+
+	    expect(started.errors).toEqual([]);
+	    expect(started.event?.event_definition_id).toBe("iafs_scavenger_chief_meeting_request");
+	    expect(started.event?.current_node_id).toBe("request_recorded");
+	    expect(started.event?.status).toBe("waiting_call");
+	    expect(started.state.world_flags.iafs_scavenger_chief_meeting_requested?.value).toBe(true);
+	    expect(started.state.world_flags.iafs_scavenger_chief_meeting_intent?.value).toBe("deferred_followup");
+	    expect(started.state.world_flags.iafs_scavenger_chief_meeting_request_crew?.value).toBe("alice");
+	    expect(started.state.world_flags.iafs_scavenger_chief_meeting_request_tile?.value).toBe("92-116");
+
+	    const ended = selectCallOption({
+	      state: started.state,
+	      index: indexResult.index,
+	      call_id: requestCallId,
+	      option_id: "ack_chief_meeting_requested",
+	      occurred_at: 12510,
+	    });
+
+	    expect(ended.errors).toEqual([]);
+	    expect(ended.event?.status).toBe("resolved");
+	    expect(ended.event?.result_key).toBe("scavenger_chief_meeting_requested");
+	  });
+
+	  it("routes failed scavenger camp threat choice into delayed captive callback", () => {
     const indexResult = buildEventContentIndex(eventContentLibrary);
     expect(indexResult.errors).toEqual([]);
     const started = processTrigger({
@@ -578,6 +833,136 @@ describe("event engine trigger intake", () => {
     expect(ended.state.world_flags.iafs_scavenger_sentry_opening_choice?.value).toBe("threaten");
     expect(ended.state.world_flags.iafs_scavenger_contact_lost?.value).toBe(true);
     expect(ended.state.crew.mike.condition_tags).toContain("iafs_scavenger_signal_lost");
+    expect(ended.state.crew.mike.condition_tags).toContain("iafs_scavenger_captive");
+    expect(ended.state.crew.mike.tile_id).toBe("90-116");
+    expect(ended.state.world_flags.iafs_scavenger_captive_crew?.value).toBe("mike");
+    expect(ended.state.world_flags.iafs_scavenger_captive_tile?.value).toBe("90-116");
+    expect(ended.state.world_flags.iafs_scavenger_captive_needs_rescue?.value).toBe(true);
+
+    const captureEvent = Object.values(ended.state.active_events).find(
+      (event) => event.event_definition_id === "iafs_scavenger_sentry_capture_callback",
+    );
+    expect(captureEvent).toEqual(
+      expect.objectContaining({
+        current_node_id: "capture_wait",
+        status: "waiting_time",
+        next_wakeup_at: 12325,
+        parent_event_id: ended.event?.id,
+      }),
+    );
+
+    const early = processEventWakeups({ state: ended.state, index: indexResult.index, elapsed_game_seconds: 12324 });
+    expect(early.errors).toEqual([]);
+    expect(Object.values(early.state.active_calls).some((call) => call.event_node_id === "captive_callback")).toBe(false);
+
+    const due = processEventWakeups({ state: ended.state, index: indexResult.index, elapsed_game_seconds: 12325 });
+    const callbackEvent = Object.values(due.state.active_events).find(
+      (event) => event.event_definition_id === "iafs_scavenger_sentry_capture_callback",
+    );
+    const callbackCallId = callbackEvent?.active_call_id ?? "";
+    const callbackCall = due.state.active_calls[callbackCallId];
+    const callbackText = callbackCall?.rendered_lines.map((line) => line.text).join(" ") ?? "";
+
+    expect(due.errors).toEqual([]);
+    expect(callbackEvent).toEqual(expect.objectContaining({ current_node_id: "captive_callback", status: "waiting_call" }));
+    expect(callbackCall).toEqual(expect.objectContaining({ status: "awaiting_choice", event_node_id: "captive_callback" }));
+    expect(callbackText).toContain("我被他们关起来了");
+    expect(callbackText).toContain("请派人支援");
+
+    const rescuePending = selectCallOption({
+      state: due.state,
+      index: indexResult.index,
+      call_id: callbackCallId,
+      option_id: "ack_captive_callback",
+      occurred_at: 12335,
+    });
+
+    expect(rescuePending.errors).toEqual([]);
+    expect(rescuePending.event?.status).toBe("resolved");
+    expect(rescuePending.event?.result_key).toBe("scavenger_sentry_captive_rescue_pending");
+    expect(rescuePending.state.world_flags.iafs_scavenger_rescue_pending?.value).toBe(true);
+    expect(rescuePending.state.objectives.iafs_scavenger_rescue_captive).toEqual(
+      expect.objectContaining({
+        title: "支援被关押的队员",
+        target_tile_id: "90-116",
+        status: "available",
+      }),
+    );
+  });
+
+	  it("routes successful scavenger camp threat choice into control negotiation", () => {
+    const indexResult = buildEventContentIndex(eventContentLibrary);
+    expect(indexResult.errors).toEqual([]);
+    const started = processTrigger({
+      state: createAuthoredScavengerCampState("92-116"),
+      index: indexResult.index,
+      context: scavengerArrivalContext("92-116", 12001),
+    });
+    const challengeCallId = started.event?.active_call_id ?? "";
+    const controlled = selectCallOption({
+      state: started.state,
+      index: indexResult.index,
+      call_id: challengeCallId,
+      option_id: "opt_threaten",
+      occurred_at: 12015,
+    });
+    const controlledCallId = controlled.event?.active_call_id ?? "";
+    const ended = selectCallOption({
+      state: controlled.state,
+      index: indexResult.index,
+      call_id: controlledCallId,
+      option_id: "ack_threaten_success",
+      occurred_at: 12025,
+    });
+    const negotiationEvent = Object.values(ended.state.active_events).find(
+      (event) => event.event_definition_id === "iafs_scavenger_sentry_control_negotiation",
+    );
+    const negotiationCallId = negotiationEvent?.active_call_id ?? "";
+    const negotiationCall = ended.state.active_calls[negotiationCallId];
+
+    expect(controlled.errors).toEqual([]);
+    expect(controlled.event?.current_node_id).toBe("threaten_control");
+    expect(controlled.event?.check_results.sentry_threaten).toEqual(
+      expect.objectContaining({
+        roll: 14,
+        modifier: 2,
+        total: 16,
+        dc: 14,
+        outcome: "success",
+        next_node_id: "threaten_control",
+      }),
+    );
+    expect(ended.errors).toEqual([]);
+    expect(ended.event?.status).toBe("resolved");
+    expect(ended.event?.result_key).toBe("scavenger_sentry_threaten_controlled");
+    expect(negotiationEvent).toEqual(expect.objectContaining({ current_node_id: "control_parley", status: "waiting_call" }));
+    expect(negotiationCall?.available_options.map((option) => option.text)).toEqual([
+      "同意进入房间和首领见面。",
+      "同意，但带上刚才控制住的哨卫做人质。",
+      "不同意，要求首领来哨站。",
+    ]);
+
+    const hostageReply = selectCallOption({
+      state: ended.state,
+      index: indexResult.index,
+      call_id: negotiationCallId,
+      option_id: "opt_enter_with_hostage",
+      occurred_at: 12035,
+    });
+    const hostageReplyCallId = hostageReply.event?.active_call_id ?? "";
+    const hostageEnded = selectCallOption({
+      state: hostageReply.state,
+      index: indexResult.index,
+      call_id: hostageReplyCallId,
+      option_id: "ack_enter_with_hostage",
+      occurred_at: 12045,
+    });
+
+    expect(hostageReply.errors).toEqual([]);
+    expect(hostageReply.event?.current_node_id).toBe("enter_with_hostage_reply");
+    expect(hostageEnded.errors).toEqual([]);
+    expect(hostageEnded.event?.result_key).toBe("scavenger_sentry_control_enter_with_hostage");
+    expect(hostageEnded.state.world_flags.iafs_scavenger_sentry_control_choice?.value).toBe("enter_with_hostage");
   });
 
 	  it("records the authored scavenger camp negotiate and chat opening choices", () => {
@@ -935,6 +1320,48 @@ describe("event engine trigger intake", () => {
     expect(due.state.active_events.evt_timed.status).toBe("resolved");
   });
 
+  it("starts immediate spawn_event children at their authored entry node", () => {
+    const spawnNode: SpawnEventNode = {
+      ...baseNode("spawn_child", "spawn_event"),
+      type: "spawn_event",
+      event_definition_id: "spawned_child",
+      spawn_policy: "immediate",
+      context_mapping: {},
+      parent_event_link: true,
+      next_node_id: "parent_done",
+    };
+    const parent = definitionWith({
+      id: "parent_event",
+      triggerType: "arrival",
+      nodes: [spawnNode, endNode("parent_done", "resolved", "parent_done", false)],
+    });
+    const child = definitionWith({
+      id: "spawned_child",
+      triggerType: "event_node_finished",
+      nodes: [waitNode("child_wait", 30, "child_done"), endNode("child_done", "resolved", "child_done", false)],
+    });
+    const index = indexFor([parent, child]);
+
+    const started = startRuntimeEvent(createState(), parent, triggerContext(120), {
+      event_id: "evt_parent",
+      content_index: index,
+    });
+    const childEvent = started.state.active_events["evt_parent:spawn_child:child"];
+
+    expect(started.errors).toEqual([]);
+    expect(started.event.status).toBe("resolved");
+    expect(started.event.child_event_ids).toEqual(["evt_parent:spawn_child:child"]);
+    expect(childEvent).toMatchObject({
+      event_definition_id: "spawned_child",
+      current_node_id: "child_wait",
+      status: "waiting_time",
+      parent_event_id: "evt_parent",
+      primary_crew_id: "amy",
+      primary_tile_id: "2-3",
+      next_wakeup_at: 150,
+    });
+  });
+
   it("filters candidates blocked by cooldown, max count, mutex, or blocking slot", () => {
     const selectedDefinition = definitionWith({ id: "selectable_event", triggerType: "arrival", priority: 1 });
     const cooldownDefinition = definitionWith({ id: "cooldown_event", triggerType: "arrival", priority: 2, cooldownSeconds: 60 });
@@ -1253,6 +1680,22 @@ function createAuthoredSuppliesState(elapsedGameSeconds: number): GraphRunnerGam
 	    },
 	    tiles: {
 	      ...state.tiles,
+	      "90-116": {
+	        id: "90-116",
+	        coordinates: { x: 116, y: 90 },
+	        terrain_type: "plain",
+	        tags: ["iafs", "ashfrost", "scavenger_camp", "rear_tent"],
+	        danger_tags: [],
+	        discovery_state: "visited",
+	        survey_state: "unsurveyed",
+	        visibility: "visible",
+	        current_crew_ids: [],
+	        resource_nodes: [],
+	        site_objects: [],
+	        buildings: [],
+	        event_marks: [],
+	        history_keys: [],
+	      },
 	      [tileId]: {
         id: tileId,
         coordinates: { x: col, y: row },

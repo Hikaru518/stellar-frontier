@@ -1024,7 +1024,10 @@ function setWorldFlag(effect: Effect, context: EffectExecutionContext, path: str
     return { state: context.state, errors: key.errors };
   }
 
-  const value = effect.params.value;
+  const value =
+    typeof effect.params.value_template === "string"
+      ? renderTemplate(effect.params.value_template, effect, context)
+      : effect.params.value;
   if (!isWorldFlagValue(value)) {
     return fail(context.state, effect, "missing_value", `${path}.params.value`, "set_world_flag requires a boolean, number, or string value.");
   }

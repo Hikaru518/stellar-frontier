@@ -317,6 +317,25 @@ describe("App", () => {
     expect(restoredMike?.conditions).not.toContain("iafs_scavenger_signal_lost");
   });
 
+  it("syncs runtime crew location changes back to visible crew state", () => {
+    const state = createSavedCrashSiteState() as unknown as GameState;
+    const eventState = toEventEngineState(state);
+    eventState.crew.mike = {
+      ...eventState.crew.mike,
+      tile_id: "90-116",
+    };
+
+    const syncedState = mergeEventRuntimeState(state, eventState);
+    const syncedMike = syncedState.crew.find((member) => member.id === "mike");
+    const expectedLocation = getTileLocationLabel(defaultMapConfig, "90-116", state.map);
+
+    expect(syncedMike).toMatchObject({
+      currentTile: "90-116",
+      coord: expectedLocation,
+      location: expectedLocation,
+    });
+  });
+
   it("migrates legacy map object status into matching feature runtime state", () => {
     window.localStorage.setItem(
       GAME_SAVE_KEY,
