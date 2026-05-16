@@ -75,6 +75,7 @@ import { GAME_SAVE_SCHEMA_VERSION, isCompatibleGameSaveState } from "./timeSyste
 import { recordPerformanceDiagnostic } from "./performanceDiagnostics";
 import { buildQuestSidebarView, clearQuestUpdateMarkers, createInitialQuestState, normalizeQuestState, type QuestCategoryFilter, type QuestStatusFilter } from "./questSystem";
 import { logger } from "./logger";
+import { resolveConfiguredYuanHostUrl } from "./yuanHostConfig";
 import {
   acquireYuanDualDeviceTerminal,
   createDualDeviceMessage,
@@ -3006,18 +3007,7 @@ function shouldStartYuanTerminal() {
 }
 
 function getConfiguredYuanHostUrl() {
-  const configured = import.meta.env.VITE_YUAN_HOST_URL as string | undefined;
-  if (configured) {
-    return configured;
-  }
-
-  const url = new URL(window.location.href);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.port = "8888";
-  url.pathname = "/";
-  url.search = "";
-  url.hash = "";
-  return url.toString();
+  return resolveConfiguredYuanHostUrl(import.meta.env.VITE_YUAN_HOST_URL as string | undefined);
 }
 
 function getConfiguredMobileTerminalUrl() {

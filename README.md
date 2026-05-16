@@ -41,7 +41,7 @@ npm run dev:pc
 npm run dev:mobile
 ```
 
-默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Game Editor 为 `http://localhost:5175/`，Yuan Host 为 `ws://localhost:8888/`。
+默认本地端口：PC 为 `http://localhost:5173/`，手机端为 `http://localhost:5174/`，Game Editor 为 `http://localhost:5175/`。默认 Yuan Host URL 为 `ws://8.159.128.125:8888/`；如需改回本地 Yuan Host，可在启动 PC 端时设置 `VITE_YUAN_HOST_URL=ws://localhost:8888/`。
 
 启动本地 Game Editor（包含 Event Editor 和 Map Editor）。先开一个终端运行 helper：
 
@@ -57,13 +57,13 @@ npm run editor:dev
 
 Editor 是 Rush app 项目 `apps/editor`。helper 只监听 `127.0.0.1`，负责读取、校验和保存本地内容：Event Editor 使用 `content/events/`，Map Editor 使用 `content/maps/`、`content/maps/tilesets/`、`content/map-objects/` 和 `assets/` 中登记过的 PNG tileset。
 
-双设备真实联调需要先启动 Yuan Host。若使用本地 Yuan 仓库，可运行：
+双设备真实联调需要确保 Yuan Host 可访问。默认使用远端 `ws://8.159.128.125:8888/`；若使用本地 Yuan 仓库，可运行：
 
 ```bash
 node /Users/c1/Work/Yuan/apps/host/lib/cli.js
 ```
 
-然后分别启动 PC 与手机端。PC 通讯台会创建真实 Yuan `Terminal(enable_WebRTC: true)`；手机扫码打开 companion 页面后也会创建 Yuan Terminal，并通过 Yuan service 回传心跳、已读、接听事件。
+然后分别启动 PC 与手机端，并为 PC 端设置 `VITE_YUAN_HOST_URL=ws://localhost:8888/`。PC 通讯台会创建真实 Yuan `Terminal(enable_WebRTC: true)`；手机扫码打开 companion 页面后也会创建 Yuan Terminal，并通过 Yuan service 回传心跳、已读、接听事件。
 
 `enable_WebRTC: true` 表示允许 Yuan 尝试 WebRTC DataChannel 升级，不表示本地测试一定已经走上 DataChannel。Yuan 仍以 WSS 作为 baseline：双方要先通过 Yuan Host 同步 `terminalInfo.enable_WebRTC`，再由发往对端的消息触发 `WebRTC/Offer` / `WebRTC/Answer`，并且浏览器 ICE 候选必须连通。当前 UI 的“局域网升级 / 公网兜底”是产品语义展示，不是实时 DataChannel 诊断面板；真实 DataChannel 需要 Yuan tunnel metric、调试日志或后续测试钩子确认。
 

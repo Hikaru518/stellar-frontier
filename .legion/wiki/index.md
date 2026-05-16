@@ -10,6 +10,7 @@
 - [Task: Fix IAFS Editor Manifest Tests](tasks/fix-iafs-editor-manifest-tests.md)
 - [Task: Mobile Communication Device Gameplay](tasks/mobile-communication-device-gameplay.md)
 - [Task: README / AGENTS / Wiki Maintenance](tasks/readme-agents-wiki-maintenance.md)
+- [Task: Configure Yuan Host Base URL](tasks/configure-yuan-host-base-url.md)
 
 ## Current Query Path
 

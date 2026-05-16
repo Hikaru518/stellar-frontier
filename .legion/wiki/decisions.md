@@ -20,6 +20,12 @@ Yuan Host/Protocol owns terminal routing, WSS baseline, Host-mediated WebRTC off
 
 The current implementation follows `docs/plans/2026-04-27-22-52/dual-device-play-design.md` and the Yuan assessment: PC shows QR/manual-code pairing, pairing tokens expire, mobile reads URL parameters, and the shared library maps a Stellar room to Yuan host/tenant-oriented connection metadata.
 
+## Yuan Host Default URL
+
+PC client pairing defaults to `ws://8.159.128.125:8888/` for Yuan Host. `VITE_YUAN_HOST_URL` remains the override for local development, alternate ports, WSS/TLS endpoints, or environment-specific deployments.
+
+This default does not change the dual-device authority boundary: PC remains the only `GameState` owner, mobile sends typed companion events, and Stellar still does not introduce a dedicated relay/server. Plain `ws://` transport is accepted only for the current configured endpoint; WSS/TLS hardening remains a separate production maintenance item.
+
 ## Yuan Protocol 评估
 
 Yuan `@yuants/app-host` 与 `@yuants/protocol` 不是 Stellar 业务语义的裸 drop-in replacement，但它是推荐底层基础设施。PC/mobile 都应成为 Yuan Terminal，`DualDeviceMessage` 构建在 `ITerminalMessage` 之上，room 可优先映射到 Yuan host/tenant。后续生产化重点不是自研 relay，而是补齐 Stellar-specific QR/token/PC-first/first-phone-lock/fallback/game-state authority 业务语义和 Yuan tenant hardening。
