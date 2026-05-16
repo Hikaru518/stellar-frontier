@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { buildCallView, type CallActionTargetView, type CallFeatureContextView } from "../callActions";
 import { GameConsoleLayout } from "../components/Layout";
 import { defaultMapConfig } from "../content/contentData";
@@ -30,6 +30,14 @@ interface CallActionGroupView {
   actions: CallActionOption[];
 }
 
+const CREW_PORTRAIT_PROFILE_LINE_WIDTH = 40;
+
+interface RuntimeTranscriptPlaybackState {
+  callId: string | null;
+  lineIndex: number;
+  charIndex: number;
+}
+
 interface CallPageProps {
   call: CallContext | null;
   crew: CrewMember[];
@@ -51,6 +59,8 @@ interface CallPageProps {
   onShowCrewStatus: (crewId: CrewId) => void;
   onShowCrewInventory: (crewId: CrewId) => void;
 }
+
+const RUNTIME_TRANSCRIPT_STEP_MS = 42;
 
 export function CallPage({
   call,
@@ -81,7 +91,9 @@ export function CallPage({
   const callClosed = Boolean(call?.settled || runtimeCallClosed);
   const canEndCall = callClosed || !isRuntimeContext;
   const selectedMoveTarget = tiles.find((tile) => tile.id === call?.selectedTargetTileId);
-  const movePreview = member && call?.selectedTargetTileId ? createMovePreview(member, call.selectedTargetTileId, tiles) : null;
+  const movePreview = member && call?.selectedTargetTileId
+    ? createMovePreview(member, call.selectedTargetTileId, tiles, gameState.debugSettings.crewMoveSpeedMultiplier)
+    : null;
   const crewActionViews = useMemo(
     () =>
       Object.fromEntries(
@@ -158,6 +170,126 @@ export function CallPage({
       isRuntime: false,
     };
   }, [activeCalls, call, elapsedGameSeconds, gameState, member, memberActionView, runtimeCall, tiles]);
+  const runtimeTranscriptCallId = callView?.isRuntime && runtimeCall ? runtimeCall.id : null;
+  const runtimeTranscriptEnabled = Boolean(callView?.isRuntime && runtimeTranscriptCallId && !callClosed);
+  const runtimeTranscriptAnimationDisabled = isRuntimeTranscriptAnimationDisabled();
+  const runtimeTranscriptPlaybackEnabled = runtimeTranscriptEnabled && !runtimeTranscriptAnimationDisabled;
+  const runtimeTranscriptLines = runtimeTranscriptEnabled ? callView?.lines ?? [] : [];
+  const firstRuntimeTranscriptLine = runtimeTranscriptLines[0];
+  const [runtimeTranscript, setRuntimeTranscript] = useState<RuntimeTranscriptPlaybackState>({
+    callId: null,
+    lineIndex: 0,
+    charIndex: 0,
+  });
+  const activeRuntimeTranscriptLineIndex =
+    runtimeTranscript.callId === runtimeTranscriptCallId ? Math.min(runtimeTranscript.lineIndex, Math.max(runtimeTranscriptLines.length - 1, 0)) : 0;
+  const activeRuntimeTranscriptCharIndex =
+    runtimeTranscript.callId === runtimeTranscriptCallId
+      ? runtimeTranscript.charIndex
+      : initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine);
+  const currentRuntimeTranscriptLine = runtimeTranscriptLines[activeRuntimeTranscriptLineIndex] ?? "";
+  const runtimeTranscriptComplete =
+    runtimeTranscriptAnimationDisabled ||
+    !runtimeTranscriptEnabled ||
+    runtimeTranscriptLines.length === 0 ||
+    (activeRuntimeTranscriptLineIndex >= runtimeTranscriptLines.length - 1 &&
+      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length);
+
+  useEffect(() => {
+    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId) {
+      setRuntimeTranscript({ callId: null, lineIndex: 0, charIndex: 0 });
+      return;
+    }
+
+    setRuntimeTranscript((current) => {
+      if (current.callId === runtimeTranscriptCallId) {
+        return current;
+      }
+      return {
+        callId: runtimeTranscriptCallId,
+        lineIndex: 0,
+        charIndex: initialRuntimeTranscriptCharCount(firstRuntimeTranscriptLine),
+      };
+    });
+  }, [firstRuntimeTranscriptLine, runtimeTranscriptCallId, runtimeTranscriptPlaybackEnabled]);
+
+  useEffect(() => {
+    if (
+      !runtimeTranscriptPlaybackEnabled ||
+      !runtimeTranscriptCallId ||
+      runtimeTranscriptLines.length === 0 ||
+      activeRuntimeTranscriptCharIndex >= currentRuntimeTranscriptLine.length
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setRuntimeTranscript((current) => {
+        if (current.callId !== runtimeTranscriptCallId || current.lineIndex !== activeRuntimeTranscriptLineIndex) {
+          return current;
+        }
+        if (current.charIndex >= currentRuntimeTranscriptLine.length) {
+          return current;
+        }
+        return {
+          ...current,
+          charIndex: current.charIndex + 1,
+        };
+      });
+    }, RUNTIME_TRANSCRIPT_STEP_MS);
+
+    return () => window.clearInterval(timer);
+  }, [
+    activeRuntimeTranscriptCharIndex,
+    activeRuntimeTranscriptLineIndex,
+    currentRuntimeTranscriptLine.length,
+    runtimeTranscriptCallId,
+    runtimeTranscriptPlaybackEnabled,
+    runtimeTranscriptLines.length,
+  ]);
+
+  const handleRuntimeTranscriptAdvance = () => {
+    if (!runtimeTranscriptPlaybackEnabled || !runtimeTranscriptCallId || runtimeTranscriptLines.length === 0) {
+      return;
+    }
+
+    setRuntimeTranscript((current) => {
+      const lineIndex = current.callId === runtimeTranscriptCallId ? Math.min(current.lineIndex, runtimeTranscriptLines.length - 1) : 0;
+      const charIndex = current.callId === runtimeTranscriptCallId ? current.charIndex : initialRuntimeTranscriptCharCount(runtimeTranscriptLines[0]);
+      const currentLine = runtimeTranscriptLines[lineIndex] ?? "";
+
+      if (charIndex < currentLine.length) {
+        return {
+          callId: runtimeTranscriptCallId,
+          lineIndex,
+          charIndex: currentLine.length,
+        };
+      }
+
+      if (lineIndex < runtimeTranscriptLines.length - 1) {
+        const nextLine = runtimeTranscriptLines[lineIndex + 1];
+        return {
+          callId: runtimeTranscriptCallId,
+          lineIndex: lineIndex + 1,
+          charIndex: initialRuntimeTranscriptCharCount(nextLine),
+        };
+      }
+
+      return {
+        callId: runtimeTranscriptCallId,
+        lineIndex,
+        charIndex,
+      };
+    });
+  };
+
+  const handleRuntimeTranscriptKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    handleRuntimeTranscriptAdvance();
+  };
 
   if (!call || !member || !callView || !memberActionView) {
     return (
@@ -298,9 +430,13 @@ export function CallPage({
             <div className="console-call-action-groups">
               <section className="console-call-action-group">
                 <h3>事件选项</h3>
-                <div className="console-call-option-list">
-                  {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
-                </div>
+                {runtimeTranscriptComplete ? (
+                  <div className="console-call-option-list">
+                    {callView.actions.map((action) => renderActionButton(action, callClosed, onDecision))}
+                  </div>
+                ) : (
+                  <p className="console-call-note-line console-call-transcript-gate">LIVE TRANSCRIPT 未完成，点击文本区继续接收。</p>
+                )}
               </section>
             </div>
           ) : (
@@ -357,18 +493,31 @@ export function CallPage({
                   <p key={`portrait-${index}-${line}`} className="console-call-portrait-line">{line}</p>
                 ))}
                 <div className="console-call-profile-copy">
-                  <p className="console-screen-line console-screen-line-cyan">CREW: {member.name.toUpperCase()} / {member.role}</p>
-                  <p className="console-call-note-line">VOICE: {member.voiceTone}</p>
-                  <p className="console-call-note-line">TAGS: {member.personalityTags.join(" / ") || "NONE"}</p>
-                  <p className="console-call-note-line">INTRO: {member.profile.selfIntro}</p>
+                  {buildCrewPortraitProfileLines(member).map((line, index) => (
+                    <p key={`profile-${index}-${line.text}`} className={line.className}>{line.text}</p>
+                  ))}
                 </div>
               </div>
             </section>
-            <section className="console-screen-block">
+            <section
+              className={`console-screen-block ${runtimeTranscriptPlaybackEnabled ? "console-call-transcript-interactive" : ""}`}
+              onClick={runtimeTranscriptPlaybackEnabled ? handleRuntimeTranscriptAdvance : undefined}
+              onKeyDown={runtimeTranscriptPlaybackEnabled ? handleRuntimeTranscriptKeyDown : undefined}
+              role={runtimeTranscriptPlaybackEnabled ? "button" : undefined}
+              tabIndex={runtimeTranscriptPlaybackEnabled ? 0 : undefined}
+              aria-label={runtimeTranscriptPlaybackEnabled ? "LIVE TRANSCRIPT，点击继续接收" : undefined}
+            >
               <p className="console-screen-section">[ LIVE TRANSCRIPT ]</p>
-              {(call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
-                <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
-              ))}
+              {runtimeTranscriptPlaybackEnabled
+                ? renderRuntimeTranscriptLines({
+                    lines: callView.lines,
+                    activeCallId: runtimeTranscriptCallId,
+                    playback: runtimeTranscript,
+                    complete: runtimeTranscriptComplete,
+                  })
+                : (call.result && !callView.isRuntime ? [call.result] : callView.lines).map((line, index) => (
+                    <p key={`transcript-${index}-${line}`} className="console-call-dialogue-line">{line}</p>
+                  ))}
               {callTimingText ? (
                 <p className={callView.isRuntime ? "console-screen-line console-screen-line-rose" : "console-screen-line console-screen-line-cyan"}>
                   {callTimingText}
@@ -414,6 +563,43 @@ function renderActionButton(action: CallActionOption, callClosed: boolean, onDec
       {action.disabledReason ? <small className="choice-disabled-reason">{action.disabledReason}</small> : null}
     </button>
   );
+}
+
+function initialRuntimeTranscriptCharCount(line: string | undefined) {
+  return line && line.length > 0 ? 1 : 0;
+}
+
+function isRuntimeTranscriptAnimationDisabled() {
+  return typeof window !== "undefined" && window.localStorage.getItem("stellar-frontier-e2e-disable-animation") === "1";
+}
+
+function renderRuntimeTranscriptLines({
+  lines,
+  activeCallId,
+  playback,
+  complete,
+}: {
+  lines: string[];
+  activeCallId: string | null;
+  playback: RuntimeTranscriptPlaybackState;
+  complete: boolean;
+}) {
+  if (!lines.length) {
+    return null;
+  }
+
+  const activeLineIndex = playback.callId === activeCallId ? Math.min(playback.lineIndex, lines.length - 1) : 0;
+  const activeCharIndex = playback.callId === activeCallId ? playback.charIndex : initialRuntimeTranscriptCharCount(lines[0]);
+  return lines.slice(0, activeLineIndex + 1).map((line, index) => {
+    const isCurrentLine = index === activeLineIndex;
+    const renderedText = isCurrentLine ? line.slice(0, Math.min(activeCharIndex, line.length)) : line;
+    return (
+      <p key={`runtime-transcript-${index}-${line}`} className="console-call-dialogue-line">
+        {renderedText}
+        {isCurrentLine && !complete ? <span className="console-call-type-cursor" aria-hidden="true">_</span> : null}
+      </p>
+    );
+  });
 }
 
 function FeatureContextPanel({ features }: { features: CallFeatureContextView[] }) {
@@ -618,6 +804,81 @@ function buildCrewPortrait(member: CrewMember, runtime: boolean) {
     frameLine(`TAG ${accent}`, 20),
     frameLine("VOX TIGHT / LOW", 20),
   ];
+}
+
+function buildCrewPortraitProfileLines(member: CrewMember) {
+  return [
+    {
+      className: "console-screen-line console-screen-line-cyan console-call-profile-line",
+      text: `CREW: ${member.name.toUpperCase()} / ${member.role}`,
+    },
+    {
+      className: "console-call-note-line console-call-profile-line",
+      text: `VOICE: ${member.voiceTone}`,
+    },
+    {
+      className: "console-call-note-line console-call-profile-line",
+      text: `TAGS: ${member.personalityTags.join(" / ") || "NONE"}`,
+    },
+    {
+      className: "console-call-note-line console-call-profile-line",
+      text: `INTRO: ${member.profile.selfIntro}`,
+    },
+  ].flatMap((line) =>
+    wrapConsoleProfileText(line.text, CREW_PORTRAIT_PROFILE_LINE_WIDTH).map((text) => ({
+      ...line,
+      text,
+    })),
+  );
+}
+
+function wrapConsoleProfileText(text: string, maxWidth: number) {
+  if (maxWidth < 1) {
+    return [text];
+  }
+
+  const lines: string[] = [];
+  let currentLine = "";
+  let currentWidth = 0;
+
+  for (const character of Array.from(text)) {
+    const characterWidth = getConsoleCharacterWidth(character);
+    if (currentLine && currentWidth + characterWidth > maxWidth) {
+      lines.push(currentLine);
+      currentLine = character;
+      currentWidth = characterWidth;
+      continue;
+    }
+
+    currentLine += character;
+    currentWidth += characterWidth;
+  }
+
+  if (currentLine || lines.length === 0) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+function getConsoleCharacterWidth(character: string) {
+  const codePoint = character.codePointAt(0) ?? 0;
+  if (
+    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
+    codePoint === 0x2329 ||
+    codePoint === 0x232a ||
+    (codePoint >= 0x2e80 && codePoint <= 0xa4cf && codePoint !== 0x303f) ||
+    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+    (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+    (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
+    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
+    (codePoint >= 0xffe0 && codePoint <= 0xffe6)
+  ) {
+    return 2;
+  }
+
+  return 1;
 }
 
 function frameTop(label: string, innerWidth: number) {

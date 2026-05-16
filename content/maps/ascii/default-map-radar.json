@@ -571,8 +571,8 @@
       "priority": 80,
       "shape": {
         "type": "circle",
-        "x": 132,
-        "y": 120,
+        "x": 115,
+        "y": 90,
         "radius": 6
       },
       "tone": "a"

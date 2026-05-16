@@ -26,6 +26,7 @@ describe("runtime call renderer", () => {
         expires_at: 245,
         render_context_snapshot: {
           crew_id: "amy",
+          crew_display_name: "Amy",
           personality_tags: ["steady"],
           event_pressure: "urgent",
           previous_choices: { previous_call: "scan" },
@@ -161,12 +162,12 @@ function callTemplate(): CallTemplate {
     domain: "test",
     event_definition_id: "test_event",
     node_id: "signal_call",
-    render_context_fields: ["crew_id", "personality_tags", "event_pressure", "previous_choices"],
+    render_context_fields: ["crew_id", "crew_display_name", "personality_tags", "event_pressure", "previous_choices"],
     opening_lines: {
       selection: "best_match",
       variants: [
         { id: "opening_default", text: "Default report.", priority: 0 },
-        { id: "opening_steady", text: "Amy keeps her voice steady.", when: [...steadyCondition], priority: 10 },
+        { id: "opening_steady", text: "{{crew_display_name}} keeps her voice steady.", when: [...steadyCondition], priority: 10 },
       ],
     },
     body_lines: [

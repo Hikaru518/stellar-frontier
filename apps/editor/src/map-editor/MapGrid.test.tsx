@@ -205,6 +205,98 @@ describe("MapGrid", () => {
     expect(screen.queryByText("平原")).not.toBeInTheDocument();
   });
 
+  it("shows terrain and weather in gameplay mode by default", () => {
+    render(
+      <MapGrid
+        draft={createDraft()}
+        selectedTileId={null}
+        selectedFeatureId={null}
+        baseLayerMode="gameplay"
+        interactionMode="pan"
+        onSelectTile={vi.fn()}
+        onTileClick={vi.fn()}
+        onTilePointerDown={vi.fn()}
+        onTilePointerEnter={vi.fn()}
+        onTilePointerUp={vi.fn()}
+      />,
+    );
+
+    const tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).toHaveTextContent("平原");
+    expect(tile).toHaveTextContent("晴朗");
+  });
+
+  it("honors gameplay terrain and weather visibility", () => {
+    const props = {
+      draft: createDraft(),
+      selectedTileId: null,
+      selectedFeatureId: null,
+      baseLayerMode: "gameplay" as const,
+      interactionMode: "pan" as const,
+      onSelectTile: vi.fn(),
+      onTileClick: vi.fn(),
+      onTilePointerDown: vi.fn(),
+      onTilePointerEnter: vi.fn(),
+      onTilePointerUp: vi.fn(),
+    };
+    const { rerender } = render(<MapGrid {...props} gameplayLayerVisibility={{ terrain: false, weather: true }} />);
+
+    let tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).not.toHaveTextContent("平原");
+    expect(tile).toHaveTextContent("晴朗");
+
+    rerender(<MapGrid {...props} gameplayLayerVisibility={{ terrain: true, weather: false }} />);
+    tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).toHaveTextContent("平原");
+    expect(tile).not.toHaveTextContent("晴朗");
+
+    rerender(<MapGrid {...props} gameplayLayerVisibility={{ terrain: false, weather: false }} />);
+    tile = screen.getByRole("button", { name: "Select tile 1-1" });
+    expect(tile).not.toHaveTextContent("平原");
+    expect(tile).not.toHaveTextContent("晴朗");
+  });
+
+  it("marks blocked gameplay tiles when terrain is mountain or impassable", () => {
+    render(
+      <MapGrid
+        draft={createDraftWithBlockedTerrain()}
+        selectedTileId={null}
+        selectedFeatureId={null}
+        baseLayerMode="gameplay"
+        interactionMode="pan"
+        onSelectTile={vi.fn()}
+        onTileClick={vi.fn()}
+        onTilePointerDown={vi.fn()}
+        onTilePointerEnter={vi.fn()}
+        onTilePointerUp={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Select tile 1-1" })).toHaveClass("map-grid-tile-gameplay-blocked");
+    expect(screen.getByRole("button", { name: "Select tile 1-2" })).toHaveClass("map-grid-tile-gameplay-blocked");
+    expect(screen.getByRole("button", { name: "Select tile 2-1" })).not.toHaveClass("map-grid-tile-gameplay-blocked");
+  });
+
+  it("does not mark blocked terrain outside gameplay mode", () => {
+    const props = {
+      draft: createDraftWithBlockedTerrain(),
+      selectedTileId: null,
+      selectedFeatureId: null,
+      interactionMode: "pan" as const,
+      onSelectTile: vi.fn(),
+      onTileClick: vi.fn(),
+      onTilePointerDown: vi.fn(),
+      onTilePointerEnter: vi.fn(),
+      onTilePointerUp: vi.fn(),
+    };
+    const { rerender } = render(<MapGrid {...props} baseLayerMode="radar" />);
+
+    expect(screen.getByRole("button", { name: "Select tile 1-1" })).not.toHaveClass("map-grid-tile-gameplay-blocked");
+
+    rerender(<MapGrid {...props} baseLayerMode="none" />);
+    expect(screen.getByRole("button", { name: "Select tile 1-1" })).not.toHaveClass("map-grid-tile-gameplay-blocked");
+  });
+
   it("keeps tile clicks working in none mode", () => {
     const onTileClick = vi.fn();
     render(
@@ -231,6 +323,22 @@ describe("MapGrid", () => {
 
 function createDraft(): MapEditorDraft {
   return createMapEditorDraft({ id: "test-map", name: "Test Map", rows: 2, cols: 2 });
+}
+
+function createDraftWithBlockedTerrain(): MapEditorDraft {
+  const draft = createDraft();
+  return {
+    ...draft,
+    tiles: draft.tiles.map((tile) => {
+      if (tile.id === "1-1") {
+        return { ...tile, terrain: "山" };
+      }
+      if (tile.id === "1-2") {
+        return { ...tile, terrain: "不可通行裂谷" };
+      }
+      return tile;
+    }),
+  };
 }
 
 function createDraftWithFeatures(): MapEditorDraft {

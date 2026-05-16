@@ -980,6 +980,7 @@ p {
 .map-tool-segment button[aria-pressed="true"],
 .map-preview-toggle button[aria-pressed="true"],
 .map-overlay-toggle button[aria-pressed="true"],
+.map-gameplay-toggle button[aria-pressed="true"],
 .semantic-brush-actions button[aria-pressed="true"],
 .feature-footprint-actions button[aria-pressed="true"] {
   border-color: #24384f;
@@ -997,7 +998,8 @@ p {
 }
 
 .map-preview-toggle,
-.map-overlay-toggle {
+.map-overlay-toggle,
+.map-gameplay-toggle {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1007,6 +1009,7 @@ p {
 
 .map-preview-toggle button,
 .map-overlay-toggle button,
+.map-gameplay-toggle button,
 .semantic-brush-actions button,
 .tile-inspector button,
 .feature-inspector button {
@@ -1201,6 +1204,17 @@ p {
   box-shadow:
     inset 0 0 0 2px rgba(138, 61, 26, 0.82),
     inset 0 0 0 4px rgba(248, 241, 232, 0.72);
+}
+
+.map-grid-tile-gameplay-blocked .map-grid-gameplay-overlay {
+  background: rgba(255, 91, 86, 0.32);
+  color: #471412;
+}
+
+.map-grid-tile-gameplay-blocked::before {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 91, 86, 0.78),
+    inset 0 0 0 999px rgba(255, 91, 86, 0.16);
 }
 
 .map-grid-tile-discovered::after {

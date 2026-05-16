@@ -180,7 +180,7 @@ function buildRenderContextSnapshot(input: RenderRuntimeCallInput, crewId: Id): 
   const crew = readCrew(input.state, crewId);
   const fieldValues: Record<string, unknown> = {
     crew_id: crewId,
-    crew_display_name: readPath(crew, "display_name") ?? readPath(crew, "displayName"),
+    crew_display_name: readPath(crew, "display_name") ?? readPath(crew, "displayName") ?? readPath(crew, "name"),
     crew_voice_type: readPath(crew, "crew_voice_type") ?? readPath(crew, "voice_type"),
     personality_tags: readPath(crew, "personality_tags") ?? [],
     expertise_tags: readPath(crew, "expertise_tags") ?? [],

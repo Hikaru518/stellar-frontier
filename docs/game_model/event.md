@@ -156,6 +156,8 @@
 
 变体匹配规则：先过滤 `when` 全部通过的 variant，再按 `priority`、`fallback_order` 匹配精度和 `id` 稳定顺序选择；没有命中时必须使用 `default` variant。`option_lines` 缺少节点 `option_id` 或出现节点不存在的 `option_id` 时校验失败。
 
+通话文本约定：队员台词在 `opening_lines` / `body_lines` 中使用 `{{crew_display_name}}：` 前缀，并在 `render_context_fields` 声明 `crew_display_name`；NPC 台词直接写明确说话人，例如 `陌生男子：...`；没有说话人的解释性内容单独写成括号行，例如 `（通讯另一端传来陌生声音）`。`option_lines` 展示的是玩家作为指挥官选择的意图或命令，不写成队员/NPC 的具体回复；选项后的具体回复需要通过后续 `call` 节点进入新的 `LIVE TRANSCRIPT`。
+
 ### 3.7 `condition`
 
 `condition` 使用结构化 JSON 表达常见规则；复杂情况只能通过白名单 `handler_type + params` 扩展。

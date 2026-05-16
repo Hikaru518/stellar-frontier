@@ -33,7 +33,7 @@ test("surveys the IAFS crash site and reveals the three repair actions", async (
   await expect(
     page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "标记这些可用设施。" }).click();
+  await page.getByRole("button", { name: "确认标记这些可用设施。" }).click();
   await waitForRuntimeEventStatus(page, "iafs_crash_site_survey_reveal", "resolved");
 
   const savedAfterSurvey = await readSave(page);
@@ -100,7 +100,7 @@ test("opens a damaged crash-site feature inspection runtime call", async ({ page
   await featureSection(page, "发电机").getByRole("button", { name: "调查" }).click();
 
   await expect(page.getByText("外壳撕裂，几根主供电线还在断续打火。现在贸然启动只会让发电机继续烧坏。")).toBeVisible();
-  await page.getByRole("button", { name: "收到，继续记录。" }).click();
+  await page.getByRole("button", { name: "确认记录发电机状态。" }).click();
   await waitForRuntimeEventStatus(page, "iafs_generator_inspect_damaged", "resolved");
 });
 
@@ -117,6 +117,6 @@ test("default survey away from the crash site reports no new clue", async ({ pag
   await answerMikeIncomingCall(page);
 
   await expect(page.getByText("暂时没有发现值得特别关注的新东西，至少眼下没有。")).toBeVisible();
-  await page.getByRole("button", { name: "收到，继续保持观察。" }).click();
+  await page.getByRole("button", { name: "确认记录，继续保持观察。" }).click();
   await waitForRuntimeEventStatus(page, "iafs_default_survey_nothing_found", "resolved");
 });

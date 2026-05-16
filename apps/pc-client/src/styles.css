@@ -919,6 +919,26 @@ blockquote {
   margin-bottom: 12px;
 }
 
+.debug-number-field {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(120px, 180px);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #46505a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.debug-number-field input {
+  min-height: 34px;
+  border: 1px solid #77736b;
+  background: #fbf8f0;
+  color: #252a2e;
+  font: inherit;
+  padding: 6px 8px;
+}
+
 .debug-confirm-row {
   border: 1px dashed #9d3d1f;
   background: #f4eadf;
@@ -2869,6 +2889,44 @@ blockquote {
   color: #f2ead8;
 }
 
+.console-call-transcript-interactive {
+  cursor: pointer;
+  outline: none;
+}
+
+.console-call-transcript-interactive:hover .console-screen-section,
+.console-call-transcript-interactive:focus-visible .console-screen-section {
+  color: #7dffb1;
+}
+
+.console-call-transcript-interactive:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(125, 255, 177, 0.28);
+}
+
+.console-call-type-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: #7dffb1;
+  animation: console-call-type-cursor-blink 0.8s steps(2, start) infinite;
+}
+
+@keyframes console-call-type-cursor-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.console-call-transcript-gate {
+  border-left: 2px solid rgba(125, 216, 255, 0.24);
+  padding-left: 8px;
+}
+
 .console-call-note-line {
   color: #79d8ff;
 }
@@ -2877,6 +2935,19 @@ blockquote {
   display: grid;
   gap: 6px;
   align-content: start;
+  justify-items: start;
+  width: 40ch;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.console-screen-block .console-call-profile-line {
+  width: 100%;
+  max-width: 40ch;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .console-call-control-stack {

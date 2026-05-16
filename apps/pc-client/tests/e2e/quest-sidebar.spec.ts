@@ -83,7 +83,7 @@ test("completes a quest todo through the crash-site event and preserves it after
   await expect(
     page.getByText("这里还有几套能辨认出来的关键设施，发电机、维生装置和穿梭机核心都还在，只是现在都散在撞击坑边上。").first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "标记这些可用设施。" }).click();
+  await page.getByRole("button", { name: "确认标记这些可用设施。" }).click();
 
   const saved = await readSave(page);
   expect(saved.quest_state.quests.regroup_after_crash.todos.survey_crash_site).toMatchObject({
